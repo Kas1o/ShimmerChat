@@ -364,3 +364,4 @@ FodyWeavers.xsd
 
 # DEBUG user data.
 /ShimmerChat/UserData
+/ShimmerChat/enabled_tools.json
