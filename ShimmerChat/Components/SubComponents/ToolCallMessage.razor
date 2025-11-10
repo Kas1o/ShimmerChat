@@ -1,0 +1,55 @@
+﻿@using Markdig
+@using Markdig.Extensions.Tables
+
+@inject IStringLocalizer<Message> l
+@inject IJSRuntime JS
+
+
+<div class="shimmer-message shimmer-toolcall">
+	<div class="shimmer-message-head">
+		<div class="shimmer-message-head-action">
+			<div @onclick="e => DeleteThisMessage()">
+				@l["BUTTON_DELETE"]
+			</div>
+			<div @onclick="CopyContentToClipboard">
+				@l["BUTTON_COPY"]
+			</div>
+		</div>
+	</div>
+	@stringContent
+</div>
+
+
+@code {
+	[Parameter]
+	public Action Delete { get; set; } = null;
+
+	[Parameter]
+	public Action MakeDirty { get; set; } = null!; // Callback to make the parent component dirty
+
+	[Parameter]
+	public ShimmerChatLib.Message message { get; set; } = null!; // The message object to display
+
+	SharperLLM.Util.ChatMessage Message => message.message;
+
+	bool isEditMode = false;
+
+	string stringContent => string.Join("\n", Message?.toolCalls?.Select(x => $"{x.name??""}|{x.arguments??""}") ?? []) ?? ""; // The string content of the message
+
+	string sender => message.sender;
+
+	Markdig.MarkdownPipeline pipeline = new Markdig.MarkdownPipelineBuilder()
+			.UsePipeTables() // 启用表格支持
+			.Build();
+
+	void DeleteThisMessage()
+	{
+		Delete();
+	}
+
+	async Task CopyContentToClipboard()
+	{
+		await JS.InvokeVoidAsync("copyTextToClipboard", stringContent);
+	}
+
+}

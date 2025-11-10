@@ -12,7 +12,11 @@
 		<div id="chat-main">
 			@foreach (var message in messages)
 			{
-				if(message.message.Content != null)
+				if(message.sender == "tool_call")
+				{
+					<ShimmerChat.Components.SubComponents.ToolCallMessage Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" ></ShimmerChat.Components.SubComponents.ToolCallMessage>
+				}
+				else
 				{
 					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" Sender="agent.name" />
 				}
@@ -188,7 +192,7 @@
 							});
 						messages.Add(new Message
 							{
-								message = new SharperLLM.Util.ToolCallChatMessage(rsp.toolCallings),
+								message = new SharperLLM.Util.ChatMessage(null, null) { toolCalls = rsp.toolCallings },
 								thinking = rsp.thinking,
 								timestamp = DateTime.Now,
 								sender = "tool_call"
@@ -201,7 +205,7 @@
 					// 工具调用结果
 					messages.Add(new Message
 						{
-							message = new SharperLLM.Util.ToolChatMessage(tuple.resp, tuple.id),
+							message = new SharperLLM.Util.ChatMessage(tuple.resp,null){id = tuple.id},
 							thinking = null,
 							timestamp = DateTime.Now,
 							sender = "tool_result"

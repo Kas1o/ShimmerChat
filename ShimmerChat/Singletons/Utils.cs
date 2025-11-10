@@ -16,8 +16,8 @@ namespace ShimmerChat.Singletons
 					"user" => (x.message, PromptBuilder.From.user),
 					"system" => (x.message, PromptBuilder.From.system),
 					"ai" => (x.message, PromptBuilder.From.assistant),
-					"tool_call" => ((x.message as ToolCallChatMessage), PromptBuilder.From.tool_call),
-					"tool_result" => ((x.message as ToolChatMessage), PromptBuilder.From.tool_result)
+					"tool_call" => (x.message, PromptBuilder.From.tool_call),
+					"tool_result" => (x.message, PromptBuilder.From.tool_result)
 				}
 			).ToList();
 			p.Insert(0, (system, PromptBuilder.From.system));
