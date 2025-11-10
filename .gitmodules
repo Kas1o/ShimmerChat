@@ -1,0 +1,3 @@
+[submodule "SharperLLM"]
+	path = SharperLLM
+	url = https://github.com/Kas1o/SharperLLM

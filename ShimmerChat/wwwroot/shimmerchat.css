@@ -1,0 +1,165 @@
+﻿.shimmer-group {
+    border-radius: 12px;
+    border-color: dimgrey;
+    border: 1px solid rgb(232, 232, 232);
+    padding: 12px;
+}
+
+.shimmer-input {
+    display: block;
+    width: 100%;
+    padding: .375rem 2.25rem .375rem .75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--bs-body-color);
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: var(--bs-body-bg);
+    background-image: var(--bs-form-select-bg-img), var(--bs-form-select-bg-icon, none);
+    background-repeat: no-repeat;
+    background-position: right .75rem center;
+    background-size: 16px 12px;
+    border: var(--bs-border-width) solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+}
+.shimmer-textarea {
+    display: block;
+    width: 100%;
+    padding: .375rem .75rem; /* 调整内边距，去掉右侧图标区域 */
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--bs-body-color);
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: var(--bs-body-bg);
+    border: var(--bs-border-width) solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    resize: vertical; /* 允许用户垂直调整大小 */
+    overflow: auto; /* 确保内容超出时可滚动 */
+    min-height: calc(1.5em + .75rem + 2 * var(--bs-border-width)); /* 设置最小高度 */
+}
+
+.shimmer-grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr); 
+    grid-template-rows: 10vh;
+    grid-gap: 12px
+}
+
+.shimmer-grid-item {
+    border-radius: 12px;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    padding: 20px;
+    text-align: center;
+    /* 垂直 + 水平居中关键 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-height: 10vh;
+    min-height: 10vh; 
+    box-sizing: border-box;
+    font-size: 1.35vh
+}
+
+.shimmer-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.shimmer-popup-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.shimmer-grid-chat-item {
+    background-image: linear-gradient(180deg, rgb(135, 82, 244) 0%, rgb(58, 17, 142) 70%);
+    color: white;
+}
+
+.shimmer-grid-agent-item {
+    position: relative;
+    color: white;
+    overflow: hidden;
+}
+
+.shimmer-grid-agent-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: radial-gradient( #814DEC, #3A118E);
+    transition: opacity 0.6s ease-in-out;
+    z-index: -1;
+}
+
+.shimmer-grid-agent-item:hover::before {
+    background-image: linear-gradient(180deg, rgb(135, 82, 244) 0%, rgb(58, 17, 142) 70%);
+    opacity: 0;
+}
+
+.shimmer-grid-agent-item::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: linear-gradient(180deg, rgb(135, 82, 244) 0%, rgb(58, 17, 142) 70%);
+    transition: opacity 0.3s ease-in-out;
+    opacity: 0;
+    z-index: -1;
+}
+
+.shimmer-grid-agent-item:hover::after {
+    opacity: 1;
+}
+
+
+.shimmer-message {
+    padding: 10px;
+    border-radius: 12px;
+    margin: 5px;
+    max-width: 100%;
+    word-break: break-word; /* 防止长单词溢出 */
+}
+
+.shimmer-message-head {
+    font-size: 24px;
+    display: flex;
+    justify-content: space-between; /* 左右分布 */
+}
+
+.shimmer-message-head-action {
+    font-size: 16px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.shimmer-message-thinking{
+    backdrop-filter : blur(10px);
+    background-color : rgba(0, 0, 0, 0.4);
+    border-radius : 15px;
+    padding : 20px;
+}

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+	<IsPackable>true</IsPackable>
+	  <LangVersion>Preview</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="UserData\**" />
+    <Content Remove="UserData\**" />
+    <EmbeddedResource Remove="UserData\**" />
+    <None Remove="UserData\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="0.41.0" />
+    <PackageReference Include="Microsoft.Extensions.Localization" Version="10.0.0-preview.2.25164.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShimmerChatLib\ShimmerChatLib.csproj" />
+  </ItemGroup>
+
+</Project>

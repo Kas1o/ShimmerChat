@@ -1,0 +1,185 @@
+﻿@page "/agent/{agentguid}/{chatname}"
+@inject IUserData userData
+@inject ICompletionService completion
+
+@if (chat != null)
+{
+	<div id="container">
+		<div id="chat-info">
+			<label>You are having chat with: </label>
+			<h2>@agent.name</h2>
+		</div>
+		<div id="chat-main">
+			@foreach (var message in messages)
+			{
+				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" Sender="agent.name" />
+			}
+		</div>
+		<div id="input-box">
+			<!-- 输入框内容 -->
+			<textarea @bind="inputText" @bind:event="oninput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
+		</div>
+	</div>
+	<style>
+		/* 父级容器 */
+		#container {
+		position: relative;
+		height: calc( 100vh - 3.8rem);
+		display: flex;
+		flex-direction: column;
+		background-color: #f9f9f9;
+		}
+
+		/* 聊天信息栏 */
+		#chat-info {
+		position: absolute; /* 固定在父级容器的左上角 */
+		top: 0;
+		left: 0;
+		padding: 10px;
+		background-color: white;
+		z-index: 100;
+		width: 100%;
+		box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+		}
+
+		/* 聊天主区域 */
+		#chat-main {
+		flex: 1; /* 占据剩余空间 */
+		overflow-y: auto; /* 允许垂直滚动 */
+		padding: 20px;
+		margin-top: 80px; /* 为 #chat-info 预留空间 */
+		margin-bottom: 80px; /* 为 #input-box 预留空间 */
+		background-color: #fff;
+		box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+		}
+
+		/* 输入框 */
+		#input-box {
+		position: absolute; /* 固定在父级容器的左下角 */
+		bottom: 0;
+		left: 0;
+		width: 100%;
+		padding: 15px;
+		background-color: white;
+		z-index: 100;
+		box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+		}
+	</style>
+}
+
+@if(chat == null)
+{
+	<p>Chat @agentguid / @chatname Not Found</p>
+}
+
+
+@code {
+	bool generating = false;
+
+	[Parameter]
+	public string agentguid { get; set; } = string.Empty;
+
+	Agent? agent
+	{
+		get
+		{
+			return userData.Agents.FirstOrDefault(agent => agent.guid.ToString() == agentguid);
+		}
+	}
+
+	[Parameter]
+	public string chatname { get; set; } = string.Empty; // The chat name to load
+
+	Chat? chat
+	{
+		get
+		{
+			if (agent == null)
+				return null;
+			return agent.chats.FirstOrDefault(chat => chat.Name == chatname);
+		}
+	}
+
+	string inputText { get; set; } = "";
+
+	void CheckEnter(KeyboardEventArgs e)
+	{
+		if (e.Key == "Enter" && !e.ShiftKey && !generating) // 检测是否按下 Enter 键
+		{
+			if (!string.IsNullOrWhiteSpace(inputText))
+			{
+				Send();
+			}
+		}
+	}
+
+	ObservableCollection<Message> messages
+	{
+		get
+		{
+			return chat.Messages;
+		}
+	}
+
+	async void Send()
+	{
+
+		var message = new Message()
+		{
+			message = new SharperLLM.Util.ChatMessage
+		(
+		Content: inputText, // 使用输入框的内容
+		ImageBase64: null // 如果有图片，可以在这里设置
+		),
+			timestamp = DateTime.Now, // 设置消息的时间戳
+			sender = "User" // 设置发送者，可以是 "User" 或其他标识
+			};
+
+		// 添加消息到聊天
+		chat.AddMessage(message);
+		inputText = ""; // 清空输入框
+		GetDirty(); // 标记为脏数据以保存
+		new Task(AddLLMReply).Start();
+
+	}
+
+	async void AddLLMReply()
+	{
+		generating = true;
+		var reply = await completion.GetAIReplyReponseEx(agent, chat);
+		messages.Add(new Message
+			{
+				message = new SharperLLM.Util.ChatMessage
+				(
+					reply.content,
+					null
+				),
+				thinking = reply.thinking,
+				timestamp = DateTime.Now,
+				sender = "ai"
+			});
+
+		generating = false;
+		GetDirty();
+		// 重新渲染页面
+		await Refresh();
+	}
+
+	async void DeleteMessage(Message message)
+	{
+		messages.Remove(message);
+		await Refresh();
+	}
+
+	void GetDirty()
+	{
+		chat.dirty = true;
+		userData.SaveSpecificAgent(agent); // Save the specific agent after making a change to the chat)
+		// 说实话，没搞懂之前写的 Dirty 后直接保存有什么意义。但不敢改。
+	}
+
+	async Task Refresh()
+	{
+		await InvokeAsync(StateHasChanged);
+	}
+}

@@ -1,0 +1,82 @@
+﻿@page "/apisettings"
+@using Singletons;
+@using ShimmerChatLib;
+@inject NavigationManager Navigation
+@inject IStringLocalizer<ApiSettingsPage> l
+@inject IUserData userData
+
+<h3>@l["Api Settings"]</h3>
+<h4>@l["ApiSettings Profile:"]</h4>
+<select @bind="_selectedIndex" class="form-select">
+    @for (int i = 0; i < apiSettings.Count; i++)
+    {
+        <option value="@i">@apiSettings[i].Name</option>
+    }
+</select>
+<button class="btn btn-primary" style="margin:5px" @onclick="CreateNewApiSetting">@l["Create New Api Setting Profile"]</button>
+
+@if (topAPISetting != null)
+{
+    <h4>@l["Profile Settings:"]</h4>
+    <div class="shimmer-group">
+        <h5>@l["Profile Name:"]</h5>
+        <input @bind="topAPISetting.Name" class="shimmer-input" />
+        <h5>@l["Api Type:"]</h5>
+        <select @bind="topAPISetting.Type" class="form-select">
+            <option value="@ApiSettingType.Kobold">kobold</option>
+            <option value="@ApiSettingType.OpenAI">openai</option>
+            <option value="@ApiSettingType.Ollama">ollama</option>
+        </select>
+        <h5>@l["Configs:"]</h5>
+        <div class="shimmer-group">
+            @if (topAPISetting.Type == ApiSettingType.Kobold)
+            {
+                <label>@l["API URL"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.KoboldUrl" />
+                <label>@l["Temperature"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.KoboldConf.temperature" />
+            }
+
+            @if (topAPISetting.Type == ApiSettingType.OpenAI)
+            {
+                <label>@l["API URL"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.OpenAIUrl" />
+                <label>@l["API KEY"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.OpenAIApiKey" />
+                <label>@l["API MODEL"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.OpenAIModel" />
+            }
+        </div>
+    </div>
+}
+<br />
+<button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">@l["Save"]</button>
+
+@code {
+    ObservableCollection<ApiSetting> apiSettings => userData.ApiSettings;
+
+    private int _selectedIndex
+    {
+        get => userData.CurrentAPISettingIndex;
+		set
+		{
+			if (value >= 0 && value < apiSettings.Count)
+			{
+				userData.CurrentAPISettingIndex = value;
+			}
+		}
+	}
+    ApiSetting topAPISetting => (_selectedIndex >= 0 && _selectedIndex < apiSettings.Count) ? apiSettings[_selectedIndex] : null;
+
+    private void CreateNewApiSetting()
+    {
+        apiSettings.Add(new ApiSetting { Name = "New API Setting" });
+        _selectedIndex = apiSettings.Count - 1;
+    }
+
+    private void SaveAll()
+    {
+        userData.SaveUserData();
+        Navigation.NavigateTo(Navigation.Uri, true);
+    }
+}

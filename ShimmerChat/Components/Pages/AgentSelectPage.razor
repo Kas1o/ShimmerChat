@@ -1,0 +1,67 @@
+﻿@page "/agentselect"
+@using System.Collections.ObjectModel;
+@inject NavigationManager navigation
+@inject IStringLocalizer<AgentSelectPage> l
+@inject IUserData userData
+
+<h3>@l["AgentSelectPage"]</h3>
+<button class="btn btn-primary" @onclick="OpenCreateAgentMenu">@l["Create New Agent"]</button>
+
+<div class="shimmer-group">
+	<div class="shimmer-grid">
+		@foreach (var agent in agents)
+		{
+			<div class="shimmer-grid-item shimmer-grid-agent-item" @onclick="()=> NavigateToAgent( agent.guid.ToString())" >@agent.name </div>
+		}
+	</div>
+</div>
+
+@if (CreatePopupVisible)
+{
+	<div class="shimmer-popup-overlay" @onclick="() => CreatePopupVisible=false">
+		<div class="shimmer-popup-content" @onclick:stopPropagation>
+			<h5>@l["Create new Agent popup title"]</h5>
+			<label>@l["Name:"]</label>
+			<input class="shimmer-input" @bind=popupNewAgentName/>
+			<label>@l["Description:"]</label>
+			<textarea class="shimmer-textarea" @bind=popupNewAgentDescription/>
+			<button class="btn btn-dark" @onclick="CreateNewAgent">@l["Create"]</button>
+		</div>
+	</div>
+}
+
+@code {
+	bool CreatePopupVisible { get; set; } = false;
+	#region Popup
+	string popupNewAgentName { get; set; } = "new agent";
+	string popupNewAgentDescription { get; set; } = "this is a cool agent!";
+	#endregion
+	ObservableCollection<Agent> agents
+	{
+		get => userData.Agents;
+	}
+
+	void OpenCreateAgentMenu()
+	{
+		CreatePopupVisible = true;
+	}
+
+	void CreateNewAgent()
+	{
+		// Validate input
+		if (popupNewAgentName == "")
+			popupNewAgentName = "new agent"; // Default name if empty"
+
+		agents.Add(Agent.Create
+		(
+			popupNewAgentName,
+			popupNewAgentDescription
+		));
+		CreatePopupVisible = false;
+	}
+
+	void NavigateToAgent(string guid)
+	{
+		navigation.NavigateTo($"/agent/{guid}");
+	}
+}

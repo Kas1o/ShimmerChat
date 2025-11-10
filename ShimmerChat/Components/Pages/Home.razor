@@ -1,0 +1,64 @@
+﻿@page "/"
+@using System.Timers
+<div id="bg-region">
+	<div id="main-content">
+		<div id="title">
+			SHIMMER CHAT
+		</div>
+		<div id="time">
+			<p>@currentTime</p>
+		</div>
+	</div>
+
+</div>
+<style>
+	#bg-region{
+	display: flex;
+	justify-content: center; /* 水平居中 */
+	align-items: center; /* 垂直居中 */
+	width: 100%;
+	height: 800px; /* 视窗高度的100%，使得div覆盖整个视窗 */
+	background-size: cover;
+	background-position: center;
+	position: relative;
+	background-image: url("/test-bg.png");
+
+	}
+	/* 中间的大号粗体字的样式 */
+	#main-content {
+	position: absolute; /* 子元素绝对定位，基于最近的相对定位祖先 */
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	color: white; /* 字体颜色 */
+	font-size: 6em; /* 调整字体大小 */
+	font-weight: bold;
+	text-shadow: 8px 4px 16px #00000099;
+	font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+	}
+	#time{
+	font-size: 30px;
+		text-shadow: 3px 2px 8px #00000099;
+	}
+</style>
+
+@code {
+	private string currentTime = DateTime.Now.ToString("T");
+	private Timer timer;
+
+	protected override void OnInitialized()
+	{
+		// 每隔一秒更新一次时间
+		timer = new Timer(1000);
+		timer.Elapsed += UpdateTime;
+		timer.AutoReset = true;
+		timer.Enabled = true;
+	}
+
+	private void UpdateTime(object source, ElapsedEventArgs e)
+	{
+		currentTime = DateTime.Now.ToString("T");
+		InvokeAsync(StateHasChanged); // 请求刷新 UI
+	}
+
+}

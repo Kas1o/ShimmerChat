@@ -1,0 +1,122 @@
+﻿@page "/contextmanager"
+@inject NavigationManager Navigation
+@inject IUserData userData
+
+<h3>Context Manager</h3>
+
+@if (UsingOpenAIAndTextCompletion)
+{
+    <h5 style="color:red">
+        Use OpenAI API with Text Completion is not recommend. Most endpoints do not support it.
+    </h5>
+}
+
+<label>Completion Type:</label>
+<select @bind="_selectedCompletionType" class="form-select" style="width:auto;display:inline-block;margin-left:8px;">
+    @if (AllowChatCompletion)
+    {
+        <option value="chat-completion">Chat Completion</option>
+    }
+    @if (AllowTextCompletion)
+    {
+        <option value="text-completion">Text Completion</option>
+    }
+</select>
+
+<br />
+<br />
+
+@if (completionType == CompletionType.TextCompletion)
+{
+    <h4>Text Completion Settings</h4>
+    <select @bind="_selectedTextCompletionIndex" class="form-select" style="width:auto;display:inline-block;">
+        @for (int i = 0; i < textCompletionSettings.Count; i++)
+        {
+            <option value="@i">@textCompletionSettings[i].name</option>
+        }
+    </select>
+    <button class="btn btn-primary" style="margin:5px" @onclick="CreateNewTextCompletionSetting">Create New Text Completion Setting Profile</button>
+    @if (topTextCompletionSetting != null)
+    {
+        <div class="shimmer-group" style="margin-top:16px;">
+            <h5>Name:</h5>
+            <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.name"></textarea>
+            <h5>System Message Template:</h5>
+            <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.SystemMessageTemplate"></textarea>
+            <h5>User Message Template:</h5>
+            <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.UserMessageTemplate"></textarea>
+            <h5>Char Message Template:</h5>
+            <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.CharMessageTemplate"></textarea>
+        </div>
+    }
+}
+
+@if (completionType == CompletionType.ChatCompletion)
+{
+    <h4>Chat Completion Settings</h4>
+    <!-- 可根据需要扩展 Chat Completion 的设置 -->
+}
+
+<br />
+<button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">Save</button>
+
+@code {
+    ObservableCollection<TextCompletionSetting> textCompletionSettings => userData.textCompletionSettings;
+
+    private int _selectedTextCompletionIndex
+    {
+        get => userData.CurrentTextCompletionSettingIndex;
+        set
+        {
+            userData.CurrentTextCompletionSettingIndex = value;
+        }
+    }
+    TextCompletionSetting topTextCompletionSetting =>
+        (_selectedTextCompletionIndex >= 0 && _selectedTextCompletionIndex < textCompletionSettings.Count)
+            ? textCompletionSettings[_selectedTextCompletionIndex]
+            : null;
+
+    private string _selectedCompletionType
+    {
+        get => completionType == CompletionType.ChatCompletion ? "chat-completion" : "text-completion";
+        set
+        {
+            userData.CompletionType = value switch
+            {
+                "chat-completion" => CompletionType.ChatCompletion,
+                "text-completion" => CompletionType.TextCompletion,
+                _ => CompletionType.ChatCompletion
+            };
+        }
+    }
+    private CompletionType completionType => userData.CompletionType;
+
+    private bool AllowChatCompletion =>
+        userData.ApiSettings[userData.CurrentAPISettingIndex].Type switch
+        {
+            ApiSettingType.Ollama => true,
+            ApiSettingType.Kobold => false,
+            ApiSettingType.OpenAI => true
+        };
+    private bool AllowTextCompletion =>
+        userData.ApiSettings[userData.CurrentAPISettingIndex].Type switch
+        {
+            ApiSettingType.Ollama => true,
+            ApiSettingType.Kobold => true,
+            ApiSettingType.OpenAI => true
+        };
+    private bool UsingOpenAIAndTextCompletion =>
+        (userData.CompletionType == CompletionType.TextCompletion) && (userData.ApiSettings[userData.CurrentAPISettingIndex].Type == ApiSettingType.OpenAI);
+
+    private void CreateNewTextCompletionSetting()
+    {
+        textCompletionSettings.Add(new TextCompletionSetting{ name = "New Text Completion Setting" });
+        _selectedTextCompletionIndex = textCompletionSettings.Count - 1;
+    }
+
+    private void SaveAll()
+    {
+        userData.SaveUserData();
+        Navigation.NavigateTo(Navigation.Uri, true);
+    }
+}

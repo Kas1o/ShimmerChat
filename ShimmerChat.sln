@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35818.85
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChat", "ShimmerChat\ShimmerChat.csproj", "{ECC4859D-2D01-42A4-8B72-6D80CBAD5725}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChatLib", "ShimmerChatLib\ShimmerChatLib.csproj", "{BDC57EF0-3957-451C-8E11-6BA41F73EC74}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ECC4859D-2D01-42A4-8B72-6D80CBAD5725}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ECC4859D-2D01-42A4-8B72-6D80CBAD5725}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ECC4859D-2D01-42A4-8B72-6D80CBAD5725}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ECC4859D-2D01-42A4-8B72-6D80CBAD5725}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDC57EF0-3957-451C-8E11-6BA41F73EC74}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDC57EF0-3957-451C-8E11-6BA41F73EC74}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDC57EF0-3957-451C-8E11-6BA41F73EC74}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDC57EF0-3957-451C-8E11-6BA41F73EC74}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9278135C-5245-4B9E-BDC4-6320CED2768F}
+	EndGlobalSection
+EndGlobal

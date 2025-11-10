@@ -1,0 +1,152 @@
+﻿@page "/agent/{agentguid}"
+@inject NavigationManager navigation
+@inject IUserData userData
+
+@if(agent != null)
+{
+    <div id="back">
+        <button id="back-button" @onclick="NavigateBack">← Back</button>
+    </div>
+
+    <div id="content">
+        <div class="content-wrapper">
+            <div id="left-section">
+                <label>agent name</label>
+                <h3>@agent.name</h3>
+                <div class="chat-section shimmer-grid shimmer-group">
+                    <div class="shimmer-grid-item shimmer-grid-chat-item" @onclick="NewChat">
+                        Add New Chat
+                    </div>
+
+                    @foreach(var chat in agent.chats)
+                    {
+                        <div class="shimmer-grid-item shimmer-grid-chat-item" @onclick= "() => OpenChat(chat)">
+                            @chat.Name
+                        </div>
+                    }
+                </div>
+
+            </div>
+            <div class="settings-section shimmer-group">
+                <h4>Settings</h4>
+                <label>Name</label><br />
+                <input class="shimmer-input" @bind="Name"/><br />
+                <label>Description</label><br />
+                <textarea class="shimmer-textarea" @bind="Description" />
+            </div>
+        </div>
+    </div>
+
+    <style>
+        #back {
+        top: 10px;
+        left: 10px;
+        }
+
+        #back-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 5px 10px;
+        }
+
+        #content {
+        margin-left: 50px;
+        margin-top: 20px;
+        height: calc(100vh - 150px);
+        }
+
+        .content-wrapper {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        margin-top: 20px;
+        height: calc(100vh - 200px);
+        gap: 20px; /* 添加间距 */
+        }
+
+        .chat-section {
+        width: 100%;
+        padding-right: 20px;
+        overflow-y: auto;
+        flex-grow: 1;
+        }
+
+        .settings-section {
+        height: 100%;
+        width: 40%;
+        flex-grow: 1;
+        }
+
+        #left-section {
+        width: 60%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        }
+    </style>
+}
+
+<!--404-->
+@if(agent == null)
+{
+    <h1>404</h1>
+    <p>the agent "@agentguid" not exist.</p>
+}
+
+@code {
+    [Parameter]
+    public string agentguid { get; set; } = string.Empty;
+
+    Agent? agent
+    {
+        get 
+        {
+            return userData.Agents.FirstOrDefault(agent => agent.guid.ToString() == agentguid);
+        }
+    }
+
+    string Name
+    {
+        get => agent.name;
+        set
+        {
+            agent.name = value;
+            userData.SaveSpecificAgent(agent); // Save the specific agent after changing the name
+        }
+    }
+
+    string Description
+    {
+        get => agent.description;
+        set
+        {
+            agent.description = value;
+            userData.SaveSpecificAgent(agent); // Save the specific agent after changing the description
+        }
+    }
+
+
+    private void NavigateBack()
+    {
+        navigation.NavigateTo("agentselect");
+    }
+
+    private void NewChat()
+    {
+        var chat = new Chat
+            (
+                $"{DateTime.Now.ToString().Replace(" ","-").Replace("/","-").Replace(":","-")}"
+            );
+
+        agent.AddChat(chat);
+
+        navigation.NavigateTo(navigation.Uri + "/" + chat.Name);
+    }
+
+    void OpenChat(Chat chat)
+    {
+        navigation.NavigateTo(navigation.Uri + "/" + chat.Name);
+    }
+}
