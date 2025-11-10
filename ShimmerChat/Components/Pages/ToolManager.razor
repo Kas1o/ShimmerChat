@@ -1,0 +1,147 @@
+﻿@page "/toolmanager"
+
+@inject IToolService ToolService
+@inject IStringLocalizer<ToolManager> l
+
+<h3>@l["Tool Manager"]</h3>
+
+@if (tools == null)
+{
+    <p>@l["Loading..."]</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>@l["Enabled"]</th>
+                <th>@l["Name"]</th>
+                <th>@l["Description"]</th>
+                <th>@l["Actions"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var tool in tools)
+            {
+                var def = tool.GetToolDefinition();
+                bool enabled = enabledNames.Contains(def.name);
+                <tr>
+                    <td>
+                        <input type="checkbox" checked="@enabled" @onchange="() => ToggleTool(def.name, enabled)" />
+                    </td>
+                    <td>@def.name</td>
+                    <td>@def.description</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" @onclick="() => ShowDetail(tool)">@l["Detail"]</button>
+                        <button class="btn btn-sm btn-success" @onclick="() => ShowTest(tool)" disabled="@(enabled ? null : "disabled")">@l["Test"]</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (showDetailTool != null)
+{
+    var def = showDetailTool.GetToolDefinition();
+    <div class="alert alert-info">
+        <strong>@def.name</strong><br />
+        <span>@def.description</span>
+        @if (def.parameters != null)
+        {
+            <ul>
+                @foreach (var p in def.parameters)
+                {
+                    <li>
+                        <b>@p.parameter.name</b> (@p.parameter.type): @p.parameter.description
+                        @if (p.required)
+                        {
+                            <span class="text-danger">[Required]</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+        <button class="btn btn-sm btn-secondary" @onclick="() => showDetailTool = null">@l["Close"]</button>
+    </div>
+}
+
+@if (showTestTool != null)
+{
+    <div class="alert alert-warning">
+        <h5>@l["Test Tool"]: @showTestTool.GetToolDefinition().name</h5>
+        <textarea class="form-control" @bind="testInput" rows="2" placeholder="@l["Input argument (JSON or string)"]"></textarea>
+        <button class="btn btn-primary mt-2" @onclick="TestToolAsync">@l["Run"]</button>
+        <button class="btn btn-secondary mt-2" @onclick="() => { showTestTool = null; testResult = null; }">@l["Cancel"]</button>
+        @if (testResult != null)
+        {
+            <div class="mt-2">
+                <b>@l["Result"]:</b>
+                <pre>@testResult</pre>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    List<ITool>? tools;
+    HashSet<string> enabledNames = new();
+    ITool? showDetailTool;
+    ITool? showTestTool;
+    string? testInput;
+    string? testResult;
+
+    protected override void OnInitialized()
+    {
+        tools = ToolService.LoadedTools;
+        enabledNames = ToolService.EnabledTools
+            .Select(t => t.GetToolDefinition().name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    void ToggleTool(string name, bool enabled)
+    {
+        if (enabled)
+        {
+            ToolService.DisableTool(name);
+            enabledNames.Remove(name);
+        }
+        else
+        {
+            ToolService.EnableTool(name);
+            enabledNames.Add(name);
+        }
+        StateHasChanged();
+    }
+
+    void ShowDetail(ITool tool)
+    {
+        showDetailTool = tool;
+        showTestTool = null;
+        testResult = null;
+    }
+
+    void ShowTest(ITool tool)
+    {
+        showTestTool = tool;
+        showDetailTool = null;
+        testInput = "";
+        testResult = null;
+    }
+
+    async Task TestToolAsync()
+    {
+        if (showTestTool == null) return;
+        testResult = "Running...";
+        StateHasChanged();
+        try
+        {
+            testResult = await showTestTool.Execute(testInput ?? "");
+        }
+        catch (Exception ex)
+        {
+            testResult = ex.Message;
+        }
+        StateHasChanged();
+    }
+}

@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ShimmerChatBuiltinTools\ShimmerChatBuiltinTools.csproj" />
     <ProjectReference Include="..\ShimmerChatLib\ShimmerChatLib.csproj" />
   </ItemGroup>
 

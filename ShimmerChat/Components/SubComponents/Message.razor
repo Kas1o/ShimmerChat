@@ -4,6 +4,7 @@
 @inject IStringLocalizer<Message> l
 @inject IJSRuntime JS
 
+
 <div class="shimmer-message">
 	<div class="shimmer-message-head">
 		<div>@sender</div>
@@ -41,7 +42,6 @@
 </div>
 
 
-
 @code {
 	[Parameter]
 	public Action Delete { get; set; } = null;
@@ -59,7 +59,7 @@
 
 	string stringContent => message.message.Content; // The string content of the message
 
-	MarkupString DisplayContent => (MarkupString)Markdig.Markdown.ToHtml(stringContent,pipeline);
+	MarkupString DisplayContent => (MarkupString)Markdig.Markdown.ToHtml(stringContent??"",pipeline);
 
 	string imageContent => message.message.ImageBase64; // The base64 string for the image content, if any
 

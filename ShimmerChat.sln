@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChatLib", "ShimmerCh
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharperLLM", "SharperLLM\SharperLLM.csproj", "{4C2872FF-A436-BC53-38F8-FCB8DDFE302F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChatBuiltinTools", "ShimmerChatBuiltinTools\ShimmerChatBuiltinTools.csproj", "{61049412-A16E-481A-8B6A-231CE623CBFB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{4C2872FF-A436-BC53-38F8-FCB8DDFE302F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C2872FF-A436-BC53-38F8-FCB8DDFE302F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C2872FF-A436-BC53-38F8-FCB8DDFE302F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{61049412-A16E-481A-8B6A-231CE623CBFB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61049412-A16E-481A-8B6A-231CE623CBFB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{61049412-A16E-481A-8B6A-231CE623CBFB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{61049412-A16E-481A-8B6A-231CE623CBFB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

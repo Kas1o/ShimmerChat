@@ -12,7 +12,10 @@
 		<div id="chat-main">
 			@foreach (var message in messages)
 			{
-				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" Sender="agent.name" />
+				if(message.message.Content != null)
+				{
+					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" Sender="agent.name" />
+				}
 			}
 		</div>
 		<div id="input-box">
@@ -146,24 +149,73 @@
 	async void AddLLMReply()
 	{
 		generating = true;
-		var reply = await completion.GetAIReplyReponseEx(agent, chat);
-		messages.Add(new Message
-			{
-				message = new SharperLLM.Util.ChatMessage
-				(
-					reply.content,
-					null
-				),
-				thinking = reply.thinking,
-				timestamp = DateTime.Now,
-				sender = "ai"
-			});
+		if (userData.CompletionType == CompletionType.TextCompletion)
+		{
+			string reply = await completion.GetAIReply(agent, chat);
+			messages.Add(new Message
+				{
+					message = new SharperLLM.Util.ChatMessage(reply, null),
+					thinking = null,
+					timestamp = DateTime.Now,
+					sender = "ai"
+				});
+		}
+		else 
+		{
+			await completion.RunAIWithToolLoopAsync(
+				agent, chat,
+				onResponse: rsp =>
+				{
+					// 每轮AI回复
+					if (rsp.toolCallings == null)
+					{
+						messages.Add(new Message
+							{
+								message = new SharperLLM.Util.ChatMessage(rsp.content, null),
+								thinking = rsp.thinking,
+								timestamp = DateTime.Now,
+								sender = "ai"
+							});
+					}
+					else
+					{
+						messages.Add(new Message
+							{
+								message = new SharperLLM.Util.ChatMessage(rsp.content, null),
+								thinking = rsp.thinking,
+								timestamp = DateTime.Now,
+								sender = "ai"
+							});
+						messages.Add(new Message
+							{
+								message = new SharperLLM.Util.ToolCallChatMessage(rsp.toolCallings),
+								thinking = rsp.thinking,
+								timestamp = DateTime.Now,
+								sender = "tool_call"
+							});
+					}
+					InvokeAsync(StateHasChanged);
+				},
+				ToolCallback: tuple =>
+				{
+					// 工具调用结果
+					messages.Add(new Message
+						{
+							message = new SharperLLM.Util.ToolChatMessage(tuple.resp, tuple.id),
+							thinking = null,
+							timestamp = DateTime.Now,
+							sender = "tool_result"
+						});
+					InvokeAsync(StateHasChanged);
+				}
+			);
+		}
 
 		generating = false;
 		GetDirty();
-		// 重新渲染页面
 		await Refresh();
 	}
+
 
 	async void DeleteMessage(Message message)
 	{
@@ -175,7 +227,7 @@
 	{
 		chat.dirty = true;
 		userData.SaveSpecificAgent(agent); // Save the specific agent after making a change to the chat)
-		// 说实话，没搞懂之前写的 Dirty 后直接保存有什么意义。但不敢改。
+		// 说实话，没搞懂之前写的 Dirty 后直接保存有什么意义。可能是不好写保存逻辑，之后再改也不迟。
 	}
 
 	async Task Refresh()
