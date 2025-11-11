@@ -166,7 +166,8 @@
 
 .shimmer-toolcall {
     backdrop-filter: blur(10px);
-    background-color: rgba(0, 0, 0, 0.4);
+    border-color: dimgrey;
+    border: 1px solid rgb(232, 232, 232);
     border-radius: 15px;
     padding: 20px;
 }

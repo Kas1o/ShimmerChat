@@ -171,7 +171,7 @@
 				onResponse: rsp =>
 				{
 					// 每轮AI回复
-					if (rsp.toolCallings == null)
+					if (rsp.content != null && rsp.content != string.Empty )
 					{
 						messages.Add(new Message
 							{
@@ -181,15 +181,8 @@
 								sender = "ai"
 							});
 					}
-					else
+					if (rsp.toolCallings != null && rsp.toolCallings?.Count >= 1)
 					{
-						messages.Add(new Message
-							{
-								message = new SharperLLM.Util.ChatMessage(rsp.content, null),
-								thinking = rsp.thinking,
-								timestamp = DateTime.Now,
-								sender = "ai"
-							});
 						messages.Add(new Message
 							{
 								message = new SharperLLM.Util.ChatMessage(null, null) { toolCalls = rsp.toolCallings },

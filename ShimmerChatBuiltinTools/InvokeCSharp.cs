@@ -26,8 +26,15 @@ namespace ShimmerChatBuiltinTools
 				{
 					scriptOptions = scriptOptions.WithImports(@using.Split(',').Select(s => s.Trim()));
 				}
-				string output = (await CSharpScript.EvaluateAsync<dynamic>(code, scriptOptions)).ToString();
-				return output;
+				try
+				{
+					string output = (await CSharpScript.EvaluateAsync<dynamic>(code, scriptOptions)).ToString();
+					return output;
+				}
+				catch(Exception ex)
+				{
+					return ex.Message;
+				}
 			}
 			throw new InvalidOperationException();
 		}

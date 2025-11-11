@@ -7,6 +7,7 @@
 
 <div class="shimmer-message shimmer-toolcall">
 	<div class="shimmer-message-head">
+		<h3>⚙️</h3>
 		<div class="shimmer-message-head-action">
 			<div @onclick="e => DeleteThisMessage()">
 				@l["BUTTON_DELETE"]
@@ -16,7 +17,10 @@
 			</div>
 		</div>
 	</div>
+	<details>
+	<summary>@summary</summary>
 	@stringContent
+	</details>
 </div>
 
 
@@ -35,6 +39,7 @@
 	bool isEditMode = false;
 
 	string stringContent => string.Join("\n", Message?.toolCalls?.Select(x => $"{x.name??""}|{x.arguments??""}") ?? []) ?? ""; // The string content of the message
+	string summary => string.Join(" ", Message?.toolCalls?.Select(x => $"{x.name ?? ""}")) ?? "";
 
 	string sender => message.sender;
 
