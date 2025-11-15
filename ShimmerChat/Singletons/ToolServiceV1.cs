@@ -7,8 +7,8 @@ namespace ShimmerChat.Singletons
 {
 	public class ToolServiceV1 : IToolService
 	{
-		private const string PluginsFolder = "./Plugins";
-		private const string ConfigFile = "enabled_tools.json";
+		private readonly string PluginsFolder = Path.Combine(AppContext.BaseDirectory, "./Plugins");
+		private readonly string ConfigFile = Path.Combine(AppContext.BaseDirectory, "enabled_tools.json");
 
 		public List<ITool> LoadedTools { get; private set; } = new();
 		public List<ITool> EnabledTools { get; private set; } = new();

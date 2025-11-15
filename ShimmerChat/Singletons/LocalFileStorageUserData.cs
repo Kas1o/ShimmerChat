@@ -6,6 +6,8 @@ namespace ShimmerChat.Singletons
 {
 	public class LocalFileStorageUserData :  IUserData
 	{
+		private readonly string root = Path.Combine(AppContext.BaseDirectory, "UserData");
+
 		#region terms
 		public ObservableCollection<ApiSetting> ApiSettings { get; set; }
 		public ObservableCollection<Agent> Agents { get;set; }
@@ -85,8 +87,6 @@ namespace ShimmerChat.Singletons
 
 		void ReadUserData()
 		{
-			const string root = "./UserData";
-
 			try
 			{
 				var apiContent = File.ReadAllText($"{root}/apisettings.json");
@@ -127,7 +127,6 @@ namespace ShimmerChat.Singletons
 		}
 		void InitializeUserDataFolder()
 		{
-			const string root = "./UserData";
 
 			if(!Directory.Exists(root))
 				Directory.CreateDirectory(root);
@@ -163,7 +162,7 @@ namespace ShimmerChat.Singletons
 
 		public void SaveUserData()
 		{
-			const string root = "./UserData";
+
 
 			var apisettingsContent = JsonSerializer.Serialize(ApiSettings);
 			File.WriteAllText($"{root}/apisettings.json",apisettingsContent);
@@ -189,7 +188,6 @@ namespace ShimmerChat.Singletons
 
 		public void SaveSpecificAgent(Agent agent)
 		{
-			const string root = "./UserData";
 			if (!Agents.Contains(agent))
 			{
 				throw new Exception("You try to save an agent that is not in the Agents collection. " +
@@ -213,7 +211,6 @@ namespace ShimmerChat.Singletons
 
 		private void DeleteAgent(Agent agent)
 		{
-			const string root = "./UserData";
 			if (Agents.Contains(agent))
 			{
 				throw new InvalidOperationException("Try to delete a agent still in the agents list.");
