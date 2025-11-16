@@ -33,6 +33,8 @@
                 <input class="shimmer-input" @bind="Name"/><br />
                 <label>Description</label><br />
                 <textarea class="shimmer-textarea" @bind="Description" />
+                <label>Greeting</label><br />
+                <textarea class="shimmer-textarea" @bind="Greeting" />
             </div>
         </div>
     </div>
@@ -127,6 +129,14 @@
         }
     }
 
+    string Greeting
+    {
+        get => agent.greeting;
+        set{
+            agent.greeting = value;
+            userData.SaveSpecificAgent(agent); 
+        }
+    }
 
     private void NavigateBack()
     {
@@ -137,9 +147,9 @@
     {
         var chat = new Chat
             (
-                $"{DateTime.Now.ToString().Replace(" ","-").Replace("/","-").Replace(":","-")}"
+                $"{DateTime.Now.ToString().Replace(" ","-").Replace("/","-").Replace(":","-")}",
+                string.IsNullOrEmpty(agent.greeting) ? agent.greeting : null
             );
-
         agent.AddChat(chat);
 
         navigation.NavigateTo(navigation.Uri + "/" + chat.Name);

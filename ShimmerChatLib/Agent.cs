@@ -12,6 +12,7 @@ namespace ShimmerChatLib
 		public Guid guid { get; set; }
 		public string name { get; set; }
         public string description { get; set; } // The description of the agent
+		public string greeting { get; set; }
 
 		public List<Chat> chats;
 
@@ -36,6 +37,7 @@ namespace ShimmerChatLib
 			}
 			File.WriteAllText(Path.Combine(path, "description.txt"), description);
 			File.WriteAllText(Path.Combine(path, "name.txt"), name); // Save the agent's name to a text file
+			File.WriteAllText(Path.Combine(path, "greeting.txt"), greeting);
 			File.WriteAllText(Path.Combine(path, "guid.txt"), guid.ToString()); // Save the agent's GUID to a text file
 		}
 
@@ -66,6 +68,7 @@ namespace ShimmerChatLib
 			// Read the description from the text file
 			agent.description = File.ReadAllText(Path.Combine(path, "description.txt"));
 			agent.name = File.ReadAllText(Path.Combine(path, "name.txt")); // Read the agent's name from the text file
+			agent.greeting = File.Exists(Path.Combine(path, "greeting.txt")) ? File.ReadAllText(Path.Combine(path, "greeting.txt")) : "";
 			agent.guid = File.ReadAllText(Path.Combine(path, "guid.txt")) is string guidString && Guid.TryParse(guidString, out Guid parsedGuid)
 				? parsedGuid
 				: Guid.NewGuid(); // Read the agent's GUID from the text file or generate a new one if it fails to parse
@@ -81,7 +84,7 @@ namespace ShimmerChatLib
 			chats.Add(chat);
 		}
 
-		public static Agent Create(string Name, string desc)
+		public static Agent Create(string Name, string desc, string greeting = null)
 		{
 			return new Agent
 			{
@@ -89,6 +92,7 @@ namespace ShimmerChatLib
 				name = Name,
 				description = desc,
 				guid= Guid.NewGuid(),
+				greeting = greeting
 			};
 		}
 
