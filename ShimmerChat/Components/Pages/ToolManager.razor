@@ -140,7 +140,10 @@ else
         }
         catch (Exception ex)
         {
-            testResult = ex.Message;
+            testResult = ex.Message + ex.InnerException;
+            #if DEBUG
+            System.Diagnostics.Debugger.Break();
+            #endif
         }
         StateHasChanged();
     }

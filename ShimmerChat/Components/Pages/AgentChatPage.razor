@@ -5,7 +5,7 @@
 @if (chat != null)
 {
 	<div id="container">
-		<div id="chat-info">
+		<div id="chat-info" class="shimmer-shadow-box">
 			<label>You are having chat with: </label>
 			<h2>@agent.name</h2>
 		</div>
@@ -22,19 +22,18 @@
 				}
 			}
 		</div>
-		<div id="input-box">
+		<div id="input-box" class="shimmer-shadow-box">
 			<!-- 输入框内容 -->
-			<textarea @bind="inputText" @bind:event="oninput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
+			<textarea  @bind="inputText" @bind:event="oninput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
 		</div>
 	</div>
 	<style>
 		/* 父级容器 */
 		#container {
 		position: relative;
-		height: calc( 100vh - 3.8rem);
+		height: calc( 100vh - 4.7rem);
 		display: flex;
 		flex-direction: column;
-		background-color: #f9f9f9;
 		}
 
 		/* 聊天信息栏 */
@@ -45,8 +44,7 @@
 		padding: 10px;
 		background-color: white;
 		z-index: 100;
-		width: 100%;
-		box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+		width: 100%;	
 		}
 
 		/* 聊天主区域 */
@@ -71,6 +69,15 @@
 		z-index: 100;
 		box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
 		}
+
+		#input-box > textarea{
+			width : 100%;
+			border : none;
+			resize: none;
+			border-radius: 15px;
+			padding: 5px;
+		}
+
 	</style>
 }
 

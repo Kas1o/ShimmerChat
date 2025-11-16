@@ -140,6 +140,7 @@
     margin: 5px;
     max-width: 100%;
     word-break: break-word; /* 防止长单词溢出 */
+
 }
 
 .shimmer-message-head {
@@ -170,4 +171,9 @@
     border: 1px solid rgb(232, 232, 232);
     border-radius: 15px;
     padding: 20px;
+}
+
+.shimmer-shadow-box {
+    border-radius: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
