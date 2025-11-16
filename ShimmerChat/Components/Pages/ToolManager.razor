@@ -53,11 +53,13 @@ else
                 @foreach (var p in def.parameters)
                 {
                     <li>
-                        <b>@p.parameter.name</b> (@p.parameter.type): @p.parameter.description
+                        <b>@p.parameter.name</b> (@p.parameter.type):
                         @if (p.required)
                         {
                             <span class="text-danger">[Required]</span>
                         }
+                        <pre> @p.parameter.description</pre>
+                        
                     </li>
                 }
             </ul>
