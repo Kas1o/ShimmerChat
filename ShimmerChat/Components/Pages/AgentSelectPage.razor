@@ -25,6 +25,8 @@
 			<input class="shimmer-input" @bind=popupNewAgentName/>
 			<label>@l["Description:"]</label>
 			<textarea class="shimmer-textarea" @bind=popupNewAgentDescription/>
+			<label>@l["Greeting:"]</label>
+			<textarea class="shimmer-textarea" @bind=popupNewAgentGreeting/>
 			<button class="btn btn-dark" @onclick="CreateNewAgent">@l["Create"]</button>
 		</div>
 	</div>
@@ -35,6 +37,7 @@
 	#region Popup
 	string popupNewAgentName { get; set; } = "new agent";
 	string popupNewAgentDescription { get; set; } = "this is a cool agent!";
+	string popupNewAgentGreeting { get; set; } = "Hello! How can I help you today?";
 	#endregion
 	ObservableCollection<Agent> agents
 	{
@@ -55,7 +58,8 @@
 		agents.Add(Agent.Create
 		(
 			popupNewAgentName,
-			popupNewAgentDescription
+			popupNewAgentDescription,
+			popupNewAgentGreeting
 		));
 		CreatePopupVisible = false;
 	}
