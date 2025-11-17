@@ -148,7 +148,7 @@
         var chat = new Chat
             (
                 $"{DateTime.Now.ToString().Replace(" ","-").Replace("/","-").Replace(":","-")}",
-                string.IsNullOrEmpty(agent.greeting) ? agent.greeting : null
+                (!string.IsNullOrEmpty(agent.greeting)) ? agent.greeting : null
             );
         agent.AddChat(chat);
 

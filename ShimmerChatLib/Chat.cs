@@ -36,7 +36,7 @@ namespace ShimmerChatLib
 		{
 			Name = name;
 			Messages = new ();
-			if (greeting != null) 
+			if (!string.IsNullOrEmpty(greeting))
 			{
 				Messages.Add(new Message { message = greeting, sender = "ai", timestamp = DateTime.Now});
 			}
