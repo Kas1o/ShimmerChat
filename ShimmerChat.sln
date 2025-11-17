@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.13.35818.85
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11205.157 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChat", "ShimmerChat\ShimmerChat.csproj", "{ECC4859D-2D01-42A4-8B72-6D80CBAD5725}"
 EndProject

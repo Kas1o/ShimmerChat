@@ -16,6 +16,7 @@ builder.Services.AddLocalization(option => option.ResourcesPath = "Resources");
 builder.Services.AddSingleton<IUserData, LocalFileStorageUserData>();
 builder.Services.AddSingleton<ICompletionService, CompletionServiceV1>();
 builder.Services.AddSingleton<IToolService, ToolServiceV1>();
+builder.Services.AddSingleton<IPopupService, PopupService>();
 
 var app = builder.Build();
 

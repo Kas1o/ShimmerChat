@@ -106,7 +106,9 @@
             ApiSettingType.OpenAI => true
         };
     private bool UsingOpenAIAndTextCompletion =>
-        (userData.CompletionType == CompletionType.TextCompletion) && (userData.ApiSettings[userData.CurrentAPISettingIndex].Type == ApiSettingType.OpenAI);
+    userData.ApiSettings.Count > 0 ?
+    (userData.CompletionType == CompletionType.TextCompletion) && (userData.ApiSettings[userData.CurrentAPISettingIndex].Type == ApiSettingType.OpenAI)
+    : false;
 
     private void CreateNewTextCompletionSetting()
     {

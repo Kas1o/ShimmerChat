@@ -31,8 +31,8 @@
 	{
 		<div>
 			<textarea @bind="editContent" rows="4" style="width:100%"></textarea>
-			<button @onclick="SaveEdit">@l["BUTTON_SAVE"]</button>
-			<button @onclick="CancelEdit">@l["BUTTON_CANCEL"]</button>
+			<button class="btn btn-success" @onclick="SaveEdit">@l["BUTTON_SAVE"]</button>
+			<button class="btn" @onclick="CancelEdit">@l["BUTTON_CANCEL"]</button>
 		</div>
 	}
 	else
