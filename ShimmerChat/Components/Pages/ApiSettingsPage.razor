@@ -31,10 +31,90 @@
         <div class="shimmer-group">
             @if (topAPISetting.Type == ApiSettingType.Kobold)
             {
-                <label>@l["API URL"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.KoboldUrl" />
-                <label>@l["Temperature"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.KoboldConf.temperature" />
+                <div class="shimmer-group">
+                    <h5>@l["Basic Settings"]</h5>
+                    <label>@l["API URL"]</label>
+                    <input class="shimmer-input" @bind="topAPISetting.KoboldUrl" />
+                    <label>@l["Temperature"]</label>
+                    <input type="number" step="0.01" min="0" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.temperature" />
+                </div>
+
+                <div class="shimmer-group">
+                    <h5>@l["Context & Length"]</h5>
+                    <label>@l["Max Context Length"]</label>
+                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.max_context_length" />
+                    <label>@l["Max Length"]</label>
+                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.max_length" />
+                </div>
+
+                <div class="shimmer-group">
+                    <h5>@l["Repetition Penalty"]</h5>
+                    <label>@l["Repetition Penalty"]</label>
+                    <input type="number" step="0.01" min="1" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.rep_pen" />
+                    <label>@l["Repetition Penalty Range"]</label>
+                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.rep_pen_range" />
+                </div>
+
+                <div class="shimmer-group">
+                    <h5>@l["Sampling Settings"]</h5>
+                    <label>@l["Sampler Seed"]</label>
+                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.sampler_seed" />
+                    <label>@l["Top K"]</label>
+                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.top_k" />
+                    <label>@l["Top P"]</label>
+                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.top_p" />
+                    <label>@l["Top A"]</label>
+                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.top_a" />
+                    <label>@l["Min P"]</label>
+                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.min_p" />
+                    <label>@l["Typical"]</label>
+                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.typical" />
+                    <label>@l["TFS (Tail Free Sampling)"]</label>
+                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.tfs" />
+                </div>
+
+                <div class="shimmer-group">
+                    <h5>@l["Dynamic Temperature"]</h5>
+                    <label>@l["Dynatemp Range"]</label>
+                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.dynatemp_range" />
+                    <label>@l["Dynatemp Exponent"]</label>
+                    <input type="number" step="0.01" min="0" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.dynatemp_exponent" />
+                    <label>@l["Smoothing Factor"]</label>
+                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.smoothing_factor" />
+                </div>
+
+                <div class="shimmer-group">
+                    <h5>@l["Mirostat"]</h5>
+                    <label>@l["Mirostat (0=disabled, 1=v1, 2=v2)"]</label>
+                    <input type="number" min="0" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.mirostat" />
+                    <label>@l["Mirostat Tau"]</label>
+                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.mirostat_tau" />
+                    <label>@l["Mirostat Eta"]</label>
+                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.mirostat_eta" />
+                </div>
+
+                <div class="shimmer-group">
+                    <h5>@l["Advanced"]</h5>
+                    <label>@l["Stop Sequence (comma separated)"]</label>
+                    <input class="shimmer-input" 
+                           @bind:get="string.Join(',', topAPISetting.KoboldConf.stop_sequence ?? new string[0])" 
+                           @bind:set="value => topAPISetting.KoboldConf.stop_sequence = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()" />
+                    <label>@l["Banned Tokens (comma separated)"]</label>
+                    <input class="shimmer-input" 
+                           @bind:get="string.Join(',', topAPISetting.KoboldConf.banned_tokens ?? new string[0])" 
+                           @bind:set="value => topAPISetting.KoboldConf.banned_tokens = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()" />
+                    <label>@l["Genkey"]</label>
+                    <input class="shimmer-input" @bind="topAPISetting.KoboldConf.genkey" />
+                    <label>@l["Grammar"]</label>
+                    <textarea class="shimmer-input" rows="3" @bind="topAPISetting.KoboldConf.grammar"></textarea>
+                    <label>@l["Trim Stop"]</label>
+                    <input type="checkbox" @bind="topAPISetting.KoboldConf.trim_stop" />
+                    <label>@l["Bypass EOS"]</label>
+                    <input type="checkbox" @bind="topAPISetting.KoboldConf.bypass_eos" />
+                </div>
+                <div class="shimmer-group">
+                    <p style="font-style: italic; color: #666;">@l["Note: Logit bias settings are available in the API but not configurable through this interface."]</p>
+                </div>
             }
 
             @if (topAPISetting.Type == ApiSettingType.OpenAI)
