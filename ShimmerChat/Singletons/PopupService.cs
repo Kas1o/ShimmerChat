@@ -33,7 +33,7 @@ namespace ShimmerChat.Singletons
 
 		public void Cancel()
 		{
-			_tcs.SetResult(false);
+			_tcs?.SetResult(false);
 			Hide();
 		}
 

@@ -30,24 +30,39 @@
 
     private PopupOptions? _options;
 
+    private Action<PopupOptions?>? _onShowHandler;
+    private Action? _onHideHandler;
+
     protected override void OnInitialized()
     {
         if (PopupService != null)
         {
-            PopupService.OnShow += options => { _options = options; StateHasChanged(); };
-            PopupService.OnHide += () => { _options = null; StateHasChanged(); };
+            _onShowHandler = options => InvokeAsync(() =>
+            {
+                _options = options;
+                StateHasChanged();
+            });
+
+            _onHideHandler = () => InvokeAsync(() =>
+            {
+                _options = null;
+                StateHasChanged();
+            });
+
+            PopupService.OnShow += _onShowHandler;
+            PopupService.OnHide += _onHideHandler;
         }
     }
-
-    private void Confirm() => PopupService?.Confirm();
-    private void Cancel() => PopupService?.Cancel();
 
     public void Dispose()
     {
         if (PopupService != null)
         {
-            PopupService.OnShow -= _ => { };
-            PopupService.OnHide -= () => { };
+            if (_onShowHandler != null) PopupService.OnShow -= _onShowHandler;
+            if (_onHideHandler != null) PopupService.OnHide -= _onHideHandler;
         }
     }
+
+    private void Confirm() => PopupService?.Confirm();
+    private void Cancel() => PopupService?.Cancel();
 }
