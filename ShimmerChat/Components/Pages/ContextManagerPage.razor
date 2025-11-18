@@ -1,5 +1,6 @@
 ﻿@page "/contextmanager"
 @inject NavigationManager Navigation
+@inject IStringLocalizer<ContextManagerPage> l
 @inject IUserData userData
 
 <h3>Context Manager</h3>
@@ -71,7 +72,7 @@
             userData.CurrentTextCompletionSettingIndex = value;
         }
     }
-    TextCompletionSetting topTextCompletionSetting =>
+    TextCompletionSetting? topTextCompletionSetting =>
         (_selectedTextCompletionIndex >= 0 && _selectedTextCompletionIndex < textCompletionSettings.Count)
             ? textCompletionSettings[_selectedTextCompletionIndex]
             : null;
@@ -96,14 +97,16 @@
         {
             ApiSettingType.Ollama => true,
             ApiSettingType.Kobold => false,
-            ApiSettingType.OpenAI => true
+            ApiSettingType.OpenAI => true,
+            _ => throw new InvalidOperationException(l["UnsupportedAPISettingTypeMessage"])
         };
     private bool AllowTextCompletion =>
         userData.ApiSettings[userData.CurrentAPISettingIndex].Type switch
         {
             ApiSettingType.Ollama => true,
             ApiSettingType.Kobold => true,
-            ApiSettingType.OpenAI => true
+            ApiSettingType.OpenAI => true,
+            _ => throw new InvalidOperationException(l["UnsupportedAPISettingTypeMessage"])
         };
     private bool UsingOpenAIAndTextCompletion =>
     userData.ApiSettings.Count > 0 ?

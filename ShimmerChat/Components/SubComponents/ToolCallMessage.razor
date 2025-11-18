@@ -34,10 +34,6 @@
 	[Parameter]
 	public ShimmerChatLib.Message message { get; set; } = null!; // The message object to display
 
-	SharperLLM.Util.ChatMessage Message => message.message;
-
-	bool isEditMode = false;
-
 	string stringContent => string.Join("\n", Message?.toolCalls?.Select(x => $"{x.name??""}|{x.arguments??""}") ?? []) ?? ""; // The string content of the message
 	string summary => string.Join(" ", Message?.toolCalls?.Select(x => $"{x.name ?? ""}") ?? []) ?? "";
 
