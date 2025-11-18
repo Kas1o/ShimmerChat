@@ -26,7 +26,7 @@
 
 @code {
 	[Parameter]
-	public Action Delete { get; set; } = null;
+	public Action? Delete { get; set; } = null;
 
 	[Parameter]
 	public Action MakeDirty { get; set; } = null!; // Callback to make the parent component dirty
@@ -34,8 +34,8 @@
 	[Parameter]
 	public ShimmerChatLib.Message message { get; set; } = null!; // The message object to display
 
-	string stringContent => string.Join("\n", Message?.toolCalls?.Select(x => $"{x.name??""}|{x.arguments??""}") ?? []) ?? ""; // The string content of the message
-	string summary => string.Join(" ", Message?.toolCalls?.Select(x => $"{x.name ?? ""}") ?? []) ?? "";
+	string stringContent => string.Join("\n", message?.message?.toolCalls?.Select(x => $"{x.name??""}|{x.arguments??""}") ?? []) ?? ""; // The string content of the message
+	string summary => string.Join(" ", message?.message?.toolCalls?.Select(x => $"{x.name ?? ""}") ?? []) ?? "";
 
 	string sender => message.sender;
 
@@ -45,7 +45,8 @@
 
 	void DeleteThisMessage()
 	{
-		Delete();
+		if(Delete != null)
+			Delete();
 	}
 
 	async Task CopyContentToClipboard()
