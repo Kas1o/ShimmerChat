@@ -1,6 +1,9 @@
-﻿@page "/"
+@page "/"
 @using System.Timers
-<div id="bg-region">
+@using ShimmerChat.Singletons
+@inject IThemeService ThemeService
+@implements IDisposable
+<div id="bg-region" style="background-image: url('@BackgroundImagePath')">
 	<div id="main-content">
 		<div id="title">
 			SHIMMER CHAT
@@ -21,7 +24,6 @@
 	background-size: cover;
 	background-position: center;
 	position: relative;
-	background-image: url("/test-bg.png");
 
 	}
 	/* 中间的大号粗体字的样式 */
@@ -45,6 +47,7 @@
 @code {
 	private string currentTime = DateTime.Now.ToString("T");
 	private Timer timer;
+	private string BackgroundImagePath => ThemeService.IsDarkMode ? "/shimmer-chat-bg.png" : "/shimmer-chat-bg-light-theme.png";
 
 	protected override void OnInitialized()
 	{
@@ -53,6 +56,15 @@
 		timer.Elapsed += UpdateTime;
 		timer.AutoReset = true;
 		timer.Enabled = true;
+		
+		// 订阅主题变更事件
+		ThemeService.OnThemeChanged += HandleThemeChanged;
+	}
+	
+	private void HandleThemeChanged(bool isDarkMode)
+	{
+		// 触发组件重新渲染，更新背景图片
+		InvokeAsync(StateHasChanged);
 	}
 
 	private void UpdateTime(object source, ElapsedEventArgs e)
@@ -61,4 +73,13 @@
 		InvokeAsync(StateHasChanged); // 请求刷新 UI
 	}
 
+	public void Dispose()
+	{
+		// 停止计时器
+		timer?.Stop();
+		timer?.Dispose();
+		
+		// 取消订阅主题变更事件
+		ThemeService.OnThemeChanged -= HandleThemeChanged;
+	}
 }

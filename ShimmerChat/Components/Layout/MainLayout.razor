@@ -1,20 +1,24 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+<div class="shimmer-layout">
+    <!-- 侧边导航栏 -->
+    <aside class="shimmer-sidebar">
         <NavMenu />
-    </div>
+    </aside>
 
-    <main>
-        <div class="top-row px-4">
-            <!--<a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>-->
-        </div>
+    <!-- 主内容区域 -->
+    <main class="shimmer-main">
+        <!-- 顶部操作栏 -->
+        <header class="shimmer-header">
+            <!-- 这里可以添加页面标题或其他控件 -->
+        </header>
 
-        <article class="content px-4">
+        <!-- 内容区域 -->
+        <article class="shimmer-content">
             @Body
         </article>
     </main>
-</div>  
+</div>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -23,4 +27,20 @@
 </div>
 
 <ShimmerChat.Components.SubComponents.PopupMessageBox/>
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // 初始化错误UI事件处理
+            InitializeErrorHandlers();
+        }
+    }
+
+    private void InitializeErrorHandlers()
+    {
+        // 这里可以添加JavaScript互操作来处理错误UI的事件
+    }
+}
 

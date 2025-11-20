@@ -1,47 +1,99 @@
+@using Microsoft.AspNetCore.Components.Routing
+@using ShimmerChat.Components.SubComponents
 @inject IStringLocalizer<NavMenu> l
+@implements IDisposable
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">
-            <img src="shimmer-chat.png" alt="ShimmerChat Logo" style="height: 24px; margin-right: 8px; vertical-align: middle;" />
-            @l["ShimmerChat"]
-        </a>
+<div class="shimmer-sidebar">
+    <div class="shimmer-nav-header">
+        <div class="shimmer-nav-brand">
+            <img src="@(ThemeService.IsDarkMode ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="ShimmerChat Logo" class="shimmer-nav-logo" />
+            <h1 class="shimmer-nav-title">@l["ShimmerChat"]</h1>
+        </div>
+    </div>
+
+    <div class="shimmer-nav-divider"></div>
+
+    <nav class="shimmer-nav-menu">
+        <ul class="shimmer-nav-list">
+            <li>
+                <NavLink class="shimmer-nav-item" href="" Match="NavLinkMatch.All">
+                    <div class="nav-item-content">
+                        <span class="nav-icon"><i class="bi bi-house-door"></i></span>
+                        <span class="nav-text">@l["Home"]</span>
+                    </div>
+                </NavLink>
+            </li>
+
+            <li>
+                <NavLink class="shimmer-nav-item" href="apisettings" Match="NavLinkMatch.All">
+                    <div class="nav-item-content">
+                        <span class="nav-icon"><i class="bi bi-gear"></i></span>
+                        <span class="nav-text">@l["API Settings"]</span>
+                    </div>
+                </NavLink>
+            </li>
+
+            <li>
+                <NavLink class="shimmer-nav-item" href="contextmanager" Match="NavLinkMatch.All">
+                    <div class="nav-item-content">
+                        <span class="nav-icon"><i class="bi bi-folder"></i></span>
+                        <span class="nav-text">@l["Context Manager"]</span>
+                    </div>
+                </NavLink>
+            </li>
+
+            <li>
+                <NavLink class="shimmer-nav-item" href="toolmanager" Match="NavLinkMatch.All">
+                    <div class="nav-item-content">
+                        <span class="nav-icon"><i class="bi bi-wrench"></i></span>
+                        <span class="nav-text">@l["Tool Manager"]</span>
+                    </div>
+                </NavLink>
+            </li>
+
+            <li>
+                <NavLink class="shimmer-nav-item" href="agentselect" Match="NavLinkMatch.All">
+                    <div class="nav-item-content">
+                        <span class="nav-icon"><i class="bi bi-person"></i></span>
+                        <span class="nav-text">@l["Agents"]</span>
+                    </div>
+                </NavLink>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="shimmer-nav-footer">
+        <div class="shimmer-nav-version">
+            <span>版本 1.0.0</span>
+        </div>
+        
+        <!-- 移动端主题切换 -->
+        <div class="shimmer-nav-theme-toggle-mobile">
+            <ThemeToggle />
+        </div>
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+@code {
+    [Inject]
+    public required IThemeService ThemeService { get; set; }
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-fill" aria-hidden="true"></span> @l["Home"]
-            </NavLink>
-        </div>
+    protected override void OnInitialized()
+    {
+        // 订阅主题变更事件
+        ThemeService.OnThemeChanged += HandleThemeChanged;
+    }
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="apisettings" Match="NavLinkMatch.All">
-                <span class="bi bi-gear-fill" aria-hidden="true"></span> @l["API Settings"]
-            </NavLink>
-        </div>
+    private void HandleThemeChanged(bool isDarkMode)
+    {
+        // 触发组件重新渲染
+        StateHasChanged();
+    }
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="contextmanager" Match="NavLinkMatch.All">
-                <span class="bi bi-file-text-fill" aria-hidden="true"></span> @l["Context Manager"]
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="toolmanager" Match="NavLinkMatch.All">
-                <span class="bi bi-wrench" aria-hidden="true"></span> @l["Tool Manager"]
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="agentselect" Match="NavLinkMatch.All">
-                <span class="bi bi-person-fill" aria-hidden="true"></span> @l["Agents"]
-            </NavLink>
-        </div>
-    </nav>
-</div>
+    public void Dispose()
+    {
+        // 取消订阅，避免内存泄漏
+        ThemeService.OnThemeChanged -= HandleThemeChanged;
+    }
+}
 

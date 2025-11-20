@@ -1,0 +1,209 @@
+:root {
+    /* 亮色主题变量 */
+    --color-primary: #7b34eb;
+    --color-primary-hover: #6a29cc;
+    --color-primary-light: #e9d5ff;
+    --color-secondary: #6b7280;
+    --color-background: #ffffff;
+    --color-surface: #f9fafb;
+    --color-card: #ffffff;
+    --color-text-primary: #111827;
+    --color-text-secondary: #4b5563;
+    --color-text-tertiary: #9ca3af;
+    --color-border: #e5e7eb;
+    --color-border-hover: #d1d5db;
+    --color-error: #ef4444;
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-info: #3b82f6;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --transition: all 0.2s ease;
+}
+
+/* 暗色主题变量 */
+.dark-theme {
+    --color-primary: #a855f7;
+    --color-primary-hover: #c084fc;
+    --color-primary-light: #4c1d95;
+    --color-secondary: #9ca3af;
+    --color-background: #000;
+    --color-surface: #000;
+    --color-card: #374151;
+    --color-text-primary: #f9fafb;
+    --color-text-secondary: #d1d5db;
+    --color-text-tertiary: #9ca3af;
+    --color-border: #374151;
+    --color-border-hover: #4b5563;
+    --color-error: #f87171;
+    --color-success: #34d399;
+    --color-warning: #fbbf24;
+    --color-info: #60a5fa;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+}
+
+/* 确保暗色主题正确应用到html和body */
+:root.light-theme,
+.light-theme {
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+}
+
+:root.dark-theme,
+.dark-theme {
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+}
+
+/* 主题切换按钮样式 */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.theme-toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-primary);
+    font-size: 1.5rem;
+    padding: 0.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+}
+
+.theme-toggle-btn:hover {
+    background-color: var(--color-card);
+    transform: rotate(15deg);
+}
+
+.theme-toggle-btn:active {
+    transform: rotate(15deg) scale(0.95);
+}
+
+/* 全局应用CSS变量 */
+body {
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+    font-family: var(--font-family);
+    transition: var(--transition);
+}
+
+/* 链接样式 */
+a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+a:hover {
+    color: var(--color-primary-hover);
+    text-decoration: underline;
+}
+
+/* 按钮基础样式 */
+.btn {
+    background-color: var(--color-primary);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 500;
+    transition: var(--transition);
+}
+
+.btn:hover {
+    background-color: var(--color-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+/* 输入框样式 */
+input, textarea, select {
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 0.5rem;
+    transition: var(--transition);
+}
+
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(123, 52, 235, 0.2);
+}
+
+/* 卡片样式 */
+.card {
+    background-color: var(--color-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
+    padding: 1.5rem;
+    transition: var(--transition);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-border-hover);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--color-surface);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-hover);
+}
+
+/* 工具提示样式 */
+[title] {
+    position: relative;
+}
+
+/* 加载动画 */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

@@ -18,6 +18,8 @@ builder.Services.AddSingleton<ICompletionService, CompletionServiceV1>();
 builder.Services.AddSingleton<IToolService, ToolServiceV1>();
 builder.Services.AddSingleton<IPopupService, PopupService>();
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
+// 添加主题服务
+builder.Services.AddScoped<IThemeService, ThemeServiceV1>();
 
 var app = builder.Build();
 

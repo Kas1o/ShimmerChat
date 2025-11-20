@@ -1,181 +1,275 @@
+/* ShimmerChat 组件样式 */
+
+/* 卡片组样式 */
 .shimmer-group {
-    border-radius: 12px;
-    border-color: dimgrey;
-    border: 1px solid rgb(232, 232, 232);
-    padding: 12px;
-    margin: 8px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    background-color: var(--color-card);
+    padding: 16px;
+    margin: 12px 0;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
 }
 
+.shimmer-group:hover {
+    border-color: var(--color-border-hover);
+    box-shadow: var(--shadow-md);
+}
+
+.shimmer-nav-logo {
+    height: 2em;
+    width: 2em;
+}
+
+/* 输入框样式 */
 .shimmer-input {
     display: block;
     width: 100%;
-    padding: .375rem 2.25rem .375rem .75rem;
+    padding: 0.5rem 2.5rem 0.5rem 1rem;
     font-size: 1rem;
     font-weight: 400;
     line-height: 1.5;
-    color: var(--bs-body-color);
+    color: var(--color-text-primary);
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    background-color: var(--bs-body-bg);
-    background-image: var(--bs-form-select-bg-img), var(--bs-form-select-bg-icon, none);
-    background-repeat: no-repeat;
-    background-position: right .75rem center;
-    background-size: 16px 12px;
-    border: var(--bs-border-width) solid var(--bs-border-color);
-    border-radius: var(--bs-border-radius);
-    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: var(--transition);
+    background-image: none;
 }
+
+.shimmer-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(123, 52, 235, 0.2);
+}
+
+/* 文本域样式 */
 .shimmer-textarea {
     display: block;
     width: 100%;
-    padding: .375rem .75rem; /* 调整内边距，去掉右侧图标区域 */
+    padding: 0.5rem 1rem;
     font-size: 1rem;
     font-weight: 400;
     line-height: 1.5;
-    color: var(--bs-body-color);
+    color: var(--color-text-primary);
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    background-color: var(--bs-body-bg);
-    border: var(--bs-border-width) solid var(--bs-border-color);
-    border-radius: var(--bs-border-radius);
-    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
-    resize: vertical; /* 允许用户垂直调整大小 */
-    overflow: auto; /* 确保内容超出时可滚动 */
-    min-height: calc(1.5em + .75rem + 2 * var(--bs-border-width)); /* 设置最小高度 */
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: var(--transition);
+    resize: vertical;
+    overflow: auto;
+    min-height: 120px;
 }
 
+.shimmer-textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(123, 52, 235, 0.2);
+}
+
+/* 网格布局 */
 .shimmer-grid {
     display: grid;
-    grid-template-columns: repeat(1, 1fr); 
-    grid-template-rows: 10vh;
-    grid-gap: 12px;
-    margin: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin: 16px;
 }
 
+/* 网格项样式 */
 .shimmer-grid-item {
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
-    border: 1px solid #ccc;
-    padding: 20px;
+    border: 1px solid var(--color-border);
+    padding: 24px;
     text-align: center;
-    /* 垂直 + 水平居中关键 */
     display: flex;
     align-items: center;
     justify-content: center;
-    max-height: 10vh;
-    min-height: 10vh; 
+    min-height: 120px;
     box-sizing: border-box;
-    font-size: 1.35vh
+    font-size: 1.1rem;
+    font-weight: 500;
+    transition: var(--transition);
+    background-color: var(--color-card);
+    color: var(--color-text-primary);
 }
 
+.shimmer-grid-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-primary);
+}
+
+/* 聊天网格项 */
+.shimmer-grid-chat-item {
+    background-image: linear-gradient(180deg, var(--color-primary) 0%, #3a118e 70%);
+    color: white;
+    border: none;
+}
+
+.shimmer-grid-chat-item:hover {
+    border-color: transparent;
+    transform: translateY(-2px);
+}
+
+/* 代理网格项 */
+.shimmer-grid-agent-item {
+    position: relative;
+    color: var(--color-text-primary);
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-card);
+}
+
+.shimmer-grid-agent-item:hover {
+    border-color: var(--color-primary);
+    background-color: var(--color-surface);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* 弹窗样式 */
 .shimmer-popup-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    backdrop-filter: blur(4px);
 }
 
 .shimmer-popup-content {
-    background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-color: var(--color-card);
+    padding: 24px;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--color-border);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    min-width: 300px;
+    width: fit-content;
 }
 
-.shimmer-grid-chat-item {
-    background-image: linear-gradient(180deg, rgb(135, 82, 244) 0%, rgb(58, 17, 142) 70%);
-    color: white;
-}
-
-.shimmer-grid-agent-item {
-    position: relative;
-    color: white;
-    overflow: hidden;
-}
-
-.shimmer-grid-agent-item::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: radial-gradient( #814DEC, #3A118E);
-    transition: opacity 0.6s ease-in-out;
-    z-index: -1;
-}
-
-.shimmer-grid-agent-item:hover::before {
-    background-image: linear-gradient(180deg, rgb(135, 82, 244) 0%, rgb(58, 17, 142) 70%);
-    opacity: 0;
-}
-
-.shimmer-grid-agent-item::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: linear-gradient(180deg, rgb(135, 82, 244) 0%, rgb(58, 17, 142) 70%);
-    transition: opacity 0.3s ease-in-out;
-    opacity: 0;
-    z-index: -1;
-}
-
-.shimmer-grid-agent-item:hover::after {
-    opacity: 1;
-}
-
-
+/* 消息样式 */
 .shimmer-message {
-    padding: 10px;
-    border-radius: 12px;
-    margin: 5px;
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    margin: 8px 0;
     max-width: 100%;
-    word-break: break-word; /* 防止长单词溢出 */
-
+    word-break: break-word;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
 }
 
+.shimmer-message:hover {
+    box-shadow: var(--shadow-md);
+}
+
+/* 消息头部 */
 .shimmer-message-head {
-    font-size: 24px;
+    font-size: 1.2rem;
+    font-weight: 600;
     display: flex;
-    justify-content: space-between; /* 左右分布 */
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    color: var(--color-text-primary);
 }
 
+/* 消息操作按钮 */
 .shimmer-message-head-action {
-    font-size: 16px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-gap: 12px;
+    font-size: 1rem;
+    display: flex;
+    gap: 12px;
     cursor: pointer;
     user-select: none;
 }
 
-.shimmer-message-thinking{
-    backdrop-filter : blur(10px);
-    background-color : rgba(0, 0, 0, 0.4);
-    border-radius : 15px;
-    padding : 20px;
+.shimmer-message-head-action button {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    transition: var(--transition);
 }
 
+.shimmer-message-head-action button:hover {
+    background-color: var(--color-surface);
+    color: var(--color-primary);
+}
+
+/* 思考中消息样式 */
+.shimmer-message-thinking {
+    backdrop-filter: blur(10px);
+    background-color: rgba(123, 52, 235, 0.15);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    border: 1px solid var(--color-primary-light);
+    color: var(--color-text-primary);
+}
+
+/* 工具调用样式 */
 .shimmer-toolcall {
     backdrop-filter: blur(10px);
-    border-color: dimgrey;
-    border: 1px solid rgb(232, 232, 232);
-    border-radius: 15px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
     padding: 20px;
+    margin: 12px 0;
+    box-shadow: var(--shadow-sm);
 }
 
+/* 阴影框样式 */
 .shimmer-shadow-box {
-    border-radius: 15px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    padding: 16px;
+    transition: var(--transition);
+}
+
+.shimmer-shadow-box:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .shimmer-grid {
+        grid-template-columns: 1fr;
+        margin: 12px 8px;
+        gap: 12px;
+    }
+    
+    .shimmer-grid-item {
+        min-height: 100px;
+        padding: 16px;
+        font-size: 1rem;
+    }
+    
+    .shimmer-popup-content {
+        padding: 20px;
+        margin: 16px;
+    }
+    
+    .shimmer-message {
+        padding: 12px;
+        margin: 6px 0;
+    }
 }
