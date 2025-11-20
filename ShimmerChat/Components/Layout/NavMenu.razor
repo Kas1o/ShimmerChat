@@ -1,4 +1,4 @@
-﻿@inject IStringLocalizer<NavMenu> l
+@inject IStringLocalizer<NavMenu> l
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -12,31 +12,31 @@
     <nav class="nav flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @l["Home"]
+                <span class="bi bi-house-fill" aria-hidden="true"></span> @l["Home"]
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="apisettings" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @l["API Settings"]
+                <span class="bi bi-gear-fill" aria-hidden="true"></span> @l["API Settings"]
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="contextmanager" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @l["Context Manager"]
+                <span class="bi bi-file-text-fill" aria-hidden="true"></span> @l["Context Manager"]
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="toolmanager" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @l["Tool Manager"]
+                <span class="bi bi-wrench" aria-hidden="true"></span> @l["Tool Manager"]
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="agentselect" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @l["Agents"]
+                <span class="bi bi-person-fill" aria-hidden="true"></span> @l["Agents"]
             </NavLink>
         </div>
     </nav>
