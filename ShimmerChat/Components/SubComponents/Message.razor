@@ -1,8 +1,9 @@
-﻿@using Markdig
+@using Markdig
 @using Markdig.Extensions.Tables
 
 @inject IStringLocalizer<Message> l
 @inject IJSRuntime JS
+@inject IMessageDisplayService MessageDisplayService
 
 
 <div class="shimmer-message">
@@ -59,15 +60,15 @@
 
 	string stringContent => message.message.Content; // The string content of the message
 
-	MarkupString DisplayContent => (MarkupString)Markdig.Markdown.ToHtml(stringContent??"",pipeline);
+	MarkupString DisplayContent => MessageDisplayService.RenderMarkdown(stringContent);
 
 	string imageContent => message.message.ImageBase64; // The base64 string for the image content, if any
 
 	string sender => message.sender;
 
-	Markdig.MarkdownPipeline pipeline = new Markdig.MarkdownPipelineBuilder()
-			.UsePipeTables() // 启用表格支持
-			.Build();
+	// 渲染逻辑已迁移到IMessageDisplayService单例服务中
+// 之前每个Message组件都会创建一个新的MarkdownPipeline实例，这是不必要的资源消耗
+// 现在所有组件共享同一个服务实例，大幅减少了内存占用和初始化开销
 
 	void DeleteThisMessage()
 	{
