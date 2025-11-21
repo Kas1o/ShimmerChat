@@ -1,0 +1,37 @@
+@using ShimmerChatLib.Tool
+@using ShimmerChatLib.Panel
+
+@attribute [PluginPanelAttribute("示例面板", "这是一个示例插件面板")]
+
+<div class="example-panel p-4">
+    <h3 class="text-xl font-bold mb-4">示例插件面板</h3>
+    <p class="mb-4">这是一个示例插件面板，用于演示如何创建和使用插件面板功能。</p>
+    
+    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <h4 class="text-lg font-semibold mb-2">面板功能演示</h4>
+        <ul class="list-disc pl-5 space-y-2">
+            <li>动态加载的Blazor组件</li>
+            <li>通过PluginPanelAttribute注册</li>
+            <li>可在应用程序中动态渲染</li>
+            <li>支持自定义图标和排序</li>
+        </ul>
+    </div>
+    
+    <div class="mt-6">
+        <button class="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-all">
+            点击我
+        </button>
+    </div>
+    
+    <div class="mt-4 text-gray-500 text-sm">
+        @DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+    </div>
+</div>
+
+@code {
+    // 组件代码部分
+    protected override void OnInitialized()
+    {
+        Console.WriteLine("示例面板已初始化");
+    }
+}
