@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Text.Json;
 using ShimmerChatLib.Tool;
 using SharperLLM.FunctionCalling;
@@ -9,12 +9,14 @@ namespace ShimmerChat.Singletons
 	{
 		private readonly string PluginsFolder = Path.Combine(AppContext.BaseDirectory, "./Plugins");
 		private readonly string ConfigFile = Path.Combine(AppContext.BaseDirectory, "enabled_tools.json");
+		private readonly IPluginLoaderService _pluginLoaderService;
 
 		public List<ITool> LoadedTools { get; private set; } = new();
 		public List<ITool> EnabledTools { get; private set; } = new();
 
-		public ToolServiceV1()
+		public ToolServiceV1(IPluginLoaderService pluginLoaderService)
 		{
+			_pluginLoaderService = pluginLoaderService;
 			LoadAllTools();
 			LoadEnabledTools();
 		}
@@ -24,14 +26,12 @@ namespace ShimmerChat.Singletons
 			var toolDict = new Dictionary<string, ITool>(StringComparer.OrdinalIgnoreCase);
 
 			// 1. 加载 ShimmerChatBuiltinTools 项目的工具
-			var builtinAssembly = typeof(ShimmerChatBuiltinTools.Target).Assembly;
-			var builtinTypes = builtinAssembly
-				.GetTypes()
-				.Where(t => typeof(ITool).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
-
-			foreach (var type in builtinTypes)
+			try
 			{
-				if (Activator.CreateInstance(type) is ITool tool)
+				var builtinAssembly = typeof(ShimmerChatBuiltinTools.Target).Assembly;
+				var builtinTools = _pluginLoaderService.LoadImplementationsFromAssembly<ITool>(builtinAssembly);
+				
+				foreach (var tool in builtinTools)
 				{
 					var name = tool.GetToolDefinition().name;
 					if (toolDict.ContainsKey(name))
@@ -39,35 +39,19 @@ namespace ShimmerChat.Singletons
 					toolDict[name] = tool;
 				}
 			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"加载内置工具失败: {ex.Message}");
+			}
 
 			// 2. 加载插件工具
-			if (Directory.Exists(PluginsFolder))
+			var pluginTools = _pluginLoaderService.LoadImplementationsFromPlugins<ITool>(PluginsFolder);
+			foreach (var tool in pluginTools)
 			{
-				foreach (var dll in Directory.GetFiles(PluginsFolder, "*.dll"))
-				{
-					try
-					{
-						var asm = Assembly.LoadFrom(dll);
-						var pluginTypes = asm.GetTypes()
-							.Where(t => typeof(ITool).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
-
-						foreach (var type in pluginTypes)
-						{
-							if (Activator.CreateInstance(type) is ITool tool)
-							{
-								var name = tool.GetToolDefinition().name;
-								if (toolDict.ContainsKey(name))
-									throw new Exception($"工具名称冲突: {name}");
-								toolDict[name] = tool;
-							}
-						}
-					}
-					catch (Exception ex)
-					{
-						// 插件加载失败，记录日志或忽略
-						Console.WriteLine($"插件加载失败: {dll} - {ex.Message}");
-					}
-				}
+				var name = tool.GetToolDefinition().name;
+				if (toolDict.ContainsKey(name))
+					throw new Exception($"工具名称冲突: {name}");
+				toolDict[name] = tool;
 			}
 
 			LoadedTools = toolDict.Values.ToList();
