@@ -1,6 +1,5 @@
 @page "/"
 @using System.Timers
-@using ShimmerChat.Singletons
 @inject IThemeService ThemeService
 @implements IDisposable
 <div id="bg-region" style="background-image: url('@BackgroundImagePath')">
@@ -15,16 +14,19 @@
 
 </div>
 <style>
+	.shimmer-content{
+		padding: 0px !important;
+	}
+
 	#bg-region{
 	display: flex;
 	justify-content: center; /* 水平居中 */
 	align-items: center; /* 垂直居中 */
 	width: 100%;
-	height: 800px; /* 视窗高度的100%，使得div覆盖整个视窗 */
+	height: 100%; /* 视窗高度的100%，使得div覆盖整个视窗 */
 	background-size: cover;
 	background-position: center;
 	position: relative;
-
 	}
 	/* 中间的大号粗体字的样式 */
 	#main-content {

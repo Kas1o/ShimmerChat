@@ -5,7 +5,7 @@
     --color-primary-light: #e9d5ff;
     --color-secondary: #6b7280;
     --color-background: #ffffff;
-    --color-surface: #eeefee;
+    --color-surface: #fff;
     --color-card: #ffffff;
     --color-text-primary: #111827;
     --color-text-secondary: #4b5563;
@@ -75,6 +75,8 @@
     background: none;
     border: none;
     cursor: pointer;
+    height: 2em;
+    width: 2em;
     color: var(--color-text-primary);
     font-size: 1.5rem;
     padding: 0.5rem;
