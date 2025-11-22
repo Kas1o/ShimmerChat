@@ -1,6 +1,7 @@
-﻿@page "/agent/{agentguid}/{chatname}"
+@page "/agent/{agentguid}/{chatname}"
 @inject IUserData userData
 @inject ICompletionService completion
+@inject IAIGenerationService aiGenerationService
 @inject IPopupService popupService
 
 @if (chat != null)
@@ -160,60 +161,46 @@
 		generating = true;
 
 		try{
-			if (userData.CompletionType == CompletionType.TextCompletion)
-			{
-				string reply = await completion.GetAIReply(agent, chat);
-				messages.Add(new Message
+			await aiGenerationService.GenerateAIResponseAsync(
+				agent, chat,
+				onResponse: rsp =>
 				{
-					message = new SharperLLM.Util.ChatMessage(reply, null),
-					thinking = null,
-					timestamp = DateTime.Now,
-					sender = "ai"
-				});
-			}
-			else 
-			{
-				await completion.RunAIWithToolLoopAsync(
-					agent, chat,
-					onResponse: rsp =>
+					// 每轮AI回复
+					if (rsp.content != null && rsp.content != string.Empty )
 					{
-						// 每轮AI回复
-						if (rsp.content != null && rsp.content != string.Empty )
-						{
-							messages.Add(new Message
-							{
-								message = new SharperLLM.Util.ChatMessage(rsp.content, null),
-								thinking = rsp.thinking,
-								timestamp = DateTime.Now,
-								sender = "ai"
-							});
-						}
-						if (rsp.toolCallings != null && rsp.toolCallings?.Count >= 1)
-						{
-							messages.Add(new Message
-							{
-								message = new SharperLLM.Util.ChatMessage(null, null) { toolCalls = rsp.toolCallings },
-								thinking = rsp.thinking,
-								timestamp = DateTime.Now,
-								sender = "tool_call"
-							});
-						}
-						InvokeAsync(StateHasChanged);
-					},
-					ToolCallback: tuple =>
-					{
-						// 工具调用结果
 						messages.Add(new Message
 						{
-							message = new SharperLLM.Util.ChatMessage(tuple.resp,null){id = tuple.id},
-							thinking = null,
+							message = new SharperLLM.Util.ChatMessage(rsp.content, null),
+							thinking = rsp.thinking,
 							timestamp = DateTime.Now,
-							sender = "tool_result"
+							sender = "ai"
 						});
-						InvokeAsync(StateHasChanged);
 					}
-				);
-			}
+					if (rsp.toolCallings != null && rsp.toolCallings?.Count >= 1)
+					{
+						messages.Add(new Message
+						{
+							message = new SharperLLM.Util.ChatMessage(null, null) { toolCalls = rsp.toolCallings },
+							thinking = rsp.thinking,
+							timestamp = DateTime.Now,
+							sender = "tool_call"
+						});
+					}
+					InvokeAsync(StateHasChanged);
+				},
+				onToolResult: tuple =>
+				{
+					// 工具调用结果
+					messages.Add(new Message
+					{
+						message = new SharperLLM.Util.ChatMessage(tuple.resp,null){id = tuple.id},
+						thinking = null,
+						timestamp = DateTime.Now,
+						sender = "tool_result"
+					});
+					InvokeAsync(StateHasChanged);
+				}
+			);
 		}catch(Exception ex)
 		{
 			popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
