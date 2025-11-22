@@ -1,9 +1,7 @@
 using ShimmerChat.Components;
 using ShimmerChat.Singletons;
 using Microsoft.AspNetCore.Localization;
-using Microsoft.Extensions.Localization;
 using System.Globalization;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 

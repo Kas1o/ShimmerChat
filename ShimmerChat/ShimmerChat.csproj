@@ -17,7 +17,6 @@
 
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.41.0" />
-    <PackageReference Include="Microsoft.Extensions.Localization" Version="10.0.0-preview.2.25164.1" />
   </ItemGroup>
 
   <ItemGroup>

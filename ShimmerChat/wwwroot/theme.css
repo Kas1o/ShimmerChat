@@ -1,8 +1,8 @@
 :root {
     /* 亮色主题变量 */
-    --color-primary: #7b34eb;
-    --color-primary-hover: #6a29cc;
-    --color-primary-light: #e9d5ff;
+    --color-primary: #ffa200;
+    --color-primary-hover: #ff7300;
+    --color-primary-light: #ffebc8;
     --color-secondary: #6b7280;
     --color-background: #ffffff;
     --color-surface: #fff;
@@ -30,9 +30,9 @@
 
 /* 暗色主题变量 */
 .dark-theme {
-    --color-primary: #a855f7;
-    --color-primary-hover: #c084fc;
-    --color-primary-light: #4c1d95;
+    --color-primary: #ffa200;
+    --color-primary-hover: #ff7300;
+    --color-primary-light: #4b2601;
     --color-secondary: #9ca3af;
     --color-background: #000;
     --color-surface: #000;
