@@ -2,6 +2,7 @@ using ShimmerChat.Components;
 using ShimmerChat.Singletons;
 using Microsoft.AspNetCore.Localization;
 using System.Globalization;
+using ShimmerChatLib.Interface;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,7 +22,7 @@ builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
 builder.Services.AddSingleton<IToolService, ToolServiceV1>();
 builder.Services.AddSingleton<IPopupService, PopupService>();
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
-// 添加主题服务
+builder.Services.AddSingleton<IPluginDataService, LocalFileStoragePluginData>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV1>();
 
 var app = builder.Build();
