@@ -1,6 +1,7 @@
 @using ShimmerChatLib.Tool
 @using ShimmerChatLib.Panel
 
+
 @attribute [PluginPanelAttribute("示例面板", "这是一个示例插件面板")]
 
 <div class="example-panel p-4">
@@ -18,7 +19,7 @@
     </div>
     
     <div class="mt-6">
-        <button class="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-all">
+        <button @onclick="OnButtonClick" class="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-all">
             点击我
         </button>
     </div>
@@ -34,4 +35,9 @@
     {
         Console.WriteLine("示例面板已初始化");
     }
+
+    private void OnButtonClick()
+    {
+        Console.WriteLine("按钮被点击了！");
+	}
 }

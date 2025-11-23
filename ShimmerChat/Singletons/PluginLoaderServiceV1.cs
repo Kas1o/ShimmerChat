@@ -1,9 +1,16 @@
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ShimmerChat.Singletons
 {
     public class PluginLoaderServiceV1 : IPluginLoaderService
     {
+        private readonly IServiceProvider _serviceProvider;
+
+        public PluginLoaderServiceV1(IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider;
+        }
         public List<T> LoadImplementations<T>()
         {
             var implementations = new List<T>();
@@ -32,7 +39,8 @@ namespace ShimmerChat.Singletons
                 {
                     try
                     {
-                        if (Activator.CreateInstance(type) is T instance)
+                        var instance = (T)ActivatorUtilities.CreateInstance(_serviceProvider, type);
+                        if (instance != null)
                         {
                             implementations.Add(instance);
                         }

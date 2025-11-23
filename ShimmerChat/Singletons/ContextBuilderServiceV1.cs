@@ -8,6 +8,12 @@ namespace ShimmerChat.Singletons
 {
     public class ContextBuilderServiceV1 : IContextBuilderService
     {
+        private readonly IContextModifierService _contextModifierService;
+
+        public ContextBuilderServiceV1(IContextModifierService contextModifierService)
+        {
+            _contextModifierService = contextModifierService;
+        }
         /// <summary>
         /// 将聊天转换为PromptBuilder
         /// </summary>
@@ -48,7 +54,12 @@ namespace ShimmerChat.Singletons
         /// <returns>构建好的PromptBuilder</returns>
         public PromptBuilder BuildPromptBuilder(Chat chat, string agentDescription)
         {
-            return CreatePromptBuilder(chat, agentDescription);
+            var promptBuilder = CreatePromptBuilder(chat, agentDescription);
+            // 获取最新的用户消息作为输入
+            var latestUserMessage = chat.Messages.LastOrDefault(m => m.sender.ToLower() == "user")?.message ?? string.Empty;
+            // 应用上下文修改器
+            _contextModifierService.ApplyModifiers(promptBuilder, latestUserMessage);
+            return promptBuilder;
         }
         
         /// <summary>
@@ -60,7 +71,12 @@ namespace ShimmerChat.Singletons
         /// <returns>构建好的PromptBuilder</returns>
         public PromptBuilder BuildPromptBuilderWithTools(Chat chat, string agentDescription, List<Tool> toolDefinitions)
         {
-            return CreatePromptBuilder(chat, agentDescription, toolDefinitions);
+            var promptBuilder = CreatePromptBuilder(chat, agentDescription, toolDefinitions);
+            // 获取最新的用户消息作为输入
+            var latestUserMessage = chat.Messages.LastOrDefault(m => m.sender.ToLower() == "user")?.message ?? string.Empty;
+            // 应用上下文修改器
+            _contextModifierService.ApplyModifiers(promptBuilder, latestUserMessage);
+            return promptBuilder;
         }
     }
 }

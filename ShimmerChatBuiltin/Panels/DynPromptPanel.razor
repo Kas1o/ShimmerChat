@@ -1,0 +1,644 @@
+@attribute [PluginPanel("DynPrompt 编辑器", "管理和编辑 DynPrompt 集合和提示词")]
+
+@using ShimmerChatLib.Interface
+@using ShimmerChatBuiltin.DynPrompt
+@using Newtonsoft.Json
+@inject IJSRuntime JS
+
+@inject IPluginDataService pluginData
+
+
+
+<div class="shimmer-content p-4">
+    <h2 class="text-2xl font-bold">DynPrompt 编辑器</h2>
+    
+    <!-- 新建 DynPromptSet -->
+    <div class="shimmer-group">
+        <h3 class="text-xl font-semibold">创建新的 DynPromptSet</h3>
+        <div class="d-flex gap-3 mt-3 align-items-center flex-wrap">
+            <input type="text" class="shimmer-input flex-1 @(validationErrors.ContainsKey("newSetName") ? "border-danger" : "")" 
+                   @bind="newSetName" placeholder="输入 DynPromptSet 名称" />
+            @if (validationErrors.ContainsKey("newSetName"))
+            {
+                <div class="text-danger text-sm">@validationErrors["newSetName"]</div>
+            }
+            <button class="btn" @onclick="CreateNewSet" disabled="@string.IsNullOrWhiteSpace(newSetName)">
+                创建
+            </button>
+        </div>
+    </div>
+
+    <!-- DynPromptSet 列表 -->
+    <div class="shimmer-group mt-5">
+        <h3 class="text-xl font-semibold">已有的 DynPromptSet (@sets.Count)</h3>
+        
+        @if (sets.Count == 0)
+        {
+            <p class="text-muted mt-3">暂无 DynPromptSet，请创建新的集合。</p>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+                @foreach (var set in sets)
+                {
+                    <div class="card cursor-pointer p-3 hover:shadow-md transition-shadow duration-200 @(selectedSet?.Name == set.Name ? "border-primary shadow-md" : "")"
+                         @onclick="() => EditSet(set)">
+                        <div class="set-header d-flex justify-content-between w-100">
+                            <h4 class="mb-0">@set.Name</h4>
+                            <div class="set-actions d-flex gap-2">
+                                <button class="btn btn-sm" @onclick:stopPropagation @onclick="() => EditSet(set)" title="编辑">✏️</button>
+                                <button class="btn btn-sm bg-danger text-white" @onclick:stopPropagation @onclick="async () => await DeleteSet(set)" title="删除">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="set-content mt-2">
+                            <p class="text-sm text-muted">包含 @set.Terms.Count 个动态提示词</p>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- 编辑 DynPromptSet -->
+    @if (selectedSet != null)
+    {
+        <div class="shimmer-group mt-5">
+            <h3>编辑: @selectedSet.Name</h3>
+            
+            <div class="set-info">
+                <div class="d-flex gap-3 mt-3 align-items-center">
+                    <label class="mt-1">集合名称:</label>
+                    <input type="text" class="shimmer-input" @bind="editingSetName" />
+                    <button class="btn" @onclick="UpdateSetName" disabled="@string.IsNullOrWhiteSpace(editingSetName)">
+                        更新名称
+                    </button>
+                </div>
+            </div>
+
+            <!-- DynPromptTerm 列表 -->
+            <div class="mt-4">
+                <h4>动态提示词列表 (@selectedSet.Terms.Count)</h4>
+                
+                @if (selectedSet.Terms.Count == 0)
+                {
+                    <p class="text-muted mt-2">该集合暂无动态提示词，请添加。</p>
+                }
+                else
+                {
+                    <div class="space-y-3 mt-2">
+                        @foreach (var term in selectedSet.Terms)
+                        {
+                            <div class="card p-3 @(editingTerm == term ? "border-primary" : "")">
+                                <div class="term-header d-flex justify-content-between">
+                                    <h5 class="mb-0">@term.Name</h5>
+                                    <div class="term-actions d-flex gap-2">
+                                        <button class="btn btn-sm" @onclick="() => EditTerm(term)" title="编辑">✏️</button>
+                                        <button class="btn btn-sm bg-danger text-white" @onclick="async () => await DeleteTerm(term)" title="删除">🗑️</button>
+                                    </div>
+                                </div>
+                                <div class="term-preview mt-2">
+                                    <p class="text-sm"><strong>内容:</strong> @(term.Content.Length > 100 ? term.Content.Substring(0, 100) + "..." : term.Content)</p>
+                                    <p class="text-sm"><strong>注入模式:</strong> @term.InjectionMode</p>
+                                    <p class="text-sm"><strong>触发规则:</strong> @(string.IsNullOrEmpty(term.TriggerRule) ? "无" : term.TriggerRule)</p>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- 添加 DynPromptTerm -->
+            <div class="mt-4">
+                <h4>添加新的动态提示词</h4>
+                <button class="btn mt-2" @onclick="ShowAddTermForm">+ 添加提示词</button>
+            </div>
+        </div>
+    }
+
+    <!-- 编辑或添加 DynPromptTerm 的表单 -->
+    @if (showTermForm)
+    {
+        <div class="shimmer-popup-overlay">
+            <div class="shimmer-popup-content">
+                <h4>@(isEditingTerm ? "编辑动态提示词" : "添加新动态提示词")</h4>
+                
+                <div class="form-group mt-3">
+                    <label>名称:</label>
+                    <input type="text" class="shimmer-input @(validationErrors.ContainsKey("termName") ? "border-danger" : "")" 
+                           @bind="termForm.Name" placeholder="输入提示词名称" />
+                    @if (validationErrors.ContainsKey("termName"))
+                    {
+                        <div class="text-danger text-sm mt-1">@validationErrors["termName"]</div>
+                    }
+                </div>
+                
+                <div class="form-group mt-3">
+                    <label>内容:</label>
+                    <textarea class="shimmer-textarea @(validationErrors.ContainsKey("termContent") ? "border-danger" : "")" 
+                              @bind="termForm.Content" placeholder="输入提示词内容" rows="5"></textarea>
+                    @if (validationErrors.ContainsKey("termContent"))
+                    {
+                        <div class="text-danger text-sm mt-1">@validationErrors["termContent"]</div>
+                    }
+                </div>
+                
+                <div class="form-group mt-3">
+                    <label>注入模式:</label>
+                    <select class="shimmer-input" @bind="termForm.InjectionMode">
+                        @foreach (var mode in Enum.GetValues(typeof(DynPromptTermInjectionMode)))
+                        {
+                            <option value="@mode">@mode</option>
+                        }
+                    </select>
+                </div>
+                
+                <div class="form-group mt-3">
+                    <label>注入深度 (当模式为 AtDepth 时有效):</label>
+                    <input type="number" class="shimmer-input" @bind="termForm.InjectionDepth" min="1" />
+                </div>
+                
+                <div class="form-group mt-3">
+                    <label>触发规则:</label>
+                    <textarea class="shimmer-textarea @(validationErrors.ContainsKey("termTriggerRule") ? "border-danger" : "")" 
+                              @bind="termForm.TriggerRule" placeholder="输入触发规则，留空表示始终触发" rows="3"></textarea>
+                    @if (validationErrors.ContainsKey("termTriggerRule"))
+                    {
+                        <div class="text-danger text-sm mt-1">@validationErrors["termTriggerRule"]</div>
+                    }
+                    <small class="text-muted mt-1">支持正则表达式和逻辑运算符: | (或), & (与), ! (非), () (分组)</small>
+                </div>
+                
+                <div class="form-group mt-3">
+                    <div class="d-flex items-center gap-2">
+                        <input type="checkbox" id="allowRecursive" @bind="termForm.AllowBeTriggeredByRecursive" />
+                        <label for="allowRecursive">允许被递归触发</label>
+                    </div>
+                </div>
+                
+                <div class="form-actions d-flex gap-3 justify-end mt-4">
+                    <button class="btn bg-danger text-white" @onclick="CancelTermForm">取消</button>
+                    <button class="btn" @onclick="SaveTerm">保存</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- 加载指示器 -->
+    @if (isLoading)
+    {
+        <div class="shimmer-popup-overlay">
+            <div class="shimmer-popup-content text-center">
+                <div class="text-primary mb-3">⏳</div>
+                <div class="text-lg">处理中...</div>
+            </div>
+        </div>
+    }
+
+    <!-- 保存和状态消息 -->
+    <div class="mt-5 pt-3 border-t">
+        <div class="d-flex justify-between items-center">
+            <button class="btn" @onclick="SaveAllChanges" disabled="@isLoading">保存所有更改</button>
+            @if (!string.IsNullOrEmpty(statusMessage))
+            {
+                <div class="px-4 py-2 rounded-md text-sm 
+                            @(statusType == "success" ? "bg-success/10 text-success" : 
+                              statusType == "error" ? "bg-error/10 text-error" : "bg-info/10 text-info")">
+                    <span>
+                        @(statusType == "success" ? "✓" : statusType == "error" ? "✗" : "i") 
+                        @statusMessage
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    List<DynPromptSet> sets = [];
+    DynPromptSet? selectedSet = null;
+    string newSetName = "";
+    string editingSetName = "";
+    DynPromptTerm? editingTerm = null;
+    bool showTermForm = false;
+    bool isEditingTerm = false;
+    string statusMessage = "";
+    string statusType = "info"; // info, success, error
+
+    // 表单数据
+    DynPromptTerm termForm = new()
+    {
+        Name = "",
+        Content = "",
+        InjectionMode = DynPromptTermInjectionMode.BeforeSystem,
+        InjectionDepth = 4,
+        TriggerRule = "",
+        AllowBeTriggeredByRecursive = false
+    };
+
+    // 加载状态
+    bool isLoading = false;
+    // 表单验证错误
+    Dictionary<string, string> validationErrors = new();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        LoadDynPromptSets();
+    }
+
+    void LoadDynPromptSets()
+    {
+        try
+        {
+            isLoading = true;
+            var data = pluginData.Read("DynPrompt", "DynPromptSets");
+            sets = JsonConvert.DeserializeObject<List<DynPromptSet>>(data ?? "[]") ?? [];
+            ShowStatus("数据加载成功", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"加载数据失败: {ex.Message}", "error");
+            sets = [];
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // 验证触发规则的正则表达式
+    bool ValidateTriggerRule(string rule)
+    {
+        if (string.IsNullOrEmpty(rule))
+            return true;
+
+        try
+        {
+            // 简单的语法验证，实际应用中可能需要更复杂的验证
+            // 这里我们只是检查括号是否匹配
+            int bracketCount = 0;
+            foreach (char c in rule)
+            {
+                if (c == '(')
+                    bracketCount++;
+                else if (c == ')')
+                    bracketCount--;
+                
+                if (bracketCount < 0)
+                    return false;
+            }
+            return bracketCount == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    void CreateNewSet()
+    {
+        // 清除之前的验证错误
+        ClearValidationErrors();
+        
+        if (string.IsNullOrWhiteSpace(newSetName))
+        {
+            AddValidationError("newSetName", "请输入有效的集合名称");
+            ShowStatus("请输入有效的集合名称", "error");
+            return;
+        }
+
+        if (sets.Any(s => s.Name == newSetName))
+        {
+            AddValidationError("newSetName", "集合名称已存在");
+            ShowStatus("集合名称已存在", "error");
+            return;
+        }
+
+        try
+        {
+            isLoading = true;
+            var newSet = new DynPromptSet { Name = newSetName };
+            sets.Add(newSet);
+            selectedSet = newSet;
+            editingSetName = newSetName;
+            newSetName = "";
+            ShowStatus("集合创建成功", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"创建集合失败: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    void AddValidationError(string field, string message)
+    {
+        validationErrors[field] = message;
+    }
+
+    void ClearValidationErrors()
+    {
+        validationErrors.Clear();
+    }
+
+    void EditSet(DynPromptSet set)
+    {
+        selectedSet = set;
+        editingSetName = set.Name;
+    }
+
+    async Task DeleteSet(DynPromptSet set)
+    {
+        try
+        {
+            // 使用JSInterop调用浏览器的confirm函数
+            bool confirmed = await JS.InvokeAsync<bool>("confirm", 
+                $"确定要删除集合 '{set.Name}' 吗？这将删除所有相关的动态提示词。");
+            
+            if (confirmed)
+            {
+                isLoading = true;
+                sets.Remove(set);
+                if (selectedSet == set)
+                {
+                    selectedSet = null;
+                    editingSetName = "";
+                }
+                ShowStatus("集合已删除", "success");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"删除集合失败: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    void UpdateSetName()
+    {
+        if (selectedSet == null || string.IsNullOrWhiteSpace(editingSetName))
+        {
+            ShowStatus("请输入有效的集合名称", "error");
+            return;
+        }
+
+        if (sets.Any(s => s.Name == editingSetName && s != selectedSet))
+        {
+            ShowStatus("集合名称已存在", "error");
+            return;
+        }
+
+        selectedSet.Name = editingSetName;
+        ShowStatus("集合名称已更新", "success");
+    }
+
+    void ShowAddTermForm()
+    {
+        if (selectedSet == null)
+        {
+            ShowStatus("请先选择一个集合", "error");
+            return;
+        }
+
+        isEditingTerm = false;
+        termForm = new()
+        {
+            Name = "",
+            Content = "",
+            InjectionMode = DynPromptTermInjectionMode.BeforeSystem,
+            InjectionDepth = 4,
+            TriggerRule = "",
+            AllowBeTriggeredByRecursive = false
+        };
+        showTermForm = true;
+    }
+
+    void EditTerm(DynPromptTerm term)
+    {
+        editingTerm = term;
+        isEditingTerm = true;
+        termForm = new()
+        {
+            Name = term.Name,
+            Content = term.Content,
+            InjectionMode = term.InjectionMode,
+            InjectionDepth = term.InjectionDepth,
+            TriggerRule = term.TriggerRule,
+            AllowBeTriggeredByRecursive = term.AllowBeTriggeredByRecursive
+        };
+        showTermForm = true;
+    }
+
+    async Task DeleteTerm(DynPromptTerm term)
+    {
+        try
+        {
+            if (selectedSet != null)
+            {
+                // 使用JSInterop调用浏览器的confirm函数
+                bool confirmed = await JS.InvokeAsync<bool>("confirm", 
+                    $"确定要删除提示词 '{term.Name}' 吗？");
+                
+                if (confirmed)
+                {
+                    isLoading = true;
+                    selectedSet.Terms.Remove(term);
+                    if (editingTerm == term)
+                    {
+                        editingTerm = null;
+                    }
+                    ShowStatus("提示词已删除", "success");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"删除提示词失败: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    void SaveTerm()
+    {
+        // 清除之前的验证错误
+        ClearValidationErrors();
+        
+        if (selectedSet == null)
+        {
+            ShowStatus("请先选择一个集合", "error");
+            return;
+        }
+
+        // 验证必填字段
+        if (string.IsNullOrWhiteSpace(termForm.Name))
+        {
+            AddValidationError("termName", "请输入提示词名称");
+        }
+
+        if (string.IsNullOrWhiteSpace(termForm.Content))
+        {
+            AddValidationError("termContent", "请输入提示词内容");
+        }
+
+        // 验证触发规则
+        if (!ValidateTriggerRule(termForm.TriggerRule))
+        {
+            AddValidationError("termTriggerRule", "触发规则语法错误，请检查括号是否匹配");
+        }
+
+        // 检查名称冲突
+        if (!string.IsNullOrWhiteSpace(termForm.Name))
+        {
+            if (isEditingTerm && editingTerm != null)
+            {
+                if (selectedSet.Terms.Any(t => t.Name == termForm.Name && t != editingTerm))
+                {
+                    AddValidationError("termName", "提示词名称已存在");
+                }
+            }
+            else
+            {
+                if (selectedSet.Terms.Any(t => t.Name == termForm.Name))
+                {
+                    AddValidationError("termName", "提示词名称已存在");
+                }
+            }
+        }
+
+        // 如果有验证错误，显示错误信息
+        if (validationErrors.Count > 0)
+        {
+            ShowStatus("请修正表单中的错误", "error");
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            isLoading = true;
+            
+            if (isEditingTerm && editingTerm != null)
+            {
+                // 更新现有项
+                editingTerm.Name = termForm.Name;
+                editingTerm.Content = termForm.Content;
+                editingTerm.InjectionMode = termForm.InjectionMode;
+                editingTerm.InjectionDepth = termForm.InjectionDepth;
+                editingTerm.TriggerRule = termForm.TriggerRule;
+                editingTerm.AllowBeTriggeredByRecursive = termForm.AllowBeTriggeredByRecursive;
+                ShowStatus("提示词已更新", "success");
+            }
+            else
+            {
+                // 添加新项
+                var newTerm = new DynPromptTerm
+                {
+                    Name = termForm.Name,
+                    Content = termForm.Content,
+                    InjectionMode = termForm.InjectionMode,
+                    InjectionDepth = termForm.InjectionDepth,
+                    TriggerRule = termForm.TriggerRule,
+                    AllowBeTriggeredByRecursive = termForm.AllowBeTriggeredByRecursive
+                };
+                selectedSet.Terms.Add(newTerm);
+                ShowStatus("提示词已添加", "success");
+            }
+
+            CancelTermForm();
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"保存提示词失败: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    void CancelTermForm()
+    {
+        showTermForm = false;
+        editingTerm = null;
+        isEditingTerm = false;
+    }
+
+    void SaveAllChanges()
+    {
+        try
+        {
+            isLoading = true;
+            
+            // 验证所有数据
+            bool hasErrors = false;
+            foreach (var set in sets)
+            {
+                if (string.IsNullOrWhiteSpace(set.Name))
+                {
+                    hasErrors = true;
+                    ShowStatus("存在无效的集合名称", "error");
+                    break;
+                }
+                
+                foreach (var term in set.Terms)
+                {
+                    if (string.IsNullOrWhiteSpace(term.Name) || string.IsNullOrWhiteSpace(term.Content))
+                    {
+                        hasErrors = true;
+                        ShowStatus("存在无效的提示词", "error");
+                        break;
+                    }
+                    
+                    if (!ValidateTriggerRule(term.TriggerRule))
+                    {
+                        hasErrors = true;
+                        ShowStatus($"提示词 '{term.Name}' 的触发规则语法错误", "error");
+                        break;
+                    }
+                }
+                
+                if (hasErrors)
+                    break;
+            }
+            
+            if (hasErrors)
+                return;
+            
+            var json = JsonConvert.SerializeObject(sets, Formatting.Indented);
+            pluginData.Write("DynPrompt", "DynPromptSets", json);
+            ShowStatus("所有更改已保存", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"保存失败: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    void ShowStatus(string message, string type)
+    {
+        statusMessage = message;
+        statusType = type;
+        // 3秒后自动清除消息
+        InvokeAsync(async () =>
+        {
+            await Task.Delay(3000);
+            statusMessage = "";
+            StateHasChanged();
+        });
+    }
+
+    // 移除模拟的confirm函数，现在使用JSInterop
+}
