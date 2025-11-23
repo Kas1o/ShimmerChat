@@ -1,13 +1,12 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using SharperLLM.Util;
 using ShimmerChatBuiltin.DynPrompt;
 using ShimmerChatLib.Context;
 using ShimmerChatLib.Interface;
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using System.Linq;
 using System.Text;
+using System.Linq;
 
 namespace ShimmerChatBuiltin.ContextModifiers
 {
@@ -79,9 +78,8 @@ namespace ShimmerChatBuiltin.ContextModifiers
 		{
 			try
 			{
-				// 简单的解析器实现，处理基本的逻辑运算
-				// 实际项目中可能需要更复杂的解析器
-				return EvaluateExpression(rule, contextText);
+				// 使用新的DynPromptEvaluator评估表达式
+				return DynPromptEvaluator.Evaluate(rule, contextText);
 			}
 			catch (Exception ex)
 			{
@@ -89,127 +87,6 @@ namespace ShimmerChatBuiltin.ContextModifiers
 				Console.WriteLine($"Error evaluating trigger rule: {ex.Message}");
 				return false;
 			}
-		}
-
-		/// <summary>
-		/// 解析和评估表达式
-		/// </summary>
-		private bool EvaluateExpression(string expression, string contextText)
-		{
-			// 去除首尾空白
-			expression = expression.Trim();
-
-			// 处理括号
-			if (expression.StartsWith("(") && expression.EndsWith(")"))
-			{
-				// 检查括号是否匹配
-				int bracketCount = 0;
-				bool isBalanced = true;
-				for (int i = 0; i < expression.Length; i++)
-				{
-					if (expression[i] == '(')
-						bracketCount++;
-					else if (expression[i] == ')')
-					{
-						bracketCount--;
-						if (bracketCount < 0)
-						{
-							isBalanced = false;
-							break;
-						}
-					}
-				}
-
-				if (!isBalanced || bracketCount != 0)
-					throw new ArgumentException("Unbalanced parentheses in expression.");
-
-				// 检查是否是最外层括号（不被其他括号包裹）
-				int innerBracketCount = 0;
-				bool isOuterBrackets = true;
-				for (int i = 1; i < expression.Length - 1; i++)
-				{
-					if (expression[i] == '(')
-						innerBracketCount++;
-					else if (expression[i] == ')')
-						innerBracketCount--;
-					
-					// 如果在内部遇到了不平衡的括号，说明这不是最外层括号
-					if (innerBracketCount < 0)
-					{
-						isOuterBrackets = false;
-						break;
-					}
-				}
-
-				if (isOuterBrackets)
-				{
-					return EvaluateExpression(expression.Substring(1, expression.Length - 2), contextText);
-				}
-			}
-
-			// 处理 NOT 操作符
-			if (expression.StartsWith("!"))
-			{
-				return !EvaluateExpression(expression.Substring(1).Trim(), contextText);
-			}
-
-			// 处理 OR 操作符
-			int orIndex = FindOperatorIndex(expression, '|');
-			if (orIndex >= 0)
-			{
-				string left = expression.Substring(0, orIndex).Trim();
-				string right = expression.Substring(orIndex + 1).Trim();
-				return EvaluateExpression(left, contextText) || EvaluateExpression(right, contextText);
-			}
-
-			// 处理 AND 操作符
-			int andIndex = FindOperatorIndex(expression, '&');
-			if (andIndex >= 0)
-			{
-				string left = expression.Substring(0, andIndex).Trim();
-				string right = expression.Substring(andIndex + 1).Trim();
-				return EvaluateExpression(left, contextText) && EvaluateExpression(right, contextText);
-			}
-
-			// 处理正则表达式模式（应该是被引号包围的字符串）
-			if (expression.StartsWith('"') && expression.EndsWith('"'))
-			{
-				// 移除引号并处理转义字符
-				string pattern = expression.Substring(1, expression.Length - 2);
-				// 替换 JSON 转义字符
-				pattern = pattern.Replace("\\\"", "\"").Replace("\\\\", "\\");
-				
-				try
-				{
-					return Regex.IsMatch(contextText, pattern, RegexOptions.IgnoreCase);
-				}
-				catch (ArgumentException)
-				{
-					// 正则表达式无效时默认返回 false
-					return false;
-				}
-			}
-
-			// 默认返回 false
-			return false;
-		}
-
-		/// <summary>
-		/// 在表达式中查找操作符的索引（考虑括号嵌套）
-		/// </summary>
-		private int FindOperatorIndex(string expression, char op)
-		{
-			int bracketCount = 0;
-			for (int i = 0; i < expression.Length; i++)
-			{
-				if (expression[i] == '(')
-					bracketCount++;
-				else if (expression[i] == ')')
-					bracketCount--;
-				else if (bracketCount == 0 && expression[i] == op)
-					return i;
-			}
-			return -1;
 		}
 
 		/// <summary>
