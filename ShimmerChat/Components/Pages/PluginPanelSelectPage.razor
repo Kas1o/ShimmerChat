@@ -1,0 +1,43 @@
+@page "/pluginpanel"
+@inject IPluginPanelService PluginPanelService
+
+<PageTitle>插件面板列表</PageTitle>
+
+<div class="plugin-panel-select-container">
+    <h1 class="panel-main-title">插件面板列表</h1>
+    <div class="panel-grid">
+        @if (pluginPanels.Count > 0)
+        {
+            @foreach (var panel in pluginPanels)
+            {
+                <div class="panel-card" @onclick="() => NavigateToPanel(panel.Name)">
+                    <h3 class="panel-card-title">@panel.Name</h3>
+                    <p class="panel-card-description">@panel.Description</p>
+                </div>
+            }
+        }
+        else
+        {
+            <p class="panel-empty-message">暂无可用的插件面板</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Inject]
+    public NavigationManager Navigation { get; set; } = null!;
+
+    private List<PluginPanelInfo> pluginPanels = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 确保插件面板服务已加载完成
+        await Task.Delay(100); // 短暂延迟确保服务初始化
+        pluginPanels = PluginPanelService.GetPluginPanels();
+    }
+    
+    private void NavigateToPanel(string panelName)
+    {
+        Navigation.NavigateTo($"/pluginpanel/{Uri.EscapeDataString(panelName)}", true);
+    }
+}

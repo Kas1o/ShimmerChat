@@ -1,0 +1,64 @@
+@page "/pluginpanel/{PanelName}"
+@inject IPluginPanelService PluginPanelService
+
+<PageTitle>插件面板 - @PanelTitle</PageTitle>
+
+<div class="plugin-panel-container">
+    @if (panelType != null)
+    {
+        <div class="panel-header">
+            <h1 class="panel-title">@PanelTitle</h1>
+            <button class="btn btn-secondary" @onclick="NavigateBack">
+                <span class="icon-back"></span>
+                返回列表
+            </button>
+        </div>
+        <div class="panel-content">
+            <DynamicComponent Type="panelType" />
+        </div>
+    }
+    else
+    {
+        <div class="panel-not-found">
+            <h1 class="panel-error-title">面板不存在</h1>
+            <div class="panel-error-message">
+                <p>未找到名称为 "@PanelName" 的插件面板</p>
+            </div>
+            <button class="btn btn-primary" @onclick="NavigateBack">
+                <span class="icon-back"></span>
+                返回面板列表
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string PanelName { get; set; } = string.Empty;
+    
+    [Inject]
+    public NavigationManager Navigation { get; set; } = null!;
+
+    private Type? panelType;
+    private string PanelTitle => panelType != null ? PanelName : "插件面板";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 确保插件面板服务已加载完成
+        await Task.Delay(100); // 短暂延迟确保服务初始化
+        
+        panelType = PluginPanelService.GetPluginPanelType(PanelName);
+        // 如果面板类型为空，可能是插件尚未加载完成
+        if (panelType == null)
+        {
+            // 尝试重新获取所有面板，确保服务已刷新
+            PluginPanelService.RefreshPluginPanels();
+            panelType = PluginPanelService.GetPluginPanelType(PanelName);
+        }
+    }
+    
+    private void NavigateBack()
+    {
+        Navigation.NavigateTo("/pluginpanel");
+    }
+}

@@ -13,6 +13,8 @@
     --color-border: #e5e7eb;
     --color-border-hover: #d1d5db;
     --color-error: #ef4444;
+    --color-error-light: rgba(239, 68, 68, 0.1);
+    --color-error-border: rgba(239, 68, 68, 0.2);
     --color-success: #10b981;
     --color-warning: #f59e0b;
     --color-info: #3b82f6;
@@ -26,6 +28,14 @@
     --radius-2xl: 1rem;
     --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     --transition: all 0.2s ease;
+    /* 间距变量 */
+    --spacing-xs: 0.25rem;  /* 4px */
+    --spacing-sm: 0.5rem;   /* 8px */
+    --spacing-md: 0.75rem;  /* 12px */
+    --spacing-lg: 1rem;     /* 16px */
+    --spacing-xl: 1.5rem;   /* 24px */
+    --spacing-2xl: 2rem;    /* 32px */
+    --spacing-3xl: 2.5rem;  /* 40px */
 }
 
 /* 暗色主题变量 */
@@ -43,6 +53,8 @@
     --color-border: #374151;
     --color-border-hover: #4b5563;
     --color-error: #f87171;
+    --color-error-light: rgba(248, 113, 113, 0.15);
+    --color-error-border: rgba(248, 113, 113, 0.25);
     --color-success: #34d399;
     --color-warning: #fbbf24;
     --color-info: #60a5fa;
