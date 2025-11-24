@@ -323,6 +323,9 @@
             editingSetName = newSetName;
             newSetName = "";
             ShowStatus("集合创建成功", "success");
+            
+            // 自动保存
+            SaveAllChanges();
         }
         catch (Exception ex)
         {
@@ -360,14 +363,17 @@
             
             if (confirmed)
             {
-                isLoading = true;
-                sets.Remove(set);
-                if (selectedSet == set)
-                {
-                    selectedSet = null;
-                    editingSetName = "";
-                }
-                ShowStatus("集合已删除", "success");
+                 isLoading = true;
+                 sets.Remove(set);
+                 if (selectedSet == set)
+                 {
+                     selectedSet = null;
+                     editingSetName = "";
+                 }
+                 ShowStatus("集合已删除", "success");
+                 
+                 // 自动保存
+                 SaveAllChanges();
             }
         }
         catch (Exception ex)
@@ -396,6 +402,9 @@
 
         selectedSet.Name = editingSetName;
         ShowStatus("集合名称已更新", "success");
+        
+        // 自动保存
+        SaveAllChanges();
     }
 
     void ShowAddTermForm()
@@ -454,6 +463,9 @@
                         editingTerm = null;
                     }
                     ShowStatus("提示词已删除", "success");
+                    
+                    // 自动保存
+                    SaveAllChanges();
                 }
             }
         }
@@ -554,15 +566,18 @@
             }
 
             CancelTermForm();
-        }
-        catch (Exception ex)
-        {
-            ShowStatus($"保存提示词失败: {ex.Message}", "error");
-        }
-        finally
-        {
-            isLoading = false;
-        }
+                
+                // 自动保存
+                SaveAllChanges();
+            }
+            catch (Exception ex)
+            {
+                ShowStatus($"保存提示词失败: {ex.Message}", "error");
+            }
+            finally
+            {
+                isLoading = false;
+            }
     }
 
     void CancelTermForm()
