@@ -58,7 +58,7 @@ namespace ShimmerChat.Singletons
             // 获取最新的用户消息作为输入
             var latestUserMessage = chat.Messages.LastOrDefault(m => m.sender.ToLower() == "user")?.message ?? string.Empty;
             // 应用上下文修改器
-            _contextModifierService.ApplyModifiers(promptBuilder, latestUserMessage);
+            _contextModifierService.ApplyModifiers(promptBuilder);
             return promptBuilder;
         }
         
@@ -75,7 +75,7 @@ namespace ShimmerChat.Singletons
             // 获取最新的用户消息作为输入
             var latestUserMessage = chat.Messages.LastOrDefault(m => m.sender.ToLower() == "user")?.message ?? string.Empty;
             // 应用上下文修改器
-            _contextModifierService.ApplyModifiers(promptBuilder, latestUserMessage);
+            _contextModifierService.ApplyModifiers(promptBuilder);
             return promptBuilder;
         }
     }

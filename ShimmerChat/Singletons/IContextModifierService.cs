@@ -37,8 +37,7 @@ namespace ShimmerChat.Singletons
         /// 顺序应用所有激活的ContextModifier到PromptBuilder
         /// </summary>
         /// <param name="promptBuilder">要修改的PromptBuilder</param>
-        /// <param name="input">用户输入</param>
-        void ApplyModifiers(PromptBuilder promptBuilder, string input);
+        void ApplyModifiers(PromptBuilder promptBuilder);
 
         public void SaveActivatedModifiers();
 	}

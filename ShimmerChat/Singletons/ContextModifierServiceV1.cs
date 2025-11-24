@@ -123,15 +123,14 @@ namespace ShimmerChat.Singletons
             SaveActivatedModifiers();
         }
 
-        public void ApplyModifiers(PromptBuilder promptBuilder, string input)
+        public void ApplyModifiers(PromptBuilder promptBuilder)
         {
             foreach (var activatedModifier in ActivatedModifiers)
             {
                 var modifier = LoadedModifiers.FirstOrDefault(m => m.info.Name == activatedModifier.Name);
                 if (modifier != null)
                 {
-                    // 使用激活时设置的输入值，如果为空则使用当前输入
-                    var modifierInput = string.IsNullOrEmpty(activatedModifier.Value) ? input : activatedModifier.Value;
+                    var modifierInput = activatedModifier.Value;
                     modifier.ModifyContext(promptBuilder, modifierInput);
                 }
             }
