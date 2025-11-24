@@ -166,6 +166,7 @@
                         <div class="text-danger text-sm mt-1">@validationErrors["termTriggerRule"]</div>
                     }
                     <small class="text-muted mt-1">支持正则表达式和逻辑运算符: | (或), & (与), ! (非), () (分组)</small>
+                    <a href="https://github.com/Kas1o/ShimmerChat/blob/master/ShimmerChatBuiltin/DynPrompt/TriggerRule.md">Doc Link</a>
                 </div>
                 
                 <div class="form-group mt-3">
@@ -267,30 +268,20 @@
     }
 
     // 验证触发规则的正则表达式
-    bool ValidateTriggerRule(string rule)
+    bool ValidateTriggerRule(string rule, out string? message)
     {
+        message = null;
         if (string.IsNullOrEmpty(rule))
             return true;
-
         try
         {
-            // 简单的语法验证，实际应用中可能需要更复杂的验证
-            // 这里我们只是检查括号是否匹配
-            int bracketCount = 0;
-            foreach (char c in rule)
-            {
-                if (c == '(')
-                    bracketCount++;
-                else if (c == ')')
-                    bracketCount--;
-                
-                if (bracketCount < 0)
-                    return false;
-            }
-            return bracketCount == 0;
+			// 用空字符串测试规则的语法有效性
+			_ = DynPromptEvaluator.Evaluate(rule, string.Empty);
+			return true;
         }
-        catch
+        catch(Exception ex)
         {
+			message = ex.Message;
             return false;
         }
     }
@@ -502,9 +493,9 @@
         }
 
         // 验证触发规则
-        if (!ValidateTriggerRule(termForm.TriggerRule))
+        if (!ValidateTriggerRule(termForm.TriggerRule, out var message))
         {
-            AddValidationError("termTriggerRule", "触发规则语法错误，请检查括号是否匹配");
+            AddValidationError("termTriggerRule", $"触发规则语法错误: {message}");
         }
 
         // 检查名称冲突
@@ -613,7 +604,7 @@
                         break;
                     }
                     
-                    if (!ValidateTriggerRule(term.TriggerRule))
+                    if (!ValidateTriggerRule(term.TriggerRule, out _))
                     {
                         hasErrors = true;
                         ShowStatus($"提示词 '{term.Name}' 的触发规则语法错误", "error");

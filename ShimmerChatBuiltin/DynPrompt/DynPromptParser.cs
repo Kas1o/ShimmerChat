@@ -438,20 +438,17 @@ namespace ShimmerChatBuiltin.DynPrompt
                                               ex.Message.Contains("Unexpected token"))
             {
                 // 语法错误，更详细的错误信息
-                Console.WriteLine($"Syntax error in expression '{expression}': {ex.Message}");
-                return false;
+                throw new Exception($"Syntax error in expression '{expression}': {ex.Message}");
             }
             catch (ArgumentException ex) when (ex.Message.Contains("Invalid regex pattern"))
             {
-                // 正则表达式错误
-                Console.WriteLine($"Invalid regex pattern in expression '{expression}': {ex.Message}");
-                return false;
+				// 正则表达式错误
+				throw new Exception($"Invalid regex pattern in expression '{expression}': {ex.Message}");
             }
             catch (Exception ex)
             {
-                // 其他评估错误
-                Console.WriteLine($"Error evaluating expression '{expression}': {ex.Message}");
-                return false;
+				// 其他评估错误
+				throw new Exception($"Error evaluating expression '{expression}': {ex.Message}");
             }
         }
     }
