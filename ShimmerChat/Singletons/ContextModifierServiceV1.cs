@@ -14,12 +14,12 @@ namespace ShimmerChat.Singletons
         private const string ActivatedModifiersKey = "activated_modifiers";
         
         private readonly IPluginLoaderService _pluginLoaderService;
-        private readonly IPluginDataService _pluginDataService;
+        private readonly IKVDataService _pluginDataService;
 
         public List<IContextModifier> LoadedModifiers { get; private set; } = new();
         public List<ActivatedModifier> ActivatedModifiers { get; private set; } = new();
 
-        public ContextModifierServiceV1(IPluginLoaderService pluginLoaderService, IPluginDataService pluginDataService)
+        public ContextModifierServiceV1(IPluginLoaderService pluginLoaderService, IKVDataService pluginDataService)
         {
             _pluginLoaderService = pluginLoaderService;
             _pluginDataService = pluginDataService;

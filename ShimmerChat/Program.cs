@@ -22,7 +22,7 @@ builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
 builder.Services.AddSingleton<IToolService, ToolServiceV1>();
 builder.Services.AddSingleton<IPopupService, PopupService>();
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
-builder.Services.AddSingleton<IPluginDataService, LocalFileStoragePluginData>();
+builder.Services.AddSingleton<IKVDataService, LocalFileStorageKVData>();
 builder.Services.AddSingleton<IContextModifierService, ContextModifierServiceV1>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV1>();
 

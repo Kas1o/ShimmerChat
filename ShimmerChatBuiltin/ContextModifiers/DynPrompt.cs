@@ -12,8 +12,8 @@ namespace ShimmerChatBuiltin.ContextModifiers
 {
 	public class DynPrompt : IContextModifier
 	{
-		IPluginDataService pluginData;
-		public DynPrompt(IPluginDataService pluginDataService)
+		IKVDataService pluginData;
+		public DynPrompt(IKVDataService pluginDataService)
 		{
 			this.pluginData = pluginDataService;
 		}
