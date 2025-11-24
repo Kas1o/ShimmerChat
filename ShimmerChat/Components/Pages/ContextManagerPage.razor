@@ -4,16 +4,16 @@
 @inject IUserData userData
 @inject IContextModifierService contextModifierService
 
-<h3>Context Manager</h3>
+<h3>@l["TITLE"] </h3>
 
 <!-- 补全设置 -->
-<h4>Completion Settings</h4>
+<h4>@l["COMPLETION_SETTINGS_TITLE"]</h4>
 @if (userData.ApiSettings.Count == 0)
 {
     <div class="alert alert-warning" style="margin-top: 20px;">
-        <h4>No API Settings Found</h4>
-        <p>You need to configure API settings before using the Context Manager.</p>
-        <button class="btn btn-primary" @onclick="NavigateToApiSettings">Go to API Settings</button>
+        <h4>@l["NO_API_SETTING_FOUND_TITLE"]</h4>
+        <p>@l["NO_API_SETTING_FOUND_CONTENT"]</p>
+        <button class="btn btn-primary" @onclick="NavigateToApiSettings">@l["GO_API_SETTING_BUTTON"]</button>
     </div>
 }
 else
@@ -21,19 +21,19 @@ else
     @if (UsingOpenAIAndTextCompletion)
     {
         <h5 style="color:red">
-            Use OpenAI API with Text Completion is not recommend. Most endpoints do not support it.
+            @l["USE_OPENAI_TEXT_COMPLETION_WARNING"]
         </h5>
     }
 
-    <label>Completion Type:</label>
+    <label>@l["COMPLETION_TYPE_LABEL"]</label>
     <select @bind="_selectedCompletionType" class="form-select" style="width:auto;display:inline-block;margin-left:8px;">
         @if (AllowChatCompletion)
         {
-            <option value="chat-completion">Chat Completion</option>
+            <option value="chat-completion">@l["CHAT_COMPLETION_OPTION"]</option>
         }
         @if (AllowTextCompletion)
         {
-            <option value="text-completion">Text Completion</option>
+            <option value="text-completion">@l["TEXT_COMPLETION_OPTION"]</option>
         }
     </select>
 
@@ -42,7 +42,7 @@ else
 
     @if (completionType == CompletionType.TextCompletion)
     {
-        <h5>Text Completion Settings</h5>
+        <h5>@l["TEXT_COMPLETION_SETTINGS_TITLE"]</h5>
         <select @bind="_selectedTextCompletionIndex" class="form-select" style="width:auto;display:inline-block;">
             @for (int i = 0; i < textCompletionSettings.Count; i++)
             {
@@ -53,13 +53,13 @@ else
         @if (topTextCompletionSetting != null)
         {
             <div class="shimmer-group" style="margin-top:16px;">
-                <h5>Name:</h5>
+                <h5>@l["NAME:"]</h5>
                 <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.name"></textarea>
-                <h5>System Message Template:</h5>
+                <h5>@l["SYSTEM_MESSAGE_TEMPLATE"]</h5>
                 <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.SystemMessageTemplate"></textarea>
-                <h5>User Message Template:</h5>
+                <h5>@l["USER_MESSAGE_TEMPLATE"]</h5>
                 <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.UserMessageTemplate"></textarea>
-                <h5>Char Message Template:</h5>
+                <h5>@l["AGENT_MESSAGE_TEMPLATE"]</h5>
                 <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.CharMessageTemplate"></textarea>
             </div>
         }
@@ -67,7 +67,7 @@ else
 
     @if (completionType == CompletionType.ChatCompletion)
     {
-        <h5>Chat Completion Settings</h5>
+        <h5>@l["CHAT_COMPLETION_SETTINGS_TITLE"]</h5>
         <!-- 可根据需要扩展 Chat Completion 的设置 -->
     }
 
@@ -76,12 +76,12 @@ else
 
 
 <!-- 上下文修改器 -->
-<h4>Context Modifier</h4>
+<h4>@l["CONTEXT_MODIFIER_TITLE"]</h4>
 
 <div class="shimmer-group" style="margin-top:16px;">
-    <h5>Available Context Modifiers:</h5>
+    <h5>@l["AVAILABLE_CONTEXT_MODIFIER"]</h5>
     <select @bind="_selectedModifierName" class="form-select" style="width:auto;display:inline-block;">
-        <option value="">-- Select a Context Modifier --</option>
+        <option value="">@l["SELECT_CM_PH"]</option>
         @foreach (var modifier in contextModifierService.LoadedModifiers)
         {
             <option value="@modifier.info.Name">@modifier.info.Name - @modifier.info.Description</option>
@@ -90,13 +90,13 @@ else
 </div>
 
 <div class="shimmer-group" style="margin-top:8px;">
-    <h5>Input Value:</h5>
-    <textarea @bind="_modifierInput" class="form-control" rows="3" placeholder="Enter input value for the selected Context Modifier..."></textarea>
-    <button class="btn btn-primary" style="margin-top:8px;" @onclick="AddModifier" disabled="@string.IsNullOrEmpty(_selectedModifierName)">Add to Active List</button>
+    <h5>@l["INPUT_VALUE"]</h5>
+    <textarea @bind="_modifierInput" class="form-control" rows="3" placeholder="@l["CM_INPUT_PH"]"></textarea>
+    <button class="btn btn-primary" style="margin-top:8px;" @onclick="AddModifier" disabled="@string.IsNullOrEmpty(_selectedModifierName)">@l["CM_ADD"]</button>
 </div>
 
 <div class="shimmer-group" style="margin-top:16px;">
-    <h5>Active Context Modifiers:</h5>
+    <h5>@l["ACTIVE_CM"]</h5>
     @if (contextModifierService.ActivatedModifiers.Any())
     {
         <ul class="list-group">
@@ -117,7 +117,7 @@ else
     }
     else
     {
-        <p class="text-muted">No active context modifiers</p>
+        <p class="text-muted">@l["NO_ACTIVE_CM"]</p>
     }
 </div>
 
