@@ -7,7 +7,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:5227"
+      "applicationUrl": "http://localhost:26735"
     },
     "IIS Express": {
       "commandName": "IISExpress",
@@ -23,7 +23,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://0.0.0.0:5227"
+      "applicationUrl": "http://0.0.0.0:26735"
     }
   },
   "$schema": "https://json.schemastore.org/launchsettings.json",
