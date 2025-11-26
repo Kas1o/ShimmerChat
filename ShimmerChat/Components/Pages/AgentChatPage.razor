@@ -42,7 +42,7 @@
 				}
 				else
 				{
-					<button class="btn btn-primary" @onclick="Send" disabled="@string.IsNullOrWhiteSpace(inputText)">发送</button>
+					<button class="btn btn-primary" @onclick="Send">发送</button>
 				}
 			</div>
 		</div>
@@ -151,10 +151,7 @@
 	{
 		if (e.Key == "Enter" && !e.ShiftKey && !generating) // 检测是否按下 Enter 键
 		{
-			if (!string.IsNullOrWhiteSpace(inputText))
-			{
-				Send();
-			}
+			Send(); // 无论输入是否为空，都调用Send方法
 		}
 	}
 
@@ -171,22 +168,27 @@
 		// 取消之前可能存在的生成任务
 		CancelPreviousGeneration();
 
-		var message = new Message()
+		// 只有当输入不为空时才添加用户消息
+		if (!string.IsNullOrWhiteSpace(inputText))
+		if (inputText.Trim().Length > 0)
 		{
-			message = new SharperLLM.Util.ChatMessage
-		(Content: inputText, // 使用输入框的内容
-		ImageBase64: null // 如果有图片，可以在这里设置
-		),
-			timestamp = DateTime.Now, // 设置消息的时间戳
-			sender = "User" // 设置发送者，可以是 "User" 或其他标识
-		};
+			var message = new Message()
+			{
+				message = new SharperLLM.Util.ChatMessage
+			(Content: inputText, // 使用输入框的内容
+			ImageBase64: null // 如果有图片，可以在这里设置
+			),
+				timestamp = DateTime.Now, // 设置消息的时间戳
+				sender = "User" // 设置发送者，可以是 "User" 或其他标识
+			};
 
-		// 添加消息到聊天
-		chat.AddMessage(message);
-		inputText = ""; // 清空输入框
-		GetDirty(); // 标记为脏数据以保存
+			// 添加消息到聊天
+			chat.AddMessage(message);
+			inputText = ""; // 清空输入框
+			GetDirty(); // 标记为脏数据以保存
+		}
 		
-		// 启动生成任务
+		// 无论输入是否为空，都启动AI生成任务
 		new Task(AddLLMReplyStream).Start();
 	}
 
