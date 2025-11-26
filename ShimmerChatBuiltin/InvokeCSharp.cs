@@ -15,6 +15,7 @@ namespace ShimmerChatBuiltinTools
 	{
 		public async Task<string> Execute(string input)
 		{
+			Console.WriteLine(input);
 			var arguments = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(input);
 			if (
 				arguments.TryGetValue("code", out string code) &&

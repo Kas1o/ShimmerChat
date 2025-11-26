@@ -1,4 +1,4 @@
-﻿@page "/apisettings"
+@page "/apisettings"
 @using Singletons;
 @using ShimmerChatLib;
 @inject NavigationManager Navigation
@@ -125,6 +125,8 @@
                 <input class="shimmer-input" @bind="topAPISetting.OpenAIApiKey" />
                 <label>@l["API MODEL"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.OpenAIModel" />
+                <label>@l["启用流式输出"]</label>
+                <input type="checkbox" @bind="topAPISetting.OpenAIStream" />
             }
         </div>
     </div>

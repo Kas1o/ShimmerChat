@@ -19,6 +19,7 @@ namespace ShimmerChatLib
 		public string? OpenAIUrl { get; set; } = "http://localhost:5001/api/v1";
 		public string? OpenAIApiKey { get; set; } = "key";
 		public string? OpenAIModel { get; set; } = "gpt-4o";
+		public bool OpenAIStream { get; set; } = true;
 
 		// Ollama 配置（可后续扩展）
 		public string? OllamaUrl { get; set; }
@@ -62,8 +63,9 @@ namespace ShimmerChatLib
 				KoboldConf = KoboldConf?.Clone() as KoboldAPI.KoboldAPIConf, // 假设 KoboldAPIConf 实现了 Clone 或可深拷贝
 
 				OpenAIUrl = OpenAIUrl,
-				OpenAIApiKey = OpenAIApiKey,
-				OpenAIModel = OpenAIModel,
+			OpenAIApiKey = OpenAIApiKey,
+			OpenAIModel = OpenAIModel,
+			OpenAIStream = OpenAIStream,
 
 				OllamaUrl = OllamaUrl,
 				OllamaModel = OllamaModel

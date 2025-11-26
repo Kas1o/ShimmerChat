@@ -8,7 +8,7 @@
 
 <div class="shimmer-message">
 	<div class="shimmer-message-head">
-		<div>@sender</div>
+		<div>@sender @(message.IsStreaming ? "(流式生成中...)" : "")</div>
 		<div class="shimmer-message-head-action">
 			<div @onclick="e => DeleteThisMessage()">
 				@l["BUTTON_DELETE"]
@@ -16,7 +16,7 @@
 			<div @onclick="CopyContentToClipboard">
 				@l["BUTTON_COPY"]
 			</div>
-			<div @onclick="EnterEditMode">
+			<div @onclick="EnterEditMode" style="display: @(message.IsStreaming ? "none" : "block")">
 				@l["BUTTON_EDIT"]
 			</div>
 		</div>
@@ -39,6 +39,10 @@
 	else
 	{
 		@DisplayContent
+		@if(message.IsStreaming)
+		{
+			<span class="shimmer-typing-indicator">▌</span>
+		}
 	}
 </div>
 
@@ -66,6 +70,58 @@
 
 	string sender => message.sender;
 
+	// 当组件初始化时设置
+	protected override void OnInitialized()
+	{
+		base.OnInitialized();
+		// 订阅Message对象的事件
+		SubscribeToMessageEvents();
+	}
+
+	// 当message参数变化时重新订阅
+	protected override void OnParametersSet()
+	{
+		base.OnParametersSet();
+		// 重新订阅Message对象的事件
+		SubscribeToMessageEvents();
+	}
+
+	// 订阅Message对象的事件
+	private void SubscribeToMessageEvents()
+	{
+		// 移除可能存在的旧订阅
+		message.ContentChanged -= HandleContentChanged;
+		message.StreamingStateChanged -= HandleStreamingStateChanged;
+		
+		// 添加新订阅
+		message.ContentChanged += HandleContentChanged;
+		message.StreamingStateChanged += HandleStreamingStateChanged;
+	}
+
+	// 当内容变化时刷新UI
+	private void HandleContentChanged(object? sender, EventArgs e)
+	{
+		// 通知Blazor重新渲染组件
+		InvokeAsync(StateHasChanged);
+	}
+
+	// 当流式状态变化时刷新UI
+	private void HandleStreamingStateChanged(object? sender, EventArgs e)
+	{
+		// 通知Blazor重新渲染组件
+		InvokeAsync(StateHasChanged);
+	}
+
+	// 组件销毁时取消订阅，防止内存泄漏
+	public void Dispose()
+	{
+		if (message != null)
+		{
+			message.ContentChanged -= HandleContentChanged;
+			message.StreamingStateChanged -= HandleStreamingStateChanged;
+		}
+	}
+
 	// 渲染逻辑已迁移到IMessageDisplayService单例服务中
 // 之前每个Message组件都会创建一个新的MarkdownPipeline实例，这是不必要的资源消耗
 // 现在所有组件共享同一个服务实例，大幅减少了内存占用和初始化开销
@@ -82,7 +138,7 @@
 
 	void EnterEditMode()
 	{
-		if (isEditMode)
+		if (isEditMode || message.IsStreaming)
 		{
 			CancelEdit();
 			return;

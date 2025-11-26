@@ -3,6 +3,7 @@ using ShimmerChatLib;
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace ShimmerChat.Singletons
 {
@@ -23,6 +24,31 @@ namespace ShimmerChat.Singletons
             _contextBuilderService = contextBuilderService;
             _userData = userData;
             _toolService = toolService;
+        }
+        
+        /// <summary>
+        /// 创建一个累积响应的异步流
+        /// </summary>
+        private async IAsyncEnumerable<ResponseEx> GetAccumulatedResponseStream(
+            IAsyncEnumerable<ResponseEx> originalStream,
+            CancellationToken cancellationToken,
+            Action<ResponseEx>? accumulateCallback = null)
+        {
+            ResponseEx accumulated = new ResponseEx { content = "", FinishReason = FinishReason.None };
+            
+            await foreach (var response in originalStream)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                
+                // 累积响应内容
+                accumulated += response;
+                
+                // 调用回调函数，传递原始响应
+                accumulateCallback?.Invoke(response);
+                
+                // 产生累积后的响应
+                yield return accumulated;
+            }
         }
 
         public async Task GenerateAIResponseAsync(
@@ -58,6 +84,37 @@ namespace ShimmerChat.Singletons
             }
         }
 
+        public async Task GenerateAIResponseStreamAsync(
+            Agent agent,
+            Chat chat,
+            Func<IAsyncEnumerable<ResponseEx>, Task> handleStreamResponses,
+            Action<List<SharperLLM.API.ToolCall>> onToolCall,
+            Action<(string name, string resp, string id)> onToolResult,
+            CancellationToken cancellationToken)
+        {
+            if (_userData.CompletionType == CompletionType.TextCompletion)
+            {
+                // 对于TextCompletion模式，仍然使用非流式，但模拟流式效果
+                await GenerateAIResponseAsync(agent, chat, 
+                    async resp => { 
+                        // 创建一个单元素的异步流并传递给处理函数
+                        var responses = new List<ResponseEx> { resp };
+                        await handleStreamResponses(responses.ToAsyncEnumerable());
+                    }, 
+                    onToolResult);
+            }
+            else
+            {
+                // 对于ChatCompletion模式，使用流式API
+                await RunAIWithToolLoopStreamAsync(
+                    agent, chat,
+                    handleStreamResponses,
+                    onToolCall,
+                    onToolResult,
+                    cancellationToken);
+            }
+        }
+
         /// <summary>
         /// 自动循环AI与ToolCall，直到FinishReason为Stop，每轮通过onResponse回调通知调用方
         /// </summary>
@@ -83,6 +140,71 @@ namespace ShimmerChat.Singletons
                 {
                     string? toolResult = await _toolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "");
                     ToolCallback((toolCall.name, toolResult ?? "[No result]", toolCall.id));
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 流式版本的AI与ToolCall循环，支持取消操作
+        /// </summary>
+        private async Task RunAIWithToolLoopStreamAsync(
+            Agent agent,
+            Chat chat,
+            Func<IAsyncEnumerable<ResponseEx>, Task> handleStreamResponses,
+            Action<List<SharperLLM.API.ToolCall>> onToolCall,
+            Action<(string name, string resp, string id)> onToolResult,
+            CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                
+                var toolDefinitions = _toolService.GetEnabledToolDefinitions().ToList();
+                var promptBuilder = _contextBuilderService.BuildPromptBuilderWithTools(chat, agent.description, toolDefinitions);
+                
+                // 累积流式响应
+                ResponseEx accumulatedResponse = new ResponseEx { content = "", FinishReason = FinishReason.None };
+                
+                try
+                {
+                    // 创建一个自定义的异步流，处理累积响应
+                    var responseStream = GetAccumulatedResponseStream(
+                        _completionService.GenerateChatExStreamAsync(promptBuilder, cancellationToken), 
+                        cancellationToken,
+                        r => accumulatedResponse += r); // 回调函数，在处理流时同时累积响应
+                    
+                    // 让调用方处理流式响应
+                    await handleStreamResponses(responseStream);
+                    
+                    // 检查是否需要调用工具
+                    bool hasToolCalls = accumulatedResponse.FinishReason == FinishReason.FunctionCall && 
+                        accumulatedResponse.toolCallings != null && 
+                        accumulatedResponse.toolCallings.Count > 0;
+                    
+                    if (hasToolCalls)
+                    {
+                        // 通知调用方有工具调用
+                        onToolCall(accumulatedResponse.toolCallings);
+                        
+                        // 执行工具调用
+                        foreach (ToolCall toolCall in accumulatedResponse.toolCallings)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            string? toolResult = await _toolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "");
+                            onToolResult((toolCall.name, toolResult ?? "[No result]", toolCall.id));
+                        }
+                        // 继续循环，获取下一轮AI响应
+                    }
+                    else
+                    {
+                        // 如果不是工具调用，结束循环
+                        break;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // 取消操作时，不需要特殊处理，调用方已经从流中收到了累积的内容
+                    throw;
                 }
             }
         }

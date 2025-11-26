@@ -2,6 +2,8 @@ using SharperLLM.API;
 using SharperLLM.Util;
 using SharperLLM.FunctionCalling;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ShimmerChat.Singletons
 {
@@ -40,5 +42,13 @@ namespace ShimmerChat.Singletons
         /// <param name="promptBuilder">提示构建器</param>
         /// <returns>增强的回复对象</returns>
         Task<ResponseEx> GenerateChatExAsync(PromptBuilder promptBuilder);
+        
+        /// <summary>
+        /// 流式生成增强的聊天回复
+        /// </summary>
+        /// <param name="promptBuilder">提示构建器</param>
+        /// <param name="cancellationToken">取消令牌</param>
+        /// <returns>增强的回复对象的异步流</returns>
+        IAsyncEnumerable<ResponseEx> GenerateChatExStreamAsync(PromptBuilder promptBuilder, CancellationToken cancellationToken);
     }
 }

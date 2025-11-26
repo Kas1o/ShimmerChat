@@ -1,8 +1,16 @@
 @page "/agent/{agentguid}/{chatname}"
+@using ShimmerChatLib
+@using SharperLLM.API
+@using System.Collections.ObjectModel
+@using System.Threading
+@using ShimmerChat.Singletons
+@using Microsoft.JSInterop
+
 @inject IUserData userData
 @inject ICompletionService completion
 @inject IAIGenerationService aiGenerationService
 @inject IPopupService popupService
+@inject IJSRuntime JS
 
 @if (chat != null)
 {
@@ -27,6 +35,16 @@
 		<div id="input-box" class="shimmer-shadow-box">
 			<!-- 输入框内容 -->
 			<textarea  @bind="inputText" @bind:event="oninput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
+			<div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
+				@if (generating)
+				{
+					<button class="btn btn-danger" @onclick="StopGeneration">停止生成</button>
+				}
+				else
+				{
+					<button class="btn btn-primary" @onclick="Send" disabled="@string.IsNullOrWhiteSpace(inputText)">发送</button>
+				}
+			</div>
 		</div>
 	</div>
 	<style>
@@ -45,7 +63,7 @@
 		left: 0;
 		padding: 10px;
 		z-index: 100;
-		width: 100%;	
+		width: 100%;
 		}
 
 		/* 聊天主区域 */
@@ -54,7 +72,7 @@
 		overflow-y: auto; /* 允许垂直滚动 */
 		padding: 20px;
 		margin-top: 80px; /* 为 #chat-info 预留空间 */
-		margin-bottom: 80px; /* 为 #input-box 预留空间 */
+		margin-bottom: 100px; /* 为 #input-box 预留空间 */
 		box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 		}
 
@@ -76,6 +94,19 @@
 			border-radius: 15px;
 			padding: 5px;
 		}
+		
+		/* 打字指示器动画 */
+		.shimmer-typing-indicator {
+			display: inline-block;
+			animation: blink 1s infinite;
+			font-weight: bold;
+			font-size: 1.2em;
+		}
+		
+		@@keyframes blink {
+			0%, 50% { opacity: 1; }
+			51%, 100% { opacity: 0; }
+		}
 
 	</style>
 }
@@ -85,9 +116,10 @@
 	<p>Chat @agentguid / @chatname Not Found</p>
 }
 
-
 @code {
 	bool generating = false;
+	CancellationTokenSource? cts; // 用于取消生成任务的令牌源
+	Message? currentAIMessage; // 当前正在生成的AI消息
 
 	[Parameter]
 	public string agentguid { get; set; } = string.Empty;
@@ -136,83 +168,200 @@
 
 	async void Send()
 	{
+		// 取消之前可能存在的生成任务
+		CancelPreviousGeneration();
 
 		var message = new Message()
 		{
 			message = new SharperLLM.Util.ChatMessage
-		(
-		Content: inputText, // 使用输入框的内容
+		(Content: inputText, // 使用输入框的内容
 		ImageBase64: null // 如果有图片，可以在这里设置
 		),
 			timestamp = DateTime.Now, // 设置消息的时间戳
 			sender = "User" // 设置发送者，可以是 "User" 或其他标识
-			};
+		};
 
 		// 添加消息到聊天
 		chat.AddMessage(message);
 		inputText = ""; // 清空输入框
 		GetDirty(); // 标记为脏数据以保存
-		new Task(AddLLMReply).Start();
-
+		
+		// 启动生成任务
+		new Task(AddLLMReplyStream).Start();
 	}
 
-	async void AddLLMReply()
+	// 停止生成
+	void StopGeneration()
+	{
+		if (cts != null)
+		{
+			try
+			{
+				cts.Cancel();
+				cts.Dispose();
+				cts = null;
+				
+				// 标记当前AI消息为非流式状态
+				if (currentAIMessage != null)
+				{
+					currentAIMessage.IsStreaming = false;
+				}
+				
+				generating = false;
+				InvokeAsync(StateHasChanged);
+			}
+			catch (Exception ex)
+			{
+				#if !DEBUG
+				popupService.ShowAsync(ex.Message, "停止生成时出错");
+				#else
+				throw;
+				#endif
+			}
+		}
+	}
+
+	// 取消之前的生成任务
+	void CancelPreviousGeneration()
+	{
+		if (cts != null)
+		{
+			cts.Cancel();
+			cts.Dispose();
+			cts = null;
+		}
+		
+		// 如果有正在生成的消息，标记为非流式状态
+		if (currentAIMessage != null)
+		{
+			currentAIMessage.IsStreaming = false;
+			currentAIMessage = null;
+		}
+	}
+
+	async void AddLLMReplyStream()
 	{
 		generating = true;
+		
+		// 创建新的CancellationTokenSource
+		cts = new CancellationTokenSource();
+		var cancellationToken = cts.Token;
 
-		try{
-			await aiGenerationService.GenerateAIResponseAsync(
+		// 消息将在handleStreamResponses回调中创建
+
+		try
+		{
+			await aiGenerationService.GenerateAIResponseStreamAsync(
 				agent, chat,
-				onResponse: rsp =>
+				// 处理流式响应的函数
+				handleStreamResponses: async (responseStream) =>
 				{
-					// 每轮AI回复
-					if (rsp.content != null && rsp.content != string.Empty )
+					// 在handleStreamResponses内部创建新的AI消息
+					currentAIMessage = new Message
 					{
-						messages.Add(new Message
-						{
-							message = new SharperLLM.Util.ChatMessage(rsp.content, null),
-							thinking = rsp.thinking,
-							timestamp = DateTime.Now,
-							sender = "ai"
-						});
-					}
-					if (rsp.toolCallings != null && rsp.toolCallings?.Count >= 1)
+						message = new SharperLLM.Util.ChatMessage(null, null),
+						thinking = string.Empty,
+						timestamp = DateTime.Now,
+						sender = "ai",
+						IsStreaming = true
+					};
+					messages.Add(currentAIMessage);
+					await InvokeAsync(StateHasChanged);
+
+					await foreach (var rsp in responseStream.WithCancellation(cancellationToken))
 					{
-						messages.Add(new Message
+						// 流式响应更新
+						// 更新消息内容
+						if (!string.IsNullOrEmpty(rsp.content))
 						{
-							message = new SharperLLM.Util.ChatMessage(null, null) { toolCalls = rsp.toolCallings },
-							thinking = rsp.thinking,
-							timestamp = DateTime.Now,
-							sender = "tool_call"
-						});
+							currentAIMessage.message.Content = rsp.content;
+						}
+						
+						// 如果有思考内容，更新思考内容
+						if (rsp.thinking != null)
+						{
+							currentAIMessage.thinking = rsp.thinking;
+						}
+						
+						// 立即触发UI刷新，确保流式内容实时显示
+						await InvokeAsync(StateHasChanged);
 					}
+				
+					// 流式响应结束，标记为非流式状态
+					if (currentAIMessage != null)
+					{
+						currentAIMessage.IsStreaming = false;
+						await InvokeAsync(StateHasChanged);
+					}
+				},
+				// 处理工具调用的回调
+				onToolCall: (toolCalls) =>
+				{
+					// 添加工具调用消息
+					messages.Add(new Message
+					{
+						message = new SharperLLM.Util.ChatMessage(null, null) { toolCalls = toolCalls },
+						timestamp = DateTime.Now,
+						sender = "tool_call"
+					});
+					
+					// 触发UI刷新
 					InvokeAsync(StateHasChanged);
 				},
-				onToolResult: tuple =>
+				// 处理工具结果的回调
+				onToolResult: (tuple) =>
 				{
 					// 工具调用结果
 					messages.Add(new Message
 					{
-						message = new SharperLLM.Util.ChatMessage(tuple.resp,null){id = tuple.id},
+						message = new SharperLLM.Util.ChatMessage(tuple.resp, null) { id = tuple.id },
 						thinking = null,
 						timestamp = DateTime.Now,
 						sender = "tool_result"
 					});
+					
+					// 触发UI刷新
 					InvokeAsync(StateHasChanged);
-				}
+				},
+				cancellationToken
 			);
-		}catch(Exception ex)
-		{
-			popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
 		}
-		generating = false;
-		GetDirty();
-		await Refresh();
+		catch (OperationCanceledException)
+		{
+			// 操作被用户取消，这是预期行为，不需要显示错误
+		}
+		catch (Exception ex)
+		{
+			#if !DEBUG
+			popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
+			#else
+			throw;
+			#endif
+			// 发生错误时，标记当前消息为非流式状态
+			if (currentAIMessage != null)
+			{
+				currentAIMessage.IsStreaming = false;
+			}
+		}
+		finally
+		{
+			generating = false;
+			cts?.Dispose();
+			cts = null;
+			currentAIMessage = null;
+			GetDirty();
+			await Refresh();
+		}
 	}
-
 
 	async void DeleteMessage(Message message)
 	{
+		// 如果删除的是当前正在生成的消息，取消生成
+		if (message == currentAIMessage)
+		{
+			StopGeneration();
+		}
+		
 		messages.Remove(message);
 		await Refresh();
 	}
@@ -221,7 +370,6 @@
 	{
 		chat.dirty = true;
 		userData.SaveSpecificAgent(agent); // Save the specific agent after making a change to the chat)
-		// 说实话，没搞懂之前写的 Dirty 后直接保存有什么意义。可能是不好写保存逻辑，之后再改也不迟。
 	}
 
 	async Task Refresh()
@@ -229,3 +377,4 @@
 		await InvokeAsync(StateHasChanged);
 	}
 }
+
