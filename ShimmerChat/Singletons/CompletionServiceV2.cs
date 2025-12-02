@@ -16,7 +16,34 @@ namespace ShimmerChat.Singletons
             _userData = userData;
         }
 
-        public async Task<string> GenerateTextAsync(
+        public async IAsyncEnumerable<string> GenerateTextStreamAsync(
+            PromptBuilder promptBuilder,
+            string sysSeqPrefix,
+            string sysSeqSuffix,
+            string inputPrefix,
+            string inputSuffix,
+            string outputPrefix,
+            string outputSuffix,
+            CancellationToken cancellationToken)
+        {
+            var finalPromptBuilder = new PromptBuilder(promptBuilder)
+            {
+                SysSeqPrefix = sysSeqPrefix,
+                SysSeqSuffix = sysSeqSuffix,
+                InputPrefix = inputPrefix,
+                InputSuffix = inputSuffix,
+                OutputPrefix = outputPrefix,
+                OutputSuffix = outputSuffix,
+            };
+            
+            await foreach (var text in _userData.ApiSettings[_userData.CurrentAPISettingIndex].llmapi
+                .GenerateTextStream(finalPromptBuilder.GeneratePromptWithLatestOuputPrefix(), cancellationToken))
+            {
+                yield return text;
+            }
+		}
+
+		public async Task<string> GenerateTextAsync(
             PromptBuilder promptBuilder,
             string sysSeqPrefix,
             string sysSeqSuffix,

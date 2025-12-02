@@ -23,8 +23,8 @@ namespace ShimmerChat.Singletons
             // 只在服务初始化时创建一次，所有消息组件共享使用
             _markdownPipeline = new MarkdownPipelineBuilder()
                 .UsePipeTables() // 启用表格支持
-				.UseBootstrap()
-				.UseAdvancedExtensions()
+				//.UseBootstrap()
+				//.UseAdvancedExtensions()
 				.Build();
         }
 

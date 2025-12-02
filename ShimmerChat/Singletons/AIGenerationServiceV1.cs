@@ -94,15 +94,36 @@ namespace ShimmerChat.Singletons
         {
             if (_userData.CompletionType == CompletionType.TextCompletion)
             {
-                // 对于TextCompletion模式，仍然使用非流式，但模拟流式效果
-                await GenerateAIResponseAsync(agent, chat, 
-                    async resp => { 
-                        // 创建一个单元素的异步流并传递给处理函数
-                        var responses = new List<ResponseEx> { resp };
-                        await handleStreamResponses(responses.ToAsyncEnumerable());
-                    }, 
-                    onToolResult);
-            }
+				// 对于TextCompletion模式，直接使用流式API
+				var templ = _userData.textCompletionSettings[_userData.CurrentTextCompletionSettingIndex].GetMessageTemplates();
+                var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent.description);
+                var responseStream = _completionService.GenerateTextStreamAsync(
+                    promptBuilder,
+                    templ.sys_start,
+                    templ.sys_stop,
+                    templ.user_start,
+                    templ.user_stop,
+                    templ.char_start,
+                    templ.char_stop,
+                    cancellationToken);
+                
+                async IAsyncEnumerable<ResponseEx> ConvertStringStreamToResponseExStream(IAsyncEnumerable<string> respStream, CancellationToken ct)
+                {
+                    await foreach(var chunk in respStream)
+                    {
+                        yield return new ResponseEx { content = chunk, FinishReason = FinishReason.None};
+                    }
+
+                    yield return new ResponseEx { content = "", FinishReason = FinishReason.Stop };
+                }
+                // 将字符串流转换为ResponseEx流
+                var responseExStream = GetAccumulatedResponseStream(
+                    ConvertStringStreamToResponseExStream(responseStream, cancellationToken),
+                    cancellationToken);
+                
+                // 让调用方处理流式响应
+                await handleStreamResponses(responseExStream);
+			}
             else
             {
                 // 对于ChatCompletion模式，使用流式API

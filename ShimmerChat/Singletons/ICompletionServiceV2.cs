@@ -28,13 +28,35 @@ namespace ShimmerChat.Singletons
             string inputSuffix,
             string outputPrefix,
             string outputSuffix);
-        
-        /// <summary>
-        /// 生成聊天回复
-        /// </summary>
-        /// <param name="promptBuilder">提示构建器</param>
-        /// <returns>生成的回复字符串</returns>
-        Task<string> GenerateChatReplyAsync(PromptBuilder promptBuilder);
+
+		/// <summary>
+		/// 流式生成文本回复
+		/// </summary>
+		/// <param name="promptBuilder">提示构建器</param>
+		/// <param name="sysSeqPrefix">系统序列前缀</param>
+		/// <param name="sysSeqSuffix">系统序列后缀</param>
+		/// <param name="inputPrefix">输入前缀</param>
+		/// <param name="inputSuffix">输入后缀</param>
+		/// <param name="outputPrefix">输出前缀</param>
+		/// <param name="outputSuffix">输出后缀</param>
+		/// <param name="cancellationToken">取消令牌</param>
+		/// <returns>生成文本的异步流</returns>
+		IAsyncEnumerable<string> GenerateTextStreamAsync(
+            PromptBuilder promptBuilder,
+            string sysSeqPrefix,
+            string sysSeqSuffix,
+            string inputPrefix,
+            string inputSuffix,
+            string outputPrefix,
+            string outputSuffix,
+            CancellationToken cancellationToken);
+
+		/// <summary>
+		/// 生成聊天回复
+		/// </summary>
+		/// <param name="promptBuilder">提示构建器</param>
+		/// <returns>生成的回复字符串</returns>
+		Task<string> GenerateChatReplyAsync(PromptBuilder promptBuilder);
         
         /// <summary>
         /// 生成增强的聊天回复（包含工具调用信息）
