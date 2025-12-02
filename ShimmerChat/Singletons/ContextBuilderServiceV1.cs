@@ -3,6 +3,7 @@ using SharperLLM.FunctionCalling;
 using ShimmerChatLib;
 using System.Collections.Generic;
 using System.Linq;
+using ShimmerChat.Models;
 
 namespace ShimmerChat.Singletons
 {
@@ -28,11 +29,11 @@ namespace ShimmerChat.Singletons
                 x =>
                      x.sender.ToLower() switch
                     {
-                        "user" => (x.message, PromptBuilder.From.user),
-                        "system" => (x.message, PromptBuilder.From.system),
-                        "ai" => (x.message, PromptBuilder.From.assistant),
-                        "tool_call" => (x.message, PromptBuilder.From.tool_call),
-                        "tool_result" => (x.message, PromptBuilder.From.tool_result),
+                        Sender.User => (x.message, PromptBuilder.From.user),
+                        Sender.System => (x.message, PromptBuilder.From.system),
+                        Sender.AI => (x.message, PromptBuilder.From.assistant),
+                        Sender.ToolCall => (x.message, PromptBuilder.From.tool_call),
+                        Sender.ToolResult => (x.message, PromptBuilder.From.tool_result),
                         var n => throw new InvalidOperationException($"Unsupported sender Type: {n}")
                     }
             ).ToList();
@@ -56,7 +57,7 @@ namespace ShimmerChat.Singletons
         {
             var promptBuilder = CreatePromptBuilder(chat, agentDescription);
             // 获取最新的用户消息作为输入
-            var latestUserMessage = chat.Messages.LastOrDefault(m => m.sender.ToLower() == "user")?.message ?? string.Empty;
+            var latestUserMessage = chat.Messages.LastOrDefault(m => m.sender.ToLower() == Sender.User)?.message ?? string.Empty;
             // 应用上下文修改器
             _contextModifierService.ApplyModifiers(promptBuilder);
             return promptBuilder;
@@ -73,7 +74,7 @@ namespace ShimmerChat.Singletons
         {
             var promptBuilder = CreatePromptBuilder(chat, agentDescription, toolDefinitions);
             // 获取最新的用户消息作为输入
-            var latestUserMessage = chat.Messages.LastOrDefault(m => m.sender.ToLower() == "user")?.message ?? string.Empty;
+            var latestUserMessage = chat.Messages.LastOrDefault(m => m.sender.ToLower() == Sender.User)?.message ?? string.Empty;
             // 应用上下文修改器
             _contextModifierService.ApplyModifiers(promptBuilder);
             return promptBuilder;

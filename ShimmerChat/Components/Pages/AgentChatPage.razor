@@ -22,13 +22,13 @@
 		<div id="chat-main">
 			@foreach (var message in messages)
 			{
-				if(message.sender == "tool_call")
+				if(message.sender == ShimmerChatLib.Sender.ToolCall)
 				{
 					<ShimmerChat.Components.SubComponents.ToolCallMessage Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" ></ShimmerChat.Components.SubComponents.ToolCallMessage>
 				}
 				else
 				{
-					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" Sender="agent.name" />
+					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" />
 				}
 			}
 		</div>
@@ -179,7 +179,7 @@
 			ImageBase64: null // 如果有图片，可以在这里设置
 			),
 				timestamp = DateTime.Now, // 设置消息的时间戳
-				sender = "User" // 设置发送者，可以是 "User" 或其他标识
+				sender = ShimmerChatLib.Sender.User // 设置发送者，可以是 "User" 或其他标识
 			};
 
 			// 添加消息到聊天
@@ -264,7 +264,7 @@
 						message = new SharperLLM.Util.ChatMessage(null, null),
 						thinking = string.Empty,
 						timestamp = DateTime.Now,
-						sender = "ai",
+						sender = ShimmerChatLib.Sender.AI,
 						IsStreaming = true
 					};
 					messages.Add(currentAIMessage);
@@ -304,7 +304,7 @@
 					{
 						message = new SharperLLM.Util.ChatMessage(null, null) { toolCalls = toolCalls },
 						timestamp = DateTime.Now,
-						sender = "tool_call"
+						sender = ShimmerChatLib.Sender.ToolCall
 					});
 					
 					// 触发UI刷新
@@ -319,7 +319,7 @@
 						message = new SharperLLM.Util.ChatMessage(tuple.resp, null) { id = tuple.id },
 						thinking = null,
 						timestamp = DateTime.Now,
-						sender = "tool_result"
+						sender = ShimmerChatLib.Sender.ToolResult
 					});
 					
 					// 触发UI刷新
