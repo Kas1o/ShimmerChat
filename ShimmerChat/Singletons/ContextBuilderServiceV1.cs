@@ -32,7 +32,6 @@ namespace ShimmerChat.Singletons
                         Sender.User => (x.message, PromptBuilder.From.user),
                         Sender.System => (x.message, PromptBuilder.From.system),
                         Sender.AI => (x.message, PromptBuilder.From.assistant),
-                        Sender.ToolCall => (x.message, PromptBuilder.From.tool_call),
                         Sender.ToolResult => (x.message, PromptBuilder.From.tool_result),
                         var n => throw new InvalidOperationException($"Unsupported sender Type: {n}")
                     }

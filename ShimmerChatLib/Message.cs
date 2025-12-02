@@ -25,7 +25,6 @@ namespace ShimmerChatLib
             }
         }
         
-        public string thinking { get; set; } = null;
         public required DateTime timestamp { get; set; } // The timestamp of the message
         public required string sender { get; set; } // The sender of the message
         

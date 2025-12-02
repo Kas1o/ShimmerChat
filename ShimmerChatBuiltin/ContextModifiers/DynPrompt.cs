@@ -94,7 +94,7 @@ namespace ShimmerChatBuiltin.ContextModifiers
 		/// </summary>
 		private void InjectTerm(PromptBuilder promptBuilder, DynPromptTerm term)
 		{
-			var newMessage = new ChatMessage(term.Content, null);
+			var newMessage = new ChatMessage { Content = term.Content };
 			
 			// 获取消息列表
 			List<(ChatMessage, PromptBuilder.From)> messages = promptBuilder.Messages.ToList();
@@ -110,7 +110,7 @@ namespace ShimmerChatBuiltin.ContextModifiers
 						// 修改第一个system消息的内容，在现有内容前添加新内容
 						var (message, from) = messages[systemMessageIndex];
 						string newContent = term.Content + Environment.NewLine + message.Content;
-						messages[systemMessageIndex] = (new ChatMessage(newContent, null), from);
+						messages[systemMessageIndex] = (newContent, from);
 						promptBuilder.Messages = messages.ToArray();
 					}
 					else
@@ -132,7 +132,7 @@ namespace ShimmerChatBuiltin.ContextModifiers
 						// 在第一个system消息后追加内容
 						var (message, from) = messages[systemMessageIndex];
 						string newContent = message.Content + Environment.NewLine + term.Content;
-						messages[systemMessageIndex] = (new ChatMessage(newContent, null), from);
+						messages[systemMessageIndex] = (newContent, from);
 						promptBuilder.Messages = messages.ToArray();
 					}
 					else

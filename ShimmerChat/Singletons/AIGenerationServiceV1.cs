@@ -34,7 +34,7 @@ namespace ShimmerChat.Singletons
             CancellationToken cancellationToken,
             Action<ResponseEx>? accumulateCallback = null)
         {
-            ResponseEx accumulated = new ResponseEx { content = "", FinishReason = FinishReason.None };
+            ResponseEx accumulated = new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = "" }, FinishReason = FinishReason.None };
             
             await foreach (var response in originalStream)
             {
@@ -71,7 +71,7 @@ namespace ShimmerChat.Singletons
                     templ.char_start,
                     templ.char_stop);
                 // 创建ResponseEx对象并调用回调
-                var response = new ResponseEx { content = reply, FinishReason = SharperLLM.API.FinishReason.Stop };
+                var response = new ResponseEx { Body= new SharperLLM.Util.ChatMessage { Content = reply }, FinishReason = SharperLLM.API.FinishReason.Stop };
                 onResponse(response);
             }
             else
@@ -111,10 +111,10 @@ namespace ShimmerChat.Singletons
                 {
                     await foreach(var chunk in respStream)
                     {
-                        yield return new ResponseEx { content = chunk, FinishReason = FinishReason.None};
+                        yield return new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = chunk }, FinishReason = FinishReason.None};
                     }
 
-                    yield return new ResponseEx { content = "", FinishReason = FinishReason.Stop };
+                    yield return new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = "" }, FinishReason = FinishReason.Stop };
                 }
                 // 将字符串流转换为ResponseEx流
                 var responseExStream = GetAccumulatedResponseStream(
@@ -154,10 +154,10 @@ namespace ShimmerChat.Singletons
                 // 通知调用方本轮AI回复
                 onResponse(rsp);
 
-                if (rsp.FinishReason != FinishReason.FunctionCall || rsp.toolCallings == null || rsp.toolCallings.Count == 0)
+                if (rsp.FinishReason != FinishReason.FunctionCall || rsp.Body.toolCalls == null || rsp.Body.toolCalls.Count == 0)
                     break;
 
-                foreach (ToolCall toolCall in rsp.toolCallings)
+                foreach (ToolCall toolCall in rsp.Body.toolCalls)
                 {
                     string? toolResult = await _toolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "");
                     ToolCallback((toolCall.name, toolResult ?? "[No result]", toolCall.id));
@@ -184,7 +184,7 @@ namespace ShimmerChat.Singletons
                 var promptBuilder = _contextBuilderService.BuildPromptBuilderWithTools(chat, agent.description, toolDefinitions);
                 
                 // 累积流式响应
-                ResponseEx accumulatedResponse = new ResponseEx { content = "", FinishReason = FinishReason.None };
+                ResponseEx accumulatedResponse = new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = "" }, FinishReason = FinishReason.None };
                 
                 try
                 {
@@ -199,16 +199,16 @@ namespace ShimmerChat.Singletons
                     
                     // 检查是否需要调用工具
                     bool hasToolCalls = accumulatedResponse.FinishReason == FinishReason.FunctionCall && 
-                        accumulatedResponse.toolCallings != null && 
-                        accumulatedResponse.toolCallings.Count > 0;
+                        accumulatedResponse.Body.toolCalls != null && 
+                        accumulatedResponse.Body.toolCalls.Count > 0;
                     
                     if (hasToolCalls)
                     {
                         // 通知调用方有工具调用
-                        onToolCall(accumulatedResponse.toolCallings);
+                        onToolCall(accumulatedResponse.Body.toolCalls);
                         
                         // 执行工具调用
-                        foreach (ToolCall toolCall in accumulatedResponse.toolCallings)
+                        foreach (ToolCall toolCall in accumulatedResponse.Body.toolCalls)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             string? toolResult = await _toolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "");

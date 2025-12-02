@@ -78,10 +78,10 @@ namespace ShimmerChat.Singletons
 				// 通知调用方本轮AI回复
 				onResponse(rsp);
 
-				if (rsp.FinishReason != FinishReason.FunctionCall || rsp.toolCallings == null || rsp.toolCallings.Count == 0)
+				if (rsp.FinishReason != FinishReason.FunctionCall || rsp.Body.toolCalls == null || rsp.Body.toolCalls.Count == 0)
 					break;
 
-				foreach (ToolCall toolCall in rsp.toolCallings)
+				foreach (ToolCall toolCall in rsp.Body.toolCalls)
 				{
 					string? toolResult = await ToolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "");
 					ToolCallback((toolCall.name, toolResult ?? "[No result]", toolCall.id));

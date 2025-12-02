@@ -22,14 +22,7 @@
 		<div id="chat-main">
 			@foreach (var message in messages)
 			{
-				if(message.sender == ShimmerChatLib.Sender.ToolCall)
-				{
-					<ShimmerChat.Components.SubComponents.ToolCallMessage Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" ></ShimmerChat.Components.SubComponents.ToolCallMessage>
-				}
-				else
-				{
-					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" />
-				}
+				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" />
 			}
 		</div>
 		<div id="input-box" class="shimmer-shadow-box">
@@ -170,24 +163,24 @@
 
 		// 只有当输入不为空时才添加用户消息
 		if (!string.IsNullOrWhiteSpace(inputText))
-		if (inputText.Trim().Length > 0)
-		{
-			var message = new Message()
+			if (inputText.Trim().Length > 0)
+			{
+				var message = new Message()
 			{
 				message = new SharperLLM.Util.ChatMessage
-			(Content: inputText, // 使用输入框的内容
-			ImageBase64: null // 如果有图片，可以在这里设置
-			),
+				{
+					Content= inputText // 使用输入框的内容
+				},
 				timestamp = DateTime.Now, // 设置消息的时间戳
 				sender = ShimmerChatLib.Sender.User // 设置发送者，可以是 "User" 或其他标识
 			};
 
-			// 添加消息到聊天
-			chat.AddMessage(message);
-			inputText = ""; // 清空输入框
-			GetDirty(); // 标记为脏数据以保存
-		}
-		
+				// 添加消息到聊天
+				chat.AddMessage(message);
+				inputText = ""; // 清空输入框
+				GetDirty(); // 标记为脏数据以保存
+			}
+
 		// 无论输入是否为空，都启动AI生成任务
 		new Task(AddLLMReplyStream).Start();
 	}
@@ -202,13 +195,13 @@
 				cts.Cancel();
 				cts.Dispose();
 				cts = null;
-				
+
 				// 标记当前AI消息为非流式状态
 				if (currentAIMessage != null)
 				{
 					currentAIMessage.IsStreaming = false;
 				}
-				
+
 				generating = false;
 				InvokeAsync(StateHasChanged);
 			}
@@ -232,7 +225,7 @@
 			cts.Dispose();
 			cts = null;
 		}
-		
+
 		// 如果有正在生成的消息，标记为非流式状态
 		if (currentAIMessage != null)
 		{
@@ -244,7 +237,7 @@
 	async void AddLLMReplyStream()
 	{
 		generating = true;
-		
+
 		// 创建新的CancellationTokenSource
 		cts = new CancellationTokenSource();
 		var cancellationToken = cts.Token;
@@ -261,8 +254,7 @@
 					// 在handleStreamResponses内部创建新的AI消息
 					currentAIMessage = new Message
 					{
-						message = new SharperLLM.Util.ChatMessage(null, null),
-						thinking = string.Empty,
+						message = new SharperLLM.Util.ChatMessage{ Content = "", thinking = string.Empty},
 						timestamp = DateTime.Now,
 						sender = ShimmerChatLib.Sender.AI,
 						IsStreaming = true
@@ -274,17 +266,22 @@
 					{
 						// 流式响应更新
 						// 更新消息内容
-						if (!string.IsNullOrEmpty(rsp.content))
+						if (!string.IsNullOrEmpty(rsp.Body.Content))
 						{
-							currentAIMessage.message.Content = rsp.content;
+							currentAIMessage.message.Content = rsp.Body.Content;
 						}
-						
+
 						// 如果有思考内容，更新思考内容
-						if (rsp.thinking != null)
+						if (rsp.Body.thinking != null)
 						{
-							currentAIMessage.thinking = rsp.thinking;
+							currentAIMessage.message.thinking = rsp.Body.thinking;
 						}
-						
+
+						if (rsp.Body.toolCalls != null)
+						{
+							currentAIMessage.message.toolCalls = rsp.Body.toolCalls;
+						}
+
 						// 立即触发UI刷新，确保流式内容实时显示
 						await InvokeAsync(StateHasChanged);
 					}
@@ -300,12 +297,14 @@
 				onToolCall: (toolCalls) =>
 				{
 					// 添加工具调用消息
+					/*
 					messages.Add(new Message
 					{
-						message = new SharperLLM.Util.ChatMessage(null, null) { toolCalls = toolCalls },
+						message = new SharperLLM.Util.ChatMessage{Content= null, thinking = null,  toolCalls = toolCalls },
 						timestamp = DateTime.Now,
 						sender = ShimmerChatLib.Sender.ToolCall
 					});
+					*/
 					
 					// 触发UI刷新
 					InvokeAsync(StateHasChanged);
@@ -316,8 +315,7 @@
 					// 工具调用结果
 					messages.Add(new Message
 					{
-						message = new SharperLLM.Util.ChatMessage(tuple.resp, null) { id = tuple.id },
-						thinking = null,
+						message = new SharperLLM.Util.ChatMessage{ Content = tuple.resp, id = tuple.id, thinking = null},
 						timestamp = DateTime.Now,
 						sender = ShimmerChatLib.Sender.ToolResult
 					});
