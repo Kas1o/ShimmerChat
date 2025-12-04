@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using ShimmerChatLib.Tool;
 using SharperLLM.FunctionCalling;
+using ShimmerChatLib;
 
 namespace ShimmerChat.Singletons
 {
@@ -111,12 +112,12 @@ namespace ShimmerChat.Singletons
 			return EnabledTools.Select(t => t.GetToolDefinition());
 		}
 
-		public async Task<string?> ExecuteToolAsync(string toolName, string arguments)
+		public async Task<string?> ExecuteToolAsync(string toolName, string arguments, Chat chat, Agent agent)
 		{
 			var tool = EnabledTools.FirstOrDefault(t => t.GetToolDefinition().name == toolName);
 			if (tool == null)
 				return null;
-			return await tool.Execute(arguments);
+			return await tool.Execute(arguments, chat, agent);
 		}
 	}
 }

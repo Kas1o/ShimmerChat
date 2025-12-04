@@ -61,7 +61,7 @@ namespace ShimmerChat.Singletons
             {
                 // 处理TextCompletion模式
                 var templ = _userData.textCompletionSettings[_userData.CurrentTextCompletionSettingIndex].GetMessageTemplates();
-                var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent.description);
+                var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent);
                 string reply = await _completionService.GenerateTextAsync(
                     promptBuilder,
                     templ.sys_start,
@@ -96,7 +96,7 @@ namespace ShimmerChat.Singletons
             {
 				// 对于TextCompletion模式，直接使用流式API
 				var templ = _userData.textCompletionSettings[_userData.CurrentTextCompletionSettingIndex].GetMessageTemplates();
-                var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent.description);
+                var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent);
                 var responseStream = _completionService.GenerateTextStreamAsync(
                     promptBuilder,
                     templ.sys_start,
@@ -148,7 +148,7 @@ namespace ShimmerChat.Singletons
             while (true)
             {
                 var toolDefinitions = _toolService.GetEnabledToolDefinitions().ToList();
-                var promptBuilder = _contextBuilderService.BuildPromptBuilderWithTools(chat, agent.description, toolDefinitions);
+                var promptBuilder = _contextBuilderService.BuildPromptBuilderWithTools(chat, agent, toolDefinitions);
                 var rsp = await _completionService.GenerateChatExAsync(promptBuilder);
 
                 // 通知调用方本轮AI回复
@@ -159,7 +159,7 @@ namespace ShimmerChat.Singletons
 
                 foreach (ToolCall toolCall in rsp.Body.toolCalls)
                 {
-                    string? toolResult = await _toolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "");
+                    string? toolResult = await _toolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "", chat, agent);
                     ToolCallback((toolCall.name, toolResult ?? "[No result]", toolCall.id));
                 }
             }
@@ -181,7 +181,7 @@ namespace ShimmerChat.Singletons
                 cancellationToken.ThrowIfCancellationRequested();
                 
                 var toolDefinitions = _toolService.GetEnabledToolDefinitions().ToList();
-                var promptBuilder = _contextBuilderService.BuildPromptBuilderWithTools(chat, agent.description, toolDefinitions);
+                var promptBuilder = _contextBuilderService.BuildPromptBuilderWithTools(chat, agent, toolDefinitions);
                 
                 // 累积流式响应
                 ResponseEx accumulatedResponse = new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = "" }, FinishReason = FinishReason.None };
@@ -211,7 +211,7 @@ namespace ShimmerChat.Singletons
                         foreach (ToolCall toolCall in accumulatedResponse.Body.toolCalls)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            string? toolResult = await _toolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "");
+                            string? toolResult = await _toolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "", chat, agent);
                             onToolResult((toolCall.name, toolResult ?? "[No result]", toolCall.id));
                         }
                         // 继续循环，获取下一轮AI响应

@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using SharperLLM.Util;
+using ShimmerChatLib;
 using ShimmerChatLib.Context;
 using System;
 using System.Collections.Generic;
@@ -23,7 +24,7 @@ namespace ShimmerChatBuiltin.ContextModifiers
 			Description = "print message dump to console. input will be ignored.",
 		};
 
-		void IContextModifier.ModifyContext(PromptBuilder promptBuilder, string input)
+		void IContextModifier.ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
 		{
 			var json = JsonConvert.SerializeObject(promptBuilder.Messages, Settings);
 			Console.WriteLine(json);

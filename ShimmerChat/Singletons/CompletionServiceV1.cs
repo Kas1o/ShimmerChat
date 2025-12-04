@@ -23,7 +23,7 @@ namespace ShimmerChat.Singletons
 			if (UserData.CompletionType == CompletionType.TextCompletion)
 			{
 				var templ = UserData.textCompletionSettings[UserData.CurrentTextCompletionSettingIndex].GetMessageTemplates();
-				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent.description);
+				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent);
 				reply = await UserData.ApiSettings[UserData.CurrentAPISettingIndex].llmapi.GenerateText(new SharperLLM.Util.PromptBuilder(promptBuilder)
 				{
 					SysSeqPrefix = templ.sys_start,
@@ -36,7 +36,7 @@ namespace ShimmerChat.Singletons
 			}
 			else
 			{
-				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent.description);
+				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent);
 				reply = await UserData.ApiSettings[UserData.CurrentAPISettingIndex].llmapi.GenerateChatReply(promptBuilder);
 			}
 
@@ -51,7 +51,7 @@ namespace ShimmerChat.Singletons
 			}
 			else
 			{
-				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent.description);
+				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent);
 				rsp = await UserData.ApiSettings[UserData.CurrentAPISettingIndex].llmapi.GenerateChatEx(promptBuilder);
 			}
 
@@ -72,7 +72,7 @@ namespace ShimmerChat.Singletons
 			while (true)
 			{
 				var toolDefinitions = ToolService.GetEnabledToolDefinitions().ToList();
-				var promptBuilder = ContextBuilderService.BuildPromptBuilderWithTools(chat, agent.description, toolDefinitions);
+				var promptBuilder = ContextBuilderService.BuildPromptBuilderWithTools(chat, agent, toolDefinitions);
 				var rsp = await UserData.ApiSettings[UserData.CurrentAPISettingIndex].llmapi.GenerateChatEx(promptBuilder);
 
 				// 通知调用方本轮AI回复
@@ -83,7 +83,7 @@ namespace ShimmerChat.Singletons
 
 				foreach (ToolCall toolCall in rsp.Body.toolCalls)
 				{
-					string? toolResult = await ToolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "");
+					string? toolResult = await ToolService.ExecuteToolAsync(toolCall.name, toolCall.arguments ?? "", chat, agent);
 					ToolCallback((toolCall.name, toolResult ?? "[No result]", toolCall.id));
 				}
 			}

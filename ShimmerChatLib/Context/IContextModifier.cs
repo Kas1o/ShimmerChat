@@ -8,7 +8,7 @@ namespace ShimmerChatLib.Context
 	public interface IContextModifier
 	{
 		public ContextModifierInfo info { get; }
-		public void ModifyContext(PromptBuilder promptBuilder, string input);
+		public void ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent);
 	}
 
 	public struct ContextModifierInfo

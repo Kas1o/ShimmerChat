@@ -1,5 +1,6 @@
 using ShimmerChatLib.Context;
 using SharperLLM.Util;
+using ShimmerChatLib;
 
 namespace ShimmerChat.Singletons
 {
@@ -37,7 +38,7 @@ namespace ShimmerChat.Singletons
         /// 顺序应用所有激活的ContextModifier到PromptBuilder
         /// </summary>
         /// <param name="promptBuilder">要修改的PromptBuilder</param>
-        void ApplyModifiers(PromptBuilder promptBuilder);
+        void ApplyModifiers(PromptBuilder promptBuilder, Chat chat, Agent agent);
 
         public void SaveActivatedModifiers();
 	}

@@ -20,7 +20,7 @@ namespace ShimmerChatLib
 				dirty = true;
 			}
 		} // The name of the chat
-		public required Guid Guid { get; set; } // The unique identifier of the chat
+		public Guid Guid { get; set; } // The unique identifier of the chat
 		public ObservableCollection<Message> Messages { get;set; } // List of messages in the chat
 
 		public Chat()

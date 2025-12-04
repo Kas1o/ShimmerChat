@@ -138,7 +138,7 @@ else
         StateHasChanged();
         try
         {
-            testResult = await showTestTool.Execute(testInput ?? "");
+            testResult = await showTestTool.Execute(testInput ?? "", null, null);
         }
         catch (Exception ex)
         {

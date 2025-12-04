@@ -4,6 +4,7 @@ using ShimmerChatLib.Context;
 using ShimmerChatLib.Interface;
 using SharperLLM.Util;
 using ShimmerChatBuiltinTools;
+using ShimmerChatLib;
 
 namespace ShimmerChat.Singletons
 {
@@ -123,7 +124,7 @@ namespace ShimmerChat.Singletons
             SaveActivatedModifiers();
         }
 
-        public void ApplyModifiers(PromptBuilder promptBuilder)
+        public void ApplyModifiers(PromptBuilder promptBuilder, Chat chat, Agent agent)
         {
             foreach (var activatedModifier in ActivatedModifiers)
             {
@@ -131,7 +132,7 @@ namespace ShimmerChat.Singletons
                 if (modifier != null)
                 {
                     var modifierInput = activatedModifier.Value;
-                    modifier.ModifyContext(promptBuilder, modifierInput);
+                    modifier.ModifyContext(promptBuilder, modifierInput, chat, agent);
                 }
             }
         }

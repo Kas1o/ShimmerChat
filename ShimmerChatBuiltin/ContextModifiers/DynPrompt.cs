@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Linq;
+using ShimmerChatLib;
 
 namespace ShimmerChatBuiltin.ContextModifiers
 {
@@ -24,7 +25,7 @@ namespace ShimmerChatBuiltin.ContextModifiers
 			Description = "Inject prompt dynamically based on rules, input the set name."
 		};
 
-		public void ModifyContext(PromptBuilder promptBuilder, string input)
+		public void ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
 		{
 			var data = pluginData.Read("DynPrompt", "DynPromptSets");
 			var sets = JsonConvert.DeserializeObject<List<DynPromptSet>>(data ?? "[]") ?? [];

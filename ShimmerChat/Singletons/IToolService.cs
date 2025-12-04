@@ -1,4 +1,5 @@
 ﻿using SharperLLM.FunctionCalling;
+using ShimmerChatLib;
 using ShimmerChatLib.Tool;
 
 namespace ShimmerChat.Singletons
@@ -13,6 +14,6 @@ namespace ShimmerChat.Singletons
 
 		IEnumerable<Tool> GetEnabledToolDefinitions();
 
-		Task<string?> ExecuteToolAsync(string toolName, string arguments);
+		Task<string?> ExecuteToolAsync(string toolName, string arguments, Chat chat, Agent agent);
 	}
 }

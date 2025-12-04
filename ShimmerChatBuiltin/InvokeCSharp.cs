@@ -8,12 +8,13 @@ using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Newtonsoft.Json;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
+using ShimmerChatLib;
 
 namespace ShimmerChatBuiltinTools
 {
 	public class InvokeCSharp : ITool
 	{
-		public async Task<string> Execute(string input)
+		public async Task<string> Execute(string input, Chat? chat, Agent? agent)
 		{
 			Console.WriteLine(input);
 			var arguments = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(input);
