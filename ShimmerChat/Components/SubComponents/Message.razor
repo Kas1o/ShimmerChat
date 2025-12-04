@@ -28,20 +28,15 @@
 	</div>
 	<!-- #endregion -->
 
-	<!-- #region 思维链展示 -->
-	@if(message.message.thinking != null)
-	@if(message.message.thinking != String.Empty)
-	{
-		<div class="shimmer-message-thinking">
-			@message.message.thinking
-		</div>
-	}
-	<!-- #endregion -->
+
 
 	<!-- #region 编辑器&常规内容 -->
 	@if (isEditMode)
 	{
 		<div>
+			<label>思考内容:</label>
+			<textarea @bind="editThinking" rows="3" style="width:100%; margin-bottom: 10px;"></textarea>
+			<label>消息内容:</label>
 			<textarea @bind="editContent" rows="4" style="width:100%"></textarea>
 			<button class="btn btn-success" @onclick="SaveEdit">@l["BUTTON_SAVE"]</button>
 			<button class="btn" @onclick="CancelEdit">@l["BUTTON_CANCEL"]</button>
@@ -49,6 +44,16 @@
 	}
 	else
 	{
+		<!-- #region 思维链展示 -->
+		@if(message.message.thinking != null)
+		@if(message.message.thinking != String.Empty)
+		{
+			<div class="shimmer-message-thinking">
+				@message.message.thinking
+			</div>
+		}
+		<!-- #endregion -->
+		
 		@DisplayContent
 		@if(message.IsStreaming)
 		{
@@ -83,7 +88,8 @@
 	public string AgentName { get; set; } = "EmptyName";
 
 	bool isEditMode = false;
-	string editContent = string.Empty;
+string editContent = string.Empty;
+string editThinking = string.Empty;
 
 	string stringContent => message.message.Content; // The string content of the message
 
@@ -165,22 +171,24 @@
 	}
 
 	void EnterEditMode()
+{
+	if (isEditMode || message.IsStreaming)
 	{
-		if (isEditMode || message.IsStreaming)
-		{
-			CancelEdit();
-			return;
-		}
-		isEditMode = true;
-		editContent = stringContent;
+		CancelEdit();
+		return;
 	}
+	isEditMode = true;
+	editContent = stringContent;
+	editThinking = message.message.thinking ?? string.Empty;
+}
 
 	void SaveEdit()
-	{
-		message.message.Content = editContent;
-		isEditMode = false;
-		MakeDirty?.Invoke();
-	}
+{
+	message.message.Content = editContent;
+	message.message.thinking = editThinking;
+	isEditMode = false;
+	MakeDirty?.Invoke();
+}
 
 	void CancelEdit()
 	{
