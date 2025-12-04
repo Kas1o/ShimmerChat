@@ -146,10 +146,23 @@
     private void NewChat()
     {
         var chat = new Chat
-            (
-                $"{DateTime.Now.ToString().Replace(" ","-").Replace("/","-").Replace(":","-")}",
-                (!string.IsNullOrEmpty(agent.greeting)) ? agent.greeting : null
-            );
+        {
+            Name = $"{DateTime.Now.ToString().Replace(" ","-").Replace("/","-").Replace(":","-")}",
+        };
+
+        if (!string.IsNullOrEmpty(agent.greeting))
+        chat.AddMessage(
+            new Message
+            {
+				sender = Sender.AI,
+				timestamp = DateTime.Now,
+                message = new SharperLLM.Util.ChatMessage
+                {
+                    Content = agent.greeting
+                }
+            }
+        );
+
         agent.AddChat(chat);
 
         navigation.NavigateTo(navigation.Uri + "/" + chat.Name);

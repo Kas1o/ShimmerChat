@@ -11,7 +11,7 @@ namespace ShimmerChatLib
     public class Chat
     {
 		public bool dirty = true;
-		public string Name {
+		public required string Name {
 			get => field;
 			set
 			{
@@ -20,33 +20,20 @@ namespace ShimmerChatLib
 				dirty = true;
 			}
 		} // The name of the chat
+		public required Guid Guid { get; set; } // The unique identifier of the chat
 		public ObservableCollection<Message> Messages { get;set; } // List of messages in the chat
-		[JsonConstructor]
-		public Chat(string name)
+
+		public Chat()
 		{
-			Name = name;
-			Messages = new();
+			Messages = new ObservableCollection<Message>();
 			Messages.CollectionChanged += (s, e) =>
 			{
 				// Set the dirty flag to true when messages are added or removed
 				dirty = true;
 			};
+			Guid = Guid.NewGuid();
 		}
-		public Chat(string name, string greeting)
-		{
-			Name = name;
-			Messages = new ();
-			if (!string.IsNullOrEmpty(greeting))
-			{
-				Messages.Add(new Message { message = greeting, sender = Sender.AI, timestamp = DateTime.Now});
-			}
 
-			Messages.CollectionChanged += (s,e) =>
-			{
-				// Set the dirty flag to true when messages are added or removed
-				dirty = true;
-			};
-		}
 		public void AddMessage(Message message)
 		{
 			Messages.Add(message);
