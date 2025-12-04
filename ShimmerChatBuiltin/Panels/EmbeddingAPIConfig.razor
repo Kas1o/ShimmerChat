@@ -1,0 +1,74 @@
+﻿@inject IKVDataService KVData
+@attribute [PluginPanel("EmbeddingAPIConfig", "Configure the openai style embedding API connection settings.")]
+<div class="shimmer-group">
+	<label> URI: </label>
+	<input type="text" @bind="Uri" placeholder="localhost" />
+	<br />
+	<label> APIKEY: </label>
+	<input type="text" @bind="ApiKey" placeholder="your apikey" />
+	<br />
+	<label> MODELNAME: </label>
+	<input type="text" @bind="ModelName" placeholder="openai/text-embedding-3-small" />
+</div>
+
+
+@code {
+	string? Uri
+	{
+		get;
+		set
+		{
+			if (field == value)
+				return;
+			if (value == null)
+				return;
+			field = value;
+			Save();
+		}
+	}
+	string? ApiKey
+	{
+		get;
+		set
+		{
+			if (field == value)
+				return;
+			if (value == null)
+				return;
+			field = value;
+			Save();
+		}
+	}
+	string? ModelName
+	{
+		get;
+		set
+		{
+			if (field == value)
+				return;
+			if (value == null)
+				return;
+			field = value;
+			Save();
+		}
+	}	
+
+	void Save()
+	{
+		if (!Initialized)
+			return;
+		KVData.Write("EmbeddingAPI", "uri", Uri);
+		KVData.Write("EmbeddingAPI", "apikey", ApiKey);
+		KVData.Write("EmbeddingAPI", "modelname", ModelName);
+	}
+
+	bool Initialized = false;
+
+	protected override void OnInitialized()
+	{
+		Uri = KVData.Read("EmbeddingAPI", "uri") ?? string.Empty;
+		ApiKey = KVData.Read("EmbeddingAPI", "apikey") ?? string.Empty;
+		ModelName = KVData.Read("EmbeddingAPI", "modelname") ?? string.Empty;
+		Initialized = true;
+	}
+}

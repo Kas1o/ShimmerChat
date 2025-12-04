@@ -1,0 +1,92 @@
+﻿@inject IKVDataService KVData
+@attribute [PluginPanel("QdrantAPIConfig", "Configure the Qdrant API connection settings.")]
+<div class="shimmer-group">
+	<label> GRPc Host: </label>
+	<input type="text" @bind="Host" placeholder="localhost"/>
+	<br />
+	<label> Port: </label>
+	<input type="text" @bind="Port" placeholder="6334" />
+	<br />
+	<label> APIKEY: </label>
+	<input type="text" @bind="ApiKey" placeholder="your apikey" />
+	<br />
+	<label> DIM: </label>
+	<input type="text" @bind="Dim" placeholder="1024" />
+</div>
+
+
+@code {
+	string? Host 
+	{
+		get;
+		set {
+			if (field == value)
+				return;
+			if (value == null)
+				return;
+			field = value;
+			Save();
+		}
+	}
+	string? Port
+	{
+		get;
+		set
+		{
+			if (field == value)
+				return;
+			if (value == null)
+				return;
+			field = value;
+			Save();
+		}
+	}
+	string? ApiKey
+	{
+		get;
+		set
+		{
+			if (field == value)
+				return;
+			if (value == null)
+				return;
+			field = value;
+			Save();
+		}
+	}
+	string? Dim
+	{
+		get;
+		set
+		{
+			if (field == value)
+				return;
+			if (value == null)
+				return;
+			field = value;
+			Save();
+		}
+	}
+
+
+	void Save()
+	{
+		if (!Initialized)
+			return;
+		KVData.Write("QdrantAPI", "host", Host);
+		KVData.Write("QdrantAPI", "port", Port);
+		KVData.Write("QdrantAPI", "apikey", ApiKey);
+		KVData.Write("QdrantAPI", "dim", Dim);
+	}
+
+	bool Initialized = false;
+
+	protected override void OnInitialized()
+	{
+		Host = KVData.Read("QdrantAPI", "uri") ?? string.Empty;
+		Port = KVData.Read("QdrantAPI", "port") ?? string.Empty;
+		ApiKey = KVData.Read("QdrantAPI", "apikey") ?? string.Empty;
+		Dim = KVData.Read("QdrantAPI", "dim") ?? string.Empty;
+		Initialized = true;
+	}
+}
