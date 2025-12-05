@@ -1,0 +1,41 @@
+﻿@page "/misc"
+
+@inject IKVDataService KVData
+
+<h3>MiscSettingsPage</h3>
+
+<div class="shimmer-group">
+	<h4>App Settings</h4>
+
+	<input type="checkbox" class="form-check-input" id="throw-exception" @bind="_throwExceptionInsteadOfPopupErrorMessage" />
+	<label class="form-check-label" for="throw-exception">Throw exception instead of popup error message</label>
+</div>
+
+@code {
+	private bool _throwExceptionInsteadOfPopupErrorMessage
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = false;
+
+	bool Initialized = false;
+	private void Save()
+	{
+		if (!Initialized) return;
+		KVData.Write("App", "throw_exception", _throwExceptionInsteadOfPopupErrorMessage ? "true": "false");
+	}
+
+	protected override void OnInitialized()
+	{
+		if(bool.TryParse(KVData.Read("App", "throw_exception"), out var result)){
+			_throwExceptionInsteadOfPopupErrorMessage = result;
+		}
+
+
+	}
+}

@@ -30,6 +30,17 @@ namespace ShimmerChatBuiltin.ContextModifiers
 
 		void IContextModifier.ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
 		{
+			// 0. 参数检查
+			if (!int.TryParse(input, out int n) || n <= 0)
+			{
+				throw new InvalidDataException("Input must be a positive integer representing the number of recent messages to consider.");
+			}
+			if(n > 5)// 值太高时打印警告
+			{
+				Console.WriteLine("[MemoryInject] Warning: High message count may lead to performance issues.");
+			}
+
+
 			// 1. 获取最新的n条非空消息。并按时间顺序分配权重。
 			var x = chat.Messages
 				.Where(x => !string.IsNullOrEmpty(x.message.Content))

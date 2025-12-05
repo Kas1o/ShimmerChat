@@ -11,6 +11,7 @@
 @inject IAIGenerationService aiGenerationService
 @inject IPopupService popupService
 @inject IJSRuntime JS
+@inject IKVDataService KVData
 
 @if (chat != null)
 {
@@ -207,11 +208,14 @@
 			}
 			catch (Exception ex)
 			{
-				#if !DEBUG
-				popupService.ShowAsync(ex.Message, "停止生成时出错");
-				#else
-				throw;
-				#endif
+				if (throwExceptionInsteadOfPopupErrorMessage)
+				{
+					throw;
+				}
+				else
+				{
+					popupService.ShowAsync(ex.Message, "停止生成时出错");
+				}
 			}
 		}
 	}
@@ -231,6 +235,15 @@
 		{
 			currentAIMessage.IsStreaming = false;
 			currentAIMessage = null;
+		}
+	}
+
+	bool throwExceptionInsteadOfPopupErrorMessage = false;
+	protected override void OnInitialized()
+	{
+		if (bool.TryParse(KVData.Read("App", "throw_exception"), out var result))
+		{
+			throwExceptionInsteadOfPopupErrorMessage = result;
 		}
 	}
 
@@ -332,16 +345,21 @@
 		}
 		catch (Exception ex)
 		{
-			#if !DEBUG
-			popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
-			#else
-			throw;
-			#endif
+			
 			// 发生错误时，标记当前消息为非流式状态
 			if (currentAIMessage != null)
 			{
 				currentAIMessage.IsStreaming = false;
 			}
+
+			if(throwExceptionInsteadOfPopupErrorMessage)
+			{
+				throw;
+			}
+			else
+			{
+				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
+			}	
 		}
 		finally
 		{

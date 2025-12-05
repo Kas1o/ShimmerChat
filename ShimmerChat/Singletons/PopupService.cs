@@ -27,7 +27,7 @@ namespace ShimmerChat.Singletons
 
 		public void Confirm()
 		{
-			_tcs.SetResult(true);
+			_tcs?.SetResult(true);
 			Hide();
 		}
 
@@ -41,9 +41,6 @@ namespace ShimmerChat.Singletons
 		{
 			_options = null;
 			OnHide?.Invoke();
-			// 重置 TCS（支持多次调用）
-			// 注意：严格来说应每次 Show 新建 TCS；这里简化处理（生产建议用队列或每次重建）
-			// 更健壮做法：见文末“注意事项”
 		}
 	}
 }
