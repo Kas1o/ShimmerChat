@@ -118,6 +118,17 @@ namespace ShimmerChat.Singletons
             }
         }
 
+        public void ReorderActivatedModifier(int oldIndex, int newIndex)
+        {
+            if (oldIndex >= 0 && oldIndex < ActivatedModifiers.Count && newIndex >= 0 && newIndex < ActivatedModifiers.Count)
+            {
+                var item = ActivatedModifiers[oldIndex];
+                ActivatedModifiers.RemoveAt(oldIndex);
+                ActivatedModifiers.Insert(newIndex, item);
+                SaveActivatedModifiers();
+            }
+        }
+
         public void ClearActivatedModifiers()
         {
             ActivatedModifiers.Clear();

@@ -133,7 +133,7 @@
     <value>Chat Completion Settings</value>
   </data>
   <data name="CM_ADD" xml:space="preserve">
-    <value>Add to Active List</value>
+    <value>Add New Context Modifier</value>
   </data>
   <data name="CM_INPUT_PH" xml:space="preserve">
     <value>Enter input value for the selected Context Modifier...</value>

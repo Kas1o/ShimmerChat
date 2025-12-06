@@ -1,8 +1,10 @@
-﻿@page "/contextmanager"
+@page "/contextmanager"
+@using ShimmerChat.Components.SubComponents
 @inject NavigationManager Navigation
 @inject IStringLocalizer<ContextManagerPage> l
 @inject IUserData userData
 @inject IContextModifierService contextModifierService
+@inject IPopupService popupService
 
 <h3>@l["TITLE"] </h3>
 
@@ -78,42 +80,34 @@ else
 <!-- 上下文修改器 -->
 <h4>@l["CONTEXT_MODIFIER_TITLE"]</h4>
 
-<div class="shimmer-group" style="margin-top:16px;">
-    <h5>@l["AVAILABLE_CONTEXT_MODIFIER"]</h5>
-    <select @bind="_selectedModifierName" class="form-select" style="width:auto;display:inline-block;">
-        <option value="">@l["SELECT_CM_PH"]</option>
-        @foreach (var modifier in contextModifierService.LoadedModifiers)
-        {
-            <option value="@modifier.info.Name">@modifier.info.Name - @modifier.info.Description</option>
-        }
-    </select>
-</div>
-
-<div class="shimmer-group" style="margin-top:8px;">
-    <h5>@l["INPUT_VALUE"]</h5>
-    <textarea @bind="_modifierInput" class="form-control" rows="3" placeholder="@l["CM_INPUT_PH"]"></textarea>
-    <button class="btn btn-primary" style="margin-top:8px;" @onclick="AddModifier" disabled="@string.IsNullOrEmpty(_selectedModifierName)">@l["CM_ADD"]</button>
-</div>
+<button class="btn btn-primary" style="margin:5px" @onclick="ShowAddModifierPopup">@l["CM_ADD"]</button>
 
 <div class="shimmer-group" style="margin-top:16px;">
     <h5>@l["ACTIVE_CM"]</h5>
     @if (contextModifierService.ActivatedModifiers.Any())
     {
-        <ul class="list-group">
+        <div class="list-group" ondragover="event.preventDefault();" @ondrop="() => HandleDrop()">
             @foreach (var modifier in contextModifierService.ActivatedModifiers)
             {
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>@modifier.Name</strong>
-                        @if (!string.IsNullOrEmpty(modifier.Value))
-                        {
-                            <small class="d-block text-muted">@modifier.Value</small>
-                        }
+                <div class="list-group-item d-flex justify-content-between align-items-center" 
+                     draggable="true" 
+                     @ondragstart="() => HandleDragStart(contextModifierService.ActivatedModifiers.IndexOf(modifier))"
+                     @ondragover="() => HandleDragOver(contextModifierService.ActivatedModifiers.IndexOf(modifier))"
+                     data-index="@contextModifierService.ActivatedModifiers.IndexOf(modifier)">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-grip-vertical" style="margin-right: 10px; cursor: move; color: #6c757d;"></i>
+                        <div>
+                            <strong>@modifier.Name</strong>
+                            @if (!string.IsNullOrEmpty(modifier.Value))
+                            {
+                                <small class="d-block text-muted">@modifier.Value</small>
+                            }
+                        </div>
                     </div>
                     <button class="btn btn-danger btn-sm" @onclick="() => RemoveModifier(contextModifierService.ActivatedModifiers.IndexOf(modifier))">Remove</button>
-                </li>
+                </div>
             }
-        </ul>
+        </div>
     }
     else
     {
@@ -123,7 +117,14 @@ else
 
 <button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">Save</button>
 
+    @if (_showAddModifierPopup)
+    {
+        <AddContextModifierPopup @ref="_addModifierPopup" OnConfirm="(result) => OnAddModifierConfirmed(result)" OnClose="() => HideAddModifierPopup()" />
+    }
+
 @code {
+    // 添加自定义弹窗组件引用
+    private AddContextModifierPopup? _addModifierPopup;
     ObservableCollection<TextCompletionSetting> textCompletionSettings => userData.textCompletionSettings;
 
     // ContextModifier相关变量
@@ -206,6 +207,31 @@ else
         Navigation.NavigateTo("/apisettings");
     }
 
+    private bool _showAddModifierPopup = false;
+
+    private void ShowAddModifierPopup()
+    {
+        _showAddModifierPopup = true;
+    }
+
+    private void HideAddModifierPopup()
+    {
+        _showAddModifierPopup = false;
+    }
+
+    private void OnAddModifierConfirmed(object result)
+    {
+        // 解析弹窗返回的结果
+        var modifierInfo = result as dynamic;
+        if (modifierInfo != null)
+        {
+            string modifierName = modifierInfo.ModifierName;
+            string inputValue = modifierInfo.InputValue;
+            contextModifierService.ActivateModifier(modifierName, inputValue);
+        }
+        HideAddModifierPopup();
+    }
+
     private void AddModifier()
     {
         if (!string.IsNullOrEmpty(_selectedModifierName))
@@ -214,6 +240,31 @@ else
             // 重置输入，以便添加下一个
             _modifierInput = string.Empty;
         }
+    }
+
+    // 拖拽排序相关变量和方法
+    private int _dragIndex = -1;
+    private int _dropTargetIndex = -1;
+
+    private void HandleDragStart(int index)
+    {
+        _dragIndex = index;
+    }
+
+    private void HandleDragOver(int index)
+    {
+        _dropTargetIndex = index;
+        // 这里可以添加视觉反馈，比如高亮显示目标位置
+    }
+
+    private void HandleDrop()
+    {
+        if (_dragIndex == -1 || _dropTargetIndex == -1 || _dragIndex == _dropTargetIndex)
+            return;
+
+        contextModifierService.ReorderActivatedModifier(_dragIndex, _dropTargetIndex);
+        _dragIndex = -1;
+        _dropTargetIndex = -1;
     }
 
     private void RemoveModifier(int modifierIdx)

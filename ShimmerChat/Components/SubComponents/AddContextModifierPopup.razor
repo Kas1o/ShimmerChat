@@ -1,0 +1,62 @@
+@using ShimmerChat.Singletons
+@using ShimmerChatLib.Context
+
+<div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加上下文修改器</h5>
+                <button type="button" class="btn-close" @onclick="Cancel"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="modifier-select" class="form-label">选择上下文修改器</label>
+                    <select id="modifier-select" @bind="_selectedModifierName" class="form-select">
+                        <option value="">请选择...</option>
+                        @foreach (var modifier in _contextModifierService.LoadedModifiers)
+                        {
+                            <option value="@modifier.info.Name">@modifier.info.Name - @modifier.info.Description</option>
+                        }
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="modifier-input" class="form-label">输入值</label>
+                    <textarea id="modifier-input" @bind="_modifierInput" class="form-control" rows="3" placeholder="输入上下文修改器的值..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Cancel">取消</button>
+                <button type="button" class="btn btn-primary" @onclick="Confirm" disabled="@string.IsNullOrEmpty(_selectedModifierName)">添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject] private IContextModifierService _contextModifierService { get; set; } = null!;
+    
+    [Parameter]
+    public EventCallback<object> OnConfirm { get; set; }
+    
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+    
+    private string? _selectedModifierName;
+    private string _modifierInput = string.Empty;
+    
+    private async Task Confirm()
+    {
+        if (!string.IsNullOrEmpty(_selectedModifierName))
+        {
+            var result = new { ModifierName = _selectedModifierName, InputValue = _modifierInput };
+            await OnConfirm.InvokeAsync(result);
+            await OnClose.InvokeAsync();
+        }
+    }
+    
+    private async Task Cancel()
+    {
+        await OnClose.InvokeAsync();
+    }
+}

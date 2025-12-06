@@ -133,7 +133,7 @@
     <value>对话补全设置</value>
   </data>
   <data name="CM_ADD" xml:space="preserve">
-    <value>加入到活动列表</value>
+    <value>添加新上下文修改器</value>
   </data>
   <data name="CM_INPUT_PH" xml:space="preserve">
     <value>输入给上下文修改器的值</value>
