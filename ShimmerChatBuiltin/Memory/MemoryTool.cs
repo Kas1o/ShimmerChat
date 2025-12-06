@@ -9,6 +9,8 @@ using ShimmerChatLib.Tool;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using static Qdrant.Client.Grpc.Conditions;
+
 
 namespace ShimmerChatBuiltin.Memory
 {
@@ -28,6 +30,7 @@ namespace ShimmerChatBuiltin.Memory
 			var QHost = KVData.Read("QdrantAPI", "host") ?? throw new InvalidDataException("Qdrant API host not set.");
 			var Qport = KVData.Read("QdrantAPI", "port") ?? throw new InvalidDataException("Qdrant API port not set.");
 			var QApiKey = KVData.Read("QdrantAPI", "apikey");
+			var vectorSize = ulong.Parse(KVData.Read("QdrantAPI", "dim") ?? "1024");
 
 			var qclient = new QdrantClient(QHost, int.Parse(Qport));
 			if (!string.IsNullOrEmpty(QApiKey))
@@ -39,7 +42,6 @@ namespace ShimmerChatBuiltin.Memory
 			var eUri = KVData.Read("EmbeddingAPI", "uri") ?? string.Empty;
 			var eApiKey = KVData.Read("EmbeddingAPI", "apikey") ?? string.Empty;
 			var eModelName = KVData.Read("EmbeddingAPI", "modelname") ?? string.Empty;
-			var vectorSize = ulong.Parse(KVData.Read("EmbeddingAPI", "vectorsize") ?? "1024");
 
 			OpenAIAPI api = new OpenAIAPI(eUri, eApiKey, eModelName);
 
@@ -62,6 +64,8 @@ namespace ShimmerChatBuiltin.Memory
 			switch (action.action)
 			{
 				case "add":
+					if(action.content == null)
+						return "Content cannot be null when adding memory.";
 					var embd = await api.GetEmbedding(action.content);
 					var point = new PointStruct
 					{
@@ -78,10 +82,60 @@ namespace ShimmerChatBuiltin.Memory
 						points: [point]
 					);
 
-					return $"Memory added: {action.content}";
+					return $"Memory added: {action.content} {point.Id}";
 				case "delete":
+					if (action.id == null)
+						return "ID cannot be null when deleting memory.";
+					var result = await qclient.DeleteAsync(
+						collectionName: $"{agent.guid}",
+						id: Guid.Parse(action.id)
+					);
+					return $"Memory with ID {action.id} deleted with result status {result.Status}.";
+				case "search":
+					if (action.content == null)
+						return "Content cannot be null when searching memory.";
+					if (action.search_mode == "similarity")
+					{
+						var searchEmbd = await api.GetEmbedding(action.content);
+						var searchResult = await qclient.SearchAsync(
+							collectionName: $"{agent.guid}",
+							vector: searchEmbd.ToArray(),
+							limit: 5
+						 );
+						StringBuilder sb = new StringBuilder();
+					 sb.AppendLine("Search Results:");
+						foreach (var res in searchResult)
+						{
+							if (res.Payload != null && res.Payload.ContainsKey("content"))
+							{
+								sb.AppendLine($"ID: {res.Id}, Score: {res.Score}, Content: {res.Payload["content"]}");
+							}
+						}
+						return sb.ToString();
+					}
+					else if(action.search_mode == "keyword")
+					{
+						var filter = MatchText("content", action.content);
+						var searchResult = await qclient.ScrollAsync(
+							collectionName: $"{agent.guid}",
+							filter: filter,
+							limit: 5
+						 );
+						StringBuilder sb = new StringBuilder();
+						sb.AppendLine("Search Results:");
+						foreach (var res in searchResult.Result)
+						{
+							if (res.Payload != null && res.Payload.ContainsKey("content"))
+							{
+								sb.AppendLine($"ID: {res.Id}, Content: {res.Payload["content"]}");
+							}
+						}
+						return sb.ToString();
+					}
 
-					return $"还不会从向量数据库删东西，先不写了。";
+
+					return "Unknown search mode.";
+
 				default:
 					throw new InvalidOperationException("Invalid action specified.");
 			}
@@ -98,13 +152,26 @@ namespace ShimmerChatBuiltin.Memory
 					name = "action",
 					type = ParameterType.String,
 					description = "The action to perform: add or delete.",
-					@enum = ["add", "delete"]
+					@enum = ["add", "delete", "search"]
 				}, true),
 				(new ToolParameter
 				{
 					name = "content",
 					type = ParameterType.String,
 					description = "The content to add or retrieve."
+				}, false),
+				(new ToolParameter
+				{
+					name = "id",
+					type = ParameterType.String,
+					description = "The ID of the memory to delete."
+				}, false),
+				(new ToolParameter
+				{
+					name = "search_mode",
+					type = ParameterType.String,
+					description = "The search mode to use.",
+					@enum = ["similarity", "keyword"]
 				}, false)
 			}
 		};
@@ -112,7 +179,9 @@ namespace ShimmerChatBuiltin.Memory
 		struct InputAction
 		{
 			public string action { get; set; }
-			public string content { get; set; }
+			public string? content { get; set; }
+			public string? id { get; set; }
+			public string search_mode { get; set; }
 		}
 	}
 }

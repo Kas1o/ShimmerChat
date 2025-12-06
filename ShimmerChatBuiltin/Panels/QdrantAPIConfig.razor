@@ -83,7 +83,7 @@
 
 	protected override void OnInitialized()
 	{
-		Host = KVData.Read("QdrantAPI", "uri") ?? string.Empty;
+		Host = KVData.Read("QdrantAPI", "host") ?? string.Empty;
 		Port = KVData.Read("QdrantAPI", "port") ?? string.Empty;
 		ApiKey = KVData.Read("QdrantAPI", "apikey") ?? string.Empty;
 		Dim = KVData.Read("QdrantAPI", "dim") ?? string.Empty;

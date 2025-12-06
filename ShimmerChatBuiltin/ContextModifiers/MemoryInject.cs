@@ -25,13 +25,13 @@ namespace ShimmerChatBuiltin.ContextModifiers
 		ContextModifierInfo IContextModifier.info => new ContextModifierInfo
 		{
 			Name = "MemoryInject",
-			Description = "Injects relevant memories into the prompt based on the latest (n) chat message. (input value : int) will be the message count"
+			Description = "Injects relevant memories into the prompt based on the latest (n) chat message. input value sep by, first parameter will be the message count(int), second parameter will be threshold(float32)."
 		};
 
 		void IContextModifier.ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
 		{
 			// 0. 参数检查
-			if (!int.TryParse(input, out int n) || n <= 0)
+			if (!int.TryParse(input.Split(',')[0], out int n) || n <= 0)
 			{
 				throw new InvalidDataException("Input must be a positive integer representing the number of recent messages to consider.");
 			}
@@ -39,6 +39,16 @@ namespace ShimmerChatBuiltin.ContextModifiers
 			{
 				Console.WriteLine("[MemoryInject] Warning: High message count may lead to performance issues.");
 			}
+
+			if(!float.TryParse(input.Split(',').ElementAtOrDefault(1) ?? "0.5", out float threshold) || threshold < 0.0f || threshold > 1.0f)
+			{
+				throw new InvalidDataException("Second parameter must be a float between 0.0 and 1.0 representing the similarity threshold.");
+			}
+			if( threshold < 0.2f)
+			{
+				Console.WriteLine("[MemoryInject] Warning: Low similarity threshold may lead to irrelevant memories being injected.");
+			}
+
 
 
 			// 1. 获取最新的n条非空消息。并按时间顺序分配权重。
@@ -91,27 +101,28 @@ namespace ShimmerChatBuiltin.ContextModifiers
 			}
 
 			// 4. 查询Qdrant
-			var searchResults = new List<string>();
+			var searchResults = new List<(string Content, string UUID)>();
 			foreach(var (vector, weight) in vectors)
 			{
+				var actual_threshold = (1f - (0.9f * (weight - 1) / (vectors.Aggregate((x,y) => x.weight > y.weight? x: y).weight - 1))) * threshold;
 				var results = qclient.SearchAsync(
 					collectionName: $"{agent.guid}",
 					vector: vector.ToArray().AsMemory(),
 					limit: 3,
-					scoreThreshold: MathF.Sin(((float)weight / float.Parse(input)) * MathF.PI / 2) * 0.8f // 根据权重调整相似度阈值
-				).Result;//System.AggregateException:“One or more errors occurred. (Status(StatusCode="InvalidArgument", Detail="Wrong input: Not existing vector name error: "))”
+					scoreThreshold: actual_threshold // 根据权重调整相似度阈值
+				).Result;
 				foreach (var res in results)
 				{
 					for(int i = 0; i < weight; i++) // 根据权重重复添加
 					{
-						searchResults.Add(res.Payload["content"].ToString());
+						searchResults.Add((res.Payload["content"].ToString(), res.Id.Uuid));
 					}
 				}
 			}
 
 			var memoryContext = string.Join("\n---\n", searchResults.Distinct());
 			var newMessages = promptBuilder.Messages.ToList();
-			newMessages.Add(($"Memories:\n{{\n{memoryContext}\n}}", PromptBuilder.From.system));
+			newMessages.Add(($"System Auto Recall Memories:\n{{\n{memoryContext}\n}}", PromptBuilder.From.system));
 			promptBuilder.Messages = newMessages.ToArray();
 		}
 	}
