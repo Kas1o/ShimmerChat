@@ -1,10 +1,10 @@
-﻿using ShimmerChat.Models;
+using ShimmerChat.Models;
 
 namespace ShimmerChat.Singletons
 {
 	public class PopupService : IPopupService
 	{
-		private readonly TaskCompletionSource<bool> _tcs = new();
+		private TaskCompletionSource<bool>? _tcs;
 		private PopupOptions? _options;
 
 		public event Action<PopupOptions?>? OnShow;
@@ -20,6 +20,8 @@ namespace ShimmerChat.Singletons
 
 		public Task<bool> ShowAsync(PopupOptions options)
 		{
+			// Create a new TaskCompletionSource for each popup
+			_tcs = new TaskCompletionSource<bool>();
 			_options = options;
 			OnShow?.Invoke(_options);
 			return _tcs.Task;
@@ -39,6 +41,7 @@ namespace ShimmerChat.Singletons
 
 		private void Hide()
 		{
+			_tcs = null;
 			_options = null;
 			OnHide?.Invoke();
 		}
