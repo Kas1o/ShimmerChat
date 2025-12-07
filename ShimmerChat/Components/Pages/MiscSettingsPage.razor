@@ -11,6 +11,14 @@
 	<label class="form-check-label" for="throw-exception">Throw exception instead of popup error message</label>
 </div>
 
+
+<div class="shimmer-group">
+	<h4>User Settings</h4>
+
+	<label class="form-check-label" for="username">User Name</label>
+	<input type="text" class="form-control" id="username" @bind="_UserName" />
+</div>
+
 @code {
 	private bool _throwExceptionInsteadOfPopupErrorMessage
 	{
@@ -22,12 +30,25 @@
 			Save();
 		}
 	} = false;
+	private string _UserName
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = "";
+
+
 
 	bool Initialized = false;
 	private void Save()
 	{
 		if (!Initialized) return;
 		KVData.Write("App", "throw_exception", _throwExceptionInsteadOfPopupErrorMessage ? "true": "false");
+		KVData.Write("User", "username", _UserName);
 	}
 
 	protected override void OnInitialized()
@@ -35,7 +56,7 @@
 		if(bool.TryParse(KVData.Read("App", "throw_exception"), out var result)){
 			_throwExceptionInsteadOfPopupErrorMessage = result;
 		}
-
-
+		_UserName = KVData.Read("User", "username") ?? "";
+		Initialized = true;
 	}
 }
