@@ -108,7 +108,7 @@ namespace ShimmerChatBuiltin.Memory
 						{
 							if (res.Payload != null && res.Payload.ContainsKey("content"))
 							{
-								sb.AppendLine($"ID: {res.Id}, Score: {res.Score}, Content: {res.Payload["content"]}");
+								sb.AppendLine($"ID: {res.Id}, Score: {res.Score}, Content: {res.Payload["content"]}, Timestamp: { res.Payload["timestamp"]}");
 							}
 						}
 						return sb.ToString();
@@ -158,13 +158,13 @@ namespace ShimmerChatBuiltin.Memory
 				{
 					name = "content",
 					type = ParameterType.String,
-					description = "The content to add or retrieve."
+					description = "The content to add or retrieve. (example value: \"Users prefer beef over other foods.\")"
 				}, false),
 				(new ToolParameter
 				{
 					name = "id",
 					type = ParameterType.String,
-					description = "The ID of the memory to delete."
+					description = "The ID of the memory to delete. (example value: \"7ac1ceca-4fc7-43c5-8ff3-02376c9c9a97\")"
 				}, false),
 				(new ToolParameter
 				{
