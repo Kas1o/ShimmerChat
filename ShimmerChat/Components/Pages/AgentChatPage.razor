@@ -113,9 +113,9 @@
 			transition: var(--transition);
 		}
 
-			.shimmer-message:hover {
-				box-shadow: var(--shadow-md);
-			}
+				.shimmer-message:hover {
+					box-shadow: var(--shadow-md);
+				}
 
 		/* 消息头部 */
 		.shimmer-message-head {
@@ -137,20 +137,20 @@
 			user-select: none;
 		}
 
-			.shimmer-message-head-action button {
-				background: none;
-				border: none;
-				color: var(--color-text-secondary);
-				cursor: pointer;
-				padding: 4px 8px;
-				border-radius: var(--radius-md);
-				transition: var(--transition);
-			}
-
-				.shimmer-message-head-action button:hover {
-					background-color: var(--color-surface);
-					color: var(--color-primary);
+				.shimmer-message-head-action button {
+					background: none;
+					border: none;
+					color: var(--color-text-secondary);
+					cursor: pointer;
+					padding: 4px 8px;
+					border-radius: var(--radius-md);
+					transition: var(--transition);
 				}
+
+						.shimmer-message-head-action button:hover {
+						background-color: var(--color-surface);
+						color: var(--color-primary);
+					}
 
 		/* 思考中消息样式 */
 		.shimmer-message-thinking {
@@ -188,37 +188,14 @@
 	[Parameter]
 	public string agentguid { get; set; } = string.Empty;
 
-	Agent? agent
-	{
-		get
-		{
-			try
-			{
-				var guid = Guid.Parse(agentguid);
-				return Agent.Load(guid, KVData);
-			}
-			catch (Exception)
-			{
-				return null;
-			}
-		}
-	}
+	private Agent? agent;
 
 	[Parameter]
 	public string chatname { get; set; } = string.Empty; // The chat name to load
 
-	Chat? chat
-	{
-		get
-		{
-			if (agent == null)
-				return null;
-			
-			// Load all chats for the agent and find the one with matching name
-			var chats = agent.GetChats(KVData);
-			return chats.FirstOrDefault(c => c.Name == chatname);
-		}
-	}
+	private Chat? chat;
+
+	ObservableCollection<Message> messages = new ObservableCollection<Message>();
 
 	string inputText { get; set; } = "";
 
@@ -230,12 +207,9 @@
 		}
 	}
 
-	ObservableCollection<Message> messages
+	ObservableCollection<Message> GetMessagesOrEmpty()
 	{
-		get
-		{
-			return chat.Messages;
-		}
+		return messages;
 	}
 
 	async void Send()
@@ -243,19 +217,24 @@
 		// 取消之前可能存在的生成任务
 		CancelPreviousGeneration();
 
+		if (chat == null || agent == null)
+		{
+			return;
+		}
+
 		// 只有当输入不为空时才添加用户消息
 		if (!string.IsNullOrWhiteSpace(inputText))
 			if (inputText.Trim().Length > 0)
 			{
 				var message = new Message()
 			{
-				message = new SharperLLM.Util.ChatMessage
-				{
-					Content= inputText // 使用输入框的内容
-				},
-				timestamp = DateTime.Now, // 设置消息的时间戳
-				sender = ShimmerChatLib.Sender.User // 设置发送者，可以是 "User" 或其他标识
-			};
+					message = new SharperLLM.Util.ChatMessage
+					{
+						Content= inputText // 使用输入框的内容
+					},
+					timestamp = DateTime.Now, // 设置消息的时间戳
+					sender = ShimmerChatLib.Sender.User // 设置发送者，可以是 "User" 或其他标识
+				};
 
 				// 添加消息到聊天
 				chat.AddMessage(message);
@@ -328,8 +307,43 @@
 		}
 	}
 
+	protected override void OnParametersSet()
+	{
+		base.OnParametersSet();
+
+		agent = null;
+		chat = null;
+		messages = new ObservableCollection<Message>();
+
+		if (Guid.TryParse(agentguid, out var guid))
+		{
+			try
+			{
+				agent = Agent.Load(guid, KVData);
+				if (agent != null)
+				{
+					var chats = agent.GetChats(KVData);
+					chat = chats.FirstOrDefault(c => c.Name == chatname);
+					if (chat != null)
+					{
+						messages = chat.Messages ?? new ObservableCollection<Message>();
+					}
+				}
+			}
+			catch (Exception)
+			{
+				agent = null;
+				chat = null;
+				messages = new ObservableCollection<Message>();
+			}
+		}
+	}
+
 	async void AddLLMReplyStream()
 	{
+		if (agent == null || chat == null)
+			return;
+
 		generating = true;
 
 		// 创建新的CancellationTokenSource
@@ -468,8 +482,10 @@
 	void GetDirty()
 	{
 		// Save the chat and agent directly
-		chat.Save(KVData);
-		agent.Save(KVData);
+		if (chat != null)
+			chat.Save(KVData);
+		if (agent != null)
+			agent.Save(KVData);
 	}
 
 	async Task Refresh()
