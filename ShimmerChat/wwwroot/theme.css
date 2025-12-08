@@ -4,7 +4,7 @@
     --color-primary-hover: #ff7300;
     --color-primary-light: #ffebc8;
     --color-secondary: #6b7280;
-    --color-background: #ffffff;
+    --color-background: #FAFAFA;
     --color-surface: #fff;
     --color-card: #ffffff;
     --color-text-primary: #111827;
@@ -29,13 +29,14 @@
     --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     --transition: all 0.2s ease;
     /* 间距变量 */
-    --spacing-xs: 0.25rem;  /* 4px */
-    --spacing-sm: 0.5rem;   /* 8px */
-    --spacing-md: 0.75rem;  /* 12px */
-    --spacing-lg: 1rem;     /* 16px */
-    --spacing-xl: 1.5rem;   /* 24px */
-    --spacing-2xl: 2rem;    /* 32px */
-    --spacing-3xl: 2.5rem;  /* 40px */
+    --spacing-xs: 0.25rem; /* 4px */
+    --spacing-sm: 0.5rem; /* 8px */
+    --spacing-md: 0.75rem; /* 12px */
+    --spacing-lg: 1rem; /* 16px */
+    --spacing-xl: 1.5rem; /* 24px */
+    --spacing-2xl: 2rem; /* 32px */
+    --spacing-3xl: 2.5rem; /* 40px */
+    --border-size: 1px;
 }
 
 /* 暗色主题变量 */
@@ -46,11 +47,11 @@
     --color-secondary: #9ca3af;
     --color-background: #000;
     --color-surface: #000;
-    --color-card: #374151;
+    --color-card: #000;
     --color-text-primary: #f9fafb;
     --color-text-secondary: #d1d5db;
     --color-text-tertiary: #9ca3af;
-    --color-border: #374151;
+    --color-border: #1F1F1F;
     --color-border-hover: #4b5563;
     --color-error: #f87171;
     --color-error-light: rgba(248, 113, 113, 0.15);
@@ -58,9 +59,10 @@
     --color-success: #34d399;
     --color-warning: #fbbf24;
     --color-info: #60a5fa;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 2px 0 #fbbf2400;
+    --shadow-md: 0 4px 6px -1px #fbbf2420, 0 2px 4px -1px #fbbf2425;
+    --shadow-lg: 0 10px 15px -3px #fbbf40, 0 4px 6px -2px #fbbf2425;
+    --border-size: 1.5px;
 }
 
 /* 确保暗色主题正确应用到html和body */
@@ -220,4 +222,10 @@ input:focus, textarea:focus, select:focus {
 
 .animate-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.form-select, .list-group-item {
+    color: var(--color-text-primary);
+    background-color: var(--color-card);
+    border: var(--border-size) solid var(--color-border);
 }

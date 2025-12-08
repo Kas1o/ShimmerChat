@@ -3,7 +3,7 @@
 /* 卡片组样式 */
 .shimmer-group {
     border-radius: var(--radius-lg);
-    border: 1px solid var(--color-border);
+    border: var(--border-size) solid var(--color-border);
     background-color: var(--color-card);
     padding: 16px;
     margin: 12px 0;

@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager NavigationManager
 
 <div class="shimmer-layout">
     <!-- 侧边导航栏 -->
@@ -37,6 +39,27 @@
     private void InitializeErrorHandlers()
     {
         // 这里可以添加JavaScript互操作来处理错误UI的事件
+    }
+
+    private string currentPath = "";
+
+    protected override void OnInitialized()
+    {
+        // 订阅导航事件
+        NavigationManager.LocationChanged += OnLocationChanged;
+        currentPath = NavigationManager.Uri;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentPath = e.Location; // 或使用 NavigationManager.ToBaseRelativePath(e.Location)
+        Console.WriteLine(currentPath);
+    }
+
+    public void Dispose()
+    {
+        // 避免内存泄漏，取消订阅
+        NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }
 
