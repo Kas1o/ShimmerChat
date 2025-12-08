@@ -1,6 +1,6 @@
-﻿@page "/agent/{agentguid}"
+@page "/agent/{agentguid}"
 @inject NavigationManager navigation
-@inject IUserData userData
+@inject IKVDataService kvDataService
 
 @if(agent != null)
 {
@@ -18,7 +18,7 @@
                         Add New Chat
                     </div>
 
-                    @foreach(var chat in agent.chats)
+                    @foreach(var chat in agent.GetChats(kvDataService))
                     {
                         <div class="shimmer-grid-item shimmer-grid-chat-item" @onclick= "() => OpenChat(chat)">
                             @chat.Name
@@ -107,40 +107,63 @@
     [Parameter]
     public string agentguid { get; set; } = string.Empty;
 
-    Agent? agent
+    private Agent? agent;
+
+    protected override void OnParametersSet()
     {
-        get 
+        base.OnParametersSet();
+
+        agent = null;
+
+        if (Guid.TryParse(agentguid, out var guid))
         {
-            return userData.Agents.FirstOrDefault(agent => agent.guid.ToString() == agentguid);
+            try
+            {
+                agent = Agent.Load(guid, kvDataService);
+            }
+            catch (Exception)
+            {
+                agent = null;
+            }
         }
     }
 
     string Name
     {
-        get => agent.name;
+        get => agent?.name ?? string.Empty;
         set
         {
-            agent.name = value;
-            userData.SaveSpecificAgent(agent); // Save the specific agent after changing the name
+            if (agent != null)
+            {
+                agent.name = value;
+                agent.Save(kvDataService); // Save the specific agent after changing the name
+            }
         }
     }
 
     string Description
     {
-        get => agent.description;
+        get => agent?.description ?? string.Empty;
         set
         {
-            agent.description = value;
-            userData.SaveSpecificAgent(agent); // Save the specific agent after changing the description
+            if (agent != null)
+            {
+                agent.description = value;
+                agent.Save(kvDataService); // Save the specific agent after changing the description
+            }
         }
     }
 
     string Greeting
     {
-        get => agent.greeting;
-        set{
-            agent.greeting = value;
-            userData.SaveSpecificAgent(agent); 
+        get => agent?.greeting ?? string.Empty;
+        set
+        {
+            if (agent != null)
+            {
+                agent.greeting = value;
+                agent.Save(kvDataService);
+            }
         }
     }
 
@@ -151,25 +174,33 @@
 
     private void NewChat()
     {
+        if (agent == null)
+            return;
+
         var chat = new Chat
         {
+            Guid = Guid.NewGuid(),
             Name = $"{DateTime.Now.ToString().Replace(" ","-").Replace("/","-").Replace(":","-")}",
         };
 
         if (!string.IsNullOrEmpty(agent.greeting))
-        chat.AddMessage(
-            new Message
-            {
-				sender = Sender.AI,
-				timestamp = DateTime.Now,
-                message = new SharperLLM.Util.ChatMessage
+            chat.AddMessage(
+                new Message
                 {
-                    Content = agent.greeting
+                    sender = Sender.AI,
+                    timestamp = DateTime.Now,
+                    message = new SharperLLM.Util.ChatMessage
+                    {
+                        Content = agent.greeting
+                    }
                 }
-            }
-        );
+            );
 
-        agent.AddChat(chat);
+        // Save the chat first
+        chat.Save(kvDataService);
+        agent.AddChatGuid(chat.Guid);
+        // Save the agent
+        agent.Save(kvDataService);
 
         navigation.NavigateTo(navigation.Uri + "/" + chat.Name);
     }

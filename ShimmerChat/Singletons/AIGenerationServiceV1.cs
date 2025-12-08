@@ -13,20 +13,17 @@ namespace ShimmerChat.Singletons
     {
         private readonly ICompletionServiceV2 _completionService;
         private readonly IContextBuilderService _contextBuilderService;
-        private readonly IUserData _userData;
         private readonly IToolService _toolService;
         private readonly IKVDataService kVDataService;
 
         public AIGenerationServiceV1(
             ICompletionServiceV2 completionService,
             IContextBuilderService contextBuilderService,
-            IUserData userData,
             IToolService toolService,
             IKVDataService kVData)
         {
             _completionService = completionService;
             _contextBuilderService = contextBuilderService;
-            _userData = userData;
             _toolService = toolService;
             kVDataService = kVData;
         }
@@ -44,9 +41,22 @@ namespace ShimmerChat.Singletons
         {
             get
             {
-				var selectedTCS = kVDataService.Read("ApiSettings", "selectedTCS") ?? "0";
-				return int.Parse(selectedTCS);
-			}
+                var selectedTCS = kVDataService.Read("ApiSettings", "selectedTCS") ?? "0";
+                return int.Parse(selectedTCS);
+            }
+        }
+
+        CompletionType CompletionType
+        {
+            get
+            {
+                var completionType = kVDataService.Read("ApiSettings", "CompletionType") ?? ((int)CompletionType.ChatCompletion).ToString();
+                return (CompletionType)Enum.Parse(typeof(CompletionType), completionType);
+            }
+            set
+            {
+                kVDataService.Write("ApiSettings", "CompletionType", ((int)value).ToString());
+            }
         }
 
 
@@ -81,7 +91,7 @@ namespace ShimmerChat.Singletons
             Action<ResponseEx> onResponse,
             Action<(string name, string resp, string id)> onToolResult)
         {
-            if (_userData.CompletionType == CompletionType.TextCompletion)
+            if (CompletionType == CompletionType.TextCompletion)
             {
                 // 处理TextCompletion模式
                 var templ = textCompletionSettings[SelectedTCS].GetMessageTemplates();
@@ -116,7 +126,7 @@ namespace ShimmerChat.Singletons
             Action<(string name, string resp, string id)> onToolResult,
             CancellationToken cancellationToken)
         {
-            if (_userData.CompletionType == CompletionType.TextCompletion)
+            if (CompletionType == CompletionType.TextCompletion)
             {
 				// 对于TextCompletion模式，直接使用流式API
 				var templ = textCompletionSettings[SelectedTCS].GetMessageTemplates();

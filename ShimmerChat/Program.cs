@@ -12,7 +12,6 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddLocalization(option => option.ResourcesPath = "Resources");
 
-builder.Services.AddSingleton<IUserData, LocalFileStorageUserData>();
 builder.Services.AddSingleton<ICompletionService, CompletionServiceV1>();
 builder.Services.AddSingleton<ICompletionServiceV2, CompletionServiceV2>();
 builder.Services.AddSingleton<IContextBuilderService, ContextBuilderServiceV1>();

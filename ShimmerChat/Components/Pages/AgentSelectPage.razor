@@ -1,8 +1,8 @@
-﻿@page "/agentselect"
+@page "/agentselect"
 @using System.Collections.ObjectModel;
 @inject NavigationManager navigation
 @inject IStringLocalizer<AgentSelectPage> l
-@inject IUserData userData
+@inject IKVDataService kvDataService
 
 <h3>@l["AgentSelectPage"]</h3>
 <button class="btn btn-primary" @onclick="OpenCreateAgentMenu">@l["Create New Agent"]</button>
@@ -84,9 +84,25 @@
 	string popupNewAgentDescription { get; set; } = "this is a cool agent!";
 	string popupNewAgentGreeting { get; set; } = "Hello! How can I help you today?";
 	#endregion
-	ObservableCollection<Agent> agents
+	List<Agent> agents
 	{
-		get => userData.Agents;
+		get 
+		{
+			var agentGuids = Agent.GetAllAgentGuids(kvDataService);
+			var result = new List<Agent>();
+			foreach (var guid in agentGuids)
+			{
+				try
+				{
+					result.Add(Agent.Load(guid, kvDataService));
+				}
+				catch (Exception ex)
+				{
+					// Skip any agents that fail to load
+				}
+			}
+			return result;
+		}
 	}
 
 	void OpenCreateAgentMenu()
@@ -100,12 +116,20 @@
 		if (popupNewAgentName == "")
 			popupNewAgentName = "new agent"; // Default name if empty"
 
-		agents.Add(Agent.Create
+		// Create the new agent
+		var newAgent = Agent.Create
 		(
 			popupNewAgentName,
 			popupNewAgentDescription,
 			popupNewAgentGreeting
-		));
+		);
+		
+		// Save the agent
+		newAgent.Save(kvDataService);
+		
+		// Add the agent to the all agents list
+		Agent.AddAgentToAll(newAgent, kvDataService);
+		
 		CreatePopupVisible = false;
 	}
 

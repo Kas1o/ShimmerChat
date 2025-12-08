@@ -2,7 +2,6 @@
 @using ShimmerChat.Components.SubComponents
 @inject NavigationManager Navigation
 @inject IStringLocalizer<ContextManagerPage> l
-@inject IUserData userData
 @inject IContextModifierService contextModifierService
 @inject IPopupService popupService
 
@@ -156,12 +155,25 @@ else
             ? textCompletionSettings[_selectedTCS]
             : null;
 
+    private CompletionType completionType
+    {
+        get
+        {
+            var completionType = KVData.Read("ApiSettings", "CompletionType") ?? ((int)CompletionType.ChatCompletion).ToString();
+            return (CompletionType)Enum.Parse(typeof(CompletionType), completionType);
+        }
+        set
+        {
+            KVData.Write("ApiSettings", "CompletionType", ((int)value).ToString());
+        }
+    }
+
     private string _selectedCompletionType
     {
         get => completionType == CompletionType.ChatCompletion ? "chat-completion" : "text-completion";
         set
         {
-            userData.CompletionType = value switch
+            completionType = value switch
             {
                 "chat-completion" => CompletionType.ChatCompletion,
                 "text-completion" => CompletionType.TextCompletion,
@@ -169,7 +181,6 @@ else
             };
         }
     }
-    private CompletionType completionType => userData.CompletionType;
 
     private bool AllowChatCompletion =>
         apiSettings.Count > 0 && _selectedAPIIndex >= 0 && _selectedAPIIndex < apiSettings.Count
@@ -195,7 +206,7 @@ else
 
     private bool UsingOpenAIAndTextCompletion =>
         apiSettings.Count > 0 && _selectedAPIIndex >= 0 && _selectedAPIIndex < apiSettings.Count
-            ? (userData.CompletionType == CompletionType.TextCompletion) && (apiSettings[_selectedAPIIndex].Type == ApiSettingType.OpenAI)
+            ? (completionType == CompletionType.TextCompletion) && (apiSettings[_selectedAPIIndex].Type == ApiSettingType.OpenAI)
             : false;
 
     private void CreateNewTextCompletionSetting()

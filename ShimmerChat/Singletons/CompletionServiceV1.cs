@@ -8,14 +8,12 @@ namespace ShimmerChat.Singletons
 {
 	public class CompletionServiceV1 : ICompletionService
 	{
-		private readonly IUserData UserData;
 		private readonly IToolService ToolService;
 		private readonly IContextBuilderService ContextBuilderService;
 		private readonly IKVDataService KVDataService;
 
-		public CompletionServiceV1(IUserData userData, IToolService toolService, IContextBuilderService contextBuilderService, IKVDataService kVData)
+		public CompletionServiceV1(IToolService toolService, IContextBuilderService contextBuilderService, IKVDataService kVData)
 		{
-			UserData = userData;
 			ToolService = toolService;
 			ContextBuilderService = contextBuilderService;
 			KVDataService = kVData;
@@ -57,11 +55,24 @@ namespace ShimmerChat.Singletons
 			}
 		}
 
+		CompletionType CompletionType
+		{
+			get
+			{
+				var completionType = KVDataService.Read("ApiSettings", "CompletionType") ?? ((int)CompletionType.ChatCompletion).ToString();
+				return (CompletionType)Enum.Parse(typeof(CompletionType), completionType);
+			}
+			set
+			{
+				KVDataService.Write("ApiSettings", "CompletionType", ((int)value).ToString());
+			}
+		}
+
 		[Obsolete]
 		public async Task<string> GetAIReply(Agent agent,Chat chat)
 		{
 			var reply = "";
-			if (UserData.CompletionType == CompletionType.TextCompletion)
+			if (CompletionType == CompletionType.TextCompletion)
 			{
 				var templ = textCompletionSettings[SelectedTCS].GetMessageTemplates();
 				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent);
@@ -86,7 +97,7 @@ namespace ShimmerChat.Singletons
 		public async Task<ResponseEx> GetAIReplyReponseEx(Agent agent, Chat chat, Action<(string name, string resp)> ToolCallback)
 		{
 			ResponseEx rsp = null;
-			if (UserData.CompletionType == CompletionType.TextCompletion)
+			if (CompletionType == CompletionType.TextCompletion)
 			{
 				throw new NotImplementedException("不支持在TextCompletion 中使用此API");
 			}
@@ -107,7 +118,7 @@ namespace ShimmerChat.Singletons
 			Action<ResponseEx> onResponse,
 			Action<(string name, string resp, string id)> ToolCallback)
 		{
-			if (UserData.CompletionType == CompletionType.TextCompletion)
+			if (CompletionType == CompletionType.TextCompletion)
 				throw new NotImplementedException("不支持在TextCompletion 中使用此API");
 
 			while (true)

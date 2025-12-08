@@ -6,7 +6,6 @@
 @using ShimmerChat.Singletons
 @using Microsoft.JSInterop
 
-@inject IUserData userData
 @inject ICompletionService completion
 @inject IAIGenerationService aiGenerationService
 @inject IPopupService popupService
@@ -193,7 +192,15 @@
 	{
 		get
 		{
-			return userData.Agents.FirstOrDefault(agent => agent.guid.ToString() == agentguid);
+			try
+			{
+				var guid = Guid.Parse(agentguid);
+				return Agent.Load(guid, KVData);
+			}
+			catch (Exception)
+			{
+				return null;
+			}
 		}
 	}
 
@@ -206,7 +213,10 @@
 		{
 			if (agent == null)
 				return null;
-			return agent.chats.FirstOrDefault(chat => chat.Name == chatname);
+			
+			// Load all chats for the agent and find the one with matching name
+			var chats = agent.GetChats(KVData);
+			return chats.FirstOrDefault(c => c.Name == chatname);
 		}
 	}
 
@@ -457,8 +467,9 @@
 
 	void GetDirty()
 	{
-		chat.dirty = true;
-		userData.SaveSpecificAgent(agent); // Save the specific agent after making a change to the chat)
+		// Save the chat and agent directly
+		chat.Save(KVData);
+		agent.Save(KVData);
 	}
 
 	async Task Refresh()

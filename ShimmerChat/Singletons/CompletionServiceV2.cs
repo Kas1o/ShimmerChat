@@ -11,11 +11,9 @@ namespace ShimmerChat.Singletons
 {
     public class CompletionServiceV2 : ICompletionServiceV2
     {
-        private readonly IUserData _userData;
 		private readonly IKVDataService KVDataService;
-		public CompletionServiceV2(IUserData userData, IKVDataService kVData)
+		public CompletionServiceV2(IKVDataService kVData)
         {
-            _userData = userData;
 			KVDataService = kVData;
 		}
 

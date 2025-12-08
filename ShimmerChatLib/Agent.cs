@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+using Newtonsoft.Json;
+using ShimmerChatLib.Interface;
 
 namespace ShimmerChatLib
 {
@@ -14,81 +13,118 @@ namespace ShimmerChatLib
         public string description { get; set; } // The description of the agent
 		public string greeting { get; set; }
 
-		public List<Chat> chats;
+		public List<Guid> chatGuids
+        {
+            get => field;
+            set
+            {
+                field = value;
+            }
+        }
 
         private Agent()
         {
 
         }
 
-        public void SaveTo(string path)
+        public void Save(IKVDataService kvDataService)
         {
-			Directory.CreateDirectory(Path.Combine(path, "chats"));
-            foreach (Chat chat in chats.Where(chat => chat.dirty))
-            {
-				chat.dirty = false;
-                var saveData = JsonSerializer.Serialize(chat, new JsonSerializerOptions
-				{
-					WriteIndented = true,
-                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-				});
-                var savePath = Path.Combine(path, $"chats/{chat.Name}.json"); // Save each chat to a separate file
-				File.WriteAllText(savePath, saveData);
-			}
-			File.WriteAllText(Path.Combine(path, "description.txt"), description);
-			File.WriteAllText(Path.Combine(path, "name.txt"), name); // Save the agent's name to a text file
-			File.WriteAllText(Path.Combine(path, "greeting.txt"), greeting);
-			File.WriteAllText(Path.Combine(path, "guid.txt"), guid.ToString()); // Save the agent's GUID to a text file
-		}
+            var agentJson = JsonConvert.SerializeObject(this);
+            kvDataService.Write("Agents", guid.ToString(), agentJson);
+        }
 
-        public static Agent ReadFrom(string path)
+        public static Agent Load(Guid guid, IKVDataService kvDataService)
         {
-			var chatFiles = new List<string>();
-			// Load all chat files from the specified path
-			string chatDir = Path.Combine(path, "chats");
-			if (Directory.Exists(chatDir))
-			{
-				chatFiles.AddRange(Directory.GetFiles(chatDir, "*.json"));
-			}
-			// Create a new Agent instance
-			Agent agent = new Agent
-			{
-				chats = new List<Chat>()
-			};
-			// Read each chat file and add it to the agent's chats
-			foreach (var chatFile in chatFiles)
-			{
-				string chatJson = File.ReadAllText(chatFile);
-				Chat chat = JsonSerializer.Deserialize<Chat>(chatJson);
-				if (chat != null)
-				{
-					agent.AddChat(chat);
-				}
-			}
-			// Read the description from the text file
-			agent.description = File.ReadAllText(Path.Combine(path, "description.txt"));
-			agent.name = File.ReadAllText(Path.Combine(path, "name.txt")); // Read the agent's name from the text file
-			agent.greeting = File.Exists(Path.Combine(path, "greeting.txt")) ? File.ReadAllText(Path.Combine(path, "greeting.txt")) : "";
-			agent.guid = File.ReadAllText(Path.Combine(path, "guid.txt")) is string guidString && Guid.TryParse(guidString, out Guid parsedGuid)
-				? parsedGuid
-				: Guid.NewGuid(); // Read the agent's GUID from the text file or generate a new one if it fails to parse
-			return agent;
-		}
-        public void AddChat(Chat chat)
+            var agentJson = kvDataService.Read("Agents", guid.ToString());
+            if (agentJson == null)
+            {
+                throw new InvalidOperationException($"Agent with GUID '{guid}' not found.");
+            }
+            return JsonConvert.DeserializeObject<Agent>(agentJson);
+        }
+
+        public static List<Guid> GetAllAgentGuids(IKVDataService kvDataService)
         {
-			// 判断 是否已经存在同名的聊天
-			if (chats.Any(c => c.Name == chat.Name))
-			{
-				throw new InvalidOperationException($"A chat with the name '{chat.Name}' already exists.");
-			}
-			chats.Add(chat);
-		}
+            var agentsJson = kvDataService.Read("Agents", "__AllAgents__");
+            if (agentsJson == null)
+            {
+                return new List<Guid>();
+            }
+            return JsonConvert.DeserializeObject<List<Guid>>(agentsJson);
+        }
+
+        public static void SaveAllAgentGuids(IKVDataService kvDataService, List<Guid> agentGuids)
+        {
+            var agentsJson = JsonConvert.SerializeObject(agentGuids);
+            kvDataService.Write("Agents", "__AllAgents__", agentsJson);
+        }
+
+        public static void AddAgentToAll(Agent agent, IKVDataService kvDataService)
+        {
+            var agentGuids = GetAllAgentGuids(kvDataService);
+            if (!agentGuids.Contains(agent.guid))
+            {
+                agentGuids.Add(agent.guid);
+                SaveAllAgentGuids(kvDataService, agentGuids);
+            }
+        }
+
+        public static void RemoveAgentFromAll(Agent agent, IKVDataService kvDataService)
+        {
+            var agentGuids = GetAllAgentGuids(kvDataService);
+            if (agentGuids.Contains(agent.guid))
+            {
+                agentGuids.Remove(agent.guid);
+                SaveAllAgentGuids(kvDataService, agentGuids);
+            }
+        }
+
+        public void AddChatGuid(Guid chatGuid)
+        {
+            if (!chatGuids.Contains(chatGuid))
+            {
+                chatGuids.Add(chatGuid);
+            }
+        }
+
+        public void RemoveChatGuid(Guid chatGuid)
+        {
+            chatGuids.Remove(chatGuid);
+        }
+
+        public List<Chat> GetChats(IKVDataService kvDataService)
+        {
+            var chats = new List<Chat>();
+            foreach (var chatGuid in chatGuids)
+            {
+                try
+                {
+                    var chat = Chat.Load(chatGuid, kvDataService);
+                    chats.Add(chat);
+                }
+                catch (Exception ex)
+                {
+                    // Handle exception if chat fails to load
+                    Console.WriteLine($"Failed to load chat with GUID '{chatGuid}': {ex.Message}");
+                }
+            }
+            return chats;
+        }
+
+        public Chat GetChat(Guid chatGuid, IKVDataService kvDataService)
+        {
+            if (!chatGuids.Contains(chatGuid))
+            {
+                throw new InvalidOperationException($"Chat with GUID '{chatGuid}' not found in agent.");
+            }
+            return Chat.Load(chatGuid, kvDataService);
+        }
 
 		public static Agent Create(string Name, string desc, string greeting = null)
 		{
 			return new Agent
 			{
-				chats = new List<Chat>(),
+				chatGuids = new List<Guid>(),
 				name = Name,
 				description = desc,
 				guid= Guid.NewGuid(),
