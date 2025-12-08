@@ -55,7 +55,7 @@ namespace ShimmerChatBuiltin.ContextModifiers
 			var x = chat.Messages
 				.Where(x => !string.IsNullOrEmpty(x.message.Content))
 				.Reverse()
-				.Take(int.Parse(input))
+				.Take(n)
 				.Reverse()
 				.Index() // 越往后的值权重越大
 				.Select(x => (x.Index+1, x.Item)) // 防止权重为0
