@@ -217,7 +217,7 @@
 /* 思考中消息样式 */
 .shimmer-message-thinking {
     backdrop-filter: blur(10px);
-    background-color: rgba(123, 52, 235, 0.15);
+    background-color: var(--color-primary-light);
     border-radius: var(--radius-lg);
     padding: 20px;
     border: 1px solid var(--color-primary-light);

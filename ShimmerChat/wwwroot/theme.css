@@ -63,6 +63,9 @@
     --shadow-md: 0 4px 6px -1px #fbbf2420, 0 2px 4px -1px #fbbf2425;
     --shadow-lg: 0 10px 15px -3px #fbbf40, 0 4px 6px -2px #fbbf2425;
     --border-size: 1.5px;
+    --bs-body-bg: #000;
+    --bs-emphasis-color: #FFF;
+    color: #FFF
 }
 
 /* 确保暗色主题正确应用到html和body */
