@@ -90,6 +90,144 @@
     </div>
 </div>
 
+<style>
+    .shimmer-nav-logo {
+        height: 2em;
+        width: 2em;
+    }
+    .shimmer-sidebar {
+        width: 270px;
+        background-color: var(--color-surface);
+        border-right: 1px solid var(--color-border);
+        display: flex;
+        flex-direction: column;
+        transition: width 0.3s ease;
+        z-index: 10;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* 品牌标识区域 */
+    .shimmer-nav-brand {
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .shimmer-brand-logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--color-card);
+    }
+
+    .shimmer-logo-image {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+    }
+
+    .shimmer-brand-text {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--color-primary);
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* 导航分隔线 */
+    .shimmer-nav-divider {
+        height: 1px;
+        background-color: var(--color-border);
+        margin: 0 16px;
+    }
+
+    /* 菜单区域 */
+    .shimmer-nav-menu {
+        flex: 1;
+        padding: 16px 0;
+    }
+
+    /* 导航菜单项样式 - 组件化版本 */
+    .shimmer-nav-item {
+        display: block;
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        margin: 4px 8px;
+        transition: var(--transition);
+        font-weight: 500;
+        text-decoration: none;
+        color: var(--color-text-secondary);
+        background-color: transparent;
+        border: none;
+        width: calc(100% - 16px);
+    }
+
+        .shimmer-nav-item:hover {
+            background-color: var(--color-surface);
+            color: var(--color-primary);
+            transform: translateX(4px);
+        }
+
+        .shimmer-nav-item.active {
+            background-color: var(--color-primary-light);
+            color: var(--color-primary);
+            font-weight: 600;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .shimmer-nav-item.dark-theme.active {
+            background-color: rgba(123, 52, 235, 0.2);
+        }
+
+    .nav-item-content {
+        display: flex;
+        align-items: center;
+        position: relative;
+    }
+
+    .nav-icon {
+        margin-right: 12px;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+    }
+
+    .nav-text {
+        flex: 1;
+    }
+
+    .nav-badge {
+        background-color: var(--color-primary);
+        color: white;
+        font-size: 0.8rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+        min-width: 24px;
+        text-align: center;
+        font-weight: 600;
+    }
+
+    /* 导航底部 */
+    .shimmer-nav-footer {
+        padding: 16px;
+        border-top: 1px solid var(--color-border);
+    }
+
+    .shimmer-mobile-theme-toggle {
+        display: none;
+    }
+</style>
+
 @code {
     [Inject]
     public required IThemeService ThemeService { get; set; }

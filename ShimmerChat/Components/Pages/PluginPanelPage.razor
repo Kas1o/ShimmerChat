@@ -32,6 +32,64 @@
     }
 </div>
 
+<style>
+    .plugin-panel-container {
+        padding: var(--spacing-lg);
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .panel-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--color-text-primary);
+        margin: 0;
+    }
+
+    .panel-content {
+        min-height: 400px;
+        background-color: var(--color-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-lg);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .panel-not-found {
+        text-align: center;
+        padding: var(--spacing-xl) var(--spacing-lg);
+    }
+
+    .panel-error-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--color-error);
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .panel-error-message {
+        background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
+        color: var(--color-error);
+        padding: var(--spacing-lg);
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--spacing-lg);
+        border: 1px solid var(--color-error-border, rgba(239, 68, 68, 0.2));
+    }
+
+    /* 图标样式 */
+    .icon-back::before {
+        content: "←";
+        margin-right: var(--spacing-xs);
+    }
+</style>
+
 @code {
     [Parameter]
     public string PanelName { get; set; } = string.Empty;

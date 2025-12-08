@@ -102,6 +102,77 @@
 			51%, 100% { opacity: 0; }
 		}
 
+		.shimmer-message {
+			padding: 16px;
+			border-radius: var(--radius-lg);
+			margin: 8px 0;
+			max-width: 100%;
+			word-break: break-word;
+			background-color: var(--color-card);
+			border: 1px solid var(--color-border);
+			box-shadow: var(--shadow-sm);
+			transition: var(--transition);
+		}
+
+			.shimmer-message:hover {
+				box-shadow: var(--shadow-md);
+			}
+
+		/* 消息头部 */
+		.shimmer-message-head {
+			font-size: 1.2rem;
+			font-weight: 600;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 12px;
+			color: var(--color-text-primary);
+		}
+
+		/* 消息操作按钮 */
+		.shimmer-message-head-action {
+			font-size: 1rem;
+			display: flex;
+			gap: 12px;
+			cursor: pointer;
+			user-select: none;
+		}
+
+			.shimmer-message-head-action button {
+				background: none;
+				border: none;
+				color: var(--color-text-secondary);
+				cursor: pointer;
+				padding: 4px 8px;
+				border-radius: var(--radius-md);
+				transition: var(--transition);
+			}
+
+				.shimmer-message-head-action button:hover {
+					background-color: var(--color-surface);
+					color: var(--color-primary);
+				}
+
+		/* 思考中消息样式 */
+		.shimmer-message-thinking {
+			backdrop-filter: blur(10px);
+			background-color: var(--color-primary-light);
+			border-radius: var(--radius-lg);
+			padding: 20px;
+			border: 1px solid var(--color-primary-light);
+			color: var(--color-text-primary);
+		}
+
+		/* 工具调用样式 */
+		.shimmer-toolcall {
+			backdrop-filter: blur(10px);
+			background-color: var(--color-surface);
+			border: 1px solid var(--color-border);
+			border-radius: var(--radius-lg);
+			padding: 20px;
+			margin: 12px 0;
+			box-shadow: var(--shadow-sm);
+		}
 	</style>
 }
 

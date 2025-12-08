@@ -23,6 +23,65 @@
     </div>
 </div>
 
+<style>
+    /* 面板网格 */
+    .panel-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
+        margin-top: var(--spacing-lg);
+    }
+
+    /* 面板卡片 */
+    .panel-card {
+        background-color: var(--color-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-lg);
+        transition: var(--transition);
+        cursor: pointer;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .panel-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--color-primary);
+        box-shadow: var(--shadow-md);
+    }
+
+    .plugin-panel-select-container {
+        padding: var(--spacing-lg);
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .panel-main-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--color-text-primary);
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .panel-card-title {
+        color: var(--color-text-primary);
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin: 0 0 var(--spacing-sm) 0;
+    }
+
+    .panel-card-description {
+        color: var(--color-text-secondary);
+        margin: 0;
+    }
+
+    .panel-empty-message {
+        grid-column: 1 / -1;
+        color: var(--color-text-tertiary);
+        text-align: center;
+        padding: var(--spacing-xl);
+    }
+</style>
+
 @code {
     [Inject]
     public NavigationManager Navigation { get; set; } = null!;
