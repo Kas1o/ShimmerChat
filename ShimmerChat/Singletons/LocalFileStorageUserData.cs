@@ -10,8 +10,6 @@ namespace ShimmerChat.Singletons
 
 		#region terms
 		public ObservableCollection<Agent> Agents { get;set; }
-		public ObservableCollection<TextCompletionSetting> textCompletionSettings { get; set; }
-		public int CurrentTextCompletionSettingIndex { get; set; }
 		public CompletionType CompletionType 
 		{
 			get => field;
@@ -86,13 +84,11 @@ namespace ShimmerChat.Singletons
 		void ReadUserData()
 		{
 			var textCompletionContent = File.ReadAllText($"{root}/textcompletionsettings.json");
-			textCompletionSettings = JsonSerializer.Deserialize<ObservableCollection<TextCompletionSetting>>(textCompletionContent) ?? new ObservableCollection<TextCompletionSetting>();
 
 			var completionTypeContent = File.ReadAllText($"{root}/completionType.json");
 			CompletionType = JsonSerializer.Deserialize<CompletionType>(completionTypeContent);
 
 			var selectedTextCompletionSettingIndexContent = File.ReadAllText($"{root}/selectedTextCompletionsetting.idx");
-			CurrentTextCompletionSettingIndex = JsonSerializer.Deserialize<int>(selectedTextCompletionSettingIndexContent);
 
 			Agents = new();
 			foreach (var item in Directory.GetDirectories($"{root}/Agents"))
@@ -115,20 +111,9 @@ namespace ShimmerChat.Singletons
 			if(!Directory.Exists(root))
 				Directory.CreateDirectory(root);
 
-			if(!File.Exists($"{root}/apisettings.json"))
-				File.WriteAllText($"{root}/apisettings.json","[]");
-
-			if (!File.Exists($"{root}/textcompletionsettings.json"))
-				File.WriteAllText($"{root}/textcompletionsettings.json", "[]");
-
 			if (!File.Exists($"{root}/completionType.json"))
 				File.WriteAllText($"{root}/completionType.json", "1");
 
-			if(!File.Exists($"{root}/selectedAPIsetting.idx"))
-				File.WriteAllText($"{root}/selectedAPIsetting.idx", "0");
-
-			if (!File.Exists($"{root}/selectedTextCompletionsetting.idx"))
-				File.WriteAllText($"{root}/selectedTextCompletionsetting.idx", "0");
 
 			if (!Directory.Exists($"{root}/Agents")) 
 				Directory.CreateDirectory($"{root}/Agents");
@@ -138,21 +123,14 @@ namespace ShimmerChat.Singletons
 		void InitListener()
 		{
 			Agents.CollectionChanged += Agents_CollectionChanged;
-			textCompletionSettings.CollectionChanged += TextCompletionSettings_CollectionChanged;
 		}
 
 		#region SaveUtil
 
 		public void SaveUserData()
 		{
-			var textCompletionContent = JsonSerializer.Serialize(textCompletionSettings);
-			File.WriteAllText($"{root}/textcompletionsettings.json", textCompletionContent);
-
 			var completionTypeContent = JsonSerializer.Serialize(CompletionType);
 			File.WriteAllText($"{root}/completionType.json", completionTypeContent);
-
-			var selectedTextCompletionSettingIndexContent = JsonSerializer.Serialize(CurrentTextCompletionSettingIndex);
-			File.WriteAllText($"{root}/selectedTextCompletionsetting.idx", selectedTextCompletionSettingIndexContent);
 
 			// 保存所有的 Agents
 			foreach (var agent in Agents ?? [])

@@ -1,9 +1,11 @@
 using SharperLLM.API;
 using ShimmerChatLib;
+using ShimmerChatLib.Interface;
 using System;
-using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace ShimmerChat.Singletons
 {
@@ -13,19 +15,41 @@ namespace ShimmerChat.Singletons
         private readonly IContextBuilderService _contextBuilderService;
         private readonly IUserData _userData;
         private readonly IToolService _toolService;
+        private readonly IKVDataService kVDataService;
 
         public AIGenerationServiceV1(
             ICompletionServiceV2 completionService,
             IContextBuilderService contextBuilderService,
             IUserData userData,
-            IToolService toolService)
+            IToolService toolService,
+            IKVDataService kVData)
         {
             _completionService = completionService;
             _contextBuilderService = contextBuilderService;
             _userData = userData;
             _toolService = toolService;
+            kVDataService = kVData;
         }
         
+        List<TextCompletionSetting>? textCompletionSettings 
+        { 
+            get
+            {
+				var tcs = kVDataService.Read("ApiSettings", "textCompletionSettings") ?? "null";
+                return Newtonsoft.Json.JsonConvert.DeserializeObject<List<TextCompletionSetting>>(tcs);
+			} 
+        }
+
+        int SelectedTCS
+        {
+            get
+            {
+				var selectedTCS = kVDataService.Read("ApiSettings", "selectedTCS") ?? "0";
+				return int.Parse(selectedTCS);
+			}
+        }
+
+
         /// <summary>
         /// 创建一个累积响应的异步流
         /// </summary>
@@ -60,7 +84,7 @@ namespace ShimmerChat.Singletons
             if (_userData.CompletionType == CompletionType.TextCompletion)
             {
                 // 处理TextCompletion模式
-                var templ = _userData.textCompletionSettings[_userData.CurrentTextCompletionSettingIndex].GetMessageTemplates();
+                var templ = textCompletionSettings[SelectedTCS].GetMessageTemplates();
                 var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent);
                 string reply = await _completionService.GenerateTextAsync(
                     promptBuilder,
@@ -95,7 +119,7 @@ namespace ShimmerChat.Singletons
             if (_userData.CompletionType == CompletionType.TextCompletion)
             {
 				// 对于TextCompletion模式，直接使用流式API
-				var templ = _userData.textCompletionSettings[_userData.CurrentTextCompletionSettingIndex].GetMessageTemplates();
+				var templ = textCompletionSettings[SelectedTCS].GetMessageTemplates();
                 var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent);
                 var responseStream = _completionService.GenerateTextStreamAsync(
                     promptBuilder,

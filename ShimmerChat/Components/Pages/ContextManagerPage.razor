@@ -46,7 +46,7 @@ else
     @if (completionType == CompletionType.TextCompletion)
     {
         <h5>@l["TEXT_COMPLETION_SETTINGS_TITLE"]</h5>
-        <select @bind="_selectedTextCompletionIndex" class="form-select" style="width:auto;display:inline-block;">
+        <select @bind="_selectedTCS" class="form-select" style="width:auto;display:inline-block;">
             @for (int i = 0; i < textCompletionSettings.Count; i++)
             {
                 <option value="@i">@textCompletionSettings[i].name</option>
@@ -128,35 +128,32 @@ else
     public required IKVDataService KVData { get; set; }
 
     List<ApiSetting>? apiSettings { get; set; }
-    private int _selectedIndex { get; set; }
+    private int _selectedAPIIndex { get; set; }
+    List<TextCompletionSetting>? textCompletionSettings { get; set; }
+    private int _selectedTCS {get; set;}
 
     protected override void OnInitialized()
     {
         var apisettings = KVData.Read("ApiSettings", "apiSetting") ?? "null";
         apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings);
+        var tcs = KVData.Read("ApiSettings", "textCompletionSettings") ?? "[]";
+        textCompletionSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<TextCompletionSetting>>(tcs);
         var selectedIndex = KVData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
-        _selectedIndex = int.Parse(selectedIndex);
+        _selectedAPIIndex = int.Parse(selectedIndex);
+        var selectedTCS = KVData.Read("ApiSettings", "selectedTCS") ?? "0";
+        _selectedTCS = int.Parse(selectedTCS);
     }
 
     // 添加自定义弹窗组件引用
     private AddContextModifierPopup? _addModifierPopup;
-    ObservableCollection<TextCompletionSetting> textCompletionSettings => userData.textCompletionSettings;
 
     // ContextModifier相关变量
     private string? _selectedModifierName;
     private string _modifierInput = string.Empty;
 
-    private int _selectedTextCompletionIndex
-    {
-        get => userData.CurrentTextCompletionSettingIndex;
-        set
-        {
-            userData.CurrentTextCompletionSettingIndex = value;
-        }
-    }
     TextCompletionSetting? topTextCompletionSetting =>
-        (_selectedTextCompletionIndex >= 0 && _selectedTextCompletionIndex < textCompletionSettings.Count)
-            ? textCompletionSettings[_selectedTextCompletionIndex]
+        (_selectedTCS >= 0 && _selectedTCS < textCompletionSettings.Count)
+            ? textCompletionSettings[_selectedTCS]
             : null;
 
     private string _selectedCompletionType
@@ -175,8 +172,8 @@ else
     private CompletionType completionType => userData.CompletionType;
 
     private bool AllowChatCompletion =>
-        apiSettings.Count > 0 && _selectedIndex >= 0 && _selectedIndex < apiSettings.Count
-            ? apiSettings[_selectedIndex].Type switch
+        apiSettings.Count > 0 && _selectedAPIIndex >= 0 && _selectedAPIIndex < apiSettings.Count
+            ? apiSettings[_selectedAPIIndex].Type switch
             {
                 ApiSettingType.Ollama => true,
                 ApiSettingType.Kobold => false,
@@ -184,10 +181,10 @@ else
                 _ => throw new InvalidOperationException(l["UnsupportedAPISettingTypeMessage"])
             }
             : false;
-    
+
     private bool AllowTextCompletion =>
-        apiSettings.Count > 0 && _selectedIndex >= 0 && _selectedIndex < apiSettings.Count
-            ? apiSettings[_selectedIndex].Type switch
+        apiSettings.Count > 0 && _selectedAPIIndex >= 0 && _selectedAPIIndex < apiSettings.Count
+            ? apiSettings[_selectedAPIIndex].Type switch
             {
                 ApiSettingType.Ollama => true,
                 ApiSettingType.Kobold => true,
@@ -195,22 +192,23 @@ else
                 _ => throw new InvalidOperationException(l["UnsupportedAPISettingTypeMessage"])
             }
             : false;
-    
+
     private bool UsingOpenAIAndTextCompletion =>
-        apiSettings.Count > 0 && _selectedIndex >= 0 && _selectedIndex < apiSettings.Count
-            ? (userData.CompletionType == CompletionType.TextCompletion) && (apiSettings[_selectedIndex].Type == ApiSettingType.OpenAI)
+        apiSettings.Count > 0 && _selectedAPIIndex >= 0 && _selectedAPIIndex < apiSettings.Count
+            ? (userData.CompletionType == CompletionType.TextCompletion) && (apiSettings[_selectedAPIIndex].Type == ApiSettingType.OpenAI)
             : false;
 
     private void CreateNewTextCompletionSetting()
     {
         textCompletionSettings.Add(new TextCompletionSetting{ name = "New Text Completion Setting" });
-        _selectedTextCompletionIndex = textCompletionSettings.Count - 1;
+        _selectedTCS = textCompletionSettings.Count - 1;
     }
 
     private void SaveAll()
     {
-        userData.SaveUserData();
-        // 保存激活的ContextModifier
+        KVData.Write("ApiSettings", "textCompletionSettings", Newtonsoft.Json.JsonConvert.SerializeObject(textCompletionSettings));
+        KVData.Write("ApiSettings", "selectedTCS", _selectedTCS.ToString());
+
         contextModifierService.SaveActivatedModifiers();
         Navigation.NavigateTo(Navigation.Uri, true);
     }

@@ -39,13 +39,31 @@ namespace ShimmerChat.Singletons
 			}
 		}
 
+		List<TextCompletionSetting>? textCompletionSettings
+		{
+			get
+			{
+				var tcs = KVDataService.Read("ApiSettings", "textCompletionSettings") ?? "null";
+				return Newtonsoft.Json.JsonConvert.DeserializeObject<List<TextCompletionSetting>>(tcs);
+			}
+		}
+
+		int SelectedTCS
+		{
+			get
+			{
+				var selectedTCS = KVDataService.Read("ApiSettings", "selectedTCS") ?? "0";
+				return int.Parse(selectedTCS);
+			}
+		}
+
 		[Obsolete]
 		public async Task<string> GetAIReply(Agent agent,Chat chat)
 		{
 			var reply = "";
 			if (UserData.CompletionType == CompletionType.TextCompletion)
 			{
-				var templ = UserData.textCompletionSettings[UserData.CurrentTextCompletionSettingIndex].GetMessageTemplates();
+				var templ = textCompletionSettings[SelectedTCS].GetMessageTemplates();
 				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent);
 				reply = await ApiSettings[SelectedAPIIndex].llmapi.GenerateText(new SharperLLM.Util.PromptBuilder(promptBuilder)
 				{
