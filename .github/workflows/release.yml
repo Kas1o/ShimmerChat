@@ -83,3 +83,5 @@ jobs:
           prerelease: false
           generate_release_notes: false  # 我们自己生成了内容
           files: publish-output/**/*     # 上传 publish-output 目录下所有文件
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
