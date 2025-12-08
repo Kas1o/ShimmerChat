@@ -135,19 +135,12 @@
 <button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">@l["Save"]</button>
 
 @code {
-    ObservableCollection<ApiSetting> apiSettings => userData.ApiSettings;
+    [Inject]
+    public required IKVDataService KVData { get; set; }
 
-    private int _selectedIndex
-    {
-        get => userData.CurrentAPISettingIndex;
-		set
-		{
-			if (value >= 0 && value < apiSettings.Count)
-			{
-				userData.CurrentAPISettingIndex = value;
-			}
-		}
-	}
+    List<ApiSetting> apiSettings { get; set; }
+
+    private int _selectedIndex { get; set; }
     ApiSetting topAPISetting => (_selectedIndex >= 0 && _selectedIndex < apiSettings.Count) ? apiSettings[_selectedIndex] : null;
 
     private void CreateNewApiSetting()
@@ -158,7 +151,17 @@
 
     private void SaveAll()
     {
-        userData.SaveUserData();
+        KVData.Write("ApiSettings", "apiSetting", Newtonsoft.Json.JsonConvert.SerializeObject(apiSettings));
+        KVData.Write("ApiSettings", "selectedAPIIndex", _selectedIndex.ToString()) ;
         Navigation.NavigateTo(Navigation.Uri, true);
     }
+
+    protected override void OnInitialized()
+    {
+        var apisettings = KVData.Read("ApiSettings", "apiSetting") ?? "[]";
+        apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings) ?? [];
+        var selectedIndex = KVData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
+        _selectedIndex = int.Parse(selectedIndex);
+    }
+
 }

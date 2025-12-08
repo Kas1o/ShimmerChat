@@ -1,6 +1,8 @@
 using SharperLLM.API;
 using ShimmerChatLib;
+using ShimmerChatLib.Interface;
 using System.Collections.Generic;
+using System.Xml.Linq;
 
 namespace ShimmerChat.Singletons
 {
@@ -9,13 +11,34 @@ namespace ShimmerChat.Singletons
 		private readonly IUserData UserData;
 		private readonly IToolService ToolService;
 		private readonly IContextBuilderService ContextBuilderService;
+		private readonly IKVDataService KVDataService;
 
-		public CompletionServiceV1(IUserData userData, IToolService toolService, IContextBuilderService contextBuilderService)
+		public CompletionServiceV1(IUserData userData, IToolService toolService, IContextBuilderService contextBuilderService, IKVDataService kVData)
 		{
 			UserData = userData;
 			ToolService = toolService;
 			ContextBuilderService = contextBuilderService;
+			KVDataService = kVData;
 		}
+
+		List<ApiSetting> ApiSettings
+		{
+			get
+			{
+				var apisettings = KVDataService.Read("ApiSettings", "apiSetting") ?? "null";
+				return Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings);
+			}
+		}
+
+		int SelectedAPIIndex
+		{
+			get
+			{
+				var selectedIndex = KVDataService.Read("ApiSettings", "selectedAPIIndex") ?? "0";
+				return int.Parse(selectedIndex);
+			}
+		}
+
 		[Obsolete]
 		public async Task<string> GetAIReply(Agent agent,Chat chat)
 		{
@@ -24,7 +47,7 @@ namespace ShimmerChat.Singletons
 			{
 				var templ = UserData.textCompletionSettings[UserData.CurrentTextCompletionSettingIndex].GetMessageTemplates();
 				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent);
-				reply = await UserData.ApiSettings[UserData.CurrentAPISettingIndex].llmapi.GenerateText(new SharperLLM.Util.PromptBuilder(promptBuilder)
+				reply = await ApiSettings[SelectedAPIIndex].llmapi.GenerateText(new SharperLLM.Util.PromptBuilder(promptBuilder)
 				{
 					SysSeqPrefix = templ.sys_start,
 					SysSeqSuffix = templ.sys_stop,
@@ -37,7 +60,7 @@ namespace ShimmerChat.Singletons
 			else
 			{
 				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent);
-				reply = await UserData.ApiSettings[UserData.CurrentAPISettingIndex].llmapi.GenerateChatReply(promptBuilder);
+				reply = await ApiSettings[SelectedAPIIndex].llmapi.GenerateChatReply(promptBuilder);
 			}
 
 			return reply;
@@ -52,7 +75,7 @@ namespace ShimmerChat.Singletons
 			else
 			{
 				var promptBuilder = ContextBuilderService.BuildPromptBuilder(chat, agent);
-				rsp = await UserData.ApiSettings[UserData.CurrentAPISettingIndex].llmapi.GenerateChatEx(promptBuilder);
+				rsp = await ApiSettings[SelectedAPIIndex].llmapi.GenerateChatEx(promptBuilder);
 			}
 
 			return rsp;
@@ -73,7 +96,7 @@ namespace ShimmerChat.Singletons
 			{
 				var toolDefinitions = ToolService.GetEnabledToolDefinitions().ToList();
 				var promptBuilder = ContextBuilderService.BuildPromptBuilderWithTools(chat, agent, toolDefinitions);
-				var rsp = await UserData.ApiSettings[UserData.CurrentAPISettingIndex].llmapi.GenerateChatEx(promptBuilder);
+				var rsp = await ApiSettings[SelectedAPIIndex].llmapi.GenerateChatEx(promptBuilder);
 
 				// 通知调用方本轮AI回复
 				onResponse(rsp);

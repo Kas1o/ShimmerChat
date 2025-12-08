@@ -10,7 +10,8 @@
 
 <!-- 补全设置 -->
 <h4>@l["COMPLETION_SETTINGS_TITLE"]</h4>
-@if (userData.ApiSettings.Count == 0)
+@if (apiSettings != null)
+@if (apiSettings.Count == 0)
 {
     <div class="alert alert-warning" style="margin-top: 20px;">
         <h4>@l["NO_API_SETTING_FOUND_TITLE"]</h4>
@@ -123,6 +124,20 @@ else
     }
 
 @code {
+    [Inject]
+    public required IKVDataService KVData { get; set; }
+
+    List<ApiSetting>? apiSettings { get; set; }
+    private int _selectedIndex { get; set; }
+
+    protected override void OnInitialized()
+    {
+        var apisettings = KVData.Read("ApiSettings", "apiSetting") ?? "null";
+        apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings);
+        var selectedIndex = KVData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
+        _selectedIndex = int.Parse(selectedIndex);
+    }
+
     // 添加自定义弹窗组件引用
     private AddContextModifierPopup? _addModifierPopup;
     ObservableCollection<TextCompletionSetting> textCompletionSettings => userData.textCompletionSettings;
@@ -160,8 +175,8 @@ else
     private CompletionType completionType => userData.CompletionType;
 
     private bool AllowChatCompletion =>
-        userData.ApiSettings.Count > 0 && userData.CurrentAPISettingIndex >= 0 && userData.CurrentAPISettingIndex < userData.ApiSettings.Count
-            ? userData.ApiSettings[userData.CurrentAPISettingIndex].Type switch
+        apiSettings.Count > 0 && _selectedIndex >= 0 && _selectedIndex < apiSettings.Count
+            ? apiSettings[_selectedIndex].Type switch
             {
                 ApiSettingType.Ollama => true,
                 ApiSettingType.Kobold => false,
@@ -171,8 +186,8 @@ else
             : false;
     
     private bool AllowTextCompletion =>
-        userData.ApiSettings.Count > 0 && userData.CurrentAPISettingIndex >= 0 && userData.CurrentAPISettingIndex < userData.ApiSettings.Count
-            ? userData.ApiSettings[userData.CurrentAPISettingIndex].Type switch
+        apiSettings.Count > 0 && _selectedIndex >= 0 && _selectedIndex < apiSettings.Count
+            ? apiSettings[_selectedIndex].Type switch
             {
                 ApiSettingType.Ollama => true,
                 ApiSettingType.Kobold => true,
@@ -182,8 +197,8 @@ else
             : false;
     
     private bool UsingOpenAIAndTextCompletion =>
-        userData.ApiSettings.Count > 0 && userData.CurrentAPISettingIndex >= 0 && userData.CurrentAPISettingIndex < userData.ApiSettings.Count
-            ? (userData.CompletionType == CompletionType.TextCompletion) && (userData.ApiSettings[userData.CurrentAPISettingIndex].Type == ApiSettingType.OpenAI)
+        apiSettings.Count > 0 && _selectedIndex >= 0 && _selectedIndex < apiSettings.Count
+            ? (userData.CompletionType == CompletionType.TextCompletion) && (apiSettings[_selectedIndex].Type == ApiSettingType.OpenAI)
             : false;
 
     private void CreateNewTextCompletionSetting()

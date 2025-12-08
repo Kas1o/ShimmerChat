@@ -9,11 +9,9 @@ namespace ShimmerChat.Singletons
 		private readonly string root = Path.Combine(AppContext.BaseDirectory, "UserData");
 
 		#region terms
-		public ObservableCollection<ApiSetting> ApiSettings { get; set; }
 		public ObservableCollection<Agent> Agents { get;set; }
 		public ObservableCollection<TextCompletionSetting> textCompletionSettings { get; set; }
 		public int CurrentTextCompletionSettingIndex { get; set; }
-		public int CurrentAPISettingIndex { get; set; }
 		public CompletionType CompletionType 
 		{
 			get => field;
@@ -87,25 +85,11 @@ namespace ShimmerChat.Singletons
 
 		void ReadUserData()
 		{
-			try
-			{
-				var apiContent = File.ReadAllText($"{root}/apisettings.json");
-				ApiSettings = JsonSerializer.Deserialize<ObservableCollection<ApiSetting>>(apiContent) ?? new ObservableCollection<ApiSetting>();
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"Error while reading api settings: {ex.Message}");
-				ApiSettings = new ObservableCollection<ApiSetting>();
-			}
-
 			var textCompletionContent = File.ReadAllText($"{root}/textcompletionsettings.json");
 			textCompletionSettings = JsonSerializer.Deserialize<ObservableCollection<TextCompletionSetting>>(textCompletionContent) ?? new ObservableCollection<TextCompletionSetting>();
 
 			var completionTypeContent = File.ReadAllText($"{root}/completionType.json");
 			CompletionType = JsonSerializer.Deserialize<CompletionType>(completionTypeContent);
-
-			var selectedAPISettingIndexContent = File.ReadAllText($"{root}/selectedAPIsetting.idx");
-			CurrentAPISettingIndex = JsonSerializer.Deserialize<int>(selectedAPISettingIndexContent);
 
 			var selectedTextCompletionSettingIndexContent = File.ReadAllText($"{root}/selectedTextCompletionsetting.idx");
 			CurrentTextCompletionSettingIndex = JsonSerializer.Deserialize<int>(selectedTextCompletionSettingIndexContent);
@@ -153,7 +137,6 @@ namespace ShimmerChat.Singletons
 
 		void InitListener()
 		{
-			ApiSettings.CollectionChanged += ApiSettings_CollectionChanged;
 			Agents.CollectionChanged += Agents_CollectionChanged;
 			textCompletionSettings.CollectionChanged += TextCompletionSettings_CollectionChanged;
 		}
@@ -162,19 +145,11 @@ namespace ShimmerChat.Singletons
 
 		public void SaveUserData()
 		{
-
-
-			var apisettingsContent = JsonSerializer.Serialize(ApiSettings);
-			File.WriteAllText($"{root}/apisettings.json",apisettingsContent);
-
 			var textCompletionContent = JsonSerializer.Serialize(textCompletionSettings);
 			File.WriteAllText($"{root}/textcompletionsettings.json", textCompletionContent);
 
 			var completionTypeContent = JsonSerializer.Serialize(CompletionType);
 			File.WriteAllText($"{root}/completionType.json", completionTypeContent);
-
-			var selectedAPISettingIndexContent = JsonSerializer.Serialize(CurrentAPISettingIndex);
-			File.WriteAllText($"{root}/selectedAPIsetting.idx", selectedAPISettingIndexContent);
 
 			var selectedTextCompletionSettingIndexContent = JsonSerializer.Serialize(CurrentTextCompletionSettingIndex);
 			File.WriteAllText($"{root}/selectedTextCompletionsetting.idx", selectedTextCompletionSettingIndexContent);

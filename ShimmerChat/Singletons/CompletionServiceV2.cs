@@ -1,22 +1,43 @@
 using SharperLLM.API;
 using SharperLLM.Util;
 using ShimmerChatLib;
+using ShimmerChatLib.Interface;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace ShimmerChat.Singletons
 {
     public class CompletionServiceV2 : ICompletionServiceV2
     {
         private readonly IUserData _userData;
-
-        public CompletionServiceV2(IUserData userData)
+		private readonly IKVDataService KVDataService;
+		public CompletionServiceV2(IUserData userData, IKVDataService kVData)
         {
             _userData = userData;
-        }
+			KVDataService = kVData;
+		}
 
-        public async IAsyncEnumerable<string> GenerateTextStreamAsync(
+		List<ApiSetting> ApiSettings
+		{
+			get
+			{
+				var apisettings = KVDataService.Read("ApiSettings", "apiSetting") ?? "null";
+				return Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings);
+			}
+		}
+
+		int SelectedAPIIndex
+		{
+			get
+			{
+				var selectedIndex = KVDataService.Read("ApiSettings", "selectedAPIIndex") ?? "0";
+				return int.Parse(selectedIndex);
+			}
+		}
+
+		public async IAsyncEnumerable<string> GenerateTextStreamAsync(
             PromptBuilder promptBuilder,
             string sysSeqPrefix,
             string sysSeqSuffix,
@@ -36,7 +57,7 @@ namespace ShimmerChat.Singletons
                 OutputSuffix = outputSuffix,
             };
             
-            await foreach (var text in _userData.ApiSettings[_userData.CurrentAPISettingIndex].llmapi
+            await foreach (var text in ApiSettings[SelectedAPIIndex].llmapi
                 .GenerateTextStream(finalPromptBuilder.GeneratePromptWithLatestOuputPrefix(), cancellationToken))
             {
                 yield return text;
@@ -62,25 +83,25 @@ namespace ShimmerChat.Singletons
                 OutputSuffix = outputSuffix,
             };
             
-            return await _userData.ApiSettings[_userData.CurrentAPISettingIndex].llmapi
+            return await ApiSettings[SelectedAPIIndex].llmapi
                 .GenerateText(finalPromptBuilder.GeneratePromptWithLatestOuputPrefix());
         }
 
         public async Task<string> GenerateChatReplyAsync(PromptBuilder promptBuilder)
         {
-            return await _userData.ApiSettings[_userData.CurrentAPISettingIndex].llmapi
+            return await ApiSettings[SelectedAPIIndex].llmapi
                 .GenerateChatReply(promptBuilder);
         }
 
         public async Task<ResponseEx> GenerateChatExAsync(PromptBuilder promptBuilder)
         {
-            return await _userData.ApiSettings[_userData.CurrentAPISettingIndex].llmapi
+            return await ApiSettings[SelectedAPIIndex].llmapi
                 .GenerateChatEx(promptBuilder);
         }
         
         public async IAsyncEnumerable<ResponseEx> GenerateChatExStreamAsync(PromptBuilder promptBuilder, CancellationToken cancellationToken)
         {
-            var apiSetting = _userData.ApiSettings[_userData.CurrentAPISettingIndex];
+            var apiSetting = ApiSettings[SelectedAPIIndex];
             
             // 对于OpenAI类型的API，根据OpenAIStream属性决定是否使用流式调用
             if (apiSetting.Type == ApiSettingType.OpenAI && apiSetting.OpenAIStream)
