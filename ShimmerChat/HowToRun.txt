@@ -1,0 +1,46 @@
+如何运行？
+How To Run?
+
+(本指南只供 Windows 用户参考，作为编译产物的一部分而提供给 Release 下载者，Linux用户请去 https://github.com/Kas1o/ShimmerChat/blob/master/README.md)
+(Windows Only, Linux users: https://github.com/Kas1o/ShimmerChat/blob/master/README.md)
+
+打开 https://dotnet.microsoft.com/zh-cn/download 如果你没有安装 .NET 10 SDK。
+go https://dotnet.microsoft.com/en-us/download if you don't have .NET 10 SDK installed.
+
+启动 Launch
+左键双击 ShimmerChat.exe 以启动应用程序。
+Double-click ShimmerChat.exe to start the application.
+
+配置端口 Configure Port
+如果你要更改默认端口（5000），请修改 appsettings.json，它大概会长这样：
+if you want to change the default port (5000), edit appsettings.json, it should look like this:
+
+{
+  "Logging": {
+	"LogLevel": {
+	  "Default": "Information",
+	  "Microsoft.AspNetCore": "Warning"
+	}
+  },
+  "AllowedHosts": "*"
+}
+
+你需要添加一个 "Kestrel" 节点，像这样：
+You need to add a "Kestrel" node, like this:
+
+{
+  "Logging": {
+	"LogLevel": {
+	  "Default": "Information",
+	  "Microsoft.AspNetCore": "Warning"
+	}
+  },
+  "AllowedHosts": "*",
+  "Kestrel": {
+	"Endpoints": {
+	  "Http": {
+		"Url": "http://localhost:你的端口号"
+	  }
+	}
+  }
+}

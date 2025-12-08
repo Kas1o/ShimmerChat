@@ -24,4 +24,10 @@
     <ProjectReference Include="..\ShimmerChatLib\ShimmerChatLib.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="HowToRun.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
