@@ -12,7 +12,6 @@ namespace ShimmerChatLib
 		public string name { get; set; }
         public string description { get; set; } // The description of the agent
 		public string greeting { get; set; }
-
 		public List<Guid> chatGuids
         {
             get => field;
@@ -21,6 +20,10 @@ namespace ShimmerChatLib
                 field = value;
             }
         }
+        public Guid AvatarGuid { get; set; }
+        public Guid BackgroundGuid { get; set; }
+
+
 
         private Agent()
         {

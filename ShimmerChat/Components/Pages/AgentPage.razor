@@ -1,31 +1,36 @@
 @page "/agent/{agentguid}"
 @inject NavigationManager navigation
 @inject IKVDataService kvDataService
+@inject IPopupService PopupService
 
 @if(agent != null)
 {
-    <div id="back">
-        <button id="back-button" @onclick="NavigateBack">← Back</button>
-    </div>
+    <div class="agent-page-container shimmer-content" style="background-image: url('@BackgroudPath'); background-size: cover; background-position: center; min-height: 100vh;">
+        <div id="back">
+            <button id="back-button" @onclick="NavigateBack">← Back</button>
+        </div>
 
-    <div id="content">
+        <div id="content">
         <div class="content-wrapper">
             <div id="left-section">
                 <label>agent name</label>
                 <h3>@agent.name</h3>
                 <div class="chat-section shimmer-grid shimmer-group">
-                    <div class="shimmer-grid-item shimmer-grid-chat-item" @onclick="NewChat">
-                        Add New Chat
+                        <div class="shimmer-grid-item shimmer-grid-chat-item fixed-size" @onclick="NewChat">
+                        <div>
+                            Add New Chat
+                        </div>
                     </div>
 
                     @foreach(var chat in agent.GetChats(kvDataService))
                     {
-                        <div class="shimmer-grid-item shimmer-grid-chat-item" @onclick= "() => OpenChat(chat)">
-                            @chat.Name
+                        <div class="shimmer-grid-item shimmer-grid-chat-item fixed-size" @onclick= "() => OpenChat(chat)">
+                            <div>
+                                @chat.Name
+                            </div>
                         </div>
                     }
                 </div>
-
             </div>
             <div class="settings-section shimmer-group">
                 <h4>Settings</h4>
@@ -35,6 +40,11 @@
                 <textarea class="shimmer-textarea" @bind="Description" />
                 <label>Greeting</label><br />
                 <textarea class="shimmer-textarea" @bind="Greeting" />
+                <label>Avatar</label><br />
+                <img id="avatar-preview" src="@AvatarPath"/><br />
+                <InputFile OnChange="InputAvatar" /><br />
+                <label>Background</label><br />
+                <InputFile OnChange="InputBackground" />
             </div>
         </div>
     </div>
@@ -54,19 +64,31 @@
         color: var(--color-text-primary);
         }
 
+        /* 固定尺寸的网格项 */
+        .shimmer-grid-item.fixed-size {
+            width: 280px;
+            height: 420px;
+            min-height: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+
         #content {
-        margin-left: 50px;
-        margin-top: 20px;
-        height: calc(100vh - 150px);
+            padding: 24px;
+            margin-left: 0;
+            margin-top: 0;
+            height: auto;
+            min-height: calc(100vh - 48px);
         }
 
         .content-wrapper {
-        display: flex;
-        width: 100%;
-        height: 100%;
-        margin-top: 20px;
-        height: calc(100vh - 200px);
-        gap: 20px; /* 添加间距 */
+            display: flex;
+            width: 100%;
+            height: 100%;
+            margin-top: 20px;
+            height: calc(100vh - 200px);
+            gap: 20px;
         }
 
         .chat-section {
@@ -93,7 +115,22 @@
             color: white;
             border: none;
         }
+
+        /* Avatar 图片样式 */
+        #avatar-preview {
+            width: 120px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+
+        /* Shimmer content style */
+        .shimmer-content {
+            padding: 0px !important; /* 覆盖掉主容器的padding，以实现无缝的背景图 */
+        }
     </style>
+    </div>
 }
 
 <!--404-->
@@ -166,6 +203,60 @@
             }
         }
     }
+
+    string AvatarPath => $"/userimages/{agent.AvatarGuid}.png";
+    string BackgroudPath => $"/userimages/{agent.BackgroundGuid}.png";
+
+    private async void InputAvatar(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file.ContentType != "image/png")
+        {
+            await PopupService.ShowAsync("Unsupported file type! Only .png file are supported.");
+            return;
+        }
+        if (file.Size > 1024 * 1024 * 30) {
+            await PopupService.ShowAsync("File Too Large! 30MiB limit!");
+            return;
+        }
+
+        Stream stream = file.OpenReadStream(1024 * 1024 * 30, default);
+        var guid = Guid.NewGuid();
+        using (var localFile = File.Create($"{AppContext.BaseDirectory}/UserUploadImage/{guid}.png"))
+        {
+            await stream.CopyToAsync(localFile);
+        }
+
+        agent.AvatarGuid = guid;
+        agent.Save(kvDataService);
+        StateHasChanged();
+    }
+    private async void InputBackground(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file.ContentType != "image/png")
+        {
+            await PopupService.ShowAsync("Unsupported file type! Only .png file are supported.");
+            return;
+        }
+        if (file.Size > 1024 * 1024 * 30)
+        {
+            await PopupService.ShowAsync("File Too Large! 30MiB limit!");
+            return;
+        }
+
+        Stream stream = file.OpenReadStream(1024 * 1024 * 30, default);
+        var guid = Guid.NewGuid();
+        using (var localFile = File.Create($"{AppContext.BaseDirectory}/UserUploadImage/{guid}.png"))
+        {
+            await stream.CopyToAsync(localFile);
+        }
+
+        agent.BackgroundGuid = guid;
+        agent.Save(kvDataService);
+        StateHasChanged();
+    }
+
 
     private void NavigateBack()
     {

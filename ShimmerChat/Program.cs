@@ -3,6 +3,7 @@ using ShimmerChat.Singletons;
 using Microsoft.AspNetCore.Localization;
 using System.Globalization;
 using ShimmerChatLib.Interface;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,5 +54,15 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// 配置用户上传图片 Configure User Upload Image
+var userImagePath = Path.Combine(AppContext.BaseDirectory, "UserUploadImage");
+if (!Directory.Exists(userImagePath))
+    Directory.CreateDirectory(userImagePath);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(userImagePath),
+    RequestPath = "/userimages"
+});
 
 app.Run();

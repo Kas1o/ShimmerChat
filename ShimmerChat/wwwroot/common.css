@@ -72,9 +72,10 @@
 /* 网格布局 */
 .shimmer-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, 280px);
     gap: 16px;
     margin: 16px;
+    justify-content: center;
 }
 
 /* 网格项样式 */
@@ -94,6 +95,7 @@
     transition: var(--transition);
     background-color: var(--color-card);
     color: var(--color-text-primary);
+    position: relative;
 }
 
 .shimmer-grid-item:hover {

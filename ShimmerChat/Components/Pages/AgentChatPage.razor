@@ -41,12 +41,21 @@
 		</div>
 	</div>
 	<style>
+
+		.shimmer-content {
+			padding: 0px !important; /* 覆盖掉主容器的padding，以实现无缝的背景图 */
+		}
+
 		/* 父级容器 */
 		#container {
-		position: relative;
-		height: calc( 100vh - 4.7rem);
-		display: flex;
-		flex-direction: column;
+			position: relative;
+			height: calc( 100vh - 4.7rem);
+			display: flex;
+			flex-direction: column;
+			background: url( @($"/userimages/{agent.BackgroundGuid}.png") );
+			background-size: cover;
+			background-position: center;
+			min-height: 100vh;
 		}
 
 		/* 聊天信息栏 */
