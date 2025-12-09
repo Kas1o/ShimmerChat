@@ -29,7 +29,7 @@ namespace ShimmerChatLib
 		/// <summary>
 		/// 根据当前配置创建对应的 ILLMAPI 实例。
 		/// </summary>
-		public ILLMAPI LLMApi
+		public ILLMAPI llmapi
 		{
 			get
 			{
