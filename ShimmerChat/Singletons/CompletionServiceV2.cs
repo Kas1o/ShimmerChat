@@ -55,7 +55,7 @@ namespace ShimmerChat.Singletons
                 OutputSuffix = outputSuffix,
             };
             
-            await foreach (var text in ApiSettings[SelectedAPIIndex].llmapi
+            await foreach (var text in ApiSettings[SelectedAPIIndex].LLMApi
                 .GenerateTextStream(finalPromptBuilder.GeneratePromptWithLatestOuputPrefix(), cancellationToken))
             {
                 yield return text;
@@ -81,19 +81,19 @@ namespace ShimmerChat.Singletons
                 OutputSuffix = outputSuffix,
             };
             
-            return await ApiSettings[SelectedAPIIndex].llmapi
+            return await ApiSettings[SelectedAPIIndex].LLMApi
                 .GenerateText(finalPromptBuilder.GeneratePromptWithLatestOuputPrefix());
         }
 
         public async Task<string> GenerateChatReplyAsync(PromptBuilder promptBuilder)
         {
-            return await ApiSettings[SelectedAPIIndex].llmapi
+            return await ApiSettings[SelectedAPIIndex].LLMApi
                 .GenerateChatReply(promptBuilder);
         }
 
         public async Task<ResponseEx> GenerateChatExAsync(PromptBuilder promptBuilder)
         {
-            return await ApiSettings[SelectedAPIIndex].llmapi
+            return await ApiSettings[SelectedAPIIndex].LLMApi
                 .GenerateChatEx(promptBuilder);
         }
         
@@ -105,7 +105,7 @@ namespace ShimmerChat.Singletons
             if (apiSetting.Type == ApiSettingType.OpenAI && apiSetting.OpenAIStream)
             {
                 // 使用流式API
-                await foreach (var response in apiSetting.llmapi.GenerateChatExStream(promptBuilder, cancellationToken))
+                await foreach (var response in apiSetting.LLMApi.GenerateChatExStream(promptBuilder, cancellationToken))
                 {
                     yield return response;
                 }
@@ -113,7 +113,7 @@ namespace ShimmerChat.Singletons
             else
             {
                 // 对于非OpenAI类型或未启用流式的情况，使用非流式API并模拟流式输出
-                var response = await apiSetting.llmapi.GenerateChatEx(promptBuilder);
+                var response = await apiSetting.LLMApi.GenerateChatEx(promptBuilder);
                 yield return response;
             }
         }

@@ -20,6 +20,7 @@ namespace ShimmerChatLib
 		public string? OpenAIApiKey { get; set; } = "key";
 		public string? OpenAIModel { get; set; } = "gpt-4o";
 		public bool OpenAIStream { get; set; } = true;
+		public int OpenAICtx { get; set; } = 16384;
 
 		// Ollama 配置（可后续扩展）
 		public string? OllamaUrl { get; set; }
@@ -28,7 +29,7 @@ namespace ShimmerChatLib
 		/// <summary>
 		/// 根据当前配置创建对应的 ILLMAPI 实例。
 		/// </summary>
-		public ILLMAPI llmapi
+		public ILLMAPI LLMApi
 		{
 			get
 			{
@@ -42,7 +43,8 @@ namespace ShimmerChatLib
 					ApiSettingType.OpenAI => new OpenAIAPI(
 						_url: OpenAIUrl ?? "https://api.openai.com/v1",
 						_apiKey: OpenAIApiKey ?? throw new InvalidOperationException("OpenAI API key is required."),
-						_model: OpenAIModel ?? "gpt-4o"
+						_model: OpenAIModel ?? "gpt-4o",
+						_max_tokens: OpenAICtx
 					),
 
 					ApiSettingType.Ollama => throw new NotImplementedException("Ollama support not implemented yet."),
@@ -60,12 +62,13 @@ namespace ShimmerChatLib
 				Type = Type,
 
 				KoboldUrl = KoboldUrl,
-				KoboldConf = KoboldConf?.Clone() as KoboldAPI.KoboldAPIConf, // 假设 KoboldAPIConf 实现了 Clone 或可深拷贝
+				KoboldConf = KoboldConf?.Clone() as KoboldAPI.KoboldAPIConf,
 
 				OpenAIUrl = OpenAIUrl,
-			OpenAIApiKey = OpenAIApiKey,
-			OpenAIModel = OpenAIModel,
-			OpenAIStream = OpenAIStream,
+				OpenAIApiKey = OpenAIApiKey,
+				OpenAIModel = OpenAIModel,
+				OpenAIStream = OpenAIStream,
+				OpenAICtx = OpenAICtx,
 
 				OllamaUrl = OllamaUrl,
 				OllamaModel = OllamaModel
