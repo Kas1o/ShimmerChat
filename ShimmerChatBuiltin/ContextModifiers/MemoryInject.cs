@@ -54,6 +54,7 @@ namespace ShimmerChatBuiltin.ContextModifiers
 			// 1. 获取最新的n条非空消息。并按时间顺序分配权重。
 			var x = chat.Messages
 				.Where(x => !string.IsNullOrEmpty(x.message.Content))
+				.Where(x => x.sender != Sender.ToolResult)
 				.Reverse()
 				.Take(n)
 				.Reverse()
