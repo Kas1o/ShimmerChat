@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -134,5 +134,17 @@
   </data>
   <data name="Name:" xml:space="preserve">
     <value>智能体名字：</value>
+  </data>
+  <data name="Delete Agent popup title" xml:space="preserve">
+    <value>删除智能体</value>
+  </data>
+  <data name="Delete Agent confirmation message" xml:space="preserve">
+    <value>您确定要删除智能体 "{0}" 吗？此操作无法撤销。</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>删除</value>
   </data>
 </root>

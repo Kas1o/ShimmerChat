@@ -11,7 +11,14 @@
 	<div class="shimmer-grid">
 		@foreach (var agent in agents)
 		{
-			<div class="shimmer-grid-item shimmer-grid-agent-item" @onclick="()=> NavigateToAgent( agent.guid.ToString())" >@agent.name </div>
+			<div class="shimmer-grid-item shimmer-grid-agent-item">
+				<div class="agent-item-content" @onclick="()=> NavigateToAgent( agent.guid.ToString())">
+					@agent.name
+				</div>
+				<button class="agent-delete-btn" @onclick:stopPropagation @onclick="()=> ShowDeleteConfirmation(agent)">
+					×
+				</button>
+			</div>
 		}
 	</div>
 </div>
@@ -32,6 +39,20 @@
 	</div>
 }
 
+@if (DeletePopupVisible)
+{
+	<div class="shimmer-popup-overlay" @onclick="() => DeletePopupVisible=false">
+		<div class="shimmer-popup-content" @onclick:stopPropagation>
+			<h5>@l["Delete Agent popup title"]</h5>
+			<p>@string.Format(l["Delete Agent confirmation message"], AgentToDelete?.name)</p>
+			<div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+				<button class="btn btn-secondary" @onclick="() => DeletePopupVisible=false">@l["Cancel"]</button>
+				<button class="btn btn-danger" @onclick="DeleteAgentConfirmed">@l["Delete"]</button>
+			</div>
+		</div>
+	</div>
+}
+
 <style>
 	.shimmer-grid-agent-item {
 		position: relative;
@@ -39,6 +60,41 @@
 		overflow: hidden;
 		border: 1px solid var(--color-border);
 		background-color: var(--color-card);
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.agent-item-content {
+		flex-grow: 1;
+		padding: 12px;
+	}
+
+	.agent-delete-btn {
+		position: absolute;
+		top: 5px;
+		right: 5px;
+		background: #0000;
+		color: var(--color-text-primary);
+		border: none;
+		border-radius: 50%;
+		width: 24px;
+		height: 24px;
+		font-size: 16px;
+		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		opacity: 0;
+	}
+
+	.shimmer-grid-agent-item:hover .agent-delete-btn {
+		opacity: 1;
+	}
+
+	.agent-delete-btn:hover {
+		background: var(--color-error);
 	}
 
 	.shimmer-grid-agent-item:hover {
@@ -79,6 +135,9 @@
 
 @code {
 	bool CreatePopupVisible { get; set; } = false;
+	bool DeletePopupVisible { get; set; } = false;
+	Agent? AgentToDelete { get; set; } = null;
+	
 	#region Popup
 	string popupNewAgentName { get; set; } = "new agent";
 	string popupNewAgentDescription { get; set; } = "this is a cool agent!";
@@ -136,5 +195,24 @@
 	void NavigateToAgent(string guid)
 	{
 		navigation.NavigateTo($"/agent/{guid}");
+	}
+	
+	void ShowDeleteConfirmation(Agent agent)
+	{
+		AgentToDelete = agent;
+		DeletePopupVisible = true;
+	}
+	
+	void DeleteAgentConfirmed()
+	{
+		if (AgentToDelete != null)
+		{
+			// Remove agent from the __AllAgents__ list
+			Agent.RemoveAgentFromAll(AgentToDelete, kvDataService);
+			
+			// Reset popup state
+			DeletePopupVisible = false;
+			AgentToDelete = null;
+		}
 	}
 }
