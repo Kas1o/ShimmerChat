@@ -33,3 +33,9 @@ cd ./ShimmerChat
 dotnet run
 ```
 （注意，是要在项目根目录下面的ShimmerChat目录里面dotnet run）
+
+## 第三方许可
+[Markdig](https://github.com/xoofx/markdig) BSD-2-Clause license
+[Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json] MIT license
+[qdrant-dotnet](https://github.com/qdrant/qdrant-dotnet) Apache-2.0 license
+[SharperLLM](https://github.com/Kas1o/SharperLLM) MIT license
