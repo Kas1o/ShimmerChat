@@ -2,6 +2,7 @@
 @inject NavigationManager navigation
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService
+@inject IJSRuntime JS
 
 @if(agent != null)
 {
@@ -44,7 +45,8 @@
                 <img id="avatar-preview" src="@AvatarPath"/><br />
                 <InputFile OnChange="InputAvatar" /><br />
                 <label>Background</label><br />
-                <InputFile OnChange="InputBackground" />
+                <InputFile OnChange="InputBackground" /> <br />
+                <button class="btn btn-primary" @onclick="Export">Export</button>
             </div>
         </div>
     </div>
@@ -145,6 +147,45 @@
     public string agentguid { get; set; } = string.Empty;
 
     private Agent? agent;
+    string Name
+    {
+        get => agent?.name ?? string.Empty;
+        set
+        {
+            if (agent != null)
+            {
+                agent.name = value;
+                agent.Save(kvDataService); // Save the specific agent after changing the name
+            }
+        }
+    }
+    string Description
+    {
+        get => agent?.description ?? string.Empty;
+        set
+        {
+            if (agent != null)
+            {
+                agent.description = value;
+                agent.Save(kvDataService); // Save the specific agent after changing the description
+            }
+        }
+    }
+    string Greeting
+    {
+        get => agent?.greeting ?? string.Empty;
+        set
+        {
+            if (agent != null)
+            {
+                agent.greeting = value;
+                agent.Save(kvDataService);
+            }
+        }
+    }
+
+    string AvatarPath => $"/userimages/{agent.AvatarGuid}.png";
+    string BackgroudPath => $"/userimages/{agent.BackgroundGuid}.png";
 
     protected override void OnParametersSet()
     {
@@ -164,48 +205,6 @@
             }
         }
     }
-
-    string Name
-    {
-        get => agent?.name ?? string.Empty;
-        set
-        {
-            if (agent != null)
-            {
-                agent.name = value;
-                agent.Save(kvDataService); // Save the specific agent after changing the name
-            }
-        }
-    }
-
-    string Description
-    {
-        get => agent?.description ?? string.Empty;
-        set
-        {
-            if (agent != null)
-            {
-                agent.description = value;
-                agent.Save(kvDataService); // Save the specific agent after changing the description
-            }
-        }
-    }
-
-    string Greeting
-    {
-        get => agent?.greeting ?? string.Empty;
-        set
-        {
-            if (agent != null)
-            {
-                agent.greeting = value;
-                agent.Save(kvDataService);
-            }
-        }
-    }
-
-    string AvatarPath => $"/userimages/{agent.AvatarGuid}.png";
-    string BackgroudPath => $"/userimages/{agent.BackgroundGuid}.png";
 
     private async void InputAvatar(InputFileChangeEventArgs e)
     {
@@ -257,7 +256,6 @@
         StateHasChanged();
     }
 
-
     private void NavigateBack()
     {
         navigation.NavigateTo("agentselect");
@@ -299,5 +297,19 @@
     void OpenChat(Chat chat)
     {
         navigation.NavigateTo(navigation.Uri + "/" + chat.Name);
+    }
+
+    private async Task Export()
+    {
+        if (agent == null)
+            return;
+        var content = agent.Export();
+        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+        var fileStream = new MemoryStream(bytes);
+        var fileName = $"{agent.name}.json";
+        using (var streamRef = new DotNetStreamReference(stream: fileStream))
+        {
+            await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+        };
     }
 }

@@ -3,10 +3,16 @@
 @inject NavigationManager navigation
 @inject IStringLocalizer<AgentSelectPage> l
 @inject IKVDataService kvDataService
+@inject IPopupService PopupService
 
 <h3>@l["AgentSelectPage"]</h3>
-<button class="btn btn-primary" @onclick="OpenCreateAgentMenu">@l["Create New Agent"]</button>
-
+<div style="display:flex">
+	<button class="btn btn-primary" @onclick="OpenCreateAgentMenu">@l["Create New Agent"]</button>
+	<div>
+		<InputFile OnChange="InputFileChanged"/>
+		<button class="btn btn-primary"	@onclick="Import" >Import</button>
+	</div>
+</div>
 <div class="shimmer-group">
 	<div class="shimmer-grid">
 		@foreach (var agent in agents)
@@ -188,7 +194,7 @@
 	bool CreatePopupVisible { get; set; } = false;
 	bool DeletePopupVisible { get; set; } = false;
 	Agent? AgentToDelete { get; set; } = null;
-	
+
 	#region Popup
 	string popupNewAgentName { get; set; } = "new agent";
 	string popupNewAgentDescription { get; set; } = "this is a cool agent!";
@@ -233,13 +239,13 @@
 			popupNewAgentDescription,
 			popupNewAgentGreeting
 		);
-		
+
 		// Save the agent
 		newAgent.Save(kvDataService);
-		
+
 		// Add the agent to the all agents list
 		Agent.AddAgentToAll(newAgent, kvDataService);
-		
+
 		CreatePopupVisible = false;
 	}
 
@@ -247,23 +253,58 @@
 	{
 		navigation.NavigateTo($"/agent/{guid}");
 	}
-	
+
 	void ShowDeleteConfirmation(Agent agent)
 	{
 		AgentToDelete = agent;
 		DeletePopupVisible = true;
 	}
-	
+
 	void DeleteAgentConfirmed()
 	{
 		if (AgentToDelete != null)
 		{
 			// Remove agent from the __AllAgents__ list
 			Agent.RemoveAgentFromAll(AgentToDelete, kvDataService);
-			
+
 			// Reset popup state
 			DeletePopupVisible = false;
 			AgentToDelete = null;
 		}
+	}
+
+	IBrowserFile File { get; set; }
+	void InputFileChanged(InputFileChangeEventArgs e)
+	{
+		File = e.File;
+	}
+
+	async Task<byte[]> ReadFullyAsync(Stream stream)
+	{
+		using var memoryStream = new MemoryStream();
+		var buffer = new byte[16384]; // 16KB 缓冲
+		int bytesRead;
+		while ((bytesRead = await stream.ReadAsync(buffer)) > 0)
+		{
+			await memoryStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+		}
+		return memoryStream.ToArray();
+	}
+
+	// 使用：
+	async Task Import()
+	{
+		var originStream = File.OpenReadStream(maxAllowedSize: 1024 * 1024 * 80);
+		var buffer = await ReadFullyAsync(originStream);
+		var content = System.Text.Encoding.UTF8.GetString(buffer);
+
+		var newAgent = Agent.Import(content);
+		if (agents.Any(x => x.guid == newAgent.guid))
+		{
+			await PopupService.ShowAsync("已经存在同Agent");
+		}
+
+		Agent.AddAgentToAll(newAgent, kvDataService);
+		StateHasChanged();
 	}
 }

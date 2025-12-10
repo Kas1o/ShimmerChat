@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
@@ -20,17 +21,77 @@ namespace ShimmerChatLib
                 field = value;
             }
         }
-        public Guid AvatarGuid { get; set; }
-        public Guid BackgroundGuid { get; set; }
+        public Guid? AvatarGuid { get; set; }
+        public Guid? BackgroundGuid { get; set; }
 
-
-
-        private Agent()
+		#region Export & Import
+        public string Export(bool clearChat = true)
         {
+            var copy = this.MemberwiseClone() as Agent;
+            if (clearChat)
+                copy.chatGuids = [];
 
+            string? avatar = null;
+            string? background = null;
+			string AvatarPath = $"{AppContext.BaseDirectory}/UserUploadImage/{this.AvatarGuid}.png";
+			string BackgroudPath = $"{AppContext.BaseDirectory}/UserUploadImage/{this.BackgroundGuid}.png";
+
+			if (AvatarGuid != null)
+            if (File.Exists(AvatarPath))
+            {
+                var content = File.ReadAllBytes(AvatarPath);
+                avatar = Convert.ToBase64String(content);
+            }
+
+			if (BackgroundGuid != null)
+			if (File.Exists(BackgroudPath))
+			{
+				var content = File.ReadAllBytes(BackgroudPath);
+				background = Convert.ToBase64String(content);
+			}
+
+
+            return JsonConvert.SerializeObject(new AgentExportStructure
+            (
+                Agent : copy!,
+                AvatarBase64 : avatar!,
+                BackgroundBase64 : background!
+            ), new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Include,
+            });
         }
 
-        public void Save(IKVDataService kvDataService)
+        public static Agent Import(string importJson, bool clearChat = true)
+        {
+            var importStructure = JsonConvert.DeserializeObject<AgentExportStructure>(importJson);
+            var agent = importStructure.Agent;
+            if (clearChat)
+            {
+                agent.chatGuids = new List<Guid>();
+            }
+            if (!string.IsNullOrEmpty(importStructure.AvatarBase64))
+            {
+                var avatarBytes = Convert.FromBase64String(importStructure.AvatarBase64);
+                var avatarGuid = Guid.NewGuid();
+                var avatarPath = $"{AppContext.BaseDirectory}/UserUploadImage/{avatarGuid}.png";
+                File.WriteAllBytes(avatarPath, avatarBytes);
+                agent.AvatarGuid = avatarGuid;
+            }
+            if (!string.IsNullOrEmpty(importStructure.BackgroundBase64))
+            {
+                var backgroundBytes = Convert.FromBase64String(importStructure.BackgroundBase64);
+                var backgroundGuid = Guid.NewGuid();
+                var backgroundPath = $"{AppContext.BaseDirectory}/UserUploadImage/{backgroundGuid}.png";
+                File.WriteAllBytes(backgroundPath, backgroundBytes);
+                agent.BackgroundGuid = backgroundGuid;
+            }
+            return agent;
+		}
+
+		#endregion
+		#region Save & Load
+		public void Save(IKVDataService kvDataService)
         {
             var agentJson = JsonConvert.SerializeObject(this);
             kvDataService.Write("Agents", guid.ToString(), agentJson);
@@ -45,8 +106,9 @@ namespace ShimmerChatLib
             }
             return JsonConvert.DeserializeObject<Agent>(agentJson);
         }
-
-        public static List<Guid> GetAllAgentGuids(IKVDataService kvDataService)
+		#endregion
+		#region Statics
+		public static List<Guid> GetAllAgentGuids(IKVDataService kvDataService)
         {
             var agentsJson = kvDataService.Read("Agents", "__AllAgents__");
             if (agentsJson == null)
@@ -81,8 +143,9 @@ namespace ShimmerChatLib
                 SaveAllAgentGuids(kvDataService, agentGuids);
             }
         }
-
-        public void AddChatGuid(Guid chatGuid)
+		#endregion
+		#region ChatUtil
+		public void AddChatGuid(Guid chatGuid)
         {
             if (!chatGuids.Contains(chatGuid))
             {
@@ -122,6 +185,14 @@ namespace ShimmerChatLib
             }
             return Chat.Load(chatGuid, kvDataService);
         }
+		#endregion
+        /// <summary>
+        /// 留由 Newtonsoft.Json 使用。
+        /// </summary>
+        private Agent()
+        {
+
+        }
 
 		public static Agent Create(string Name, string desc, string greeting = null)
 		{
@@ -134,7 +205,7 @@ namespace ShimmerChatLib
 				greeting = greeting
 			};
 		}
-
+		#region Equal
 		public override bool Equals(object? obj)
 		{
 			if(obj is Agent agent)
@@ -148,5 +219,13 @@ namespace ShimmerChatLib
 		{
 			return guid.GetHashCode();
 		}
+		#endregion
 	}
+
+    public record AgentExportStructure
+    (
+        Agent? Agent,
+        string? AvatarBase64,
+        string? BackgroundBase64
+    );
 }
