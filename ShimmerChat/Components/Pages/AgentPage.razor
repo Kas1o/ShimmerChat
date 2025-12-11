@@ -291,7 +291,7 @@
         // Save the agent
         agent.Save(kvDataService);
 
-        navigation.NavigateTo(navigation.Uri + "/" + chat.Name);
+        OpenChat(chat);
     }
 
     void OpenChat(Chat chat)
