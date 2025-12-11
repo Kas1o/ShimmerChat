@@ -296,7 +296,7 @@
 
     void OpenChat(Chat chat)
     {
-        navigation.NavigateTo(navigation.Uri + "/" + chat.Name);
+        navigation.NavigateTo(navigation.Uri + "/" + chat.Guid.ToString());
     }
 
     private async Task Export()

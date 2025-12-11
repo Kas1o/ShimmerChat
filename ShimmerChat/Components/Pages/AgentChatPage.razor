@@ -1,4 +1,4 @@
-@page "/agent/{agentguid}/{chatname}"
+@page "/agent/{AgentGuid}/{ChatGuid}"
 @using ShimmerChatLib
 @using SharperLLM.API
 @using System.Collections.ObjectModel
@@ -11,13 +11,14 @@
 @inject IPopupService popupService
 @inject IJSRuntime JS
 @inject IKVDataService KVData
+@inject NavigationManager navigation
 
 @if (chat != null)
 {
 	<div id="container">
 		<div id="chat-info" class="shimmer-shadow-box">
 			<label>You are having chat with: </label>
-			<h2>@agent.name</h2>
+			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.name</h2>
 		</div>
 		<div id="chat-main">
 			@foreach (var message in messages)
@@ -186,7 +187,7 @@
 
 @if(chat == null)
 {
-	<p>Chat @agentguid / @chatname Not Found</p>
+	<p>Chat @AgentGuid / @ChatGuid Not Found</p>
 }
 
 @code {
@@ -195,12 +196,12 @@
 	Message? currentAIMessage; // 当前正在生成的AI消息
 
 	[Parameter]
-	public string agentguid { get; set; } = string.Empty;
+	public string AgentGuid { get; set; } = string.Empty;
 
 	private Agent? agent;
 
 	[Parameter]
-	public string chatname { get; set; } = string.Empty; // The chat name to load
+	public string ChatGuid { get; set; } = string.Empty; // The chat name to load
 
 	private Chat? chat;
 
@@ -324,7 +325,7 @@
 		chat = null;
 		messages = new ObservableCollection<Message>();
 
-		if (Guid.TryParse(agentguid, out var guid))
+		if (Guid.TryParse(AgentGuid, out var guid))
 		{
 			try
 			{
@@ -332,7 +333,7 @@
 				if (agent != null)
 				{
 					var chats = agent.GetChats(KVData);
-					chat = chats.FirstOrDefault(c => c.Name == chatname);
+					chat = chats.FirstOrDefault(c => c.Guid.ToString() == ChatGuid);
 					if (chat != null)
 					{
 						messages = chat.Messages ?? new ObservableCollection<Message>();
@@ -402,7 +403,7 @@
 						// 立即触发UI刷新，确保流式内容实时显示
 						await InvokeAsync(StateHasChanged);
 					}
-				
+
 					// 流式响应结束，标记为非流式状态
 					if (currentAIMessage != null)
 					{
@@ -420,11 +421,11 @@
 						message = new SharperLLM.Util.ChatMessage{Content= null, thinking = null,  toolCalls = toolCalls },
 						timestamp = DateTime.Now,
 						sender = ShimmerChatLib.Sender.ToolCall
-					});
+						});
 					*/
-					
-					// 触发UI刷新
-					InvokeAsync(StateHasChanged);
+
+													// 触发UI刷新
+													InvokeAsync(StateHasChanged);
 				},
 				// 处理工具结果的回调
 				onToolResult: (tuple) =>
@@ -436,7 +437,7 @@
 						timestamp = DateTime.Now,
 						sender = ShimmerChatLib.Sender.ToolResult
 					});
-					
+
 					// 触发UI刷新
 					InvokeAsync(StateHasChanged);
 				},
@@ -449,7 +450,7 @@
 		}
 		catch (Exception ex)
 		{
-			
+
 			// 发生错误时，标记当前消息为非流式状态
 			if (currentAIMessage != null)
 			{
@@ -483,7 +484,7 @@
 		{
 			StopGeneration();
 		}
-		
+
 		messages.Remove(message);
 		await Refresh();
 	}
@@ -500,6 +501,11 @@
 	async Task Refresh()
 	{
 		await InvokeAsync(StateHasChanged);
+	}
+
+	void BackToAgentPage()
+	{
+		navigation.NavigateTo($"/agent/{AgentGuid}");
 	}
 }
 
