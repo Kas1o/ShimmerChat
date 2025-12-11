@@ -2,6 +2,7 @@
 
 @inject IToolService ToolService
 @inject IStringLocalizer<ToolManager> l
+@inject IKVDataService KVData
 
 <h3>@l["Tool Manager"]</h3>
 
@@ -92,6 +93,7 @@ else
     ITool? showTestTool;
     string? testInput;
     string? testResult;
+    bool throwExceptionInsteadOfPopupErrorMessage = false;
 
     protected override void OnInitialized()
     {
@@ -99,6 +101,10 @@ else
         enabledNames = ToolService.EnabledTools
             .Select(t => t.GetToolDefinition().name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (bool.TryParse(KVData.Read("App", "throw_exception"), out var result))
+        {
+            throwExceptionInsteadOfPopupErrorMessage = result;
+        }
     }
 
     void ToggleTool(string name, bool enabled)
@@ -143,9 +149,10 @@ else
         catch (Exception ex)
         {
             testResult = ex.Message + ex.InnerException;
-            #if DEBUG
-            System.Diagnostics.Debugger.Break();
-            #endif
+            if (throwExceptionInsteadOfPopupErrorMessage)
+            {
+                throw;
+            }
         }
         StateHasChanged();
     }
