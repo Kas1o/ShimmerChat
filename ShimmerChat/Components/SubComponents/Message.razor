@@ -36,6 +36,7 @@
 			<textarea @bind="editThinking" rows="3" style="width:100%; margin-bottom: 10px;"></textarea>
 			<label>消息内容:</label>
 			<textarea @bind="editContent" rows="4" style="width:100%"></textarea>
+			<!-- 这里有个长文本输入问题，Blazor SignalR 消息不允许过长的文本输入-->
 			<button class="btn btn-success" @onclick="SaveEdit">@l["BUTTON_SAVE"]</button>
 			<button class="btn" @onclick="CancelEdit">@l["BUTTON_CANCEL"]</button>
 		</div>
@@ -130,7 +131,7 @@
 		// 移除可能存在的旧订阅
 		message.ContentChanged -= HandleContentChanged;
 		message.StreamingStateChanged -= HandleStreamingStateChanged;
-		
+
 		// 添加新订阅
 		message.ContentChanged += HandleContentChanged;
 		message.StreamingStateChanged += HandleStreamingStateChanged;
@@ -161,8 +162,8 @@
 	}
 
 	// 渲染逻辑已迁移到IMessageDisplayService单例服务中
-// 之前每个Message组件都会创建一个新的MarkdownPipeline实例，这是不必要的资源消耗
-// 现在所有组件共享同一个服务实例，大幅减少了内存占用和初始化开销
+	// 之前每个Message组件都会创建一个新的MarkdownPipeline实例，这是不必要的资源消耗
+	// 现在所有组件共享同一个服务实例，大幅减少了内存占用和初始化开销
 
 	void DeleteThisMessage()
 	{
@@ -175,24 +176,24 @@
 	}
 
 	void EnterEditMode()
-{
-	if (isEditMode || message.IsStreaming)
 	{
-		CancelEdit();
-		return;
+		if (isEditMode || message.IsStreaming)
+		{
+			CancelEdit();
+			return;
+		}
+		isEditMode = true;
+		editContent = stringContent;
+		editThinking = message.message.thinking ?? string.Empty;
 	}
-	isEditMode = true;
-	editContent = stringContent;
-	editThinking = message.message.thinking ?? string.Empty;
-}
 
 	void SaveEdit()
-{
-	message.message.Content = editContent;
-	message.message.thinking = editThinking;
-	isEditMode = false;
-	MakeDirty?.Invoke();
-}
+	{
+		message.message.Content = editContent;
+		message.message.thinking = editThinking;
+		isEditMode = false;
+		MakeDirty?.Invoke();
+	}
 
 	void CancelEdit()
 	{
