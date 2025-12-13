@@ -43,11 +43,15 @@
 	else
 	{
 		<!-- #region 思维链展示 -->
-		@if(message.message.thinking != null)
-		@if(message.message.thinking != String.Empty)
+		@if(!String.IsNullOrEmpty(message.message.thinking))
 		{
 			<div class="shimmer-message-thinking">
-				@message.message.thinking
+				<details>
+					<summary>
+						思考……
+					</summary>
+					@DisplayThinking
+				</details>
 			</div>
 		}
 		<!-- #endregion -->
@@ -92,6 +96,8 @@
 	string stringContent => message.message.Content; // The string content of the message
 
 	MarkupString DisplayContent => MessageDisplayService.RenderMarkdown(stringContent);
+	MarkupString DisplayThinking => MessageDisplayService.RenderMarkdown(message.message.thinking);
+
 
 	string imageContent => message.message.ImageBase64; // The base64 string for the image content, if any
 
