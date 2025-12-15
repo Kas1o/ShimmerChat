@@ -6,6 +6,7 @@ using System.Reflection;
 using ShimmerChatLib.Panel;
 using ShimmerChatLib.Tool;
 using ShimmerChatBuiltinTools;
+using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
 {

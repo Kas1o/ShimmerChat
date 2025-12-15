@@ -3,7 +3,7 @@ using SharperLLM.FunctionCalling;
 using ShimmerChatLib;
 using System.Collections.Generic;
 
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Interface
 {
     public interface IContextBuilderService
     {
@@ -22,6 +22,6 @@ namespace ShimmerChat.Singletons
         /// <param name="agentDescription">代理描述</param>
         /// <param name="toolDefinitions">工具定义列表</param>
         /// <returns>构建好的PromptBuilder</returns>
-        PromptBuilder BuildPromptBuilderWithTools(Chat chat, Agent agent, List<Tool> toolDefinitions);
+        PromptBuilder BuildPromptBuilderWithTools(Chat chat, Agent agent, List<SharperLLM.FunctionCalling.Tool> toolDefinitions);
     }
 }

@@ -3,9 +3,16 @@ using System.Text.Json;
 using ShimmerChatLib.Tool;
 using SharperLLM.FunctionCalling;
 using ShimmerChatLib;
+using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
 {
+	/// <summary>
+	/// 单例工具服务，负责加载、启用/禁用和执行工具。
+	/// 工具生命周期与应用程序相同。
+	/// 工具会在被ToolServiceV1加载时实例化，并在应用程序关闭时释放。
+	/// 工具初始化时可用依赖注入服务。（所以请不要尝试使用 Scoped 或 Transient 服务）
+	/// </summary>
 	public class ToolServiceV1 : IToolService
 	{
 		private readonly string PluginsFolder = Path.Combine(AppContext.BaseDirectory, "./Plugins");

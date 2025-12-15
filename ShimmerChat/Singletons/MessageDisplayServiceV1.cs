@@ -1,6 +1,7 @@
 using Markdig;
 using Markdig.Extensions.Tables;
 using Microsoft.AspNetCore.Components;
+using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
 {

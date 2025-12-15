@@ -3,7 +3,8 @@ using SharperLLM.FunctionCalling;
 using ShimmerChatLib;
 using System.Collections.Generic;
 using System.Linq;
-using ShimmerChat.Models;
+using ShimmerChatLib.Models;
+using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
 {

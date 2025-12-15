@@ -1,7 +1,7 @@
 ﻿using SharperLLM.API;
 using ShimmerChatLib;
 
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Interface
 {
 	public interface ICompletionService
 	{

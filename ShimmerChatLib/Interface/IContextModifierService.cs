@@ -2,7 +2,7 @@ using ShimmerChatLib.Context;
 using SharperLLM.Util;
 using ShimmerChatLib;
 
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Interface
 {
     public interface IContextModifierService
     {

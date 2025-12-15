@@ -1,4 +1,4 @@
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Interface
 {
     public interface IThemeService
     {

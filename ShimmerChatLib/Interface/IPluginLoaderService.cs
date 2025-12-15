@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Interface
 {
     public interface IPluginLoaderService
     {

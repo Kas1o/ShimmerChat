@@ -1,4 +1,5 @@
-using ShimmerChat.Models;
+using ShimmerChatLib.Interface;
+using ShimmerChatLib.Models;
 
 namespace ShimmerChat.Singletons
 {

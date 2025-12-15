@@ -1,4 +1,5 @@
 using Microsoft.JSInterop;
+using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
 {

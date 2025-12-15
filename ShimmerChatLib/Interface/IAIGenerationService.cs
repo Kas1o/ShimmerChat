@@ -2,7 +2,7 @@ using SharperLLM.API;
 using ShimmerChatLib;
 using System.Threading;
 
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Interface
 {
     public interface IAIGenerationService
     {

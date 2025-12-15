@@ -1,6 +1,6 @@
-﻿using ShimmerChat.Models;
+﻿using ShimmerChatLib.Models;
 
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Interface
 {
 	public interface IPopupService
 	{

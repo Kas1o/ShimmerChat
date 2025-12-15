@@ -1,8 +1,8 @@
-﻿using SharperLLM.FunctionCalling;
-using ShimmerChatLib;
+﻿using ShimmerChatLib;
 using ShimmerChatLib.Tool;
+using SharperLLM.FunctionCalling;
 
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Interface
 {
 	public interface IToolService
 	{
@@ -12,7 +12,7 @@ namespace ShimmerChat.Singletons
 		void EnableTool(string name);
 		void DisableTool(string name);
 
-		IEnumerable<Tool> GetEnabledToolDefinitions();
+		IEnumerable<SharperLLM.FunctionCalling.Tool> GetEnabledToolDefinitions();
 
 		Task<string?> ExecuteToolAsync(string toolName, string arguments, Chat chat, Agent agent);
 	}

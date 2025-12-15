@@ -1,4 +1,4 @@
-﻿namespace ShimmerChat.Models
+﻿namespace ShimmerChatLib.Models
 {
 	public class PopupOptions
 	{

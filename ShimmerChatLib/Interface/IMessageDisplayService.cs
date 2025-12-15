@@ -1,4 +1,5 @@
-using Microsoft.AspNetCore.Components;namespace ShimmerChat.Singletons
+using Microsoft.AspNetCore.Components;
+namespace ShimmerChatLib.Interface
 {
     /// <summary>
     /// 消息显示渲染服务接口

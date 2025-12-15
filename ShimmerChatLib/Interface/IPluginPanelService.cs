@@ -1,6 +1,6 @@
 using ShimmerChatLib.Tool;
 
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Interface
 {
     public interface IPluginPanelService
     {
