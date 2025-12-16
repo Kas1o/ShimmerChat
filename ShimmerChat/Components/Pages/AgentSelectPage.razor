@@ -294,6 +294,10 @@
 	// 使用：
 	async Task Import()
 	{
+		if(File == null)
+		{
+			await PopupService.ShowAsync("未选择 Agent 文件。");
+		}
 		var originStream = File.OpenReadStream(maxAllowedSize: 1024 * 1024 * 80);
 		var buffer = await ReadFullyAsync(originStream);
 		var content = System.Text.Encoding.UTF8.GetString(buffer);
