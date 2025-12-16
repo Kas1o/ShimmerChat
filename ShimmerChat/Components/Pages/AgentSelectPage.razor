@@ -297,6 +297,7 @@
 		if(File == null)
 		{
 			await PopupService.ShowAsync("未选择 Agent 文件。");
+			return;
 		}
 		var originStream = File.OpenReadStream(maxAllowedSize: 1024 * 1024 * 80);
 		var buffer = await ReadFullyAsync(originStream);
