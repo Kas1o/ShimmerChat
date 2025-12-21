@@ -129,6 +129,9 @@
   <data name="BUTTON_EDIT" xml:space="preserve">
     <value>EDIT</value>
   </data>
+  <data name="BUTTON_REGENERATE" xml:space="preserve">
+    <value>REGEN</value>
+  </data>
   <data name="BUTTON_SAVE" xml:space="preserve">
     <value>SAVE</value>
   </data>

@@ -23,7 +23,7 @@
 		<div id="chat-main">
 			@foreach (var message in messages)
 			{
-				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" />
+				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" />
 			}
 		</div>
 		<div id="input-box" class="shimmer-shadow-box">
@@ -487,6 +487,31 @@
 
 		messages.Remove(message);
 		await Refresh();
+	}
+
+	async void RegenerateFromMessage(Message message)
+	{
+		// 停止当前可能正在进行的生成
+		StopGeneration();
+
+		// 找到消息的索引
+		int messageIndex = messages.IndexOf(message);
+		
+		// 如果找不到消息，直接返回
+		if (messageIndex == -1) return;
+
+		// 删除此消息及其后的所有消息
+		for (int i = messages.Count - 1; i >= messageIndex; i--)
+		{
+			messages.RemoveAt(i);
+		}
+
+		// 保存更改
+		GetDirty();
+		await Refresh();
+
+		// 启动新的AI回复生成
+		new Task(AddLLMReplyStream).Start();
 	}
 
 	void GetDirty()

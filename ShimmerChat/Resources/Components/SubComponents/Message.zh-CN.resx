@@ -129,6 +129,9 @@
   <data name="BUTTON_EDIT" xml:space="preserve">
     <value>编辑</value>
   </data>
+  <data name="BUTTON_REGENERATE" xml:space="preserve">
+    <value>重生成</value>
+  </data>
   <data name="BUTTON_SAVE" xml:space="preserve">
     <value>保存</value>
   </data>
