@@ -28,16 +28,26 @@ namespace ShimmerChatLib.Panel
 		/// </summary>
 		public int Order { get; set; }
 
+		public PanelDisplayPlace PanelDisplayPlace { get; set; }
+
 		/// <summary>
 		/// 构造函数
 		/// </summary>
 		/// <param name="name">面板名称</param>
 		/// <param name="description">面板描述</param>
-		public PluginPanelAttribute(string name, string description)
+		public PluginPanelAttribute(string name, string description, PanelDisplayPlace panelDisplayPlace = PanelDisplayPlace.Settings)
 		{
 			Name = name;
 			Description = description;
 			Order = 0; // 默认顺序
+			PanelDisplayPlace = panelDisplayPlace;
 		}
+	}
+
+	public enum PanelDisplayPlace
+	{
+		Settings,
+		Agent, // no implement
+		Chat 
 	}
 }

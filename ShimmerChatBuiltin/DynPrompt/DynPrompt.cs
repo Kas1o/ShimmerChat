@@ -1,6 +1,5 @@
 using Newtonsoft.Json;
 using SharperLLM.Util;
-using ShimmerChatBuiltin.DynPrompt;
 using ShimmerChatLib.Context;
 using ShimmerChatLib.Interface;
 using System;
@@ -9,7 +8,7 @@ using System.Text;
 using System.Linq;
 using ShimmerChatLib;
 
-namespace ShimmerChatBuiltin.ContextModifiers
+namespace ShimmerChatBuiltin.DynPrompt
 {
 	public class DynPrompt : IContextModifier
 	{

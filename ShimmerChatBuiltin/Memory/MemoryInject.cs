@@ -8,7 +8,7 @@ using ShimmerChatLib;
 using ShimmerChatLib.Context;
 using ShimmerChatLib.Interface;
 
-namespace ShimmerChatBuiltin.ContextModifiers
+namespace ShimmerChatBuiltin.Memory
 {
 	public class MemoryInject : IContextModifier
 	{

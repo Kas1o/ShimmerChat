@@ -130,7 +130,8 @@ namespace ShimmerChat.Singletons
                                 attribute.Description,
                                 attribute.Icon,
                                 attribute.Order,
-                                panelType
+                                panelType,
+                                attribute.PanelDisplayPlace
                             ));
                         }
                         else

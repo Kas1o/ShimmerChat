@@ -1,0 +1,22 @@
+﻿@inject IPluginPanelService PluginPanelService
+
+@foreach(var item in PluginPanelInfos)
+{
+	<DynamicComponent Type="item.PanelType"/>
+}
+
+
+@code {
+	[Parameter]
+	public Guid ChatGuid { get; set; }
+
+	[Parameter]
+	public Guid AgentGuid { get; set; }
+
+	List<PluginPanelInfo> PluginPanelInfos;
+
+	protected override void OnInitialized()
+	{
+		this.PluginPanelInfos = PluginPanelService.GetPluginPanels().Where(x => x.PanelDisplayPlace == ShimmerChatLib.Panel.PanelDisplayPlace.Chat).ToList();
+	}
+}

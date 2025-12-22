@@ -1,3 +1,4 @@
+using ShimmerChatLib.Panel;
 using ShimmerChatLib.Tool;
 
 namespace ShimmerChatLib.Interface
@@ -58,21 +59,24 @@ namespace ShimmerChatLib.Interface
         /// </summary>
         public Type PanelType { get; set; }
 
-        /// <summary>
-        /// 构造函数
-        /// </summary>
-        /// <param name="name">面板名称</param>
-        /// <param name="description">面板描述</param>
-        /// <param name="icon">面板图标</param>
-        /// <param name="order">面板顺序</param>
-        /// <param name="panelType">面板类型</param>
-        public PluginPanelInfo(string name, string description, string? icon, int order, Type panelType)
+		public PanelDisplayPlace PanelDisplayPlace { get; set; }
+
+		/// <summary>
+		/// 构造函数
+		/// </summary>
+		/// <param name="name">面板名称</param>
+		/// <param name="description">面板描述</param>
+		/// <param name="icon">面板图标</param>
+		/// <param name="order">面板顺序</param>
+		/// <param name="panelType">面板类型</param>
+		public PluginPanelInfo(string name, string description, string? icon, int order, Type panelType, PanelDisplayPlace panelDisplayPlace)
         {
             Name = name;
             Description = description;
             Icon = icon;
             Order = order;
             PanelType = panelType;
+            PanelDisplayPlace = panelDisplayPlace;
         }
     }
 }
