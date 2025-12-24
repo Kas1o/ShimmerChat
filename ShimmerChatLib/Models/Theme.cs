@@ -199,7 +199,7 @@ namespace ShimmerChatLib.Models
         public bool IsDarkMode { get; set; } = false;
 
         [JsonProperty("lightColorFactor")]
-        public double LightColorFactor { get; set; } = 0.2;
+        public double LightColorFactor { get; set; } = 0.5;
 
         /// <summary>
         /// 自定义CSS

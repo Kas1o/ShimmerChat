@@ -124,7 +124,6 @@
     
     private string GetLighterColorOklch(string hexColor)
     {
-        // 将十六进制颜色转换为Oklch并增加亮度
         hexColor = hexColor.Replace("#", "");
         if (hexColor.Length != 6) return $"#{hexColor}";
         
@@ -132,17 +131,20 @@
         var oklab = RgbToOklab(rgb.R, rgb.G, rgb.B);
         var oklch = OklabToOklch(oklab.L, oklab.A, oklab.B);
         
-        // 增加亮度 (L component) - increase by about 0.2 but cap at 1.0
         var newL = Math.Min(1.0, oklch.L + ThemeService.CurrentTheme?.LightColorFactor ?? 0.2);
         
-        // Convert back to RGB
-        var newOklab = OklchToOklab(newL, oklch.C, oklch.H);
+        // 🔥 关键修复 2：适度降低 Chroma（防止过饱和）
+        // 启发式：亮度越高，允许的 Chroma 越低
+        var maxC = 0.38 * Math.Pow(1.0 - newL, 0.8); // 经验曲线（sRGB）
+        var newC = Math.Min(oklch.C * 0.7, maxC);     // 保留 70% + 上限约束
+        newC = Math.Max(0, newC); // 防负
+    
+        var newOklab = OklchToOklab(newL, newC, oklch.H);
         var newRgb = OklabToRgb(newOklab.L, newOklab.A, newOklab.B);
         
-        // Ensure values are in the correct range
-        var r = (int)Math.Max(0, Math.Min(255, Math.Round(newRgb.R)));
-        var g = (int)Math.Max(0, Math.Min(255, Math.Round(newRgb.G)));
-        var b = (int)Math.Max(0, Math.Min(255, Math.Round(newRgb.B)));
+        var r = (int)Math.Round(Math.Max(0, Math.Min(255, newRgb.R)));
+        var g = (int)Math.Round(Math.Max(0, Math.Min(255, newRgb.G)));
+        var b = (int)Math.Round(Math.Max(0, Math.Min(255, newRgb.B)));
         
         return $"#{r:X2}{g:X2}{b:X2}";
     }

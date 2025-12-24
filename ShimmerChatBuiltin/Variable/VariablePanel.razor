@@ -112,6 +112,16 @@
 </div>
 
 <style>
+    .btn{
+        background-color: var(--color-secondary);
+        border-color: var(--color-secondary);
+    }
+
+    .btn-check:checked + .btn{
+        background-color: var(--color-primary);
+        border-color: var(--color-primary);
+    }
+
     .variable-panel {
         padding: 1rem;
     }
@@ -162,7 +172,7 @@
     .variable-value {
         font-family: 'Consolas', 'Monaco', monospace;
         font-size: 0.9rem;
-        color: var(--bs-primary, #0d6efd);
+        color: var(--color-primary, #0d6efd);
         word-break: break-all;
     }
 
@@ -177,7 +187,7 @@
 
     .variable-edit {
         padding: 0.5rem;
-        background: var(--bs-primary-bg, #cfe2ff);
+        background: var(--color-primary-bg, #cfe2ff);
         border-radius: 6px;
         margin-top: 0.5rem;
     }
