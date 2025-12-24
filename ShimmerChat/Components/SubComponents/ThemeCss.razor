@@ -1,0 +1,91 @@
+@using ShimmerChatLib.Interface
+@inject IThemeService ThemeService
+@implements IDisposable
+
+@if (ThemeService.CurrentTheme != null)
+{
+    <style>
+        :root {
+            /* 颜色变量 */
+            --color-primary: @ThemeService.CurrentTheme.ColorPrimary;
+            --color-primary-hover: @ThemeService.CurrentTheme.ColorPrimaryHover;
+            --color-primary-active: @ThemeService.CurrentTheme.ColorPrimaryActive;
+            --color-secondary: @ThemeService.CurrentTheme.ColorSecondary;
+            --color-secondary-hover: @ThemeService.CurrentTheme.ColorSecondaryHover;
+            --color-secondary-active: @ThemeService.CurrentTheme.ColorSecondaryActive;
+            --color-success: @ThemeService.CurrentTheme.ColorSuccess;
+            --color-success-hover: @ThemeService.CurrentTheme.ColorSuccessHover;
+            --color-success-active: @ThemeService.CurrentTheme.ColorSuccessActive;
+            --color-warning: @ThemeService.CurrentTheme.ColorWarning;
+            --color-warning-hover: @ThemeService.CurrentTheme.ColorWarningHover;
+            --color-warning-active: @ThemeService.CurrentTheme.ColorWarningActive;
+            --color-danger: @ThemeService.CurrentTheme.ColorDanger;
+            --color-danger-hover: @ThemeService.CurrentTheme.ColorDangerHover;
+            --color-danger-active: @ThemeService.CurrentTheme.ColorDangerActive;
+            --color-info: @ThemeService.CurrentTheme.ColorInfo;
+            --color-info-hover: @ThemeService.CurrentTheme.ColorInfoHover;
+            --color-info-active: @ThemeService.CurrentTheme.ColorInfoActive;
+            --color-text-primary: @ThemeService.CurrentTheme.ColorTextPrimary;
+            --color-text-secondary: @ThemeService.CurrentTheme.ColorTextSecondary;
+            --color-text-tertiary: @ThemeService.CurrentTheme.ColorTextTertiary;
+            --color-text-inverse: @ThemeService.CurrentTheme.ColorTextInverse;
+            --color-bg-primary: @ThemeService.CurrentTheme.ColorBgPrimary;
+            --color-bg-secondary: @ThemeService.CurrentTheme.ColorBgSecondary;
+            --color-bg-tertiary: @ThemeService.CurrentTheme.ColorBgTertiary;
+            --color-bg-inverse: @ThemeService.CurrentTheme.ColorBgInverse;
+            --color-border-primary: @ThemeService.CurrentTheme.ColorBorderPrimary;
+            --color-border-secondary: @ThemeService.CurrentTheme.ColorBorderSecondary;
+            --color-border-tertiary: @ThemeService.CurrentTheme.ColorBorderTertiary;
+            --color-overlay: @ThemeService.CurrentTheme.ColorOverlay;
+
+            /* 阴影变量 */
+            --shadow-sm: @ThemeService.CurrentTheme.ShadowSm;
+            --shadow-base: @ThemeService.CurrentTheme.ShadowBase;
+            --shadow-md: @ThemeService.CurrentTheme.ShadowMd;
+            --shadow-lg: @ThemeService.CurrentTheme.ShadowLg;
+            --shadow-xl: @ThemeService.CurrentTheme.ShadowXl;
+            --shadow-2xl: @ThemeService.CurrentTheme.Shadow2Xl;
+
+            /* 圆角变量 */
+            --radius-xs: @ThemeService.CurrentTheme.RadiusXs;
+            --radius-sm: @ThemeService.CurrentTheme.RadiusSm;
+            --radius-md: @ThemeService.CurrentTheme.RadiusMd;
+            --radius-lg: @ThemeService.CurrentTheme.RadiusLg;
+            --radius-xl: @ThemeService.CurrentTheme.RadiusXl;
+            --radius-2xl: @ThemeService.CurrentTheme.Radius2Xl;
+            --radius-3xl: @ThemeService.CurrentTheme.Radius3Xl;
+            --radius-full: @ThemeService.CurrentTheme.RadiusFull;
+
+            /* 间距变量 */
+            --spacing-xs: @ThemeService.CurrentTheme.SpacingXs;
+            --spacing-sm: @ThemeService.CurrentTheme.SpacingSm;
+            --spacing-md: @ThemeService.CurrentTheme.SpacingMd;
+            --spacing-lg: @ThemeService.CurrentTheme.SpacingLg;
+            --spacing-xl: @ThemeService.CurrentTheme.SpacingXl;
+            --spacing-2xl: @ThemeService.CurrentTheme.Spacing2Xl;
+            --spacing-3xl: @ThemeService.CurrentTheme.Spacing3Xl;
+        }
+        
+        @if (!string.IsNullOrEmpty(ThemeService.CurrentTheme.CustomCss))
+        {
+            @((MarkupString)ThemeService.CurrentTheme.CustomCss)
+        }
+    </style>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        ThemeService.OnThemeChanged += OnThemeChanged;
+    }
+
+    private void OnThemeChanged(ShimmerChatLib.Models.Theme theme)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= OnThemeChanged;
+    }
+}

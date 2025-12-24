@@ -6,7 +6,7 @@
 <div class="shimmer-sidebar">
     <div class="shimmer-nav-header">
         <div class="shimmer-nav-brand">
-            <img src="@(ThemeService.IsDarkMode ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="ShimmerChat Logo" class="shimmer-nav-logo" />
+            <img src="@(ThemeService.CurrentTheme?.IsDarkMode == true ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="ShimmerChat Logo" class="shimmer-nav-logo" />
             <h1 class="shimmer-nav-title">@l["ShimmerChat"]</h1>
         </div>
     </div>
@@ -72,6 +72,15 @@
                     <div class="nav-item-content">
                         <span class="nav-icon"><i class="bi bi-ui-checks-grid"></i></span>
                         <span class="nav-text">@l["Misc"]</span>
+                    </div>
+                </NavLink>
+            </div>
+            
+            <div>
+                <NavLink class="shimmer-nav-item" href="thememanager" Match="NavLinkMatch.All">
+                    <div class="nav-item-content">
+                        <span class="nav-icon"><i class="bi bi-palette"></i></span>
+                        <span class="nav-text">主题管理</span>
                     </div>
                 </NavLink>
             </div>
@@ -238,7 +247,7 @@
         ThemeService.OnThemeChanged += HandleThemeChanged;
     }
 
-    private void HandleThemeChanged(bool isDarkMode)
+    private void HandleThemeChanged(ShimmerChatLib.Models.Theme theme)
     {
         // 触发组件重新渲染
         StateHasChanged();

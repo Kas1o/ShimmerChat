@@ -3,7 +3,8 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
 {
-    public class ThemeServiceV1 : IThemeService
+    [Obsolete]
+    public class ThemeServiceV1 //: IThemeService
     {
         private readonly IJSRuntime _jsRuntime;
         private bool _isDarkMode = false;
