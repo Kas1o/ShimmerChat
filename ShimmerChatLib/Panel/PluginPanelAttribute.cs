@@ -43,7 +43,7 @@ namespace ShimmerChatLib.Panel
 			PanelDisplayPlace = panelDisplayPlace;
 		}
 	}
-
+	
 	public enum PanelDisplayPlace
 	{
 		Settings,

@@ -1,0 +1,330 @@
+@using ShimmerChatBuiltin.Variable
+@using ShimmerChatLib.Panel
+@using ShimmerChatLib
+@using ShimmerChatLib.Interface
+@inject IKVDataService KVData
+
+@attribute [PluginPanelAttribute("变量管理", "管理对话中的变量，支持 Agent 和 Chat 两种作用域", PanelDisplayPlace.Chat)]
+
+<div class="variable-panel">
+    <div class="variable-header">
+        <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" name="var-scope" id="scope-chat" autocomplete="off"
+                   checked="@(_selectedScope == VariableScope.Chat)" @onchange="() => _selectedScope = VariableScope.Chat">
+            <label class="btn btn-outline-primary" for="scope-chat">对话变量</label>
+
+            <input type="radio" class="btn-check" name="var-scope" id="scope-agent" autocomplete="off"
+                   checked="@(_selectedScope == VariableScope.Agent)" @onchange="() => _selectedScope = VariableScope.Agent">
+            <label class="btn btn-outline-primary" for="scope-agent">智能体变量</label>
+        </div>
+    </div>
+
+    <div class="variable-actions mb-3">
+        <div class="input-group">
+            <span class="input-group-text bi bi-plus-circle"></span>
+            <input type="text" class="form-control" placeholder="变量名" @bind="_newVariableName">
+            <select class="form-select" style="max-width: 100px;" @bind="_newVariableType">
+                <option value="String">字符串</option>
+                <option value="Int">整数</option>
+                <option value="Float">浮点数</option>
+            </select>
+            <input type="text" class="form-control" placeholder="值" @bind="_newVariableValue">
+            <button class="btn btn-primary" @onclick="AddVariable">
+                <span class="bi bi-plus"></span> 添加
+            </button>
+        </div>
+    </div>
+
+    @if (_variables.Variables.Count == 0)
+    {
+        <div class="alert alert-info">
+            <span class="bi bi-info-circle"></span> 暂无变量，点击上方按钮添加
+        </div>
+    }
+    else
+    {
+        <div class="variable-list">
+            @foreach (var variable in _variables.Variables)
+            {
+                <div class="variable-item">
+                    <div class="variable-info" @onclick="() => ToggleVariableEdit(variable)">
+                        <div class="variable-name">
+                            <span class="bi bi-tag"></span> @variable.Name
+                            <span class="badge bg-secondary">@variable.Type</span>
+                            <span class="badge bg-secondary">@variable.Scope</span>
+                        </div>
+                        <div class="variable-value">
+                            @if (variable.Type == VariableType.String)
+                            {
+                                <span class="text-muted">"</span>@variable.StringValue<span class="text-muted">"</span>
+                            }
+                            else
+                            {
+                                @variable.GetValueAsString()
+                            }
+                        </div>
+                        <div class="variable-meta">
+                            <small class="text-muted">@variable.UpdatedAt</small>
+                        </div>
+                    </div>
+                    <div class="variable-actions-item">
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteVariable(variable)">
+                            <span class="bi bi-trash"></span>
+                        </button>
+                    </div>
+                </div>
+                @if (_editingVariable?.Name == variable.Name)
+                {
+                    <div class="variable-edit">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">值</span>
+                            @if (variable.Type == VariableType.String)
+                            {
+                                <input type="text" class="form-control" @bind="_editValue">
+                            }
+                            else if (variable.Type == VariableType.Int)
+                            {
+                                <input type="number" class="form-control" @bind="_editValue">
+                            }
+                            else
+                            {
+                                <input type="number" class="form-control" step="0.1" @bind="_editValue">
+                            }
+                            <button class="btn btn-outline-success" @onclick="() => SaveVariable(variable)">
+                                <span class="bi bi-check"></span>
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="CancelEdit">
+                                <span class="bi bi-x"></span>
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_message))
+    {
+        <div class="alert alert-info mt-3">
+            @_message
+        </div>
+    }
+</div>
+
+<style>
+    .variable-panel {
+        padding: 1rem;
+    }
+
+    .variable-header {
+        margin-bottom: 1rem;
+    }
+
+    .variable-actions {
+        margin-bottom: 1rem;
+    }
+
+    .variable-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .variable-item {
+        display: flex;
+        align-items: center;
+        background: var(--bs-tertiary-bg, #f8f9fa);
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 8px;
+        padding: 0.75rem;
+        transition: background 0.2s;
+    }
+
+    .variable-item:hover {
+        background: var(--bs-secondary-bg, #e9ecef);
+    }
+
+    .variable-info {
+        flex: 1;
+        cursor: pointer;
+        min-width: 0;
+    }
+
+    .variable-name {
+        font-weight: 600;
+        color: var(--bs-body-color, #212529);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .variable-value {
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.9rem;
+        color: var(--bs-primary, #0d6efd);
+        word-break: break-all;
+    }
+
+    .variable-meta {
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+
+    .variable-actions-item {
+        margin-left: 0.5rem;
+    }
+
+    .variable-edit {
+        padding: 0.5rem;
+        background: var(--bs-primary-bg, #cfe2ff);
+        border-radius: 6px;
+        margin-top: 0.5rem;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Guid ChatGuid { get; set; }
+
+    [Parameter]
+    public Guid AgentGuid { get; set; }
+
+    private VariableSet _variables = new();
+    private VariableScope _selectedScope = VariableScope.Chat;
+    private string _newVariableName = string.Empty;
+    private string _newVariableType = "String";
+    private string _newVariableValue = string.Empty;
+    private Variable? _editingVariable;
+    private string _editValue = string.Empty;
+    private string _message = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        LoadVariables();
+    }
+
+    private void LoadVariables()
+    {
+        _variables = VariableManager.GetAggregatedVariables(KVData, ChatGuid, AgentGuid);
+    }
+
+    private void ToggleVariableEdit(Variable variable)
+    {
+        if (_editingVariable?.Name == variable.Name)
+        {
+            _editingVariable = null;
+        }
+        else
+        {
+            _editingVariable = variable;
+            _editValue = variable.GetValueAsString();
+        }
+    }
+
+    private void AddVariable()
+    {
+        if (string.IsNullOrWhiteSpace(_newVariableName))
+        {
+            _message = "请输入变量名";
+            return;
+        }
+
+        var type = _newVariableType switch
+        {
+            "Int" => VariableType.Int,
+            "Float" => VariableType.Float,
+            _ => VariableType.String
+        };
+
+        var value = ParseValue(_newVariableValue, type);
+        if (value == null && type != VariableType.String)
+        {
+            _message = $"值格式不正确，无法转换为 {type} 类型";
+            return;
+        }
+
+        var variable = new Variable
+        {
+            Name = _newVariableName,
+            Type = type,
+            Scope = _selectedScope
+        };
+        variable.SetValue(value ?? _newVariableValue);
+
+        if (_selectedScope == VariableScope.Agent)
+        {
+            VariableManager.SetAgentVariable(KVData, AgentGuid, variable);
+        }
+        else
+        {
+            VariableManager.SetChatVariable(KVData, ChatGuid, variable);
+        }
+
+        _message = $"变量 '{_newVariableName}' 已添加";
+        _newVariableName = string.Empty; 
+        _newVariableValue = string.Empty; 
+        LoadVariables();
+    }
+
+    private void SaveVariable(Variable variable)
+    {
+        if (_editingVariable == null) return;
+
+        var value = ParseValue(_editValue, variable.Type);
+        if (value == null && variable.Type != VariableType.String)
+        {
+            _message = $"值格式不正确";
+            return;
+        }
+
+        variable.SetValue(value ?? _editValue);
+
+        if (variable.Scope == VariableScope.Agent)
+        {
+            VariableManager.SetAgentVariable(KVData, AgentGuid, variable);
+        }
+        else
+        {
+            VariableManager.SetChatVariable(KVData, ChatGuid, variable);
+        }
+
+        _editingVariable = null;
+        _editValue = string.Empty;
+        _message = $"变量 '{variable.Name}' 已更新";
+        LoadVariables();
+    }
+
+    private void CancelEdit()
+    {
+        _editingVariable = null;
+        _editValue = string.Empty;
+    }
+
+    private void DeleteVariable(Variable variable)
+    {
+        if (variable.Scope == VariableScope.Agent)
+        {
+            VariableManager.RemoveAgentVariable(KVData, AgentGuid, variable.Name);
+        }
+        else
+        {
+            VariableManager.RemoveChatVariable(KVData, ChatGuid, variable.Name);
+        }
+
+        _message = $"变量 '{variable.Name}' 已删除";
+        LoadVariables();
+    }
+
+    private object? ParseValue(string value, VariableType type)
+    {
+        return type switch
+        {
+            VariableType.Float => float.TryParse(value, out var f) ? f : null,
+            VariableType.Int => int.TryParse(value, out var i) ? i : null,
+            VariableType.String => value,
+            _ => value
+        };
+    }
+}
