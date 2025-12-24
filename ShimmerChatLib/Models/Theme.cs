@@ -195,8 +195,11 @@ namespace ShimmerChatLib.Models
         [JsonProperty("borderSize")]
         public string BorderSize { get; set; } = "1px";
 
-        [JsonProperty]
+        [JsonProperty("isDarkMode")]
         public bool IsDarkMode { get; set; } = false;
+
+        [JsonProperty("lightColorFactor")]
+        public double LightColorFactor { get; set; } = 0.2;
 
         /// <summary>
         /// 自定义CSS
@@ -225,6 +228,11 @@ namespace ShimmerChatLib.Models
             Name = "新主题";
             CreatedAt = DateTime.UtcNow;
             UpdatedAt = DateTime.UtcNow;
+        }
+
+        public Theme Clone()
+        {
+            return (Theme)MemberwiseClone();
         }
     }
 }

@@ -1,4 +1,5 @@
 @page "/thememanager"
+@using System
 @using Newtonsoft.Json
 @using ShimmerChatLib.Interface
 @using ShimmerChatLib.Models
@@ -76,8 +77,17 @@
                     <label class="form-check-label" for="isDefault">设为默认主题</label>
                 </div>
                 
+                <div class="form-check">
+                    <input type="checkbox" id="isDefault" class="form-check-input" @bind="editingTheme.IsDarkMode" />
+                    <label class="form-check-label" for="isDefault">被视作黑暗主题</label>
+                </div>
+
                 <h4>颜色设置</h4>
                 <div class="color-settings-grid">
+                    <div class="form-group">
+                        <label>计算亮色因子:</label>
+                        <input type="number" class="form-control" @bind="editingTheme.LightColorFactor" />
+                    </div>
                     <div class="form-group">
                         <label>主要颜色:</label>
                         <input type="color" class="form-control color-picker" @bind="editingTheme.ColorPrimary" />
@@ -561,34 +571,161 @@
 </style>
 
 @code {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     private List<Theme> themes = new();
     private bool showEditor = false;
     private Theme? editingTheme;
     private string? selectedTheme;
-    
+
     protected override async Task OnInitializedAsync()
     {
         await LoadThemes();
         ThemeService.OnThemeChanged += OnThemeChanged;
     }
-    
+
     private async Task LoadThemes()
     {
         themes = ThemeService.AvailableThemes.ToList();
     }
-    
+
     private void OnThemeChanged(Theme theme)
     {
         InvokeAsync(StateHasChanged);
     }
-    
+
     private async Task SelectTheme(string themeId)
     {
         ThemeService.SetTheme(themeId);
         await LoadThemes(); // 重新加载以确保状态同步
         StateHasChanged();
     }
-    
+
     private void CreateNewTheme()
     {
         editingTheme = new Theme
@@ -604,78 +741,19 @@
         };
         showEditor = true;
     }
-    
+
     private void EditTheme(string themeId)
     {
         var theme = themes.FirstOrDefault(t => t.Id == themeId);
         if (theme != null && !theme.IsBuiltIn)
         {
-            editingTheme = new Theme
-            {
-                Id = theme.Id,
-                Name = theme.Name,
-                Description = theme.Description,
-                IsDefault = theme.IsDefault,
-                IsBuiltIn = theme.IsBuiltIn,
-                ColorPrimary = theme.ColorPrimary,
-                ColorPrimaryHover = theme.ColorPrimaryHover,
-                ColorPrimaryActive = theme.ColorPrimaryActive,
-                ColorSecondary = theme.ColorSecondary,
-                ColorSecondaryHover = theme.ColorSecondaryHover,
-                ColorSecondaryActive = theme.ColorSecondaryActive,
-                ColorSuccess = theme.ColorSuccess,
-                ColorSuccessHover = theme.ColorSuccessHover,
-                ColorSuccessActive = theme.ColorSuccessActive,
-                ColorWarning = theme.ColorWarning,
-                ColorWarningHover = theme.ColorWarningHover,
-                ColorWarningActive = theme.ColorWarningActive,
-                ColorDanger = theme.ColorDanger,
-                ColorDangerHover = theme.ColorDangerHover,
-                ColorDangerActive = theme.ColorDangerActive,
-                ColorInfo = theme.ColorInfo,
-                ColorInfoHover = theme.ColorInfoHover,
-                ColorInfoActive = theme.ColorInfoActive,
-                ColorTextPrimary = theme.ColorTextPrimary,
-                ColorTextSecondary = theme.ColorTextSecondary,
-                ColorTextTertiary = theme.ColorTextTertiary,
-                ColorTextInverse = theme.ColorTextInverse,
-                ColorBgPrimary = theme.ColorBgPrimary,
-                ColorBgSecondary = theme.ColorBgSecondary,
-                ColorBgTertiary = theme.ColorBgTertiary,
-                ColorBgInverse = theme.ColorBgInverse,
-                ColorBorderPrimary = theme.ColorBorderPrimary,
-                ColorBorderSecondary = theme.ColorBorderSecondary,
-                ColorBorderTertiary = theme.ColorBorderTertiary,
-                ColorOverlay = theme.ColorOverlay,
-                ShadowSm = theme.ShadowSm,
-                ShadowBase = theme.ShadowBase,
-                ShadowMd = theme.ShadowMd,
-                ShadowLg = theme.ShadowLg,
-                ShadowXl = theme.ShadowXl,
-                Shadow2Xl = theme.Shadow2Xl,
-                RadiusXs = theme.RadiusXs,
-                RadiusSm = theme.RadiusSm,
-                RadiusMd = theme.RadiusMd,
-                RadiusLg = theme.RadiusLg,
-                RadiusXl = theme.RadiusXl,
-                Radius2Xl = theme.Radius2Xl,
-                Radius3Xl = theme.Radius3Xl,
-                RadiusFull = theme.RadiusFull,
-                SpacingXs = theme.SpacingXs,
-                SpacingSm = theme.SpacingSm,
-                SpacingMd = theme.SpacingMd,
-                SpacingLg = theme.SpacingLg,
-                SpacingXl = theme.SpacingXl,
-                Spacing2Xl = theme.Spacing2Xl,
-                Spacing3Xl = theme.Spacing3Xl,
-                CustomCss = theme.CustomCss,
-                CreatedAt = theme.CreatedAt,
-                UpdatedAt = DateTime.Now
-            };
+            editingTheme = theme.Clone();
+
+            editingTheme.UpdatedAt = DateTime.Now;
             showEditor = true;
         }
     }
-    
+
     private async Task SaveTheme()
     {
         if (editingTheme != null)
@@ -689,19 +767,19 @@
             {
                 ThemeService.UpdateTheme(editingTheme);
             }
-            
+
             await LoadThemes();
             showEditor = false;
             editingTheme = null;
         }
     }
-    
+
     private void CancelEdit()
     {
         showEditor = false;
         editingTheme = null;
     }
-    
+
     private async Task DeleteTheme(string themeId)
     {
         var theme = themes.FirstOrDefault(t => t.Id == themeId);
@@ -714,7 +792,7 @@
             }
         }
     }
-    
+
     private async Task DeleteCurrentTheme()
     {
         if (editingTheme != null && !editingTheme.IsBuiltIn && !editingTheme.IsDefault)
@@ -728,75 +806,23 @@
             }
         }
     }
-    
+
     private async Task DuplicateTheme(string themeId)
     {
         var theme = themes.FirstOrDefault(t => t.Id == themeId);
         if (theme != null)
         {
-            var duplicatedTheme = new Theme
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = theme.Name + " (副本)",
-                Description = theme.Description,
-                IsDefault = false,
-                IsBuiltIn = false,
-                ColorPrimary = theme.ColorPrimary,
-                ColorPrimaryHover = theme.ColorPrimaryHover,
-                ColorPrimaryActive = theme.ColorPrimaryActive,
-                ColorSecondary = theme.ColorSecondary,
-                ColorSecondaryHover = theme.ColorSecondaryHover,
-                ColorSecondaryActive = theme.ColorSecondaryActive,
-                ColorSuccess = theme.ColorSuccess,
-                ColorSuccessHover = theme.ColorSuccessHover,
-                ColorSuccessActive = theme.ColorSuccessActive,
-                ColorWarning = theme.ColorWarning,
-                ColorWarningHover = theme.ColorWarningHover,
-                ColorWarningActive = theme.ColorWarningActive,
-                ColorDanger = theme.ColorDanger,
-                ColorDangerHover = theme.ColorDangerHover,
-                ColorDangerActive = theme.ColorDangerActive,
-                ColorInfo = theme.ColorInfo,
-                ColorInfoHover = theme.ColorInfoHover,
-                ColorInfoActive = theme.ColorInfoActive,
-                ColorTextPrimary = theme.ColorTextPrimary,
-                ColorTextSecondary = theme.ColorTextSecondary,
-                ColorTextTertiary = theme.ColorTextTertiary,
-                ColorTextInverse = theme.ColorTextInverse,
-                ColorBgPrimary = theme.ColorBgPrimary,
-                ColorBgSecondary = theme.ColorBgSecondary,
-                ColorBgTertiary = theme.ColorBgTertiary,
-                ColorBgInverse = theme.ColorBgInverse,
-                ColorBorderPrimary = theme.ColorBorderPrimary,
-                ColorBorderSecondary = theme.ColorBorderSecondary,
-                ColorBorderTertiary = theme.ColorBorderTertiary,
-                ColorOverlay = theme.ColorOverlay,
-                ShadowSm = theme.ShadowSm,
-                ShadowBase = theme.ShadowBase,
-                ShadowMd = theme.ShadowMd,
-                ShadowLg = theme.ShadowLg,
-                ShadowXl = theme.ShadowXl,
-                Shadow2Xl = theme.Shadow2Xl,
-                RadiusXs = theme.RadiusXs,
-                RadiusSm = theme.RadiusSm,
-                RadiusMd = theme.RadiusMd,
-                RadiusLg = theme.RadiusLg,
-                RadiusXl = theme.RadiusXl,
-                Radius2Xl = theme.Radius2Xl,
-                Radius3Xl = theme.Radius3Xl,
-                RadiusFull = theme.RadiusFull,
-                SpacingXs = theme.SpacingXs,
-                SpacingSm = theme.SpacingSm,
-                SpacingMd = theme.SpacingMd,
-                SpacingLg = theme.SpacingLg,
-                SpacingXl = theme.SpacingXl,
-                Spacing2Xl = theme.Spacing2Xl,
-                Spacing3Xl = theme.Spacing3Xl,
-                CustomCss = theme.CustomCss,
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
-            };
-            
+
+            var duplicatedTheme = theme.Clone();
+
+            duplicatedTheme.Id = Guid.NewGuid().ToString();
+
+            duplicatedTheme.Name = theme.Name + " (副本)";
+
+            duplicatedTheme.CreatedAt = DateTime.Now;
+
+            duplicatedTheme.UpdatedAt = DateTime.Now;
+
             ThemeService.CreateTheme(duplicatedTheme);
             await LoadThemes();
         }
