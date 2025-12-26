@@ -5,6 +5,7 @@
 @using ShimmerChatLib.Models
 @inject IThemeService ThemeService
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
 
 <div class="theme-manager">
     <h2>主题管理</h2>
@@ -365,7 +366,6 @@
     }
     
     .theme-actions {
-        margin-bottom: 20px;
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
@@ -574,130 +574,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     private List<Theme> themes = new();
     private bool showEditor = false;
     private Theme? editingTheme;
@@ -771,6 +647,7 @@
             await LoadThemes();
             showEditor = false;
             editingTheme = null;
+            NavigationManager.NavigateTo("/", false);
         }
     }
 

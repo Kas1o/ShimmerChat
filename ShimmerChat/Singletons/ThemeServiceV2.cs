@@ -293,13 +293,9 @@ namespace ShimmerChat.Singletons
                 theme.UpdatedAt = DateTime.Now;
                 AvailableThemes[existingIndex] = theme;
                 
-                // 如果这是当前主题，重新应用它
-                if (_currentTheme.Id == theme.Id)
-                {
-                    _currentTheme = theme;
-                    ApplyTheme(theme);
-                }
-                
+                _currentTheme = theme;
+                ApplyTheme(theme);
+
                 SaveAllThemes();
             }
         }
