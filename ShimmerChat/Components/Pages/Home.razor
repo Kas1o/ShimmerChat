@@ -1,5 +1,6 @@
 @page "/"
 @using System.Timers
+@using ShimmerChatLib.Models
 @inject IThemeService ThemeService
 @implements IDisposable
 <div id="bg-region" style="background-image: url('@BackgroundImagePath')">
@@ -49,7 +50,7 @@
 @code {
 	private string currentTime = DateTime.Now.ToString("T");
 	private Timer timer;
-	private string BackgroundImagePath => ThemeService.IsDarkMode ? "/shimmer-chat-bg.png" : "/shimmer-chat-bg-light-theme.png";
+	private string BackgroundImagePath => ThemeService.CurrentTheme.IsDarkMode ? "/shimmer-chat-bg.png" : "/shimmer-chat-bg-light-theme.png";
 
 	protected override void OnInitialized()
 	{
@@ -63,7 +64,7 @@
 		ThemeService.OnThemeChanged += HandleThemeChanged;
 	}
 	
-	private void HandleThemeChanged(bool isDarkMode)
+	private void HandleThemeChanged(Theme _)
 	{
 		// 触发组件重新渲染，更新背景图片
 		InvokeAsync(StateHasChanged);

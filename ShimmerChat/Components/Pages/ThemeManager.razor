@@ -1,0 +1,787 @@
+@page "/thememanager"
+@using System
+@using Newtonsoft.Json
+@using ShimmerChatLib.Interface
+@using ShimmerChatLib.Models
+@inject IThemeService ThemeService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<div class="theme-manager">
+    <h2>主题管理</h2>
+    
+    <div class="theme-actions">
+        <button class="btn btn-primary" @onclick="CreateNewTheme">创建新主题</button>
+        <div class="import-btn">
+            <button class="btn btn-secondary">导入主题</button>
+            <InputFile OnChange="@OnImportFileSelected" accept=".json" />
+        </div>
+        <button class="btn btn-secondary" @onclick="ExportCurrentTheme" disabled="@(selectedTheme == null)">导出主题</button>
+    </div>
+    
+    <div class="theme-list">
+        <h3>可用主题</h3>
+        <div class="theme-grid">
+            @foreach (var theme in themes)
+            {
+                <div class="theme-card @(theme.Id == ThemeService.CurrentTheme.Id ? "active" : "")" @onclick="() => SelectTheme(theme.Id)">
+                    <div class="theme-preview" style="background: @theme.ColorBgPrimary; color: @theme.ColorTextPrimary; border: 1px solid @theme.ColorBorderPrimary;">
+                        <h4>@theme.Name</h4>
+                        <p>@theme.Description</p>
+                        <div class="color-preview">
+                            <div class="color-box" style="background: @theme.ColorPrimary;" title="Primary"></div>
+                            <div class="color-box" style="background: @theme.ColorSecondary;" title="Secondary"></div>
+                            <div class="color-box" style="background: @theme.ColorSuccess;" title="Success"></div>
+                            <div class="color-box" style="background: @theme.ColorDanger;" title="Danger"></div>
+                        </div>
+                        <div class="theme-meta">
+                            <small>@(theme.IsBuiltIn ? "内置" : "自定义") @(theme.IsDefault ? " | 默认" : "")</small>
+                        </div>
+                    </div>
+                    <div class="theme-actions">
+                        @if (!theme.IsBuiltIn)
+                        {
+                            <button class="btn btn-sm btn-outline" @onclick="() => EditTheme(theme.Id)" title="编辑">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline" @onclick="() => DeleteTheme(theme.Id)" title="删除" disabled="@theme.IsDefault">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        }
+                        <button class="btn btn-sm btn-outline" @onclick="() => DuplicateTheme(theme.Id)" title="复制">
+                            <i class="bi bi-files"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+    
+    @if (showEditor)
+    {
+        <div class="theme-editor-overlay">
+            <div class="theme-editor">
+                <h3>@(editingTheme?.IsBuiltIn == true ? "查看主题" : editingTheme?.Id == "new" ? "创建新主题" : "编辑主题")</h3>
+                
+                <div class="form-group">
+                    <label>主题名称:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.Name" />
+                </div>
+                
+                <div class="form-group">
+                    <label>描述:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.Description" />
+                </div>
+                
+                <div class="form-check">
+                    <input type="checkbox" id="isDefault" class="form-check-input" @bind="editingTheme.IsDefault" />
+                    <label class="form-check-label" for="isDefault">设为默认主题</label>
+                </div>
+                
+                <div class="form-check">
+                    <input type="checkbox" id="isDarkMode" class="form-check-input" @bind="editingTheme.IsDarkMode" />
+                    <label class="form-check-label" for="isDarkMode">被视作黑暗主题</label>
+                </div>
+
+                <h4>颜色设置</h4>
+                <div class="color-settings-grid">
+                    <div class="form-group">
+                        <label>计算亮色因子:</label>
+                        <input type="number" class="form-control" @bind="editingTheme.LightColorFactor" />
+                    </div>
+                    <div class="form-group">
+                        <label>主要颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorPrimary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorPrimary" />
+                    </div>
+                    <div class="form-group">
+                        <label>主要颜色悬停:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorPrimaryHover" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorPrimaryHover" />
+                    </div>
+                    <div class="form-group">
+                        <label>主要颜色激活:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorPrimaryActive" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorPrimaryActive" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>次要颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorSecondary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorSecondary" />
+                    </div>
+                    <div class="form-group">
+                        <label>次要颜色悬停:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorSecondaryHover" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorSecondaryHover" />
+                    </div>
+                    <div class="form-group">
+                        <label>次要颜色激活:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorSecondaryActive" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorSecondaryActive" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>成功颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorSuccess" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorSuccess" />
+                    </div>
+                    <div class="form-group">
+                        <label>成功颜色悬停:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorSuccessHover" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorSuccessHover" />
+                    </div>
+                    <div class="form-group">
+                        <label>成功颜色激活:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorSuccessActive" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorSuccessActive" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>警告颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorWarning" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorWarning" />
+                    </div>
+                    <div class="form-group">
+                        <label>警告颜色悬停:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorWarningHover" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorWarningHover" />
+                    </div>
+                    <div class="form-group">
+                        <label>警告颜色激活:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorWarningActive" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorWarningActive" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>危险颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorDanger" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorDanger" />
+                    </div>
+                    <div class="form-group">
+                        <label>危险颜色悬停:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorDangerHover" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorDangerHover" />
+                    </div>
+                    <div class="form-group">
+                        <label>危险颜色激活:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorDangerActive" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorDangerActive" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>信息颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorInfo" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorInfo" />
+                    </div>
+                    <div class="form-group">
+                        <label>信息颜色悬停:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorInfoHover" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorInfoHover" />
+                    </div>
+                    <div class="form-group">
+                        <label>信息颜色激活:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorInfoActive" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorInfoActive" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>文本主要颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorTextPrimary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorTextPrimary" />
+                    </div>
+                    <div class="form-group">
+                        <label>文本次要颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorTextSecondary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorTextSecondary" />
+                    </div>
+                    <div class="form-group">
+                        <label>文本三级颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorTextTertiary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorTextTertiary" />
+                    </div>
+                    <div class="form-group">
+                        <label>文本反色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorTextInverse" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorTextInverse" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>背景主要颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorBgPrimary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorBgPrimary" />
+                    </div>
+                    <div class="form-group">
+                        <label>背景次要颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorBgSecondary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorBgSecondary" />
+                    </div>
+                    <div class="form-group">
+                        <label>背景三级颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorBgTertiary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorBgTertiary" />
+                    </div>
+                    <div class="form-group">
+                        <label>背景反色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorBgInverse" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorBgInverse" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>边框主要颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorBorderPrimary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorBorderPrimary" />
+                    </div>
+                    <div class="form-group">
+                        <label>边框次要颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorBorderSecondary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorBorderSecondary" />
+                    </div>
+                    <div class="form-group">
+                        <label>边框三级颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorBorderTertiary" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorBorderTertiary" />
+                    </div>
+                    <div class="form-group">
+                        <label>覆盖层颜色:</label>
+                        <input type="color" class="form-control color-picker" @bind="editingTheme.ColorOverlay" />
+                        <input type="text" class="form-control" @bind="editingTheme.ColorOverlay" />
+                    </div>
+                </div>
+                
+                <h4>阴影设置</h4>
+                <div class="form-group">
+                    <label>小阴影:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.ShadowSm" />
+                </div>
+                <div class="form-group">
+                    <label>基础阴影:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.ShadowBase" />
+                </div>
+                <div class="form-group">
+                    <label>中等阴影:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.ShadowMd" />
+                </div>
+                <div class="form-group">
+                    <label>大阴影:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.ShadowLg" />
+                </div>
+                <div class="form-group">
+                    <label>加大阴影:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.ShadowXl" />
+                </div>
+                <div class="form-group">
+                    <label>超大阴影:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.Shadow2Xl" />
+                </div>
+                
+                <h4>圆角设置</h4>
+                <div class="form-group">
+                    <label>超小圆角:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.RadiusXs" />
+                </div>
+                <div class="form-group">
+                    <label>小圆角:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.RadiusSm" />
+                </div>
+                <div class="form-group">
+                    <label>中圆角:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.RadiusMd" />
+                </div>
+                <div class="form-group">
+                    <label>大圆角:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.RadiusLg" />
+                </div>
+                <div class="form-group">
+                    <label>加大圆角:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.RadiusXl" />
+                </div>
+                <div class="form-group">
+                    <label>超大圆角:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.Radius2Xl" />
+                </div>
+                <div class="form-group">
+                    <label>超大圆角2:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.Radius3Xl" />
+                </div>
+                <div class="form-group">
+                    <label>全圆角:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.RadiusFull" />
+                </div>
+                
+                <h4>间距设置</h4>
+                <div class="form-group">
+                    <label>超小间距:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.SpacingXs" />
+                </div>
+                <div class="form-group">
+                    <label>小间距:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.SpacingSm" />
+                </div>
+                <div class="form-group">
+                    <label>中间距:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.SpacingMd" />
+                </div>
+                <div class="form-group">
+                    <label>大间距:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.SpacingLg" />
+                </div>
+                <div class="form-group">
+                    <label>加大间距:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.SpacingXl" />
+                </div>
+                <div class="form-group">
+                    <label>超大间距:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.Spacing2Xl" />
+                </div>
+                <div class="form-group">
+                    <label>超大间距2:</label>
+                    <input type="text" class="form-control" @bind="editingTheme.Spacing3Xl" />
+                </div>
+                
+                <h4>自定义CSS</h4>
+                <div class="form-group">
+                    <label>自定义CSS:</label>
+                    <textarea class="form-control custom-css" @bind="editingTheme.CustomCss" placeholder="在此添加自定义CSS..."></textarea>
+                </div>
+                
+                <div class="editor-actions">
+                    <button class="btn btn-primary" @onclick="SaveTheme">保存</button>
+                    <button class="btn btn-secondary" @onclick="CancelEdit">取消</button>
+                    @if (editingTheme?.Id != "new" && !editingTheme.IsBuiltIn)
+                    {
+                        <button class="btn btn-danger" @onclick="DeleteCurrentTheme">删除</button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .theme-manager {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .theme-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .theme-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 20px;
+    }
+    
+    .theme-card {
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .theme-card.active {
+        border-color: var(--color-primary);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .theme-card:hover {
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-2px);
+    }
+    
+    .theme-preview {
+        padding: 15px;
+        height: 200px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .color-preview {
+        display: flex;
+        gap: 5px;
+        margin: 10px 0;
+    }
+    
+    .color-box {
+        width: 20px;
+        height: 20px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-secondary);
+    }
+    
+    .theme-meta {
+        margin-top: auto;
+    }
+    
+    .theme-actions {
+        padding: 10px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 5px;
+        border-top: 1px solid var(--color-border-secondary);
+        background-color: var(--color-bg-secondary);
+    }
+    
+    .btn-sm {
+        padding: 5px 10px;
+        font-size: 0.875rem;
+    }
+    
+    .theme-editor-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        padding: 20px;
+    }
+    
+    .theme-editor {
+        background: var(--color-bg-primary);
+        border-radius: var(--radius-lg);
+        padding: 25px;
+        max-width: 90vw;
+        max-height: 90vh;
+        overflow-y: auto;
+        width: 800px;
+        color: var(--color-text-primary);
+    }
+    
+    .color-settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 15px;
+        margin: 15px 0;
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-sm);
+        background-color: var(--color-bg-secondary);
+        color: var(--color-text-primary);
+    }
+    
+    .color-picker {
+        height: 40px;
+        padding: 0;
+    }
+    
+    .custom-css {
+        min-height: 150px;
+        font-family: monospace;
+    }
+    
+    .editor-actions {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+    
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-size: 1rem;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+        transition: background-color 0.3s;
+    }
+    
+    .btn-primary {
+        background-color: var(--color-primary);
+        color: var(--color-text-inverse);
+    }
+    
+    .btn-primary:hover {
+        background-color: var(--color-primary-hover);
+    }
+    
+    .btn-secondary {
+        background-color: var(--color-secondary);
+        color: var(--color-text-inverse);
+    }
+    
+    .btn-secondary:hover {
+        background-color: var(--color-secondary-hover);
+    }
+    
+    .btn-danger {
+        background-color: var(--color-danger);
+        color: var(--color-text-inverse);
+    }
+    
+    .btn-danger:hover {
+        background-color: var(--color-danger-hover);
+    }
+    
+    .btn-outline {
+        background-color: transparent;
+        border: 1px solid var(--color-border-primary);
+        color: var(--color-text-primary);
+    }
+    
+    .btn-outline:hover {
+        background-color: var(--color-bg-secondary);
+    }
+    
+    .file-input-hidden {
+        display: none;
+    }
+    
+    .import-btn {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+    }
+    
+    .import-btn input[type=file] {
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+    }
+</style>
+
+@code {
+
+
+
+    private List<Theme> themes = new();
+    private bool showEditor = false;
+    private Theme? editingTheme;
+    private string? selectedTheme;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadThemes();
+        ThemeService.OnThemeChanged += OnThemeChanged;
+    }
+
+    private async Task LoadThemes()
+    {
+        themes = ThemeService.AvailableThemes.ToList();
+    }
+
+    private void OnThemeChanged(Theme theme)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SelectTheme(string themeId)
+    {
+        ThemeService.SetTheme(themeId);
+        await LoadThemes(); // 重新加载以确保状态同步
+        StateHasChanged();
+    }
+
+    private void CreateNewTheme()
+    {
+        editingTheme = new Theme
+        {
+            Id = "new",
+            Name = "新主题",
+            Description = "",
+            IsDefault = false,
+            IsBuiltIn = false,
+            CustomCss = "",
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
+        };
+        showEditor = true;
+    }
+
+    private void EditTheme(string themeId)
+    {
+        var theme = themes.FirstOrDefault(t => t.Id == themeId);
+        if (theme != null && !theme.IsBuiltIn)
+        {
+            editingTheme = theme.Clone();
+
+            editingTheme.UpdatedAt = DateTime.Now;
+            showEditor = true;
+        }
+    }
+
+    private async Task SaveTheme()
+    {
+        if (editingTheme != null)
+        {
+            if (editingTheme.Id == "new")
+            {
+                editingTheme.Id = Guid.NewGuid().ToString();
+                ThemeService.CreateTheme(editingTheme);
+            }
+            else
+            {
+                ThemeService.UpdateTheme(editingTheme);
+            }
+
+            await LoadThemes();
+            showEditor = false;
+            editingTheme = null;
+            NavigationManager.NavigateTo("/", false);
+        }
+    }
+
+    private void CancelEdit()
+    {
+        showEditor = false;
+        editingTheme = null;
+    }
+
+    private async Task DeleteTheme(string themeId)
+    {
+        var theme = themes.FirstOrDefault(t => t.Id == themeId);
+        if (theme != null && !theme.IsBuiltIn && !theme.IsDefault)
+        {
+            if (await JSRuntime.InvokeAsync<bool>("confirm", $"确定要删除主题 '{theme.Name}' 吗？"))
+            {
+                ThemeService.DeleteTheme(themeId);
+                await LoadThemes();
+            }
+        }
+    }
+
+    private async Task DeleteCurrentTheme()
+    {
+        if (editingTheme != null && !editingTheme.IsBuiltIn && !editingTheme.IsDefault)
+        {
+            if (await JSRuntime.InvokeAsync<bool>("confirm", $"确定要删除主题 '{editingTheme.Name}' 吗？"))
+            {
+                ThemeService.DeleteTheme(editingTheme.Id);
+                await LoadThemes();
+                showEditor = false;
+                editingTheme = null;
+            }
+        }
+    }
+
+    private async Task DuplicateTheme(string themeId)
+    {
+        var theme = themes.FirstOrDefault(t => t.Id == themeId);
+        if (theme != null)
+        {
+
+            var duplicatedTheme = theme.Clone();
+
+            duplicatedTheme.Id = Guid.NewGuid().ToString();
+
+            duplicatedTheme.Name = theme.Name + " (副本)";
+
+            duplicatedTheme.CreatedAt = DateTime.Now;
+
+            duplicatedTheme.UpdatedAt = DateTime.Now;
+
+            ThemeService.CreateTheme(duplicatedTheme);
+            await LoadThemes();
+        }
+    }
+    
+    private async Task OnImportFileSelected(InputFileChangeEventArgs e)
+    {
+        var files = e.GetMultipleFiles();
+        if (files.Count > 0)
+        {
+            var file = files.First();
+            
+            // 验证文件类型
+            if (file.ContentType != "application/json" && !file.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "请选择一个有效的JSON文件！");
+                return;
+            }
+            
+            // 验证文件大小（限制为1MB）
+            if (file.Size > 1024 * 1024)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "文件大小不能超过1MB！");
+                return;
+            }
+            
+            try
+            {
+                using var stream = file.OpenReadStream(1024 * 1024); // 限制流大小
+                using var reader = new StreamReader(stream);
+                var themeJson = await reader.ReadToEndAsync();
+                
+                // 验证JSON格式
+                if (string.IsNullOrWhiteSpace(themeJson))
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "文件内容为空或无效！");
+                    return;
+                }
+                
+                ThemeService.ImportTheme(themeJson);
+                await LoadThemes();
+                
+                // 显示成功消息
+                await JSRuntime.InvokeVoidAsync("alert", $"主题 '{file.Name}' 导入成功！");
+            }
+            catch (JsonException jsonEx)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", $"JSON格式错误: {jsonEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", $"导入主题失败: {ex.Message}");
+            }
+        }
+    }
+    
+    private async Task ExportCurrentTheme()
+    {
+        if (selectedTheme != null)
+        {
+            var themeJson = ThemeService.ExportTheme(selectedTheme);
+            
+            // 创建一个Blob并下载
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+                const blob = new Blob(['{themeJson}'], {{ type: 'application/json' }});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '{themes.First(t => t.Id == selectedTheme).Name}.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            ");
+        }
+    }
+    
+    public void Dispose()
+    {
+        if (ThemeService != null)
+        {
+            ThemeService.OnThemeChanged -= OnThemeChanged;
+        }
+    }
+}

@@ -1,0 +1,285 @@
+@using ShimmerChatLib.Interface
+@inject IThemeService ThemeService
+@implements IDisposable
+
+@if (ThemeService.CurrentTheme != null)
+{
+    <style>
+        :root {
+            /* 颜色变量 */
+            --color-primary: @ThemeService.CurrentTheme.ColorPrimary;
+            --color-primary-hover: @ThemeService.CurrentTheme.ColorPrimaryHover;
+            --color-primary-light: @GetPrimaryLightColor(); /* 生成主色的浅色变体 */
+            --color-primary-active: @ThemeService.CurrentTheme.ColorPrimaryActive;
+            --color-secondary: @ThemeService.CurrentTheme.ColorSecondary;
+            --color-secondary-hover: @ThemeService.CurrentTheme.ColorSecondaryHover;
+            --color-secondary-active: @ThemeService.CurrentTheme.ColorSecondaryActive;
+            --color-background: @ThemeService.CurrentTheme.ColorBgPrimary; /* 背景色映射 */
+            --color-surface: @ThemeService.CurrentTheme.ColorBgSecondary; /* 表面色映射 */
+            --color-card: @ThemeService.CurrentTheme.ColorBgSecondary; /* 卡片色映射 */
+            --color-text-primary: @ThemeService.CurrentTheme.ColorTextPrimary;
+            --color-text-secondary: @ThemeService.CurrentTheme.ColorTextSecondary;
+            --color-text-tertiary: @ThemeService.CurrentTheme.ColorTextTertiary;
+            --color-border: @ThemeService.CurrentTheme.ColorBorderPrimary; /* 边框色映射 */
+            --color-border-hover: @ThemeService.CurrentTheme.ColorBorderSecondary; /* 边框悬停色映射 */
+            --color-error: @ThemeService.CurrentTheme.ColorDanger; /* 错误色映射 */
+            --color-error-light: @GetErrorLightColor(); /* 错误浅色变体 */
+            --color-error-border: @GetErrorBorderColor(); /* 错误边框色 */
+            --color-success: @ThemeService.CurrentTheme.ColorSuccess;
+            --color-warning: @ThemeService.CurrentTheme.ColorWarning;
+            --color-info: @ThemeService.CurrentTheme.ColorInfo;
+            
+            /* 原有颜色变量 */
+            --color-success-hover: @ThemeService.CurrentTheme.ColorSuccessHover;
+            --color-success-active: @ThemeService.CurrentTheme.ColorSuccessActive;
+            --color-warning-hover: @ThemeService.CurrentTheme.ColorWarningHover;
+            --color-warning-active: @ThemeService.CurrentTheme.ColorWarningActive;
+            --color-danger-hover: @ThemeService.CurrentTheme.ColorDangerHover;
+            --color-danger-active: @ThemeService.CurrentTheme.ColorDangerActive;
+            --color-info-hover: @ThemeService.CurrentTheme.ColorInfoHover;
+            --color-info-active: @ThemeService.CurrentTheme.ColorInfoActive;
+            --color-text-inverse: @ThemeService.CurrentTheme.ColorTextInverse;
+            --color-bg-primary: @ThemeService.CurrentTheme.ColorBgPrimary;
+            --color-bg-secondary: @ThemeService.CurrentTheme.ColorBgSecondary;
+            --color-bg-tertiary: @ThemeService.CurrentTheme.ColorBgTertiary;
+            --color-bg-inverse: @ThemeService.CurrentTheme.ColorBgInverse;
+            --color-border-primary: @ThemeService.CurrentTheme.ColorBorderPrimary;
+            --color-border-secondary: @ThemeService.CurrentTheme.ColorBorderSecondary;
+            --color-border-tertiary: @ThemeService.CurrentTheme.ColorBorderTertiary;
+            --color-overlay: @ThemeService.CurrentTheme.ColorOverlay;
+
+            /* 阴影变量 */
+            --shadow-sm: @ThemeService.CurrentTheme.ShadowSm;
+            --shadow-base: @ThemeService.CurrentTheme.ShadowBase;
+            --shadow-md: @ThemeService.CurrentTheme.ShadowMd;
+            --shadow-lg: @ThemeService.CurrentTheme.ShadowLg;
+            --shadow-xl: @ThemeService.CurrentTheme.ShadowXl;
+            --shadow-2xl: @ThemeService.CurrentTheme.Shadow2Xl;
+
+            /* 圆角变量 */
+            --radius-xs: @ThemeService.CurrentTheme.RadiusXs;
+            --radius-sm: @ThemeService.CurrentTheme.RadiusSm;
+            --radius-md: @ThemeService.CurrentTheme.RadiusMd;
+            --radius-lg: @ThemeService.CurrentTheme.RadiusLg;
+            --radius-xl: @ThemeService.CurrentTheme.RadiusXl;
+            --radius-2xl: @ThemeService.CurrentTheme.Radius2Xl;
+            --radius-3xl: @ThemeService.CurrentTheme.Radius3Xl;
+            --radius-full: @ThemeService.CurrentTheme.RadiusFull;
+
+            /* 间距变量 */
+            --spacing-xs: @ThemeService.CurrentTheme.SpacingXs;
+            --spacing-sm: @ThemeService.CurrentTheme.SpacingSm;
+            --spacing-md: @ThemeService.CurrentTheme.SpacingMd;
+            --spacing-lg: @ThemeService.CurrentTheme.SpacingLg;
+            --spacing-xl: @ThemeService.CurrentTheme.SpacingXl;
+            --spacing-2xl: @ThemeService.CurrentTheme.Spacing2Xl;
+            --spacing-3xl: @ThemeService.CurrentTheme.Spacing3Xl;
+            
+            /* 其他变量 */
+            --border-size: @ThemeService.CurrentTheme.BorderSize;
+            --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            --transition: all 0.2s ease;
+        }
+        
+        @if (!string.IsNullOrEmpty(ThemeService.CurrentTheme.CustomCss))
+        {
+            @((MarkupString)ThemeService.CurrentTheme.CustomCss)
+        }
+    </style>
+}
+
+@code {
+    private string GetPrimaryLightColor()
+    {
+        // 生成主色的浅色变体 - 使用主题主色的淡色版本，基于Oklch色彩空间
+        var color = ThemeService.CurrentTheme?.ColorPrimary ?? "#ffa200";
+        return GetLighterColorOklch(color);
+    }
+    
+    private string GetErrorLightColor()
+    {
+        // 生成错误色的浅色变体 - 使用rgba格式，基于Oklch色彩空间
+        var color = ThemeService.CurrentTheme?.ColorDanger ?? "#ef4444";
+        var lighterColor = GetLighterColorOklch(color);
+        // 转换为rgba格式 - extract RGB values from the hex color
+        var hex = lighterColor.Replace("#", "");
+        var r = Convert.ToInt32(hex.Substring(0, 2), 16);
+        var g = Convert.ToInt32(hex.Substring(2, 2), 16);
+        var b = Convert.ToInt32(hex.Substring(4, 2), 16);
+        return $"({r}, {g}, {b}, 0.1)";
+    }
+    
+    private string GetErrorBorderColor()
+    {
+        // 生成错误边框色 - 使用rgba格式，基于Oklch色彩空间
+        var color = ThemeService.CurrentTheme?.ColorDanger ?? "#ef4444";
+        var lighterColor = GetLighterColorOklch(color);
+        // 转换为rgba格式 - extract RGB values from the hex color
+        var hex = lighterColor.Replace("#", "");
+        var r = Convert.ToInt32(hex.Substring(0, 2), 16);
+        var g = Convert.ToInt32(hex.Substring(2, 2), 16);
+        var b = Convert.ToInt32(hex.Substring(4, 2), 16);
+        return $"({r}, {g}, {b}, 0.2)";
+    }
+    
+    private string GetLighterColorOklch(string hexColor)
+    {
+        hexColor = hexColor.Replace("#", "");
+        if (hexColor.Length != 6) return $"#{hexColor}";
+        
+        var rgb = HexToLinearRgb(hexColor);
+        var oklab = RgbToOklab(rgb.R, rgb.G, rgb.B);
+        var oklch = OklabToOklch(oklab.L, oklab.A, oklab.B);
+        
+        var newL = Math.Min(1.0, oklch.L + ThemeService.CurrentTheme?.LightColorFactor ?? 0.2);
+        
+        // 🔥 关键修复 2：适度降低 Chroma（防止过饱和）
+        // 启发式：亮度越高，允许的 Chroma 越低
+        var maxC = 0.38 * Math.Pow(1.0 - newL, 0.8); // 经验曲线（sRGB）
+        var newC = Math.Min(oklch.C * 0.7, maxC);     // 保留 70% + 上限约束
+        newC = Math.Max(0, newC); // 防负
+    
+        var newOklab = OklchToOklab(newL, newC, oklch.H);
+        var newRgb = OklabToRgb(newOklab.L, newOklab.A, newOklab.B);
+        
+        var r = (int)Math.Round(Math.Max(0, Math.Min(255, newRgb.R)));
+        var g = (int)Math.Round(Math.Max(0, Math.Min(255, newRgb.G)));
+        var b = (int)Math.Round(Math.Max(0, Math.Min(255, newRgb.B)));
+        
+        return $"#{r:X2}{g:X2}{b:X2}";
+    }
+    
+    private (double R, double G, double B) HexToLinearRgb(string hex)
+    {
+        var r = Convert.ToInt32(hex.Substring(0, 2), 16);
+        var g = Convert.ToInt32(hex.Substring(2, 2), 16);
+        var b = Convert.ToInt32(hex.Substring(4, 2), 16);
+        
+        // Convert to linear RGB (remove sRGB gamma correction)
+        var rLinear = RgbToLinear(r / 255.0);
+        var gLinear = RgbToLinear(g / 255.0);
+        var bLinear = RgbToLinear(b / 255.0);
+        
+        return (rLinear, gLinear, bLinear);
+    }
+    
+    private double RgbToLinear(double c)
+    {
+        // Remove sRGB gamma correction to get linear RGB
+        if (c <= 0.04045)
+            return c / 12.92;
+        else
+            return Math.Pow((c + 0.055) / 1.055, 2.4);
+    }
+    
+    private (double L, double A, double B) RgbToOklab(double r, double g, double b)
+    {
+        // Linear RGB → LMS
+        var l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+        var m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+        var s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+    
+        // Cube root with clamp for negative (avoid NaN)
+        var l_ = Math.Sign(l) * Math.Pow(Math.Abs(l), 1.0 / 3.0);
+        var m_ = Math.Sign(m) * Math.Pow(Math.Abs(m), 1.0 / 3.0);
+        var s_ = Math.Sign(s) * Math.Pow(Math.Abs(s), 1.0 / 3.0);
+    
+        // LMS → Oklab
+        var oklabL = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
+        var oklabA = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_;
+        var oklabB = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_;
+    
+        return (oklabL, oklabA, oklabB);
+    }
+    
+    private (double L, double C, double H) OklabToOklch(double l, double a, double b)
+    {
+        var c = Math.Sqrt(a * a + b * b);
+        var h = Math.Atan2(b, a);
+        
+        // Convert hue to degrees
+        h = h * 180.0 / Math.PI;
+        if (double.IsNaN(h)) h = 0; // Handle NaN case
+        if (h < 0) h += 360;
+        
+        return (l, c, h);
+    }
+    
+    private (double L, double A, double B) OklchToOklab(double l, double c, double h)
+    {
+        // Convert hue from degrees to radians
+        var hRad = h * Math.PI / 180.0;
+        
+        var a = c * Math.Cos(hRad);
+        var b = c * Math.Sin(hRad);
+        
+        return (l, a, b);
+    }
+    
+    private (double R, double G, double B) OklabToRgb(double l, double a, double b)
+    {
+        // Oklab → LMS (inverse matrix)
+        var l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+        var m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+        var s_ = l - 0.0894841775 * a - 1.2914855480 * b;
+    
+        // Cube
+        var l_c = l_ * l_ * l_;
+        var m_c = m_ * m_ * m_;
+        var s_c = s_ * s_ * s_;
+    
+        // LMS → linear RGB (inverse of forward matrix)
+        var linear_r =  4.0767416621 * l_c - 3.3077115913 * m_c + 0.2309699292 * s_c;
+        var linear_g = -1.2684380046 * l_c + 2.6097574011 * m_c - 0.3413193965 * s_c;
+        var linear_b = -0.0041960863 * l_c - 0.7034186147 * m_c + 1.7076147010 * s_c;
+    
+        // Clamp to [0, 1] BEFORE gamma (important!)
+        linear_r = Math.Max(0.0, Math.Min(1.0, linear_r));
+        linear_g = Math.Max(0.0, Math.Min(1.0, linear_g));
+        linear_b = Math.Max(0.0, Math.Min(1.0, linear_b));
+    
+        // Apply sRGB gamma
+        var rFinal = LinearToRgb(linear_r);
+        var gFinal = LinearToRgb(linear_g);
+        var bFinal = LinearToRgb(linear_b);
+    
+        return (rFinal * 255, gFinal * 255, bFinal * 255);
+    }
+    
+    private double LinearToRgb(double c)
+    {
+        // Apply sRGB gamma correction
+        if (c <= 0.0031308)
+            return c * 12.92;
+        else
+            return 1.055 * Math.Pow(c, 1 / 2.4) - 0.055;
+    }
+    
+    private string GetRgbaFromHex(string hexColor, double alpha)
+    {
+        // 将十六进制颜色转换为rgba格式
+        hexColor = hexColor.Replace("#", "");
+        if (hexColor.Length != 6) return "(239, 68, 68, 0.1)"; // 默认值
+        
+        var r = Convert.ToInt32(hexColor.Substring(0, 2), 16);
+        var g = Convert.ToInt32(hexColor.Substring(2, 2), 16);
+        var b = Convert.ToInt32(hexColor.Substring(4, 2), 16);
+        
+        return $"({r}, {g}, {b}, {alpha})";
+    }
+
+    protected override void OnInitialized()
+    {
+        ThemeService.OnThemeChanged += OnThemeChanged;
+    }
+
+    private void OnThemeChanged(ShimmerChatLib.Models.Theme theme)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= OnThemeChanged;
+    }
+}
