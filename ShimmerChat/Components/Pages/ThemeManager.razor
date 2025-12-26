@@ -574,6 +574,10 @@
 
 
 
+
+
+
+
     private List<Theme> themes = new();
     private bool showEditor = false;
     private Theme? editingTheme;
@@ -625,7 +629,6 @@
         {
             editingTheme = theme.Clone();
 
-            editingTheme.UpdatedAt = DateTime.Now;
             showEditor = true;
         }
     }
@@ -641,13 +644,13 @@
             }
             else
             {
+                editingTheme.UpdatedAt = DateTime.Now;
                 ThemeService.UpdateTheme(editingTheme);
             }
-
+            await SelectTheme(editingTheme.Id);
             await LoadThemes();
             showEditor = false;
             editingTheme = null;
-            NavigationManager.NavigateTo("/", false);
         }
     }
 
