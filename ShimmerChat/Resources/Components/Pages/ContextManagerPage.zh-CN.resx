@@ -171,6 +171,9 @@
   <data name="SYSTEM_MESSAGE_TEMPLATE" xml:space="preserve">
     <value>系统消息模板</value>
   </data>
+  <data name="TEMPLATE_PLACEHOLDER" xml:space="preserve">
+    <value>使用 &lt;|&gt; 在序列开始符 和 序列结束符之间。</value>
+  </data>
   <data name="TEXT_COMPLETION_OPTION" xml:space="preserve">
     <value>文本补全</value>
   </data>

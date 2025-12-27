@@ -171,6 +171,9 @@
   <data name="SYSTEM_MESSAGE_TEMPLATE" xml:space="preserve">
     <value>System Message Template:</value>
   </data>
+  <data name="TEMPLATE_PLACEHOLDER" xml:space="preserve">
+    <value>Use &lt;|&gt; to  separate eos and bos or role token.</value>
+  </data>
   <data name="TEXT_COMPLETION_OPTION" xml:space="preserve">
     <value>Text Completion</value>
   </data>

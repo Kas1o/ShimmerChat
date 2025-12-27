@@ -58,11 +58,11 @@ else
                 <h5>@l["NAME:"]</h5>
                 <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.name"></textarea>
                 <h5>@l["SYSTEM_MESSAGE_TEMPLATE"]</h5>
-                <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.SystemMessageTemplate"></textarea>
+                <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="topTextCompletionSetting.SystemMessageTemplate"></textarea>
                 <h5>@l["USER_MESSAGE_TEMPLATE"]</h5>
-                <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.UserMessageTemplate"></textarea>
+                <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="topTextCompletionSetting.UserMessageTemplate"></textarea>
                 <h5>@l["AGENT_MESSAGE_TEMPLATE"]</h5>
-                <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.CharMessageTemplate"></textarea>
+                <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="topTextCompletionSetting.CharMessageTemplate"></textarea>
             </div>
         }
     }
