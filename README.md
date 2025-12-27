@@ -29,14 +29,14 @@
 
 ### 🖼️ 界面预览
 
-![ShimmerChat 主界面](./docs/screenshots/main-ui.png)
+<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/2fd4dfe7-52ec-4585-a09c-393d23768ed1" />
 > *主界面 - 欢迎页面，显示当前时间*
 
-![API 配置页面](./docs/screenshots/api-settings.png)
+<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/f6b1944e-49ac-4aac-ad1b-f23f8286d292" />
 > *API 配置页面 - 支持多种 LLM 服务配置*
 
-![代理管理页面](./docs/screenshots/agent-manager.png)
-> *代理管理页面 - 创建和管理不同的 AI 代理*
+<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/f45b0eb3-7a12-4710-873a-fdb2f32263c1" />
+> *插件管理页面 - 创建和管理不同的 AI 插件*
 
 </div>
 
