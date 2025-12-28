@@ -475,6 +475,51 @@
 			currentAIMessage = null;
 			GetDirty();
 			await Refresh();
+			
+			// AI生成完成时调用通知
+			await ShowNotificationWhenCompleted();
+		}
+	}
+
+	// AI生成完成时显示通知
+	private async Task ShowNotificationWhenCompleted()
+	{
+		try
+		{
+			// 检查用户是否启用了通知
+			var notificationsEnabled = false;
+			var notificationsEnabledStr = KVData.Read("App", "enable_notifications");
+			if (bool.TryParse(notificationsEnabledStr, out var result))
+			{
+				notificationsEnabled = result;
+			}
+			
+			// 如果用户未启用通知，则直接返回
+			if (!notificationsEnabled)
+			{
+				return;
+			}
+			
+			// 检查是否有AI消息
+			var aiMessage = messages.LastOrDefault(m => m.sender == ShimmerChatLib.Sender.AI);
+			if (aiMessage != null && !string.IsNullOrEmpty(aiMessage.message.Content))
+			{
+				// 准备通知选项
+				var notificationOptions = new
+				{
+					body = aiMessage.message.Content.Length > 100 ? aiMessage.message.Content.Substring(0, 100) + "..." : aiMessage.message.Content,
+					icon = "/images/ai-icon.png", // 可以使用项目中的图标
+					badge = "/images/badge-icon.png" // 可选的徽章图标
+				};
+				
+				// 调用JavaScript中的通知函数
+				await JS.InvokeVoidAsync("showNotification", $"来自 {agent?.name} 的新消息", notificationOptions);
+			}
+		}
+		catch (Exception ex)
+		{
+			// 如果通知失败，记录错误但不中断程序
+			Console.WriteLine($"显示通知时出错: {ex.Message}");
 		}
 	}
 

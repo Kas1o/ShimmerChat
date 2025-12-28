@@ -1,6 +1,8 @@
-﻿@page "/misc"
+@page "/misc"
 
+@using Microsoft.JSInterop
 @inject IKVDataService KVData
+@inject IJSRuntime JS
 
 <h3>MiscSettingsPage</h3>
 
@@ -11,6 +13,15 @@
 	<label class="form-check-label" for="throw-exception">Throw exception instead of popup error message</label>
 </div>
 
+<div class="shimmer-group">
+	<h4>Notification Settings</h4>
+	
+	<input type="checkbox" class="form-check-input" id="enable-notifications" @bind="_enableNotifications" />
+	<label class="form-check-label" for="enable-notifications">Enable desktop notifications</label>
+	
+	<button class="btn btn-outline-primary" @onclick="RequestNotificationPermission" style="margin-left: 10px;">Request Notification Permission</button>
+	<span style="margin-left: 10px;">Current status: <strong>@notificationPermissionStatus</strong></span>
+</div>
 
 <div class="shimmer-group">
 	<h4>User Settings</h4>
@@ -30,6 +41,18 @@
 			Save();
 		}
 	} = false;
+	
+	private bool _enableNotifications
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = false;
+	
 	private string _UserName
 	{
 		get => field;
@@ -41,22 +64,46 @@
 		}
 	} = "";
 
-
+	private string notificationPermissionStatus = "Unknown";
 
 	bool Initialized = false;
 	private void Save()
 	{
 		if (!Initialized) return;
 		KVData.Write("App", "throw_exception", _throwExceptionInsteadOfPopupErrorMessage ? "true": "false");
+		KVData.Write("App", "enable_notifications", _enableNotifications ? "true": "false");
 		KVData.Write("User", "username", _UserName);
 	}
 
-	protected override void OnInitialized()
+	protected override async Task OnInitializedAsync()
 	{
 		if(bool.TryParse(KVData.Read("App", "throw_exception"), out var result)){
 			_throwExceptionInsteadOfPopupErrorMessage = result;
 		}
+		if(bool.TryParse(KVData.Read("App", "enable_notifications"), out var notificationResult)){
+			_enableNotifications = notificationResult;
+		}
 		_UserName = KVData.Read("User", "username") ?? "";
 		Initialized = true;
+		
+		// 获取当前通知权限状态
+		notificationPermissionStatus = await JS.InvokeAsync<string>("eval", "Notification.permission");
+		StateHasChanged();
+	}
+	
+	private async Task RequestNotificationPermission()
+	{
+		var granted = await JS.InvokeAsync<bool>("requestNotificationPermission");
+		if (granted)
+		{
+			notificationPermissionStatus = "Granted";
+			// 同时启用通知设置
+			_enableNotifications = true;
+		}
+		else
+		{
+			notificationPermissionStatus = "Denied";
+		}
+		StateHasChanged();
 	}
 }
