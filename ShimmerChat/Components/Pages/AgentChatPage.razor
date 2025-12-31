@@ -20,7 +20,7 @@
 			<label>You are having chat with: </label>
 			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.name</h2>
 		</div>
-		<div id="chat-main">
+		<div id="chat-main" @ref="ChatMainElement">
 			@foreach (var message in messages)
 			{
 				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" />
@@ -192,6 +192,7 @@
 }
 
 @code {
+	ElementReference ChatMainElement;
 	bool generating = false;
 	CancellationTokenSource? cts; // 用于取消生成任务的令牌源
 	Message? currentAIMessage; // 当前正在生成的AI消息
@@ -310,11 +311,16 @@
 	}
 
 	bool throwExceptionInsteadOfPopupErrorMessage = false;
+	bool autoScrollDown = true;
 	protected override void OnInitialized()
 	{
 		if (bool.TryParse(KVData.Read("App", "throw_exception"), out var result))
 		{
 			throwExceptionInsteadOfPopupErrorMessage = result;
+		}
+		if (bool.TryParse(KVData.Read("App", "auto_scroll_down"), out var autoscroll))
+		{
+			autoScrollDown = autoscroll;
 		}
 	}
 
@@ -401,6 +407,11 @@
 							currentAIMessage.message.toolCalls = rsp.Body.toolCalls;
 						}
 
+						if (autoScrollDown)
+						{
+							await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+						}
+
 						// 立即触发UI刷新，确保流式内容实时显示
 						await InvokeAsync(StateHasChanged);
 					}
@@ -425,8 +436,8 @@
 						});
 					*/
 
-													// 触发UI刷新
-													InvokeAsync(StateHasChanged);
+					// 触发UI刷新
+					InvokeAsync(StateHasChanged);
 				},
 				// 处理工具结果的回调
 				onToolResult: (tuple) =>
@@ -439,6 +450,10 @@
 						sender = ShimmerChatLib.Sender.ToolResult
 					});
 
+					if (autoScrollDown)
+					{
+						JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+					}
 					// 触发UI刷新
 					InvokeAsync(StateHasChanged);
 				},
@@ -508,8 +523,7 @@
 				var notificationOptions = new
 				{
 					body = aiMessage.message.Content.Length > 100 ? aiMessage.message.Content.Substring(0, 100) + "..." : aiMessage.message.Content,
-					icon = "/images/ai-icon.png", // 可以使用项目中的图标
-					badge = "/images/badge-icon.png" // 可选的徽章图标
+					icon = Assets["favicon.png"], // 可以使用项目中的图标
 				};
 				
 				// 调用JavaScript中的通知函数

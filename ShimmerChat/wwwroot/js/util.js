@@ -68,3 +68,19 @@ window.requestNotificationPermission = async () => {
     const permission = await Notification.requestPermission();
     return Promise.resolve(permission === "granted");
 };
+
+window.scrollToBottom = function (element) {
+    try {
+        if (element) {
+            // 使用scrollTo方法滚动到底部
+            element.scrollTo({
+                top: element.scrollHeight,
+                behavior: 'smooth'
+            });
+        } else {
+            console.error('Element is null');
+        }
+    } catch (error) {
+        console.error('Error scrolling to bottom:', error);
+    }
+};
