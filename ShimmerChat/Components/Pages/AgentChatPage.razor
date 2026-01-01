@@ -32,11 +32,11 @@
 			<div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
 				@if (generating)
 				{
-					<button class="btn btn-danger" @onclick="StopGeneration">停止生成</button>
+					<button class="btn btn-danger" @onclick="OnClickStopGenerationButton">停止生成</button>
 				}
 				else
 				{
-					<button class="btn btn-primary" @onclick="Send">发送</button>
+					<button class="btn btn-primary" @onclick="OnClickSendButton">发送</button>
 				}
 			</div>
 		</div>
@@ -192,25 +192,37 @@
 }
 
 @code {
-	ElementReference ChatMainElement;
-	bool generating = false;
-	CancellationTokenSource? cts; // 用于取消生成任务的令牌源
-	Message? currentAIMessage; // 当前正在生成的AI消息
-
+	#region 参数
 	[Parameter]
 	public string AgentGuid { get; set; } = string.Empty;
-
-	private Agent? agent;
-
 	[Parameter]
 	public string ChatGuid { get; set; } = string.Empty; // The chat name to load
+	#endregion
 
-	private Chat? chat;
+	#region 成员
 
-	ObservableCollection<Message> messages = new ObservableCollection<Message>();
+	/// <summary>
+	/// 指向聊天容器，用于在生成时自动滚动到底部 <see cref="AddLLMReplyStream"/> <see cref="MiscSettingsPage._autoScrollDown"/>
+	/// </summary>
+	ElementReference ChatMainElement; 
 
-	string inputText { get; set; } = "";
+	bool generating = false; // 表示当前是否在生成中
+	CancellationTokenSource? cts; // 用于取消生成任务的令牌源
+	Message? currentAIMessage; // 当前正在生成的AI消息
+	private Agent? agent; // 当前对话所属的Agent引用
+	private Chat? chat; // 当前对话的引用
 
+	/// <summary>
+	/// 消息列表的引用，由 <see cref="OnParametersSet" /> 设置为对 <see cref="Chat.Messages"/> 的 引用。
+	/// </summary>
+	ObservableCollection<Message> messages = new ObservableCollection<Message>(); 
+	string inputText { get; set; } = ""; // 当前正在输入的文本。
+
+	bool throwExceptionInsteadOfPopupErrorMessage = false; // 抛出异常设置
+	bool autoScrollDown = true; // 自动滚动设置
+	#endregion
+
+	#region 交互
 	void CheckEnter(KeyboardEventArgs e)
 	{
 		if (e.Key == "Enter" && !e.ShiftKey && !generating) // 检测是否按下 Enter 键
@@ -218,12 +230,21 @@
 			Send(); // 无论输入是否为空，都调用Send方法
 		}
 	}
-
-	ObservableCollection<Message> GetMessagesOrEmpty()
+	void OnClickStopGenerationButton()
 	{
-		return messages;
+		StopGeneration();
 	}
+	void OnClickSendButton()
+	{
+		Send();
+	}
+	void BackToAgentPage()
+	{
+		navigation.NavigateTo($"/agent/{AgentGuid}");
+	}
+	#endregion
 
+	#region 逻辑
 	async void Send()
 	{
 		// 取消之前可能存在的生成任务
@@ -257,8 +278,6 @@
 		// 无论输入是否为空，都启动AI生成任务
 		new Task(AddLLMReplyStream).Start();
 	}
-
-	// 停止生成
 	void StopGeneration()
 	{
 		if (cts != null)
@@ -291,71 +310,6 @@
 			}
 		}
 	}
-
-	// 取消之前的生成任务
-	void CancelPreviousGeneration()
-	{
-		if (cts != null)
-		{
-			cts.Cancel();
-			cts.Dispose();
-			cts = null;
-		}
-
-		// 如果有正在生成的消息，标记为非流式状态
-		if (currentAIMessage != null)
-		{
-			currentAIMessage.IsStreaming = false;
-			currentAIMessage = null;
-		}
-	}
-
-	bool throwExceptionInsteadOfPopupErrorMessage = false;
-	bool autoScrollDown = true;
-	protected override void OnInitialized()
-	{
-		if (bool.TryParse(KVData.Read("App", "throw_exception"), out var result))
-		{
-			throwExceptionInsteadOfPopupErrorMessage = result;
-		}
-		if (bool.TryParse(KVData.Read("App", "auto_scroll_down"), out var autoscroll))
-		{
-			autoScrollDown = autoscroll;
-		}
-	}
-
-	protected override void OnParametersSet()
-	{
-		base.OnParametersSet();
-
-		agent = null;
-		chat = null;
-		messages = new ObservableCollection<Message>();
-
-		if (Guid.TryParse(AgentGuid, out var guid))
-		{
-			try
-			{
-				agent = Agent.Load(guid, KVData);
-				if (agent != null)
-				{
-					var chats = agent.GetChats(KVData);
-					chat = chats.FirstOrDefault(c => c.Guid.ToString() == ChatGuid);
-					if (chat != null)
-					{
-						messages = chat.Messages ?? new ObservableCollection<Message>();
-					}
-				}
-			}
-			catch (Exception)
-			{
-				agent = null;
-				chat = null;
-				messages = new ObservableCollection<Message>();
-			}
-		}
-	}
-
 	async void AddLLMReplyStream()
 	{
 		if (agent == null || chat == null)
@@ -495,8 +449,105 @@
 			await ShowNotificationWhenCompleted();
 		}
 	}
+	void CancelPreviousGeneration()
+	{
+		if (cts != null)
+		{
+			cts.Cancel();
+			cts.Dispose();
+			cts = null;
+		}
 
-	// AI生成完成时显示通知
+		// 如果有正在生成的消息，标记为非流式状态
+		if (currentAIMessage != null)
+		{
+			currentAIMessage.IsStreaming = false;
+			currentAIMessage = null;
+		}
+	}
+	async void DeleteMessage(Message message)
+	{
+		// 如果删除的是当前正在生成的消息，取消生成
+		if (message == currentAIMessage)
+		{
+			StopGeneration();
+		}
+
+		messages.Remove(message);
+		await Refresh();
+	}
+	async void RegenerateFromMessage(Message message)
+	{
+		// 停止当前可能正在进行的生成
+		StopGeneration();
+
+		// 找到消息的索引
+		int messageIndex = messages.IndexOf(message);
+		
+		// 如果找不到消息，直接返回
+		if (messageIndex == -1) return;
+
+		// 删除此消息及其后的所有消息
+		for (int i = messages.Count - 1; i >= messageIndex; i--)
+		{
+			messages.RemoveAt(i);
+		}
+
+		// 保存更改
+		GetDirty();
+		await Refresh();
+
+		// 启动新的AI回复生成
+		new Task(AddLLMReplyStream).Start();
+	}
+	#endregion
+
+	#region 初始化 & 参数设置
+	protected override void OnInitialized()
+	{
+		if (bool.TryParse(KVData.Read("App", "throw_exception"), out var result))
+		{
+			throwExceptionInsteadOfPopupErrorMessage = result;
+		}
+		if (bool.TryParse(KVData.Read("App", "auto_scroll_down"), out var autoscroll))
+		{
+			autoScrollDown = autoscroll;
+		}
+	}
+	protected override void OnParametersSet()
+	{
+		base.OnParametersSet();
+
+		agent = null;
+		chat = null;
+		messages = new ObservableCollection<Message>();
+
+		if (Guid.TryParse(AgentGuid, out var guid))
+		{
+			try
+			{
+				agent = Agent.Load(guid, KVData);
+				if (agent != null)
+				{
+					var chats = agent.GetChats(KVData);
+					chat = chats.FirstOrDefault(c => c.Guid.ToString() == ChatGuid);
+					if (chat != null)
+					{
+						messages = chat.Messages ?? new ObservableCollection<Message>();
+					}
+				}
+			}
+			catch (Exception)
+			{
+				agent = null;
+				chat = null;
+				messages = new ObservableCollection<Message>();
+			}
+		}
+	}
+	#endregion
+
+	#region IO
 	private async Task ShowNotificationWhenCompleted()
 	{
 		try
@@ -536,44 +587,6 @@
 			Console.WriteLine($"显示通知时出错: {ex.Message}");
 		}
 	}
-
-	async void DeleteMessage(Message message)
-	{
-		// 如果删除的是当前正在生成的消息，取消生成
-		if (message == currentAIMessage)
-		{
-			StopGeneration();
-		}
-
-		messages.Remove(message);
-		await Refresh();
-	}
-
-	async void RegenerateFromMessage(Message message)
-	{
-		// 停止当前可能正在进行的生成
-		StopGeneration();
-
-		// 找到消息的索引
-		int messageIndex = messages.IndexOf(message);
-		
-		// 如果找不到消息，直接返回
-		if (messageIndex == -1) return;
-
-		// 删除此消息及其后的所有消息
-		for (int i = messages.Count - 1; i >= messageIndex; i--)
-		{
-			messages.RemoveAt(i);
-		}
-
-		// 保存更改
-		GetDirty();
-		await Refresh();
-
-		// 启动新的AI回复生成
-		new Task(AddLLMReplyStream).Start();
-	}
-
 	void GetDirty()
 	{
 		// Save the chat and agent directly
@@ -582,15 +595,10 @@
 		if (agent != null)
 			agent.Save(KVData);
 	}
-
 	async Task Refresh()
 	{
 		await InvokeAsync(StateHasChanged);
 	}
-
-	void BackToAgentPage()
-	{
-		navigation.NavigateTo($"/agent/{AgentGuid}");
-	}
+	#endregion
 }
 
