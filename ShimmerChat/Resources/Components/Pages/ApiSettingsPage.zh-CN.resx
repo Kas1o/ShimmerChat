@@ -117,8 +117,8 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="API CTX" xml:space="preserve">
-    <value>上下文长度</value>
+  <data name="API GENERATION LENGTH" xml:space="preserve">
+    <value>生成长度</value>
   </data>
   <data name="Api Settings" xml:space="preserve">
     <value>API 设置</value>
