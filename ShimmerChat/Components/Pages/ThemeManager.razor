@@ -572,12 +572,6 @@
 
 @code {
 
-
-
-
-
-
-
     private List<Theme> themes = new();
     private bool showEditor = false;
     private Theme? editingTheme;
@@ -702,6 +696,11 @@
             duplicatedTheme.CreatedAt = DateTime.Now;
 
             duplicatedTheme.UpdatedAt = DateTime.Now;
+
+            // 使得在复制自带主题时不会创建出错误地被认为是默认内置的主题。
+            duplicatedTheme.IsDefault = false;
+            duplicatedTheme.IsBuiltIn = false;
+
 
             ThemeService.CreateTheme(duplicatedTheme);
             await LoadThemes();
