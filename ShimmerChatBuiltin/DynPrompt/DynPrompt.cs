@@ -29,7 +29,7 @@ namespace ShimmerChatBuiltin.DynPrompt
 			var data = pluginData.Read("DynPrompt", "DynPromptSets");
 			var sets = JsonConvert.DeserializeObject<List<DynPromptSet>>(data ?? "[]") ?? [];
 
-			var set = sets.FindLast(s => s.Name == input);
+			var set = sets.FindLast(s => s.Name.Trim() == input.Trim());
 			if(set == null)
 				throw new InvalidOperationException($"No DynPromptSet found with name '{input}'");
 
