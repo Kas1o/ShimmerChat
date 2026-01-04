@@ -5,6 +5,7 @@
 @inject IKVDataService KVData
 
 @attribute [PluginPanelAttribute("变量管理", "管理对话中的变量，支持 Agent 和 Chat 两种作用域", PanelDisplayPlace.Chat)]
+@implements IChatPanelEventHandler
 
 <div class="variable-panel">
     <div class="variable-header">
@@ -194,11 +195,17 @@
 </style>
 
 @code {
+
+
+
     [Parameter]
     public Guid ChatGuid { get; set; }
 
     [Parameter]
     public Guid AgentGuid { get; set; }
+
+    [Parameter]
+    public Action<IChatPanelEventHandler> EventHandlerReg { get;set; }
 
     private VariableSet _variables = new();
     private VariableScope _selectedScope = VariableScope.Chat;
@@ -213,6 +220,8 @@
     {
         base.OnParametersSet();
         LoadVariables();
+
+        EventHandlerReg?.Invoke(this);
     }
 
     private void LoadVariables()
@@ -326,6 +335,20 @@
         _message = $"变量 '{variable.Name}' 已删除";
         LoadVariables();
     }
+
+    public void OnToolCallResult(Message message)
+    {
+        if (message.message.Content.Contains("Variable"))
+        {
+            LoadVariables();
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void OnUserMessage(Message message) { }
+
+    public void OnAgentMessage(Message message) { }
+
 
     private object? ParseValue(string value, VariableType type)
     {

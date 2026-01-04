@@ -20,7 +20,7 @@
 					<p class="plugin-description">@item.Description</p>
 				}
 				<div class="plugin-content">
-					<DynamicComponent Type="item.PanelType" Parameters="Parameters" />
+					<DynamicComponent Type="item.PanelType" Parameters="Parameters"/>
 				</div>
 			</details>
 		}
@@ -164,7 +164,8 @@
 	private Dictionary<string, object> Parameters => new Dictionary<string, object>
 	{
 		["ChatGuid"] = ChatGuid,
-		["AgentGuid"] = AgentGuid
+		["AgentGuid"] = AgentGuid,
+		["EventHandlerReg"] = RegisterEventHandler
 	};
 
 	private bool _isExpanded = false;
@@ -181,5 +182,35 @@
 	private void ToggleSidebar()
 	{
 		_isExpanded = !_isExpanded;
+	}
+
+	private void RegisterEventHandler(ShimmerChatLib.Panel.IChatPanelEventHandler eventHandler)
+	{
+		if(eventHandler != null)
+			EventHandlers.Add(eventHandler);
+	}
+
+	List<ShimmerChatLib.Panel.IChatPanelEventHandler> EventHandlers = [];
+
+	public void OnToolCallResult(ShimmerChatLib.Message message)
+	{
+		foreach(var handler in EventHandlers)
+		{
+			handler.OnToolCallResult(message);
+		}
+	}
+	public void OnUserMessage(ShimmerChatLib.Message message)
+	{
+		foreach (var handler in EventHandlers)
+		{
+			handler.OnUserMessage(message);
+		}
+	}
+	public void OnAgentMessage(ShimmerChatLib.Message message)
+	{
+		foreach (var handler in EventHandlers)
+		{
+			handler.OnAgentMessage(message);
+		}
 	}
 }

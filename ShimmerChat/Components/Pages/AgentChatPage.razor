@@ -41,7 +41,7 @@
 			</div>
 		</div>
 	</div>
-	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.guid" ChatGuid="chat.Guid" />
+	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.guid" ChatGuid="chat.Guid" @ref="ChatPluginPanelContainer"/>
 	<style>
 
 		.shimmer-content {
@@ -220,6 +220,8 @@
 
 	bool throwExceptionInsteadOfPopupErrorMessage = false; // 抛出异常设置
 	bool autoScrollDown = true; // 自动滚动设置
+
+	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
 	#endregion
 
 	#region 交互
@@ -271,6 +273,7 @@
 
 				// 添加消息到聊天
 				chat.AddMessage(message);
+				ChatPluginPanelContainer?.OnUserMessage(message);
 				inputText = ""; // 清空输入框
 				GetDirty(); // 标记为脏数据以保存
 			}
@@ -374,6 +377,7 @@
 					if (currentAIMessage != null)
 					{
 						currentAIMessage.IsStreaming = false;
+						ChatPluginPanelContainer?.OnAgentMessage(currentAIMessage);
 						await InvokeAsync(StateHasChanged);
 					}
 				},
@@ -396,13 +400,16 @@
 				// 处理工具结果的回调
 				onToolResult: (tuple) =>
 				{
-					// 工具调用结果
-					messages.Add(new Message
+					var newMessage = new Message
 					{
-						message = new SharperLLM.Util.ChatMessage{ Content = tuple.resp, id = tuple.id, thinking = null},
+						message = new SharperLLM.Util.ChatMessage { Content = tuple.resp, id = tuple.id, thinking = null },
 						timestamp = DateTime.Now,
 						sender = ShimmerChatLib.Sender.ToolResult
-					});
+					};
+					// 工具调用结果
+					messages.Add(newMessage);
+
+					ChatPluginPanelContainer?.OnToolCallResult(newMessage);
 
 					if (autoScrollDown)
 					{
