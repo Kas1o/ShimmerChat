@@ -17,7 +17,10 @@ namespace ShimmerChatBuiltin.ContextModifiers
 
 		void IContextModifier.ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
 		{
-			Console.WriteLine(input.Replace("{time}", DateTime.Now.ToString("g")));
+			Console.WriteLine(input
+				.Replace("{time}", DateTime.Now.ToString("g"))
+				.Replace("{total_len}", promptBuilder.Messages.Select(x => x.Item1.Content.Length).Sum().ToString())
+				);
 		}
 	}
 }
