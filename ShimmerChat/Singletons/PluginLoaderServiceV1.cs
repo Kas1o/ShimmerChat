@@ -77,7 +77,10 @@ namespace ShimmerChat.Singletons
                 return implementations;
             }
             
-            foreach (var dll in Directory.GetFiles(pluginsFolder, "*.dll"))
+            // 递归获取所有子目录中的DLL文件
+            var dllFiles = Directory.GetFiles(pluginsFolder, "*.dll", SearchOption.AllDirectories);
+            
+            foreach (var dll in dllFiles)
             {
                 try
                 {
@@ -132,7 +135,10 @@ namespace ShimmerChat.Singletons
                 return types;
             }
             
-            foreach (var dll in Directory.GetFiles(pluginsFolder, "*.dll"))
+            // 递归获取所有子目录中的DLL文件
+            var dllFiles = Directory.GetFiles(pluginsFolder, "*.dll", SearchOption.AllDirectories);
+            
+            foreach (var dll in dllFiles)
             {
                 try
                 {
