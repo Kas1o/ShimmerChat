@@ -18,18 +18,18 @@ namespace ShimmerChatBuiltin.Misc
 		public void ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
 		{
 			// 默认不包含初始系统提示
-			bool includeFirstSystem = false;
+			bool keepFirstSystem = true;
 			var backup = promptBuilder.Messages.First();
 
 			// 如果 输入 以 叹号开始则包含并去除叹号
 			if (input.StartsWith('!'))
 			{
-				includeFirstSystem = true;
+				keepFirstSystem = false;
 				input.Remove(0,1);
 			}
 
 			// 再校验是否以 System 开头
-			includeFirstSystem &= promptBuilder.Messages.First().Item2 == PromptBuilder.From.system;
+			keepFirstSystem &= promptBuilder.Messages.First().Item2 == PromptBuilder.From.system;
 
 			// 验证输入
 			var n = int.Parse(input);
@@ -43,13 +43,14 @@ namespace ShimmerChatBuiltin.Misc
 			}
 
 			// 取 LastN
-			promptBuilder.Messages =  promptBuilder.Messages.TakeLast(n).ToArray();
+			var list =  promptBuilder.Messages.TakeLast(n).ToList();
 
 			// 添加回列表
-			if (includeFirstSystem)
+			if (keepFirstSystem)
 			{
-				promptBuilder.Messages = promptBuilder.Messages.Append(backup).ToArray();
+				list.Insert(0,backup);
 			}
+			promptBuilder.Messages = list.ToArray();
 		}
 	}
 }
