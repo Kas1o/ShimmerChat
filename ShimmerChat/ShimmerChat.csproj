@@ -17,6 +17,10 @@
 
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.41.0" />
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.9.50">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

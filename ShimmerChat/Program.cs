@@ -4,6 +4,21 @@ using Microsoft.AspNetCore.Localization;
 using System.Globalization;
 using ShimmerChatLib.Interface;
 using Microsoft.Extensions.FileProviders;
+using System.Reflection;
+
+Console.WriteLine(
+    """
+    ===========================
+    ShimmerChat Starting...
+    ===========================
+    """);
+
+var infoVer = typeof(Program).Assembly
+    .GetCustomAttributes<AssemblyInformationalVersionAttribute>()
+    ?.First()?.InformationalVersion ?? "Unknown";
+
+Console.WriteLine($"Version: {infoVer}");
+
 
 var builder = WebApplication.CreateBuilder(args);
 
