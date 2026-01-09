@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 	<IsPackable>true</IsPackable>
 	  <LangVersion>Preview</LangVersion>
+	  <ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
