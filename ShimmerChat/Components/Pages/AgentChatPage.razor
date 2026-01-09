@@ -194,6 +194,7 @@
 }
 
 @code {
+
 	#region 参数
 	[Parameter]
 	public string AgentGuid { get; set; } = string.Empty;
@@ -396,8 +397,8 @@
 						});
 					*/
 
-					// 触发UI刷新
-					InvokeAsync(StateHasChanged);
+									// 触发UI刷新
+									InvokeAsync(StateHasChanged);
 				},
 				// 处理工具结果的回调
 				onToolResult: (tuple) =>
@@ -453,7 +454,7 @@
 			currentAIMessage = null;
 			GetDirty();
 			await Refresh();
-			
+
 			// AI生成完成时调用通知
 			await ShowNotificationWhenCompleted();
 		}
@@ -492,7 +493,7 @@
 
 		// 找到消息的索引
 		int messageIndex = messages.IndexOf(message);
-		
+
 		// 如果找不到消息，直接返回
 		if (messageIndex == -1) return;
 
@@ -568,13 +569,13 @@
 			{
 				notificationsEnabled = result;
 			}
-			
+
 			// 如果用户未启用通知，则直接返回
 			if (!notificationsEnabled)
 			{
 				return;
 			}
-			
+
 			// 检查是否有AI消息
 			var aiMessage = messages.LastOrDefault(m => m.sender == ShimmerChatLib.Sender.AI);
 			if (aiMessage != null && !string.IsNullOrEmpty(aiMessage.message.Content))
@@ -585,7 +586,7 @@
 					body = aiMessage.message.Content.Length > 100 ? aiMessage.message.Content.Substring(0, 100) + "..." : aiMessage.message.Content,
 					icon = Assets["favicon.png"], // 可以使用项目中的图标
 				};
-				
+
 				// 调用JavaScript中的通知函数
 				await JS.InvokeVoidAsync("showNotification", $"来自 {agent?.name} 的新消息", notificationOptions);
 			}
@@ -598,6 +599,8 @@
 	}
 	void GetDirty()
 	{
+		chat.LastModifyTime = DateTime.Now;
+
 		// Save the chat and agent directly
 		if (chat != null)
 			chat.Save(KVData);

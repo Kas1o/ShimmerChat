@@ -20,6 +20,9 @@ namespace ShimmerChatLib
 		public Guid Guid { get; set; } // The unique identifier of the chat
 		public ObservableCollection<Message> Messages { get;set; } // List of messages in the chat
 
+		public DateTime CreateTime { get; set; }
+		public DateTime LastModifyTime { get; set; }
+
 		public Chat()
 		{
 			Messages = new ObservableCollection<Message>();

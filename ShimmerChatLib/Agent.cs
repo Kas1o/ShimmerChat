@@ -174,6 +174,7 @@ namespace ShimmerChatLib
                     Console.WriteLine($"Failed to load chat with GUID '{chatGuid}': {ex.Message}");
                 }
             }
+            chats = chats.OrderBy(x => x.LastModifyTime).Reverse().ToList();
             return chats;
         }
 

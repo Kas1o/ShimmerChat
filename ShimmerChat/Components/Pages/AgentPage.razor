@@ -16,22 +16,39 @@
             <div id="left-section">
                 <label>agent name</label>
                 <h3>@agent.name</h3>
-                <div class="chat-section shimmer-grid shimmer-group">
-                        <div class="shimmer-grid-item shimmer-grid-chat-item fixed-size" @onclick="NewChat">
-                        <div>
-                            Add New Chat
-                        </div>
+                <div class="chat-section chat-list">
+                    <div class="chat-item new-chat-item" @onclick="NewChat">
+                        <div class="chat-name">Add New Chat</div>
+                        <div class="chat-last-message"></div>
                     </div>
 
                     @foreach(var chat in agent.GetChats(kvDataService))
                     {
-                        <div class="shimmer-grid-item shimmer-grid-chat-item fixed-size" @onclick= "() => OpenChat(chat)">
-                            <div>
-                                @chat.Name
+                        <div class="chat-item" @onclick= "() => OpenChat(chat)">
+                            <div class="chat-info">
+                                <div class="chat-name">@chat.Name</div>
+                                <div class="chat-last-message">@GetLastMessageContent(chat)</div>
                             </div>
+                            <button class="chat-delete-btn" @onclick:stopPropagation @onclick="() => ShowDeleteChatConfirmation(chat)">
+                                ×
+                            </button>
                         </div>
                     }
                 </div>
+                
+                @if (DeleteChatPopupVisible)
+                {
+                    <div class="shimmer-popup-overlay" @onclick="() => DeleteChatPopupVisible=false">
+                        <div class="shimmer-popup-content" @onclick:stopPropagation>
+                            <h5>Delete Chat</h5>
+                            <p>Are you sure you want to delete the chat "@ChatToDelete?.Name"?</p>
+                            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                                <button class="btn btn-secondary" @onclick="() => DeleteChatPopupVisible=false">Cancel</button>
+                                <button class="btn btn-danger" @onclick="DeleteChatConfirmed">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                }
             </div>
             <div class="settings-section shimmer-group">
                 <h4>Settings</h4>
@@ -104,6 +121,7 @@
         height: 100%;
         width: 40%;
         flex-grow: 1;
+        overflow: auto;
         }
 
         #left-section {
@@ -130,6 +148,122 @@
         /* Shimmer content style */
         .shimmer-content {
             padding: 0px !important; /* 覆盖掉主容器的padding，以实现无缝的背景图 */
+        }
+        
+        /* New chat list styles */
+        .chat-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .chat-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background-color: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .chat-item:hover {
+            border-color: var(--color-primary);
+            background-color: var(--color-surface);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .chat-info {
+            flex-grow: 1;
+        }
+        
+        .chat-name {
+            font-weight: bold;
+            color: var(--color-text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .chat-last-message {
+            color: var(--color-text-secondary);
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: calc(100% - 30px);
+        }
+        
+        .new-chat-item {
+            background-color: var(--color-primary-light);
+            color: white;
+            border: 1px groove var(--color-primary);
+        }
+        
+        .new-chat-item:hover {
+            background-color: var(--color-primary);
+        }
+        
+        .new-chat-item .chat-name {
+            color: white;
+        }
+        
+        .new-chat-item .chat-last-message {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .chat-delete-btn {
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            font-size: 18px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.3s ease;
+            margin-left: 10px;
+        }
+        
+        .chat-item:hover .chat-delete-btn {
+            opacity: 1;
+        }
+        
+        .chat-delete-btn:hover {
+            background: var(--color-error);
+        }
+        
+        .shimmer-popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+
+        .shimmer-popup-content {
+            background-color: var(--color-card);
+            padding: 24px;
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--color-border);
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            min-width: 300px;
+            width: fit-content;
         }
     </style>
     </div>
@@ -270,6 +404,8 @@
         {
             Guid = Guid.NewGuid(),
             Name = $"{DateTime.Now.ToString().Replace(" ","-").Replace("/","-").Replace(":","-")}",
+            CreateTime = DateTime.Now,
+            LastModifyTime = DateTime.Now
         };
 
         if (!string.IsNullOrEmpty(agent.greeting))
@@ -312,4 +448,50 @@
             await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
         };
     }
+    
+    #region Chat Management
+    
+    bool DeleteChatPopupVisible { get; set; } = false;
+    Chat? ChatToDelete { get; set; } = null;
+
+    string GetLastMessageContent(Chat chat)
+    {
+        if (chat.Messages == null || chat.Messages.Count == 0)
+            return string.Empty;
+        
+        var lastMessage = chat.Messages.LastOrDefault();
+        if (lastMessage?.message?.Content != null)
+        {
+            // Limit the message length to prevent overly long previews
+            var content = lastMessage.message.Content;
+            if (content.Length > 50)
+                return content.Substring(0, 50) + "...";
+            return content;
+        }
+        return string.Empty;
+    }
+
+    void ShowDeleteChatConfirmation(Chat chat)
+    {
+        ChatToDelete = chat;
+        DeleteChatPopupVisible = true;
+    }
+
+    void DeleteChatConfirmed()
+    {
+        if (ChatToDelete != null && agent != null)
+        {
+            // Remove the chat from the agent's chat list
+            agent.RemoveChatGuid(ChatToDelete.Guid);
+            agent.Save(kvDataService);
+
+            // Reset popup state
+            DeleteChatPopupVisible = false;
+            ChatToDelete = null;
+            
+            StateHasChanged();
+        }
+    }
+    
+    #endregion
 }
