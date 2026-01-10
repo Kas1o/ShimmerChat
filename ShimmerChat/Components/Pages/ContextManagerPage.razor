@@ -104,7 +104,10 @@ else
                             }
                         </div>
                     </div>
-                    <button class="btn btn-danger btn-sm" @onclick="() => RemoveModifier(contextModifierService.ActivatedModifiers.IndexOf(modifier))">Remove</button>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => ShowEditModifierPopup(contextModifierService.ActivatedModifiers.IndexOf(modifier))">Edit</button>
+                        <button class="btn btn-danger btn-sm" @onclick="() => RemoveModifier(contextModifierService.ActivatedModifiers.IndexOf(modifier))">Remove</button>
+                    </div>
                 </div>
             }
         </div>
@@ -120,6 +123,15 @@ else
     @if (_showAddModifierPopup)
     {
         <AddContextModifierPopup @ref="_addModifierPopup" OnConfirm="(result) => OnAddModifierConfirmed(result)" OnClose="() => HideAddModifierPopup()" />
+    }
+    
+    @if (_showEditModifierPopup)
+    {
+        <EditContextModifierPopup @ref="_editModifierPopup" 
+                                  ModifierName="@_editingModifierName" 
+                                  ModifierValue="@_editingModifierValue"
+                                  OnConfirm="(result) => OnEditModifierConfirmed(result)" 
+                                  OnClose="() => HideEditModifierPopup()" />
     }
 
 @code {
@@ -145,10 +157,17 @@ else
 
     // 添加自定义弹窗组件引用
     private AddContextModifierPopup? _addModifierPopup;
+    private EditContextModifierPopup? _editModifierPopup;
 
     // ContextModifier相关变量
     private string? _selectedModifierName;
     private string _modifierInput = string.Empty;
+
+    // Edit ContextModifier相关变量
+    private bool _showEditModifierPopup = false;
+    private string? _editingModifierName;
+    private string _editingModifierValue = string.Empty;
+    private int _editingModifierIndex = -1;
 
     TextCompletionSetting? topTextCompletionSetting =>
         (_selectedTCS >= 0 && _selectedTCS < textCompletionSettings.Count)
@@ -254,6 +273,47 @@ else
             contextModifierService.ActivateModifier(modifierName, inputValue);
         }
         HideAddModifierPopup();
+    }
+
+    private void ShowEditModifierPopup(int index)
+    {
+        if (index >= 0 && index < contextModifierService.ActivatedModifiers.Count)
+        {
+            _editingModifierIndex = index;
+            var modifier = contextModifierService.ActivatedModifiers[index];
+            _editingModifierName = modifier.Name;
+            _editingModifierValue = modifier.Value;
+            _showEditModifierPopup = true;
+        }
+    }
+
+    private void HideEditModifierPopup()
+    {
+        _showEditModifierPopup = false;
+        _editingModifierIndex = -1;
+        _editingModifierName = null;
+        _editingModifierValue = string.Empty;
+    }
+
+    private void OnEditModifierConfirmed(object result)
+    {
+        // 解析弹窗返回的结果
+        var modifierInfo = result as dynamic;
+        if (modifierInfo != null && _editingModifierIndex >= 0)
+        {
+            string modifierName = modifierInfo.ModifierName;
+            string inputValue = modifierInfo.InputValue;
+            
+            // 确保编辑的是正确的修改器（双重验证）
+            if (_editingModifierIndex < contextModifierService.ActivatedModifiers.Count && 
+                contextModifierService.ActivatedModifiers[_editingModifierIndex].Name == modifierName)
+            {
+                contextModifierService.ActivatedModifiers[_editingModifierIndex].Value = inputValue;
+                // 保存更改
+                contextModifierService.SaveActivatedModifiers();
+            }
+        }
+        HideEditModifierPopup();
     }
 
     private void AddModifier()
