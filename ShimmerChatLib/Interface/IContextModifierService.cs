@@ -57,5 +57,6 @@ namespace ShimmerChatLib.Interface
     {
         public required string Name { get; set; }
         public required string Value { get; set; }
+        public bool IsEnabled { get; set; } = true;
     }
 }

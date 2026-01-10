@@ -140,7 +140,7 @@ namespace ShimmerChat.Singletons
             foreach (var activatedModifier in ActivatedModifiers)
             {
                 var modifier = LoadedModifiers.FirstOrDefault(m => m.info.Name == activatedModifier.Name);
-                if (modifier != null)
+                if (modifier != null && activatedModifier.IsEnabled)
                 {
                     var modifierInput = activatedModifier.Value;
                     modifier.ModifyContext(promptBuilder, modifierInput, chat, agent);
