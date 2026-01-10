@@ -572,6 +572,8 @@
 
 @code {
 
+
+
     private List<Theme> themes = new();
     private bool showEditor = false;
     private Theme? editingTheme;
@@ -596,6 +598,8 @@
     private async Task SelectTheme(string themeId)
     {
         ThemeService.SetTheme(themeId);
+
+        selectedTheme = themeId;
         await LoadThemes(); // 重新加载以确保状态同步
         StateHasChanged();
     }
@@ -764,18 +768,13 @@
         {
             var themeJson = ThemeService.ExportTheme(selectedTheme);
             
-            // 创建一个Blob并下载
-            await JSRuntime.InvokeVoidAsync("eval", $@"
-                const blob = new Blob(['{themeJson}'], {{ type: 'application/json' }});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = '{themes.First(t => t.Id == selectedTheme).Name}.json';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            ");
+            var bytes = System.Text.Encoding.UTF8.GetBytes(themeJson);
+            var fileStream = new MemoryStream(bytes);
+            var fileName = $"exported_theme.json";
+            using (var streamRef = new DotNetStreamReference(stream: fileStream))
+            {
+                await JSRuntime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+            };
         }
     }
     
