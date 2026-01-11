@@ -152,3 +152,4 @@ ShimmerChat 提供了灵活的插件系统，自带了以下功能扩展：
 - [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) - MIT license
 - [qdrant-dotnet](https://github.com/qdrant/qdrant-dotnet) - Apache-2.0 license
 - [SharperLLM](https://github.com/Kas1o/SharperLLM) - MIT license
+- [Tokenizers.HuggingFace.DotNet](https://github.com/IgnaciodelaTorreArias/Tokenizers.HuggingFace.DotNet) - Apache-2.0 license

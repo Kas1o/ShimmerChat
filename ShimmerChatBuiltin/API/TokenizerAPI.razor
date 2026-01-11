@@ -1,0 +1,41 @@
+@inject IKVDataService KVData
+@attribute [PluginPanel("TokenizerAPI", "Configure the Tokenizer settings.")]
+
+<div class="shimmer-group">
+	<label> Model: </label>
+	<input type="text" @bind="Model" placeholder="./tokenizer.json" />
+	<br />
+</div>
+
+
+
+@code {
+    string? Model
+    {
+        get;
+        set{
+            field = value;
+            Save();
+        }
+    }
+
+    bool Initialized
+    {
+        get;
+        set;
+    }
+
+
+    void Save(){
+        if(!Initialized)
+            return;
+        KVData.Write("Tokenize", "local_vocab_path", Model);
+    }
+
+
+    protected override void OnInitialized()
+    {
+        Model = KVData.Read("Tokenize", "local_vocab_path");
+        Initialized = true;
+    }
+}
