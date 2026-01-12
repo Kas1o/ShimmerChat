@@ -79,5 +79,10 @@ namespace ShimmerChat.Singletons
             _contextModifierService.ApplyModifiers(promptBuilder, chat, agent);
             return promptBuilder;
         }
-    }
+
+        public PromptBuilder BuildPromptBuilderWithoutContextModify(Chat chat, Agent agent)
+        {
+            return CreatePromptBuilder(chat, agent.description);
+        }
+	}
 }

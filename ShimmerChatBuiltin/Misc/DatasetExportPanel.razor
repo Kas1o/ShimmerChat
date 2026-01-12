@@ -1,0 +1,79 @@
+@using ShimmerChatBuiltin.Variable
+@using ShimmerChatLib.Panel
+@using ShimmerChatLib
+@using ShimmerChatLib.Interface
+@inject IKVDataService KVData
+@inject IJSRuntime JS
+@inject IContextBuilderService ContextBuilderService
+
+@attribute [PluginPanelAttribute("数据集导出", "导出对话内容，支持应用上下文修改器和不应用", PanelDisplayPlace.Chat)]
+
+<button class="btn btn-primary" @onclick="Export">Export</button>
+<button class="btn btn-primary" @onclick="ApplyModifiersAndExport">Apply Modifiers And Export</button>
+
+<br />
+<label>Export Path</label>
+<input type="text" @bind="ExportPath"/>
+
+@code{
+	[Parameter]
+	public Guid ChatGuid { get; set; }
+
+	[Parameter]
+	public Guid AgentGuid { get; set; }
+
+	[Parameter]
+	public Action<IChatPanelEventHandler> EventHandlerReg { get;set; }
+
+	string ExportPath
+	{
+		get => field;
+		set
+		{
+			field = value;
+			Save();
+		}
+	} = string.Empty;
+
+	bool Initialized = false;
+
+	void Export()
+	{
+		var agent = Agent.Load(AgentGuid, KVData);
+		var chat = Chat.Load(ChatGuid, KVData);
+		var pb = ContextBuilderService.BuildPromptBuilderWithoutContextModify(chat,agent);
+		var json = Newtonsoft.Json.JsonConvert.SerializeObject(SharperLLM.Util.Dataset.ShareGPTDatasetTerm.CreateFromPromptBuilder(pb));
+		SaveToFile(json);
+	}
+
+	void ApplyModifiersAndExport()
+	{
+		var agent = Agent.Load(AgentGuid, KVData);
+		var chat = Chat.Load(ChatGuid, KVData);
+		var pb = ContextBuilderService.BuildPromptBuilder(chat,agent);
+		var json = Newtonsoft.Json.JsonConvert.SerializeObject(SharperLLM.Util.Dataset.ShareGPTDatasetTerm.CreateFromPromptBuilder(pb));
+		SaveToFile(json);
+	}
+
+	void SaveToFile(string content)
+	{
+		var fileName = $"{Agent.Load(AgentGuid, KVData).name}-{Chat.Load(ChatGuid,KVData).Name}.json";
+		if(!string.IsNullOrEmpty(ExportPath))
+		{
+			File.WriteAllText(Path.Combine(ExportPath, fileName), content);
+		}
+	}
+
+	protected override void OnInitialized()
+	{
+		ExportPath = KVData.Read("DatasetExport", "path") ?? string.Empty;
+		Initialized = true;
+	}
+	void Save()
+	{
+		if (!Initialized)
+			return;
+		KVData.Write("DatasetExport", "path", ExportPath);
+	}
+
+}

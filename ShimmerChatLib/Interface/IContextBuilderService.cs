@@ -23,5 +23,7 @@ namespace ShimmerChatLib.Interface
         /// <param name="toolDefinitions">工具定义列表</param>
         /// <returns>构建好的PromptBuilder</returns>
         PromptBuilder BuildPromptBuilderWithTools(Chat chat, Agent agent, List<SharperLLM.FunctionCalling.Tool> toolDefinitions);
+
+        PromptBuilder BuildPromptBuilderWithoutContextModify(Chat chat, Agent agent);
     }
 }
