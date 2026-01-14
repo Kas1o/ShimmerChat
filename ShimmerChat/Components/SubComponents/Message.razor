@@ -1,6 +1,7 @@
 @using Markdig
 @using Markdig.Extensions.Tables
 @using ShimmerChatLib
+@using SharperLLM.Util
 
 @inject IStringLocalizer<Message> l
 @inject IJSRuntime JS
@@ -11,8 +12,26 @@
 <div class="shimmer-message">
 	<!-- #region 头部菜单 -->
 	<div class="shimmer-message-head">
-		<div>@sender @(message.IsStreaming ? "(流式生成中...)" : "")</div>
+		<div>
+			@sender 
+			@(message.IsStreaming ? "(流式生成中...)" : "")
+			@if (message.HasMultipleVersions)
+			{
+				<span class="version-indicator">(@(message.CurrentVersionIndex + 1)/@message.Versions.Count)</span>
+			}
+		</div>
 		<div class="shimmer-message-head-action">
+			@if (message.HasMultipleVersions)
+			{
+				<div class="version-navigation">
+					<button class="version-btn" @onclick="() => NavigateToPreviousVersion()" disabled="@(message.CurrentVersionIndex <= 0)">
+						&lt;
+					</button>
+					<button class="version-btn" @onclick="() => NavigateToNextVersion()" disabled="@(message.CurrentVersionIndex >= message.Versions.Count - 1)">
+						&gt;
+					</button>
+				</div>
+			}
 			@if (message.sender == ShimmerChatLib.Sender.AI)
 			{
 				<div @onclick="RegenerateFromThisMessage" style="display: @(message.IsStreaming ? "none" : "block")">
@@ -50,7 +69,7 @@
 	else
 	{
 		<!-- #region 思维链展示 -->
-		@if(!String.IsNullOrEmpty(message.message.thinking))
+		@if(!String.IsNullOrEmpty(CurrentMessageContent?.thinking))
 		{
 			<div class="shimmer-message-thinking">
 				<details>
@@ -72,8 +91,8 @@
 	<!-- #endregion -->
 
 	<!-- #region 工具调用 -->
-	@if(message.message.toolCalls != null)
-	@if(message.message.toolCalls.Count > 0)
+	@if(CurrentMessageContent?.toolCalls != null)
+	@if(CurrentMessageContent?.toolCalls.Count > 0)
 	{
 		<ToolCallMessage message="message" />
 	}
@@ -103,13 +122,16 @@
 	string editContent = string.Empty;
 	string editThinking = string.Empty;
 
-	string stringContent => message.message.Content; // The string content of the message
+	// 获取当前版本的消息内容
+	ChatMessage CurrentMessageContent => message.CurrentVersion;
+
+	string stringContent => CurrentMessageContent?.Content ?? string.Empty; // The string content of the message
 
 	MarkupString DisplayContent => MessageDisplayService.RenderMarkdown(stringContent);
-	MarkupString DisplayThinking => MessageDisplayService.RenderMarkdown(message.message.thinking);
+	MarkupString DisplayThinking => MessageDisplayService.RenderMarkdown(CurrentMessageContent?.thinking ?? string.Empty);
 
 
-	string imageContent => message.message.ImageBase64; // The base64 string for the image content, if any
+	string imageContent => CurrentMessageContent?.ImageBase64 ?? string.Empty; // The base64 string for the image content, if any
 
 	string sender => message.sender switch
 	{
@@ -141,10 +163,12 @@
 		// 移除可能存在的旧订阅
 		message.ContentChanged -= HandleContentChanged;
 		message.StreamingStateChanged -= HandleStreamingStateChanged;
+		message.VersionChanged -= HandleVersionChanged;
 
 		// 添加新订阅
 		message.ContentChanged += HandleContentChanged;
 		message.StreamingStateChanged += HandleStreamingStateChanged;
+		message.VersionChanged += HandleVersionChanged;
 	}
 
 	// 当内容变化时刷新UI
@@ -161,6 +185,13 @@
 		InvokeAsync(StateHasChanged);
 	}
 
+	// 当版本变化时刷新UI
+	private void HandleVersionChanged(object? sender, EventArgs e)
+	{
+		// 通知Blazor重新渲染组件
+		InvokeAsync(StateHasChanged);
+	}
+
 	// 组件销毁时取消订阅，防止内存泄漏
 	public void Dispose()
 	{
@@ -168,6 +199,27 @@
 		{
 			message.ContentChanged -= HandleContentChanged;
 			message.StreamingStateChanged -= HandleStreamingStateChanged;
+			message.VersionChanged -= HandleVersionChanged;
+		}
+	}
+
+	// 导航到上一个版本
+	private void NavigateToPreviousVersion()
+	{
+		if (message.CurrentVersionIndex > 0)
+		{
+			message.CurrentVersionIndex--;
+			MakeDirty?.Invoke();
+		}
+	}
+
+	// 导航到下一个版本
+	private void NavigateToNextVersion()
+	{
+		if (message.CurrentVersionIndex < message.Versions.Count - 1)
+		{
+			message.CurrentVersionIndex++;
+			MakeDirty?.Invoke();
 		}
 	}
 
@@ -199,13 +251,16 @@
 		}
 		isEditMode = true;
 		editContent = stringContent;
-		editThinking = message.message.thinking ?? string.Empty;
+		editThinking = CurrentMessageContent?.thinking ?? string.Empty;
 	}
 
 	void SaveEdit()
 	{
-		message.message.Content = editContent;
-		message.message.thinking = editThinking;
+		if (CurrentMessageContent != null)
+		{
+			CurrentMessageContent.Content = editContent;
+			CurrentMessageContent.thinking = editThinking;
+		}
 		isEditMode = false;
 		MakeDirty?.Invoke();
 	}

@@ -58,6 +58,8 @@
                 <textarea class="shimmer-textarea" @bind="Description" />
                 <label>Greeting</label><br />
                 <textarea class="shimmer-textarea" @bind="Greeting" />
+                <label>Alternative Greetings</label><br />
+                <textarea class="shimmer-textarea" @bind="AlternativeGreetings" placeholder="Enter alternative greetings, sep by '<|>'" rows="4" />
                 <label>Avatar</label><br />
                 <img id="avatar-preview" src="@AvatarPath"/><br />
                 <InputFile OnChange="InputAvatar" /><br />
@@ -318,6 +320,27 @@
         }
     }
 
+    string AlternativeGreetings
+    {
+        get => agent?.alternativeGreetings != null ? string.Join("<|>", agent.alternativeGreetings) : string.Empty;
+        set
+        {
+            if (agent != null)
+            {
+                // 将多行文本分割成列表
+                if (!string.IsNullOrEmpty(value))
+                {
+                    agent.alternativeGreetings = value.Split("<|>", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                }
+                else
+                {
+                    agent.alternativeGreetings = new List<string>();
+                }
+                agent.Save(kvDataService);
+            }
+        }
+    }
+
     string AvatarPath => $"/userimages/{agent.AvatarGuid}.png";
     string BackgroudPath => $"/userimages/{agent.BackgroundGuid}.png";
 
@@ -408,18 +431,37 @@
             LastModifyTime = DateTime.Now
         };
 
-        if (!string.IsNullOrEmpty(agent.greeting))
-            chat.AddMessage(
-                new Message
+        if (!string.IsNullOrEmpty(agent.greeting) || (agent.alternativeGreetings != null && agent.alternativeGreetings.Count > 0))
+        {
+            var welcomeMessage = new Message
+            {
+                sender = Sender.AI,
+                timestamp = DateTime.Now,
+                message = new SharperLLM.Util.ChatMessage
                 {
-                    sender = Sender.AI,
-                    timestamp = DateTime.Now,
-                    message = new SharperLLM.Util.ChatMessage
+                    Content = agent.greeting ?? ""
+                }
+            };
+
+            // 如果有替代问候语，将它们添加为版本
+            if (agent.alternativeGreetings != null)
+            {
+                foreach (var altGreeting in agent.alternativeGreetings)
+                {
+                    if (!string.IsNullOrEmpty(altGreeting) && altGreeting != agent.greeting)
                     {
-                        Content = agent.greeting
+                        var altMessage = new SharperLLM.Util.ChatMessage
+                        {
+                            Content = altGreeting
+                        };
+                        welcomeMessage.AddVersion(altMessage);
                     }
                 }
-            );
+            }
+            welcomeMessage.CurrentVersionIndex = 0;
+
+            chat.AddMessage(welcomeMessage);
+        }
 
         // Save the chat first
         chat.Save(kvDataService);

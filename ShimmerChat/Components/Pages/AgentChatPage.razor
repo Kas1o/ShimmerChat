@@ -336,15 +336,32 @@
 				// 处理流式响应的函数
 				handleStreamResponses: async (responseStream) =>
 				{
-					// 在handleStreamResponses内部创建新的AI消息
-					currentAIMessage = new Message
+					// 检查是否已经有currentAIMessage（重新生成场景）
+					if (currentAIMessage == null)
 					{
-						message = new SharperLLM.Util.ChatMessage{ Content = "", thinking = string.Empty},
-						timestamp = DateTime.Now,
-						sender = ShimmerChatLib.Sender.AI,
-						IsStreaming = true
-					};
-					messages.Add(currentAIMessage);
+						// 创建新的AI消息
+						currentAIMessage = new Message
+						{
+							message = new SharperLLM.Util.ChatMessage{ Content = "", thinking = string.Empty},
+							timestamp = DateTime.Now,
+							sender = ShimmerChatLib.Sender.AI,
+							IsStreaming = true
+						};
+						messages.Add(currentAIMessage);
+					}
+					else
+					{
+						// 如果是重新生成，确保消息处于流式状态
+						currentAIMessage.IsStreaming = true;
+						// 清空当前版本内容以准备新生成
+						if (currentAIMessage.CurrentVersion != null)
+						{
+							currentAIMessage.CurrentVersion.Content = "";
+							currentAIMessage.CurrentVersion.thinking = null;
+							currentAIMessage.CurrentVersion.toolCalls = null;
+						}
+					}
+					
 					await InvokeAsync(StateHasChanged);
 
 					await foreach (var rsp in responseStream.WithCancellation(cancellationToken))
@@ -353,18 +370,27 @@
 						// 更新消息内容
 						if (!string.IsNullOrEmpty(rsp.Body.Content))
 						{
-							currentAIMessage.message.Content = rsp.Body.Content;
+							if (currentAIMessage.CurrentVersion != null)
+								currentAIMessage.CurrentVersion.Content = rsp.Body.Content;
+							else
+								currentAIMessage.message = new SharperLLM.Util.ChatMessage { Content = rsp.Body.Content };
 						}
 
 						// 如果有思考内容，更新思考内容
 						if (rsp.Body.thinking != null)
 						{
-							currentAIMessage.message.thinking = rsp.Body.thinking;
+							if (currentAIMessage.CurrentVersion != null)
+								currentAIMessage.CurrentVersion.thinking = rsp.Body.thinking;
+							else if (currentAIMessage.message != null)
+								currentAIMessage.message.thinking = rsp.Body.thinking;
 						}
 
 						if (rsp.Body.toolCalls != null)
 						{
-							currentAIMessage.message.toolCalls = rsp.Body.toolCalls;
+							if (currentAIMessage.CurrentVersion != null)
+								currentAIMessage.CurrentVersion.toolCalls = rsp.Body.toolCalls;
+							else if (currentAIMessage.message != null)
+								currentAIMessage.message.toolCalls = rsp.Body.toolCalls;
 						}
 
 						if (autoScrollDown)
@@ -497,8 +523,28 @@
 		// 如果找不到消息，直接返回
 		if (messageIndex == -1) return;
 
-		// 删除此消息及其后的所有消息
-		for (int i = messages.Count - 1; i >= messageIndex; i--)
+		// 保存当前消息作为版本
+		var currentContent = message.CurrentVersion?.Content ?? "";
+		var currentThinking = message.CurrentVersion?.thinking ?? "";
+		var currentToolCalls = message.CurrentVersion?.toolCalls;
+
+		if (!string.IsNullOrEmpty(currentContent))
+		{
+			// 将当前内容添加为新版本
+			var versionMessage = new SharperLLM.Util.ChatMessage
+			{
+				Content = currentContent,
+				thinking = currentThinking,
+				toolCalls = currentToolCalls != null ? new List<SharperLLM.API.ToolCall>(currentToolCalls) : null
+			};
+			message.AddVersion(versionMessage);
+		}
+
+		// 设置currentAIMessage为要重新生成的消息
+		currentAIMessage = message;
+
+		// 删除此消息之后的所有消息
+		for (int i = messages.Count - 1; i > messageIndex; i--)
 		{
 			messages.RemoveAt(i);
 		}
@@ -507,7 +553,7 @@
 		GetDirty();
 		await Refresh();
 
-		// 启动新的AI回复生成
+		// 启动新的AI回复生成（会复用currentAIMessage）
 		new Task(AddLLMReplyStream).Start();
 	}
 	#endregion
@@ -578,12 +624,12 @@
 
 			// 检查是否有AI消息
 			var aiMessage = messages.LastOrDefault(m => m.sender == ShimmerChatLib.Sender.AI);
-			if (aiMessage != null && !string.IsNullOrEmpty(aiMessage.message.Content))
+			if (aiMessage != null && !string.IsNullOrEmpty(aiMessage.CurrentVersion?.Content))
 			{
 				// 准备通知选项
 				var notificationOptions = new
 				{
-					body = aiMessage.message.Content.Length > 100 ? aiMessage.message.Content.Substring(0, 100) + "..." : aiMessage.message.Content,
+					body = aiMessage.CurrentVersion.Content.Length > 100 ? aiMessage.CurrentVersion.Content.Substring(0, 100) + "..." : aiMessage.CurrentVersion.Content,
 					icon = Assets["favicon.png"], // 可以使用项目中的图标
 				};
 

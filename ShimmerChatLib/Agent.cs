@@ -13,6 +13,7 @@ namespace ShimmerChatLib
 		public string name { get; set; }
         public string description { get; set; } // The description of the agent
 		public string greeting { get; set; }
+		public List<string> alternativeGreetings { get; set; } = new List<string>(); // Alternative greetings for the agent
 		public List<Guid> chatGuids
         {
             get => field;
@@ -195,7 +196,7 @@ namespace ShimmerChatLib
 
         }
 
-		public static Agent Create(string Name, string desc, string greeting = null)
+		public static Agent Create(string Name, string desc, string greeting = null, List<string> alternativeGreetings = null)
 		{
 			return new Agent
 			{
@@ -203,7 +204,8 @@ namespace ShimmerChatLib
 				name = Name,
 				description = desc,
 				guid= Guid.NewGuid(),
-				greeting = greeting
+				greeting = greeting,
+				alternativeGreetings = alternativeGreetings ?? new List<string>()
 			};
 		}
 		#region Equal
