@@ -21,7 +21,6 @@ namespace ShimmerChatBuiltin.Misc
 		public TokenLimit(IKVDataService kvDataService)
 		{
 			_kvDataService = kvDataService;
-			TryRecreateTokenizer();
 		}
 
 		private Tokenizer _tokenizer;	
