@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿﻿using System;
 using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +24,7 @@ namespace ShimmerChatLib
         }
         public Guid? AvatarGuid { get; set; }
         public Guid? BackgroundGuid { get; set; }
+        public List<string> CustomToolNames { get; set; } = new List<string>(); // Custom tools for this agent
 
 		#region Export & Import
         public string Export(bool clearChat = true)
@@ -205,7 +206,8 @@ namespace ShimmerChatLib
 				description = desc,
 				guid= Guid.NewGuid(),
 				greeting = greeting,
-				alternativeGreetings = alternativeGreetings ?? new List<string>()
+				alternativeGreetings = alternativeGreetings ?? new List<string>(),
+				CustomToolNames = new List<string>()
 			};
 		}
 		#region Equal
@@ -225,6 +227,10 @@ namespace ShimmerChatLib
 		#endregion
 	}
 
+    /// <summary>
+    /// 导出的 Agent 结构。
+    /// 因为 Agent 保存的是图像的 Guid，所以导出时需要包含图像的 Base64 编码。
+    /// </summary>
     public record AgentExportStructure
     (
         Agent? Agent,

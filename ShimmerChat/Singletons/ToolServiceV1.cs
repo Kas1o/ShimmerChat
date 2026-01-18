@@ -119,12 +119,42 @@ namespace ShimmerChat.Singletons
 			return EnabledTools.Select(t => t.GetToolDefinition());
 		}
 
+		public IEnumerable<Tool> GetAgentToolDefinitions(Agent agent)
+		{
+			var agentTools = new List<ITool>();
+			
+			// Add agent-specific tools only (not globally enabled tools)
+			if (agent?.CustomToolNames != null)
+			{
+				foreach (var toolName in agent.CustomToolNames)
+				{
+					var tool = LoadedTools.FirstOrDefault(t => t.GetToolDefinition().name.Equals(toolName, StringComparison.OrdinalIgnoreCase));
+					if (tool != null && !agentTools.Contains(tool))
+					{
+						agentTools.Add(tool);
+					}
+				}
+			}
+			
+			return agentTools.Select(t => t.GetToolDefinition());
+		}
+
 		public async Task<string?> ExecuteToolAsync(string toolName, string arguments, Chat chat, Agent agent)
 		{
-			var tool = EnabledTools.FirstOrDefault(t => t.GetToolDefinition().name == toolName);
-			if (tool == null)
-				return null;
-			return await tool.Execute(arguments, chat, agent);
+			// Check both globally enabled tools and agent-specific tools
+			var globalTool = EnabledTools.FirstOrDefault(t => t.GetToolDefinition().name.Equals(toolName, StringComparison.OrdinalIgnoreCase));
+			if (globalTool != null)
+				return await globalTool.Execute(arguments, chat, agent);
+			
+			// Check if it's an agent-specific tool
+			if (agent?.CustomToolNames != null && agent.CustomToolNames.Contains(toolName, StringComparer.OrdinalIgnoreCase))
+			{
+				var agentTool = LoadedTools.FirstOrDefault(t => t.GetToolDefinition().name.Equals(toolName, StringComparison.OrdinalIgnoreCase));
+				if (agentTool != null)
+					return await agentTool.Execute(arguments, chat, agent);
+			}
+			
+			return null;
 		}
 	}
 }

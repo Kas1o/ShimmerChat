@@ -112,6 +112,7 @@ namespace ShimmerChat.Singletons
 		/// <summary>
 		/// 自动循环AI与ToolCall，直到FinishReason为Stop，每轮通过onResponse回调通知调用方。
 		/// </summary>
+		[Obsolete("使用 IAIGenerationService提供的RunAIWithToolLoopAsync")]
 		public async Task RunAIWithToolLoopAsync(
 			Agent agent,
 			Chat chat,

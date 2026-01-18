@@ -3,6 +3,7 @@
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService
 @inject IJSRuntime JS
+@inject IToolService ToolService
 
 @if(agent != null)
 {
@@ -65,6 +66,40 @@
                 <InputFile OnChange="InputAvatar" /><br />
                 <label>Background</label><br />
                 <InputFile OnChange="InputBackground" /> <br />
+                
+                <!-- Agent-specific Tools Section -->
+                <h4 style="margin-top: 20px;">Custom Tools</h4>
+                <div class="tool-management-section">
+                    <div class="tool-selector">
+                        <select class="shimmer-input" @bind="SelectedToolToAdd">
+                            <option value="">Select a tool to add...</option>
+                            @foreach(var tool in AvailableTools)
+                            {
+                                <option value="@tool.GetToolDefinition().name">@tool.GetToolDefinition().name</option>
+                            }
+                        </select>
+                        <button class="btn btn-secondary" @onclick="AddToolToAgent" disabled="@(string.IsNullOrEmpty(SelectedToolToAdd))">Add Tool</button>
+                    </div>
+                    
+                    <div class="tool-list">
+                        <h5>Agent Tools:</h5>
+                        @if (agent?.CustomToolNames != null && agent.CustomToolNames.Any())
+                        {
+                            @foreach (var toolName in agent.CustomToolNames)
+                            {
+                                <div class="tool-item">
+                                    <span class="tool-name">@toolName</span>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => RemoveToolFromAgent(toolName)">Remove</button>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p>No custom tools added yet.</p>
+                        }
+                    </div>
+                </div>
+                
                 <button class="btn btn-primary" @onclick="Export">Export</button>
             </div>
         </div>
@@ -267,6 +302,45 @@
             min-width: 300px;
             width: fit-content;
         }
+        
+        /* Tool management styles */
+        .tool-management-section {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+        }
+        
+        .tool-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        
+        .tool-selector select {
+            flex-grow: 1;
+        }
+        
+        .tool-list {
+            margin-top: 15px;
+        }
+        
+        .tool-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        
+        .tool-name {
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
     </style>
     </div>
 }
@@ -361,6 +435,9 @@
                 agent = null;
             }
         }
+        
+        // Load available tools after agent is loaded
+        LoadAvailableTools();
     }
 
     private async void InputAvatar(InputFileChangeEventArgs e)
@@ -533,6 +610,57 @@
             
             StateHasChanged();
         }
+    }
+    
+    #endregion
+    
+    #region Tool Management
+    
+    string SelectedToolToAdd { get; set; } = string.Empty;
+    List<ShimmerChatLib.Tool.ITool> AvailableTools { get; set; } = new List<ShimmerChatLib.Tool.ITool>();
+    
+
+    
+    void LoadAvailableTools()
+    {
+        if (ToolService != null && agent != null)
+        {
+            // Show all loaded tools that are not already in the agent's custom tools list
+            AvailableTools = ToolService.LoadedTools.Where(t => !agent.CustomToolNames.Contains(t.GetToolDefinition().name)).ToList();
+        }
+        else
+        {
+            AvailableTools = new List<ShimmerChatLib.Tool.ITool>();
+        }
+    }
+    
+    async Task AddToolToAgent()
+    {
+        if (string.IsNullOrEmpty(SelectedToolToAdd) || agent == null)
+            return;
+            
+        if (!agent.CustomToolNames.Contains(SelectedToolToAdd))
+        {
+            agent.CustomToolNames.Add(SelectedToolToAdd);
+            agent.Save(kvDataService);
+            
+            // Reset selection and reload available tools
+            SelectedToolToAdd = string.Empty;
+            LoadAvailableTools();
+            StateHasChanged();
+        }
+    }
+    
+    async Task RemoveToolFromAgent(string toolName)
+    {
+        if (agent == null)
+            return;
+            
+        agent.CustomToolNames.RemoveAll(t => t == toolName);
+        agent.Save(kvDataService);
+        
+        LoadAvailableTools();
+        StateHasChanged();
     }
     
     #endregion

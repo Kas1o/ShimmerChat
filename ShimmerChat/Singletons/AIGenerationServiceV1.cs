@@ -181,7 +181,9 @@ namespace ShimmerChat.Singletons
         {
             while (true)
             {
-                var toolDefinitions = _toolService.GetEnabledToolDefinitions().ToList();
+                var globalTools = _toolService.GetEnabledToolDefinitions();
+                var agentTools = _toolService.GetAgentToolDefinitions(agent);
+                var toolDefinitions = globalTools.Concat(agentTools).Distinct().ToList();
                 var promptBuilder = _contextBuilderService.BuildPromptBuilderWithTools(chat, agent, toolDefinitions);
                 var rsp = await _completionService.GenerateChatExAsync(promptBuilder);
 
@@ -214,7 +216,9 @@ namespace ShimmerChat.Singletons
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 
-                var toolDefinitions = _toolService.GetEnabledToolDefinitions().ToList();
+                var globalTools = _toolService.GetEnabledToolDefinitions();
+                var agentTools = _toolService.GetAgentToolDefinitions(agent);
+                var toolDefinitions = globalTools.Concat(agentTools).Distinct().ToList();
                 var promptBuilder = _contextBuilderService.BuildPromptBuilderWithTools(chat, agent, toolDefinitions);
                 
                 // 累积流式响应

@@ -13,6 +13,7 @@ namespace ShimmerChatLib.Interface
 		void DisableTool(string name);
 
 		IEnumerable<SharperLLM.FunctionCalling.Tool> GetEnabledToolDefinitions();
+		IEnumerable<SharperLLM.FunctionCalling.Tool> GetAgentToolDefinitions(Agent agent);
 
 		Task<string?> ExecuteToolAsync(string toolName, string arguments, Chat chat, Agent agent);
 	}
