@@ -409,11 +409,14 @@
 						ChatPluginPanelContainer?.OnAgentMessage(currentAIMessage);
 						await InvokeAsync(StateHasChanged);
 					}
+
+					// 防止被多轮对话时写入同样的消息
+					currentAIMessage = null;
 				},
 				// 处理工具调用的回调
 				onToolCall: (toolCalls) =>
 				{
-					// 添加工具调用消息
+					// 添加工具调用消息 （已经集成，不再使用单独的 ToolCall Message）
 					/*
 					messages.Add(new Message
 					{
@@ -423,8 +426,8 @@
 						});
 					*/
 
-									// 触发UI刷新
-									InvokeAsync(StateHasChanged);
+					// 触发UI刷新
+					InvokeAsync(StateHasChanged);
 				},
 				// 处理工具结果的回调
 				onToolResult: (tuple) =>
