@@ -23,7 +23,7 @@
 		<div id="chat-main" @ref="ChatMainElement">
 			@foreach (var message in messages)
 			{
-				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" />
+				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" Chat="@chat" Agent="@agent" />
 			}
 			<br />
 			<br />

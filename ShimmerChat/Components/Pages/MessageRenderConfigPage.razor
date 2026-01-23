@@ -1,0 +1,174 @@
+@page "/messagerender"
+@using ShimmerChat.Components.SubComponents
+@using ShimmerChatLib.Interface
+@inject NavigationManager Navigation
+@inject IMessageDisplayService messageDisplayService
+
+<h3>消息渲染器配置</h3>
+
+<button class="btn btn-primary" style="margin:5px" @onclick="ShowAddModifierPopup">添加渲染修改器</button>
+
+<div class="shimmer-group" style="margin-top:16px;">
+    <h5>已激活的修改器</h5>
+    @if (messageDisplayService.ActivatedModifiers.Any())
+    {
+        <div class="list-group" ondragover="event.preventDefault();" @ondrop="() => HandleDrop()">
+            @foreach (var modifier in messageDisplayService.ActivatedModifiers)
+            {
+                <div class="list-group-item d-flex justify-content-between align-items-center" 
+                     draggable="true" 
+                     @ondragstart="() => HandleDragStart(messageDisplayService.ActivatedModifiers.IndexOf(modifier))"
+                     @ondragover="() => HandleDragOver(messageDisplayService.ActivatedModifiers.IndexOf(modifier))"
+                     data-index="@messageDisplayService.ActivatedModifiers.IndexOf(modifier)">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-grip-vertical" style="margin-right: 10px; cursor: move; color: #6c757d;"></i>
+                        <div class="me-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" 
+                                       id="enableSwitch_@messageDisplayService.ActivatedModifiers.IndexOf(modifier)" 
+                                       @bind="modifier.IsEnabled">
+                                <label class="form-check-label" for="enableSwitch_@messageDisplayService.ActivatedModifiers.IndexOf(modifier)">
+                                    <strong>@modifier.Name</strong>
+                                </label>
+                            </div>
+                            @if (!string.IsNullOrEmpty(modifier.Value))
+                            {
+                                <small class="d-block text-muted">@modifier.Value</small>
+                            }
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => ShowEditModifierPopup(messageDisplayService.ActivatedModifiers.IndexOf(modifier))">Edit</button>
+                        <button class="btn btn-danger btn-sm" @onclick="() => RemoveModifier(messageDisplayService.ActivatedModifiers.IndexOf(modifier))">Remove</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="text-muted">无激活的渲染修改器</p>
+    }
+</div>
+
+<button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">保存配置</button>
+
+@if (_showAddModifierPopup)
+{
+    <AddMessageRenderModifierPopup @ref="_addModifierPopup" OnConfirm="(result) => OnAddModifierConfirmed(result)" OnClose="() => HideAddModifierPopup()" />
+}
+
+@if (_showEditModifierPopup)
+{
+    <EditMessageRenderModifierPopup @ref="_editModifierPopup" 
+                              ModifierName="@_editingModifierName" 
+                              ModifierValue="@_editingModifierValue"
+                              OnConfirm="(result) => OnEditModifierConfirmed(result)" 
+                              OnClose="() => HideEditModifierPopup()" />
+}
+
+@code {
+    private AddMessageRenderModifierPopup? _addModifierPopup;
+    private EditMessageRenderModifierPopup? _editModifierPopup;
+
+    private bool _showAddModifierPopup = false;
+    private bool _showEditModifierPopup = false;
+    private string? _editingModifierName;
+    private string _editingModifierValue = string.Empty;
+    private int _editingModifierIndex = -1;
+
+    // 拖拽排序相关变量
+    private int _dragIndex = -1;
+    private int _dropTargetIndex = -1;
+
+    private void SaveAll()
+    {
+        messageDisplayService.SaveActivatedModifiers();
+        Navigation.NavigateTo(Navigation.Uri, true);
+    }
+
+    private void ShowAddModifierPopup()
+    {
+        _showAddModifierPopup = true;
+    }
+
+    private void HideAddModifierPopup()
+    {
+        _showAddModifierPopup = false;
+    }
+
+    private void OnAddModifierConfirmed(object result)
+    {
+        var modifierInfo = result as dynamic;
+        if (modifierInfo != null)
+        {
+            string modifierName = modifierInfo.ModifierName;
+            string inputValue = modifierInfo.InputValue;
+            messageDisplayService.ActivateModifier(modifierName, inputValue);
+        }
+        HideAddModifierPopup();
+    }
+
+    private void ShowEditModifierPopup(int index)
+    {
+        if (index >= 0 && index < messageDisplayService.ActivatedModifiers.Count)
+        {
+            _editingModifierIndex = index;
+            var modifier = messageDisplayService.ActivatedModifiers[index];
+            _editingModifierName = modifier.Name;
+            _editingModifierValue = modifier.Value;
+            _showEditModifierPopup = true;
+        }
+    }
+
+    private void HideEditModifierPopup()
+    {
+        _showEditModifierPopup = false;
+        _editingModifierIndex = -1;
+        _editingModifierName = null;
+        _editingModifierValue = string.Empty;
+    }
+
+    private void OnEditModifierConfirmed(object result)
+    {
+        var modifierInfo = result as dynamic;
+        if (modifierInfo != null && _editingModifierIndex >= 0)
+        {
+            string modifierName = modifierInfo.ModifierName;
+            string inputValue = modifierInfo.InputValue;
+            
+            if (_editingModifierIndex < messageDisplayService.ActivatedModifiers.Count && 
+                messageDisplayService.ActivatedModifiers[_editingModifierIndex].Name == modifierName)
+            {
+                messageDisplayService.ActivatedModifiers[_editingModifierIndex].Value = inputValue;
+                messageDisplayService.SaveActivatedModifiers();
+            }
+        }
+        HideEditModifierPopup();
+    }
+
+    private void HandleDragStart(int index)
+    {
+        _dragIndex = index;
+    }
+
+    private void HandleDragOver(int index)
+    {
+        _dropTargetIndex = index;
+    }
+
+    private void HandleDrop()
+    {
+        if (_dragIndex == -1 || _dropTargetIndex == -1 || _dragIndex == _dropTargetIndex)
+            return;
+
+        messageDisplayService.ReorderActivatedModifier(_dragIndex, _dropTargetIndex);
+        _dragIndex = -1;
+        _dropTargetIndex = -1;
+    }
+
+    private void RemoveModifier(int modifierIdx)
+    {
+        messageDisplayService.RemoveActivatedModifier(modifierIdx);
+    }
+}

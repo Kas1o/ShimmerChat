@@ -118,6 +118,12 @@
 	[Parameter]
 	public string AgentName { get; set; } = "EmptyName";
 
+	[Parameter]
+	public Chat? Chat { get; set; }
+
+	[Parameter]
+	public Agent? Agent { get; set; }
+
 	bool isEditMode = false;
 	string editContent = string.Empty;
 	string editThinking = string.Empty;
@@ -127,8 +133,8 @@
 
 	string stringContent => CurrentMessageContent?.Content ?? string.Empty; // The string content of the message
 
-	MarkupString DisplayContent => MessageDisplayService.RenderMarkdown(stringContent);
-	MarkupString DisplayThinking => MessageDisplayService.RenderMarkdown(CurrentMessageContent?.thinking ?? string.Empty);
+	MarkupString DisplayContent => MessageDisplayService.Render(stringContent, Chat, Agent);
+	MarkupString DisplayThinking => MessageDisplayService.Render(CurrentMessageContent?.thinking ?? string.Empty, Chat, Agent);
 
 
 	string imageContent => CurrentMessageContent?.ImageBase64 ?? string.Empty; // The base64 string for the image content, if any

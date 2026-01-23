@@ -1,0 +1,258 @@
+@using ShimmerChatLib.Panel
+@using ShimmerChatLib.Interface
+@using ShimmerChatBuiltin.RegexModifier
+@using System.Text.RegularExpressions
+@inject IKVDataService KVData
+
+@attribute [PluginPanelAttribute("Regex Replacement Settings", "Configure Regex sets for the Regex Render Modifier.", PanelDisplayPlace.Settings)]
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Left Column: List of Sets -->
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Regex Sets</h5>
+                    <button class="btn btn-sm btn-success" @onclick="CreateNewSet">
+                        <i class="bi bi-plus-lg"></i> New
+                    </button>
+                </div>
+                <div class="list-group list-group-flush">
+                    @foreach (var set in _regexSets)
+                    {
+                        <button type="button" 
+                                class="list-group-item list-group-item-action @(_selectedSet == set ? "active" : "")"
+                                @onclick="() => SelectSet(set)">
+                            @set.Name
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Editor -->
+        <div class="col-md-8">
+            @if (_selectedSet != null)
+            {
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Edit Set</h5>
+                        <div>
+                            <button class="btn btn-sm btn-primary me-2" @onclick="SaveSelectedSet">Save</button>
+                            <button class="btn btn-sm btn-danger" @onclick="DeleteSelectedSet">Delete</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Set Name</label>
+                            <input type="text" class="form-control" @bind="_selectedSet.Name" />
+                        </div>
+
+                        <div class="mb-2 d-flex justify-content-between align-items-center">
+                            <h6>Rules</h6>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="AddRule">Add Rule</button>
+                        </div>
+
+                        @if (_selectedSet.Rules != null && _selectedSet.Rules.Count > 0)
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 40px;">On</th>
+                                            <th>Pattern (Regex)</th>
+                                            <th>Replacement</th>
+                                            <th style="width: 120px;">Options</th>
+                                            <th style="width: 40px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var rule in _selectedSet.Rules)
+                                        {
+                                            <tr>
+                                                <td class="text-center align-middle">
+                                                    <input type="checkbox" class="form-check-input" @bind="rule.IsEnabled" />
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm" @bind="rule.Pattern" @bind:event="oninput" placeholder="Regex Pattern" />
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm" @bind="rule.Replacement" @bind:event="oninput" placeholder="Replacement Text" />
+                                                </td>
+                                                <td>
+                                                    <select multiple class="form-select form-select-sm" style="height: 85px;" @onchange="(e) => UpdateRuleOptions(rule, e)">
+                                                        <option value="IgnoreCase" selected="@rule.Options.HasFlag(RegexOptions.IgnoreCase)">IgnoreCase</option>
+                                                        <option value="Multiline" selected="@rule.Options.HasFlag(RegexOptions.Multiline)">Multiline</option>
+                                                        <option value="Singleline" selected="@rule.Options.HasFlag(RegexOptions.Singleline)">Singleline</option>
+                                                    </select>
+                                                </td>
+                                                <td class="text-center align-middle">
+                                                    <button class="btn btn-sm btn-outline-danger border-0" @onclick="() => RemoveRule(rule)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted text-center py-3">No rules defined in this set.</p>
+                        }
+                        
+                        <hr />
+                        
+                        <!-- Test Section -->
+                        <div class="mt-3">
+                            <h6>Test Playground</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label small">Input Text</label>
+                                    <textarea class="form-control" rows="3" @bind="_testInput" @bind:event="oninput" placeholder="Enter text to test..."></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Output Result</label>
+                                    <textarea class="form-control" rows="3" readonly value="@_testOutput"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-secondary text-center" role="alert">
+                    Select a Regex Set to edit, or create a new one.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<RegexSet> _regexSets = new();
+    private RegexSet? _selectedSet;
+
+    // Test variables
+    private string _testInput = string.Empty;
+    private string _testOutput
+    {
+        get
+        {
+            if (_selectedSet == null) return "";
+
+            string result = _testInput;
+            try
+            {
+                foreach (var rule in _selectedSet.Rules)
+                {
+                    if (rule.IsEnabled && !string.IsNullOrEmpty(rule.Pattern))
+                    {
+                        try
+                        {
+                            result = Regex.Replace(result, rule.Pattern, rule.Replacement ?? "", rule.Options);
+                        }
+                        catch (Exception)
+                        {
+                            // Ignore invalid regex during test
+                        }
+                    }
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return $"Error: {ex.Message}";
+            }
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        LoadSets();
+    }
+
+    private void LoadSets()
+    {
+        _regexSets = RegexManager.LoadRegexSets(KVData);
+        if (_selectedSet != null)
+        {
+            // Refresh selected set reference if it exists in the new list
+            _selectedSet = _regexSets.FirstOrDefault(s => s.Name == _selectedSet.Name) ?? _selectedSet;
+        }
+    }
+
+    private void CreateNewSet()
+    {
+        var newSet = new RegexSet
+        {
+            Name = "New Set " + (_regexSets.Count + 1),
+            Rules = new List<RegexRule>()
+        };
+        _regexSets.Add(newSet);
+        _selectedSet = newSet;
+    }
+
+    private void SelectSet(RegexSet set)
+    {
+        _selectedSet = set;
+        _testInput = string.Empty;
+    }
+
+    private void SaveSelectedSet()
+    {
+        if (_selectedSet != null)
+        {
+            RegexManager.SaveRegexSet(KVData, _selectedSet);
+            LoadSets(); // Reload to ensure sync
+        }
+    }
+
+    private void DeleteSelectedSet()
+    {
+        if (_selectedSet != null)
+        {
+            RegexManager.DeleteRegexSet(KVData, _selectedSet.Name);
+            _selectedSet = null;
+            LoadSets();
+        }
+    }
+
+    private void AddRule()
+    {
+        if (_selectedSet != null)
+        {
+            _selectedSet.Rules.Add(new RegexRule());
+        }
+    }
+
+    private void RemoveRule(RegexRule rule)
+    {
+        if (_selectedSet != null)
+        {
+            _selectedSet.Rules.Remove(rule);
+        }
+    }
+    
+    private void UpdateRuleOptions(RegexRule rule, ChangeEventArgs e)
+    {
+        var selectedStrings = e.Value as string[];
+        RegexOptions newOpts = RegexOptions.None;
+        
+        if (selectedStrings != null)
+        {
+            foreach (var s in selectedStrings)
+            {
+                if (Enum.TryParse<RegexOptions>(s, out var result))
+                {
+                    newOpts |= result;
+                }
+            }
+        }
+        
+        rule.Options = newOpts;
+    }
+}
