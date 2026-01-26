@@ -1,4 +1,4 @@
-﻿@page "/toolmanager"
+@page "/toolmanager"
 
 @inject IToolService ToolService
 @inject IStringLocalizer<ToolManager> l
@@ -33,8 +33,8 @@ else
                     <td>@def.name</td>
                     <td>@def.description</td>
                     <td>
-                        <button class="btn btn-sm btn-info" @onclick="() => ShowDetail(tool)">@l["Detail"]</button>
-                        <button class="btn btn-sm btn-success" @onclick="() => ShowTest(tool)" disabled="@(enabled ? null : "disabled")">@l["Test"]</button>
+                        <button class="btn btn-sm btn-secondary" @onclick="() => ShowDetail(tool)">@l["Detail"]</button>
+                        <button class="btn btn-sm btn-primary" @onclick="() => ShowTest(tool)" disabled="@(enabled ? null : "disabled")">@l["Test"]</button>
                     </td>
                 </tr>
             }
@@ -45,7 +45,7 @@ else
 @if (showDetailTool != null)
 {
     var def = showDetailTool.GetToolDefinition();
-    <div class="alert alert-info">
+    <div class="alert alert-custom">
         <strong>@def.name</strong><br />
         <span>@def.description</span>
         @if (def.parameters != null)
@@ -57,7 +57,7 @@ else
                         <b>@p.parameter.name</b> (@p.parameter.type):
                         @if (p.required)
                         {
-                            <span class="text-danger">[Required]</span>
+                            <span class="text-required">[Required]</span>
                         }
                         <pre> @p.parameter.description</pre>
                         
@@ -71,7 +71,7 @@ else
 
 @if (showTestTool != null)
 {
-    <div class="alert alert-warning">
+    <div class="alert alert-custom-test">
         <h5>@l["Test Tool"]: @showTestTool.GetToolDefinition().name</h5>
         <textarea class="form-control" @bind="testInput" rows="2" placeholder="@l["Input argument (JSON or string)"]"></textarea>
         <button class="btn btn-primary mt-2" @onclick="TestToolAsync">@l["Run"]</button>
@@ -80,11 +80,20 @@ else
         {
             <div class="mt-2">
                 <b>@l["Result"]:</b>
-                <pre>@testResult</pre>
+                <pre class="result-output">@testResult</pre>
             </div>
         }
     </div>
 }
+
+<style>
+    .table{
+        --bs-table-bg: var(--color-background);
+        --bs-table-color: var(--color-text-primary);
+        --bs-table-border-color: var(--color-text-secondary);
+    }
+</style>
+
 
 @code {
     List<ITool>? tools;

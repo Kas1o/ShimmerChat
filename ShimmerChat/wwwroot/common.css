@@ -283,6 +283,39 @@
     vertical-align: middle;
 }
 
+/* ToolManager 页面特定样式 */
+.alert-custom {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    color: var(--color-text-primary);
+}
+
+.alert-custom-test {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    color: var(--color-text-primary);
+}
+
+.text-required {
+    color: var(--color-error);
+    font-weight: bold;
+}
+
+.result-output {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-md);
+    color: var(--color-text-primary);
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
 .version-navigation {
     display: inline-flex;
     align-items: center;
