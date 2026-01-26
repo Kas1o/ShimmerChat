@@ -13,6 +13,7 @@
     }
 </select>
 <button class="btn btn-primary" style="margin:5px" @onclick="CreateNewApiSetting">@l["Create New Api Setting Profile"]</button>
+<button class="btn btn-secondary" style="margin:5px" @onclick="CloneCurrentApiSetting">@l["Clone Current Api Setting Profile"]</button>
 
 @if (topAPISetting != null)
 {
@@ -148,6 +149,17 @@
     {
         apiSettings.Add(new ApiSetting { Name = "New API Setting" });
         _selectedIndex = apiSettings.Count - 1;
+    }
+
+    private void CloneCurrentApiSetting()
+    {
+        if (topAPISetting != null)
+        {
+            var clonedSetting = topAPISetting.Clone();
+            clonedSetting.Name = $"{clonedSetting.Name} - Copy";
+            apiSettings.Add(clonedSetting);
+            _selectedIndex = apiSettings.Count - 1;
+        }
     }
 
     private void SaveAll()

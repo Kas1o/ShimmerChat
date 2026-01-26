@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -134,6 +134,9 @@
   </data>
   <data name="Create New Api Setting Profile" xml:space="preserve">
     <value>创建新API设置</value>
+  </data>
+  <data name="Clone Current Api Setting Profile" xml:space="preserve">
+    <value>克隆当前API设置</value>
   </data>
   <data name="Profile Name:" xml:space="preserve">
     <value>文件名：</value>
