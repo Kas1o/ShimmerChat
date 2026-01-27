@@ -28,34 +28,33 @@ namespace ShimmerChat.Singletons
             kVDataService = kVData;
         }
         
-        List<TextCompletionSetting>? textCompletionSettings 
-        { 
-            get
-            {
-				var tcs = kVDataService.Read("ApiSettings", "textCompletionSettings") ?? "null";
-                return Newtonsoft.Json.JsonConvert.DeserializeObject<List<TextCompletionSetting>>(tcs);
-			} 
-        }
-
-        int SelectedTCS
+        ApiSetting? CurrentApiSetting
         {
             get
             {
-                var selectedTCS = kVDataService.Read("ApiSettings", "selectedTCS") ?? "0";
-                return int.Parse(selectedTCS);
-            }
-        }
-
-        CompletionType CompletionType
-        {
-            get
-            {
-                var completionType = kVDataService.Read("ApiSettings", "CompletionType") ?? ((int)CompletionType.ChatCompletion).ToString();
-                return (CompletionType)Enum.Parse(typeof(CompletionType), completionType);
+                var apisettings = kVDataService.Read("ApiSettings", "apiSetting") ?? "[]";
+                var apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings) ?? new List<ApiSetting>();
+                var selectedIndex = kVDataService.Read("ApiSettings", "selectedAPIIndex") ?? "0";
+                var index = int.Parse(selectedIndex);
+                
+                if (index >= 0 && index < apiSettings.Count)
+                {
+                    return apiSettings[index];
+                }
+                return null;
             }
             set
             {
-                kVDataService.Write("ApiSettings", "CompletionType", ((int)value).ToString());
+                var apisettings = kVDataService.Read("ApiSettings", "apiSetting") ?? "[]";
+                var apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings) ?? new List<ApiSetting>();
+                var selectedIndex = kVDataService.Read("ApiSettings", "selectedAPIIndex") ?? "0";
+                var index = int.Parse(selectedIndex);
+                
+                if (index >= 0 && index < apiSettings.Count && value != null)
+                {
+                    apiSettings[index] = value;
+                    kVDataService.Write("ApiSettings", "apiSetting", Newtonsoft.Json.JsonConvert.SerializeObject(apiSettings));
+                }
             }
         }
 
@@ -91,22 +90,35 @@ namespace ShimmerChat.Singletons
             Action<ResponseEx> onResponse,
             Action<(string name, string resp, string id)> onToolResult)
         {
-            if (CompletionType == CompletionType.TextCompletion)
+            if (CurrentApiSetting?.CompletionType == CompletionType.TextCompletion)
             {
                 // 处理TextCompletion模式
-                var templ = textCompletionSettings[SelectedTCS].GetMessageTemplates();
-                var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent);
-                string reply = await _completionService.GenerateTextAsync(
-                    promptBuilder,
-                    templ.sys_start,
-                    templ.sys_stop,
-                    templ.user_start,
-                    templ.user_stop,
-                    templ.char_start,
-                    templ.char_stop);
-                // 创建ResponseEx对象并调用回调
-                var response = new ResponseEx { Body= new SharperLLM.Util.ChatMessage { Content = reply }, FinishReason = SharperLLM.API.FinishReason.Stop };
-                onResponse(response);
+                if (CurrentApiSetting?.TextCompletionSettings != null && 
+                    CurrentApiSetting.SelectedTextCompletionSettingIndex >= 0 && 
+                    CurrentApiSetting.SelectedTextCompletionSettingIndex < CurrentApiSetting.TextCompletionSettings.Count)
+                {
+                    var templ = CurrentApiSetting.TextCompletionSettings[CurrentApiSetting.SelectedTextCompletionSettingIndex].GetMessageTemplates();
+                    var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent);
+                    string reply = await _completionService.GenerateTextAsync(
+                        promptBuilder,
+                        templ.sys_start,
+                        templ.sys_stop,
+                        templ.user_start,
+                        templ.user_stop,
+                        templ.char_start,
+                        templ.char_stop);
+                    // 创建ResponseEx对象并调用回调
+                    var response = new ResponseEx { Body= new SharperLLM.Util.ChatMessage { Content = reply }, FinishReason = SharperLLM.API.FinishReason.Stop };
+                    onResponse(response);
+                }
+                else
+                {
+                    // 如果没有找到合适的文本完成设置，使用聊天完成模式
+                    await RunAIWithToolLoopAsync(
+                        agent, chat,
+                        onResponse,
+                        onToolResult);
+                }
             }
             else
             {
@@ -126,37 +138,52 @@ namespace ShimmerChat.Singletons
             Action<(string name, string resp, string id)> onToolResult,
             CancellationToken cancellationToken)
         {
-            if (CompletionType == CompletionType.TextCompletion)
+            if (CurrentApiSetting?.CompletionType == CompletionType.TextCompletion)
             {
 				// 对于TextCompletion模式，直接使用流式API
-				var templ = textCompletionSettings[SelectedTCS].GetMessageTemplates();
-                var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent);
-                var responseStream = _completionService.GenerateTextStreamAsync(
-                    promptBuilder,
-                    templ.sys_start,
-                    templ.sys_stop,
-                    templ.user_start,
-                    templ.user_stop,
-                    templ.char_start,
-                    templ.char_stop,
-                    cancellationToken);
-                
-                async IAsyncEnumerable<ResponseEx> ConvertStringStreamToResponseExStream(IAsyncEnumerable<string> respStream, CancellationToken ct)
+				if (CurrentApiSetting?.TextCompletionSettings != null && 
+                    CurrentApiSetting.SelectedTextCompletionSettingIndex >= 0 && 
+                    CurrentApiSetting.SelectedTextCompletionSettingIndex < CurrentApiSetting.TextCompletionSettings.Count)
                 {
-                    await foreach(var chunk in respStream)
+                    var templ = CurrentApiSetting.TextCompletionSettings[CurrentApiSetting.SelectedTextCompletionSettingIndex].GetMessageTemplates();
+                    var promptBuilder = _contextBuilderService.BuildPromptBuilder(chat, agent);
+                    var responseStream = _completionService.GenerateTextStreamAsync(
+                        promptBuilder,
+                        templ.sys_start,
+                        templ.sys_stop,
+                        templ.user_start,
+                        templ.user_stop,
+                        templ.char_start,
+                        templ.char_stop,
+                        cancellationToken);
+                    
+                    async IAsyncEnumerable<ResponseEx> ConvertStringStreamToResponseExStream(IAsyncEnumerable<string> respStream, CancellationToken ct)
                     {
-                        yield return new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = chunk }, FinishReason = FinishReason.None};
-                    }
+                        await foreach(var chunk in respStream)
+                        {
+                            yield return new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = chunk }, FinishReason = FinishReason.None};
+                        }
 
-                    yield return new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = "" }, FinishReason = FinishReason.Stop };
+                        yield return new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = "" }, FinishReason = FinishReason.Stop };
+                    }
+                    // 将字符串流转换为ResponseEx流
+                    var responseExStream = GetAccumulatedResponseStream(
+                        ConvertStringStreamToResponseExStream(responseStream, cancellationToken),
+                        cancellationToken);
+                    
+                    // 让调用方处理流式响应
+                    await handleStreamResponses(responseExStream);
                 }
-                // 将字符串流转换为ResponseEx流
-                var responseExStream = GetAccumulatedResponseStream(
-                    ConvertStringStreamToResponseExStream(responseStream, cancellationToken),
-                    cancellationToken);
-                
-                // 让调用方处理流式响应
-                await handleStreamResponses(responseExStream);
+                else
+                {
+                    // 如果没有找到合适的文本完成设置，使用聊天完成模式
+                    await RunAIWithToolLoopStreamAsync(
+                        agent, chat,
+                        handleStreamResponses,
+                        onToolCall,
+                        onToolResult,
+                        cancellationToken);
+                }
 			}
             else
             {

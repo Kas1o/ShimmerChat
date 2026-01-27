@@ -26,6 +26,11 @@ namespace ShimmerChatLib
 		public string? OllamaUrl { get; set; }
 		public string? OllamaModel { get; set; }
 
+		// Completion settings
+		public CompletionType CompletionType { get; set; } = CompletionType.ChatCompletion;
+		public List<TextCompletionSetting>? TextCompletionSettings { get; set; } = new List<TextCompletionSetting>();
+		public int SelectedTextCompletionSettingIndex { get; set; } = 0;
+
 		/// <summary>
 		/// 根据当前配置创建对应的 ILLMAPI 实例。
 		/// </summary>
@@ -71,7 +76,11 @@ namespace ShimmerChatLib
 				OpenAICtx = OpenAICtx,
 
 				OllamaUrl = OllamaUrl,
-				OllamaModel = OllamaModel
+				OllamaModel = OllamaModel,
+
+				CompletionType = CompletionType,
+				TextCompletionSettings = TextCompletionSettings?.Select(tcs => tcs.Clone()).ToList(),
+				SelectedTextCompletionSettingIndex = SelectedTextCompletionSettingIndex
 			};
 		}
 	}

@@ -27,6 +27,42 @@
             <option value="@ApiSettingType.OpenAI">openai</option>
             <option value="@ApiSettingType.Ollama">ollama</option>
         </select>
+        
+        <!-- Completion Type Selection -->
+        <h5>@l["Completion Type:"]</h5>
+        <select @bind="topAPISetting.CompletionType" class="form-select">
+            <option value="@ShimmerChatLib.CompletionType.ChatCompletion">@l["Chat Completion"]</option>
+            <option value="@ShimmerChatLib.CompletionType.TextCompletion">@l["Text Completion"]</option>
+        </select>
+        
+        <!-- Text Completion Settings (shown only when Text Completion is selected) -->
+        @if (topAPISetting.CompletionType == ShimmerChatLib.CompletionType.TextCompletion)
+        {
+            <h5>@l["Text Completion Settings:"]</h5>
+            <select @bind="topAPISetting.SelectedTextCompletionSettingIndex" class="form-select">
+                @for (int i = 0; i < (topAPISetting.TextCompletionSettings?.Count ?? 0); i++)
+                {
+                    <option value="@i">@(topAPISetting.TextCompletionSettings?[i]?.name ?? "Unnamed")</option>
+                }
+            </select>
+            <button class="btn btn-primary" style="margin:5px" @onclick="CreateNewTextCompletionSetting">@l["Create New Text Completion Setting Profile"]</button>
+            
+            @if (topAPISetting.TextCompletionSettings != null && topAPISetting.SelectedTextCompletionSettingIndex >= 0 && topAPISetting.SelectedTextCompletionSettingIndex < topAPISetting.TextCompletionSettings.Count)
+            {
+                var currentTextSetting = topAPISetting.TextCompletionSettings[topAPISetting.SelectedTextCompletionSettingIndex];
+                <div class="shimmer-group" style="margin-top:16px;">
+                    <h5>@l["NAME:"]</h5>
+                    <textarea class="form-control" rows="2" @bind="currentTextSetting.name"></textarea>
+                    <h5>@l["SYSTEM_MESSAGE_TEMPLATE"]</h5>
+                    <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.SystemMessageTemplate"></textarea>
+                    <h5>@l["USER_MESSAGE_TEMPLATE"]</h5>
+                    <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.UserMessageTemplate"></textarea>
+                    <h5>@l["AGENT_MESSAGE_TEMPLATE"]</h5>
+                    <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.CharMessageTemplate"></textarea>
+                </div>
+            }
+        }
+        
         <h5>@l["Configs:"]</h5>
         <div class="shimmer-group">
             @if (topAPISetting.Type == ApiSettingType.Kobold)
@@ -159,6 +195,19 @@
             clonedSetting.Name = $"{clonedSetting.Name} - Copy";
             apiSettings.Add(clonedSetting);
             _selectedIndex = apiSettings.Count - 1;
+        }
+    }
+
+    private void CreateNewTextCompletionSetting()
+    {
+        if (topAPISetting != null)
+        {
+            if (topAPISetting.TextCompletionSettings == null)
+            {
+                topAPISetting.TextCompletionSettings = new List<TextCompletionSetting>();
+            }
+            topAPISetting.TextCompletionSettings.Add(new TextCompletionSetting { name = "New Text Completion Setting" });
+            topAPISetting.SelectedTextCompletionSettingIndex = topAPISetting.TextCompletionSettings.Count - 1;
         }
     }
 

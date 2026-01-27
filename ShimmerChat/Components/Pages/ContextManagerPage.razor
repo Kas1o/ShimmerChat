@@ -7,8 +7,6 @@
 
 <h3>@l["TITLE"] </h3>
 
-<!-- 补全设置 -->
-<h4>@l["COMPLETION_SETTINGS_TITLE"]</h4>
 @if (apiSettings != null)
 @if (apiSettings.Count == 0)
 {
@@ -26,56 +24,7 @@ else
             @l["USE_OPENAI_TEXT_COMPLETION_WARNING"]
         </h5>
     }
-
-    <label>@l["COMPLETION_TYPE_LABEL"]</label>
-    <select @bind="_selectedCompletionType" class="form-select" style="width:auto;display:inline-block;margin-left:8px;">
-        @if (AllowChatCompletion)
-        {
-            <option value="chat-completion">@l["CHAT_COMPLETION_OPTION"]</option>
-        }
-        @if (AllowTextCompletion)
-        {
-            <option value="text-completion">@l["TEXT_COMPLETION_OPTION"]</option>
-        }
-    </select>
-
-    <br />
-    <br />
-
-    @if (completionType == CompletionType.TextCompletion)
-    {
-        <h5>@l["TEXT_COMPLETION_SETTINGS_TITLE"]</h5>
-        <select @bind="_selectedTCS" class="form-select" style="width:auto;display:inline-block;">
-            @for (int i = 0; i < textCompletionSettings.Count; i++)
-            {
-                <option value="@i">@textCompletionSettings[i].name</option>
-            }
-        </select>
-        <button class="btn btn-primary" style="margin:5px" @onclick="CreateNewTextCompletionSetting">Create New Text Completion Setting Profile</button>
-        @if (topTextCompletionSetting != null)
-        {
-            <div class="shimmer-group" style="margin-top:16px;">
-                <h5>@l["NAME:"]</h5>
-                <textarea class="form-control" rows="2" @bind="topTextCompletionSetting.name"></textarea>
-                <h5>@l["SYSTEM_MESSAGE_TEMPLATE"]</h5>
-                <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="topTextCompletionSetting.SystemMessageTemplate"></textarea>
-                <h5>@l["USER_MESSAGE_TEMPLATE"]</h5>
-                <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="topTextCompletionSetting.UserMessageTemplate"></textarea>
-                <h5>@l["AGENT_MESSAGE_TEMPLATE"]</h5>
-                <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="topTextCompletionSetting.CharMessageTemplate"></textarea>
-            </div>
-        }
-    }
-
-    @if (completionType == CompletionType.ChatCompletion)
-    {
-        <h5>@l["CHAT_COMPLETION_SETTINGS_TITLE"]</h5>
-        <!-- 可根据需要扩展 Chat Completion 的设置 -->
-    }
-
-    <br />
 }
-
 
 <!-- 上下文修改器 -->
 <h4>@l["CONTEXT_MODIFIER_TITLE"]</h4>
@@ -147,19 +96,23 @@ else
 
     List<ApiSetting>? apiSettings { get; set; }
     private int _selectedAPIIndex { get; set; }
-    List<TextCompletionSetting>? textCompletionSettings { get; set; }
-    private int _selectedTCS {get; set;}
 
     protected override void OnInitialized()
     {
         var apisettings = KVData.Read("ApiSettings", "apiSetting") ?? "null";
         apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings);
-        var tcs = KVData.Read("ApiSettings", "textCompletionSettings") ?? "[]";
-        textCompletionSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<TextCompletionSetting>>(tcs);
         var selectedIndex = KVData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
         _selectedAPIIndex = int.Parse(selectedIndex);
-        var selectedTCS = KVData.Read("ApiSettings", "selectedTCS") ?? "0";
-        _selectedTCS = int.Parse(selectedTCS);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Load context modifiers after the component has rendered
+            await Task.Delay(1); // Small delay to ensure proper initialization
+            contextModifierService.LoadActivatedModifiers();
+        }
     }
 
     // 添加自定义弹窗组件引用
@@ -176,76 +129,13 @@ else
     private string _editingModifierValue = string.Empty;
     private int _editingModifierIndex = -1;
 
-    TextCompletionSetting? topTextCompletionSetting =>
-        (_selectedTCS >= 0 && _selectedTCS < textCompletionSettings.Count)
-            ? textCompletionSettings[_selectedTCS]
-            : null;
-
-    private CompletionType completionType
-    {
-        get
-        {
-            var completionType = KVData.Read("ApiSettings", "CompletionType") ?? ((int)CompletionType.ChatCompletion).ToString();
-            return (CompletionType)Enum.Parse(typeof(CompletionType), completionType);
-        }
-        set
-        {
-            KVData.Write("ApiSettings", "CompletionType", ((int)value).ToString());
-        }
-    }
-
-    private string _selectedCompletionType
-    {
-        get => completionType == CompletionType.ChatCompletion ? "chat-completion" : "text-completion";
-        set
-        {
-            completionType = value switch
-            {
-                "chat-completion" => CompletionType.ChatCompletion,
-                "text-completion" => CompletionType.TextCompletion,
-                _ => CompletionType.ChatCompletion
-            };
-        }
-    }
-
-    private bool AllowChatCompletion =>
-        apiSettings.Count > 0 && _selectedAPIIndex >= 0 && _selectedAPIIndex < apiSettings.Count
-            ? apiSettings[_selectedAPIIndex].Type switch
-            {
-                ApiSettingType.Ollama => true,
-                ApiSettingType.Kobold => false,
-                ApiSettingType.OpenAI => true,
-                _ => throw new InvalidOperationException(l["UnsupportedAPISettingTypeMessage"])
-            }
-            : false;
-
-    private bool AllowTextCompletion =>
-        apiSettings.Count > 0 && _selectedAPIIndex >= 0 && _selectedAPIIndex < apiSettings.Count
-            ? apiSettings[_selectedAPIIndex].Type switch
-            {
-                ApiSettingType.Ollama => true,
-                ApiSettingType.Kobold => true,
-                ApiSettingType.OpenAI => true,
-                _ => throw new InvalidOperationException(l["UnsupportedAPISettingTypeMessage"])
-            }
-            : false;
-
     private bool UsingOpenAIAndTextCompletion =>
         apiSettings.Count > 0 && _selectedAPIIndex >= 0 && _selectedAPIIndex < apiSettings.Count
-            ? (completionType == CompletionType.TextCompletion) && (apiSettings[_selectedAPIIndex].Type == ApiSettingType.OpenAI)
+            ? (apiSettings[_selectedAPIIndex].CompletionType == ShimmerChatLib.CompletionType.TextCompletion) && (apiSettings[_selectedAPIIndex].Type == ApiSettingType.OpenAI)
             : false;
-
-    private void CreateNewTextCompletionSetting()
-    {
-        textCompletionSettings.Add(new TextCompletionSetting{ name = "New Text Completion Setting" });
-        _selectedTCS = textCompletionSettings.Count - 1;
-    }
 
     private void SaveAll()
     {
-        KVData.Write("ApiSettings", "textCompletionSettings", Newtonsoft.Json.JsonConvert.SerializeObject(textCompletionSettings));
-        KVData.Write("ApiSettings", "selectedTCS", _selectedTCS.ToString());
-
         contextModifierService.SaveActivatedModifiers();
         Navigation.NavigateTo(Navigation.Uri, true);
     }

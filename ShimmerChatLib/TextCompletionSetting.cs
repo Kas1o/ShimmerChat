@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -37,5 +37,16 @@ namespace ShimmerChatLib
 
             return (sys_start, sys_stop, user_start, user_stop, char_start, char_stop);
 		}
+
+        public TextCompletionSetting Clone()
+        {
+            return new TextCompletionSetting
+            {
+                name = this.name,
+                SystemMessageTemplate = this.SystemMessageTemplate,
+                UserMessageTemplate = this.UserMessageTemplate,
+                CharMessageTemplate = this.CharMessageTemplate
+            };
+        }
 	}
 }

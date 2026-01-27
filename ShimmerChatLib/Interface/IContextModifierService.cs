@@ -47,7 +47,9 @@ namespace ShimmerChatLib.Interface
         /// <param name="promptBuilder">要修改的PromptBuilder</param>
         void ApplyModifiers(PromptBuilder promptBuilder, Chat chat, Agent agent);
 
-        public void SaveActivatedModifiers();
+        void SaveActivatedModifiers();
+        
+        void LoadActivatedModifiers();
 	}
 
     /// <summary>

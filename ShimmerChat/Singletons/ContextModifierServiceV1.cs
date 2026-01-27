@@ -64,7 +64,7 @@ namespace ShimmerChat.Singletons
             LoadedModifiers = modifierDict.Values.ToList();
         }
 
-        private void LoadActivatedModifiers()
+        public void LoadActivatedModifiers()
         {
             try
             {
