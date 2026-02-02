@@ -21,10 +21,9 @@
 			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.name</h2>
 		</div>
 		<div id="chat-main" @ref="ChatMainElement">
-			@foreach (var message in messages)
-			{
+			<Virtualize  Items="messages" Context="message" >
 				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" Chat="@chat" Agent="@agent" />
-			}
+			</Virtualize>
 			<br />
 			<br />
 		</div>

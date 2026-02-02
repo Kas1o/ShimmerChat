@@ -1,4 +1,4 @@
-﻿using SharperLLM.API;
+﻿﻿﻿﻿using SharperLLM.API;
 using System.Text.Json.Serialization;
 
 namespace ShimmerChatLib

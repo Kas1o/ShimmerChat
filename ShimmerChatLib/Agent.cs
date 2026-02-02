@@ -1,6 +1,7 @@
-﻿﻿﻿using System;
+﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Buffers.Text;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
@@ -178,6 +179,105 @@ namespace ShimmerChatLib
             }
             chats = chats.OrderBy(x => x.LastModifyTime).Reverse().ToList();
             return chats;
+        }
+
+        /// <summary>
+        /// 获取指定范围的聊天列表，按 LastModifyTime 降序排序
+        /// 只加载指定范围内的聊天，用于虚拟化列表的惰性加载
+        /// </summary>
+        public List<Chat> GetChatsRange(IKVDataService kvDataService, int startIndex, int count)
+        {
+            // 首先获取所有 chatGuid 和它们的 LastModifyTime（轻量级元数据）
+            // 使用 DateTime.MinValue 作为默认值，确保即使读取失败也能包含该聊天
+            var chatMetadata = new List<(Guid Guid, DateTime LastModifyTime)>();
+            foreach (var chatGuid in chatGuids)
+            {
+                try
+                {
+                    // 尝试从 KV 存储中只读取元数据（LastModifyTime）
+                    var lastModifyTime = GetChatLastModifyTime(chatGuid, kvDataService);
+                    // 如果读取失败，使用 DateTime.MinValue 作为默认值，确保聊天仍然被包含
+                    chatMetadata.Add((chatGuid, lastModifyTime ?? DateTime.MinValue));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to get metadata for chat '{chatGuid}': {ex.Message}");
+                    // 即使失败也添加该聊天，使用最小时间值
+                    chatMetadata.Add((chatGuid, DateTime.MinValue));
+                }
+            }
+
+            // 按 LastModifyTime 降序排序
+            var sortedGuids = chatMetadata
+                .OrderByDescending(x => x.LastModifyTime)
+                .Select(x => x.Guid)
+                .Skip(startIndex)
+                .Take(count)
+                .ToList();
+
+            // 只加载指定范围内的完整聊天数据
+            var chats = new List<Chat>();
+            foreach (var chatGuid in sortedGuids)
+            {
+                try
+                {
+                    var chat = Chat.Load(chatGuid, kvDataService);
+                    chats.Add(chat);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to load chat with GUID '{chatGuid}': {ex.Message}");
+                }
+            }
+
+            return chats;
+        }
+
+        /// <summary>
+        /// 获取聊天总数
+        /// </summary>
+        public int GetChatCount()
+        {
+            return chatGuids.Count;
+        }
+
+        /// <summary>
+        /// 从 KV 存储中只读取聊天的 LastModifyTime
+        /// </summary>
+        private DateTime? GetChatLastModifyTime(Guid chatGuid, IKVDataService kvDataService)
+        {
+            try
+            {
+                var chatJson = kvDataService.Read("Chats", chatGuid.ToString());
+                if (string.IsNullOrEmpty(chatJson))
+                    return null;
+
+                // 使用 Json.NET 只解析需要的字段
+                using var reader = new JsonTextReader(new StringReader(chatJson));
+                while (reader.Read())
+                {
+                    if (reader.TokenType == JsonToken.PropertyName && reader.Value?.ToString() == "LastModifyTime")
+                    {
+                        reader.Read();
+                        if (reader.TokenType == JsonToken.Date)
+                        {
+                            return (DateTime)reader.Value;
+                        }
+                        else if (reader.TokenType == JsonToken.String)
+                        {
+                            if (DateTime.TryParse(reader.Value?.ToString(), out var dateTime))
+                            {
+                                return dateTime;
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public Chat GetChat(Guid chatGuid, IKVDataService kvDataService)

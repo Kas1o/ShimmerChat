@@ -23,18 +23,27 @@
                         <div class="chat-last-message"></div>
                     </div>
 
-                    @foreach(var chat in agent.GetChats(kvDataService))
-                    {
-                        <div class="chat-item" @onclick= "() => OpenChat(chat)">
-                            <div class="chat-info">
-                                <div class="chat-name">@chat.Name</div>
-                                <div class="chat-last-message">@GetLastMessageContent(chat)</div>
+                    <Virtualize ItemsProvider="LoadChatsAsync" Context="chat" @ref="chatVirtualize">
+                        <ItemContent>
+                            <div class="chat-item" @onclick="() => OpenChat(chat)">
+                                <div class="chat-info">
+                                    <div class="chat-name">@chat.Name</div>
+                                    <div class="chat-last-message">@GetLastMessageContent(chat)</div>
+                                </div>
+                                <button class="chat-delete-btn" @onclick:stopPropagation @onclick="() => ShowDeleteChatConfirmation(chat)">
+                                    ×
+                                </button>
                             </div>
-                            <button class="chat-delete-btn" @onclick:stopPropagation @onclick="() => ShowDeleteChatConfirmation(chat)">
-                                ×
-                            </button>
-                        </div>
-                    }
+                        </ItemContent>
+                        <Placeholder>
+                            <div class="chat-item">
+                                <div class="chat-info">
+                                    <div class="chat-name">Loading...</div>
+                                    <div class="chat-last-message">Please wait</div>
+                                </div>
+                            </div>
+                        </Placeholder>
+                    </Virtualize>
                 </div>
                 
                 @if (DeleteChatPopupVisible)
@@ -435,7 +444,7 @@
                 agent = null;
             }
         }
-        
+
         // Load available tools after agent is loaded
         LoadAvailableTools();
     }
@@ -495,7 +504,7 @@
         navigation.NavigateTo("agentselect");
     }
 
-    private void NewChat()
+    private async Task NewChat()
     {
         if (agent == null)
             return;
@@ -545,6 +554,9 @@
         agent.AddChatGuid(chat.Guid);
         // Save the agent
         agent.Save(kvDataService);
+
+        // Refresh the Virtualize component to show the new chat
+        await RefreshChatsAsync();
 
         OpenChat(chat);
     }
@@ -596,7 +608,7 @@
         DeleteChatPopupVisible = true;
     }
 
-    void DeleteChatConfirmed()
+    async Task DeleteChatConfirmed()
     {
         if (ChatToDelete != null && agent != null)
         {
@@ -607,11 +619,43 @@
             // Reset popup state
             DeleteChatPopupVisible = false;
             ChatToDelete = null;
-            
-            StateHasChanged();
+
+            // Refresh the Virtualize component
+            if (chatVirtualize != null)
+            {
+                await chatVirtualize.RefreshDataAsync();
+            }
         }
     }
-    
+
+    #endregion
+
+    #region Virtualize Chat Loading
+
+    private Virtualize<Chat>? chatVirtualize;
+
+    private ValueTask<ItemsProviderResult<Chat>> LoadChatsAsync(ItemsProviderRequest request)
+    {
+        if (agent == null)
+        {
+            return ValueTask.FromResult(new ItemsProviderResult<Chat>(Array.Empty<Chat>(), 0));
+        }
+
+        // 使用 GetChatsRange 只加载指定范围的聊天，实现真正的惰性加载
+        var totalCount = agent.GetChatCount();
+        var chats = agent.GetChatsRange(kvDataService, request.StartIndex, request.Count);
+
+        return ValueTask.FromResult(new ItemsProviderResult<Chat>(chats, totalCount));
+    }
+
+    private async Task RefreshChatsAsync()
+    {
+        if (chatVirtualize != null)
+        {
+            await chatVirtualize.RefreshDataAsync();
+        }
+    }
+
     #endregion
     
     #region Tool Management
