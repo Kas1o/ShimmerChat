@@ -653,7 +653,11 @@
 		if (chat != null)
 			chat.Save(KVData);
 		if (agent != null)
+		{
+			// 将当前聊天移到列表开头（表示最新更新）
+			agent.MoveChatToTop(chat.Guid);
 			agent.Save(KVData);
+		}
 	}
 	async Task Refresh()
 	{
