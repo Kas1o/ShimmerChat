@@ -163,3 +163,7 @@ input:focus, textarea:focus, select:focus {
     background-color: var(--color-card);
     border: var(--border-size) solid var(--color-border);
 }
+
+.text-muted {
+    color: var(--color-text-secondary) !important;
+}
