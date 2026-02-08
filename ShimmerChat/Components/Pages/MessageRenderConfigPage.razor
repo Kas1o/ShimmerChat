@@ -6,6 +6,21 @@
 
 <h3>消息渲染器配置</h3>
 
+<div class="shimmer-group" style="margin-bottom: 16px;">
+    <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch"
+               id="debugModeSwitch"
+               @bind="messageDisplayService.DebugModeEnabled"
+               @bind:after="SaveDebugModeSetting">
+        <label class="form-check-label" for="debugModeSwitch">
+            <strong>启用调试模式</strong>
+        </label>
+    </div>
+    <small class="text-muted d-block">
+        开启后，渲染出错时将显示完整的渲染流程中间结果，便于排查问题。
+    </small>
+</div>
+
 <button class="btn btn-primary" style="margin:5px" @onclick="ShowAddModifierPopup">添加渲染修改器</button>
 
 <div class="shimmer-group" style="margin-top:16px;">
@@ -170,5 +185,10 @@
     private void RemoveModifier(int modifierIdx)
     {
         messageDisplayService.RemoveActivatedModifier(modifierIdx);
+    }
+
+    private void SaveDebugModeSetting()
+    {
+        messageDisplayService.SaveDebugModeSetting();
     }
 }

@@ -29,6 +29,11 @@ namespace ShimmerChatLib.Interface
         List<ActivatedMessageRenderModifier> ActivatedModifiers { get; }
 
         /// <summary>
+        /// 是否启用调试模式（返回完整渲染流程中间结果）
+        /// </summary>
+        bool DebugModeEnabled { get; set; }
+
+        /// <summary>
         /// 激活一个MessageRenderModifier
         /// </summary>
         /// <param name="modifierName">MessageRenderModifier的名称</param>
@@ -52,6 +57,11 @@ namespace ShimmerChatLib.Interface
         /// 保存激活的MessageRenderModifier配置
         /// </summary>
         void SaveActivatedModifiers();
+
+        /// <summary>
+        /// 保存调试模式设置
+        /// </summary>
+        void SaveDebugModeSetting();
     }
 
     /// <summary>
