@@ -44,6 +44,7 @@ namespace ShimmerChatLib
         }
         
         // 版本管理相关属性
+        [JsonIgnore]
         public IReadOnlyList<ChatMessage> Versions => _versions.AsReadOnly();
         
         public int CurrentVersionIndex 
@@ -62,6 +63,7 @@ namespace ShimmerChatLib
             }
         }
         
+        [JsonIgnore]
         public ChatMessage CurrentVersion 
         { 
             get 
@@ -135,6 +137,7 @@ namespace ShimmerChatLib
             }
         }
         
+        [JsonIgnore]
         public bool HasMultipleVersions => _versions.Count > 1;
         
         // 内容变化事件
