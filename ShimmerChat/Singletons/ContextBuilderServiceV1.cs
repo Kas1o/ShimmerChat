@@ -26,17 +26,19 @@ namespace ShimmerChat.Singletons
         private PromptBuilder CreatePromptBuilder(Chat chat, string system, List<Tool> tools = null)
         {
             var pb = new PromptBuilder();
-            var p = chat.Messages.Select(
-                x =>
-                     x.sender.ToLower() switch
-                    {
-                        Sender.User => (x.message, PromptBuilder.From.user),
-                        Sender.System => (x.message, PromptBuilder.From.system),
-                        Sender.AI => (x.message, PromptBuilder.From.assistant),
-                        Sender.ToolResult => (x.message, PromptBuilder.From.tool_result),
-                        var n => throw new InvalidOperationException($"Unsupported sender Type: {n}")
-                    }
-            ).ToList();
+            var p = chat.Messages
+                .Where(x => x.GenerationState != MessageGenerationState.Regenerating)
+                .Select(
+                    x =>
+                        x.sender.ToLower() switch
+                        {
+                            Sender.User => (x.message, PromptBuilder.From.user),
+                            Sender.System => (x.message, PromptBuilder.From.system),
+                            Sender.AI => (x.message, PromptBuilder.From.assistant),
+                            Sender.ToolResult => (x.message, PromptBuilder.From.tool_result),
+                            var n => throw new InvalidOperationException($"Unsupported sender Type: {n}")
+                        }
+                ).ToList();
             p.Insert(0, (system, PromptBuilder.From.system));
             pb.Messages = p.ToArray();
             if(tools != null)

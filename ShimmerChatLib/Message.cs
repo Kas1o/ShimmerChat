@@ -8,6 +8,19 @@ using Newtonsoft.Json;
 
 namespace ShimmerChatLib
 {
+    /// <summary>
+    /// 消息生成状态
+    /// </summary>
+    public enum MessageGenerationState
+    {
+        /// <summary>消息已完成生成</summary>
+        Completed,
+        /// <summary>消息正在首次生成中</summary>
+        Generating,
+        /// <summary>消息正在重新生成中（清空旧内容）</summary>
+        Regenerating
+    }
+
 	public class Message
     {
         [JsonProperty]
@@ -76,20 +89,55 @@ namespace ShimmerChatLib
         public required DateTime timestamp { get; set; } // The timestamp of the message
         public required string sender { get; set; } // The sender of the message
         
-        // 流式状态属性
-        private bool _isStreaming;
-        public bool IsStreaming 
+        // 生成状态属性（替代原来的 IsStreaming）
+        private MessageGenerationState _generationState = MessageGenerationState.Completed;
+        public MessageGenerationState GenerationState
         {
-            get => _isStreaming;
-            set 
+            get => _generationState;
+            set
             {
-                _isStreaming = value;
-                if (StreamingStateChanged != null)
+                _generationState = value;
+                if (GenerationStateChanged != null)
                 {
-                    StreamingStateChanged(this, EventArgs.Empty);
+                    GenerationStateChanged(this, EventArgs.Empty);
                 }
             }
         }
+
+        // 为了向后兼容，保留 IsStreaming 属性
+        [JsonIgnore]
+        public bool IsStreaming
+        {
+            get => _generationState == MessageGenerationState.Generating || _generationState == MessageGenerationState.Regenerating;
+            set
+            {
+                // 设置时转换为新状态
+                if (value)
+                {
+                    // 如果原来是 Completed，设为 Generating；否则保持 Regenerating
+                    if (_generationState == MessageGenerationState.Completed)
+                    {
+                        GenerationState = MessageGenerationState.Generating;
+                    }
+                }
+                else
+                {
+                    GenerationState = MessageGenerationState.Completed;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 检查消息是否正在生成中（包括首次生成和重新生成）
+        /// </summary>
+        [JsonIgnore]
+        public bool IsGenerating => _generationState == MessageGenerationState.Generating || _generationState == MessageGenerationState.Regenerating;
+
+        /// <summary>
+        /// 检查消息是否正在重新生成中
+        /// </summary>
+        [JsonIgnore]
+        public bool IsRegenerating => _generationState == MessageGenerationState.Regenerating;
         
         // 添加版本管理方法
         public void AddVersion(ChatMessage newVersion)
@@ -142,10 +190,17 @@ namespace ShimmerChatLib
         
         // 内容变化事件
         public event EventHandler ContentChanged;
-        
-        // 流式状态变化事件
-        public event EventHandler StreamingStateChanged;
-        
+
+        // 生成状态变化事件（替代 StreamingStateChanged）
+        public event EventHandler GenerationStateChanged;
+
+        // 为了向后兼容，保留 StreamingStateChanged 事件
+        public event EventHandler StreamingStateChanged
+        {
+            add => GenerationStateChanged += value;
+            remove => GenerationStateChanged -= value;
+        }
+
         // 版本变化事件
         public event EventHandler VersionChanged;
         

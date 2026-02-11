@@ -206,11 +206,10 @@
 	/// <summary>
 	/// 指向聊天容器，用于在生成时自动滚动到底部 <see cref="AddLLMReplyStream"/> <see cref="MiscSettingsPage._autoScrollDown"/>
 	/// </summary>
-	ElementReference ChatMainElement; 
+	ElementReference ChatMainElement;
 
 	bool generating = false; // 表示当前是否在生成中
 	CancellationTokenSource? cts; // 用于取消生成任务的令牌源
-	Message? currentAIMessage; // 当前正在生成的AI消息
 	private Agent? agent; // 当前对话所属的Agent引用
 	private Chat? chat; // 当前对话的引用
 
@@ -283,6 +282,14 @@
 		// 无论输入是否为空，都启动AI生成任务
 		new Task(AddLLMReplyStream).Start();
 	}
+	/// <summary>
+	/// 获取当前正在生成的消息
+	/// </summary>
+	private Message? GetGeneratingMessage()
+	{
+		return messages.FirstOrDefault(m => m.IsGenerating);
+	}
+
 	void StopGeneration()
 	{
 		if (cts != null)
@@ -293,10 +300,11 @@
 				cts.Dispose();
 				cts = null;
 
-				// 标记当前AI消息为非流式状态
-				if (currentAIMessage != null)
+				// 标记当前AI消息为完成状态
+				var generatingMessage = GetGeneratingMessage();
+				if (generatingMessage != null)
 				{
-					currentAIMessage.IsStreaming = false;
+					generatingMessage.GenerationState = MessageGenerationState.Completed;
 				}
 
 				generating = false;
@@ -326,7 +334,7 @@
 		cts = new CancellationTokenSource();
 		var cancellationToken = cts.Token;
 
-		// 消息将在handleStreamResponses回调中创建
+
 
 		try
 		{
@@ -335,32 +343,35 @@
 				// 处理流式响应的函数
 				handleStreamResponses: async (responseStream) =>
 				{
-					// 检查是否已经有currentAIMessage（重新生成场景）
-					if (currentAIMessage == null)
+					// 查找是否有正在重新生成的消息（Regenerating 状态）
+					var regeneratingMessage = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Regenerating);
+					Message generatingMessage;
+
+					if (regeneratingMessage != null)
+					{
+						// 重新生成场景：清空内容后转为 Generating 状态
+						generatingMessage = regeneratingMessage;
+						if (generatingMessage.CurrentVersion != null)
+						{
+							generatingMessage.CurrentVersion.Content = "";
+							generatingMessage.CurrentVersion.thinking = null;
+							generatingMessage.CurrentVersion.toolCalls = null;
+						}
+						generatingMessage.GenerationState = MessageGenerationState.Generating;
+					}
+					else
 					{
 						// 创建新的AI消息
-						currentAIMessage = new Message
+						generatingMessage = new Message
 						{
 							message = new SharperLLM.Util.ChatMessage{ Content = "", thinking = string.Empty},
 							timestamp = DateTime.Now,
 							sender = ShimmerChatLib.Sender.AI,
-							IsStreaming = true
+							GenerationState = MessageGenerationState.Generating
 						};
-						messages.Add(currentAIMessage);
+						messages.Add(generatingMessage);
 					}
-					else
-					{
-						// 如果是重新生成，确保消息处于流式状态
-						currentAIMessage.IsStreaming = true;
-						// 清空当前版本内容以准备新生成
-						if (currentAIMessage.CurrentVersion != null)
-						{
-							currentAIMessage.CurrentVersion.Content = "";
-							currentAIMessage.CurrentVersion.thinking = null;
-							currentAIMessage.CurrentVersion.toolCalls = null;
-						}
-					}
-					
+
 					await InvokeAsync(StateHasChanged);
 
 					await foreach (var rsp in responseStream.WithCancellation(cancellationToken))
@@ -369,27 +380,27 @@
 						// 更新消息内容
 						if (!string.IsNullOrEmpty(rsp.Body.Content))
 						{
-							if (currentAIMessage.CurrentVersion != null)
-								currentAIMessage.CurrentVersion.Content = rsp.Body.Content;
+							if (generatingMessage.CurrentVersion != null)
+								generatingMessage.CurrentVersion.Content = rsp.Body.Content;
 							else
-								currentAIMessage.message = new SharperLLM.Util.ChatMessage { Content = rsp.Body.Content };
+								generatingMessage.message = new SharperLLM.Util.ChatMessage { Content = rsp.Body.Content };
 						}
 
 						// 如果有思考内容，更新思考内容
 						if (rsp.Body.thinking != null)
 						{
-							if (currentAIMessage.CurrentVersion != null)
-								currentAIMessage.CurrentVersion.thinking = rsp.Body.thinking;
-							else if (currentAIMessage.message != null)
-								currentAIMessage.message.thinking = rsp.Body.thinking;
+							if (generatingMessage.CurrentVersion != null)
+								generatingMessage.CurrentVersion.thinking = rsp.Body.thinking;
+							else if (generatingMessage.message != null)
+								generatingMessage.message.thinking = rsp.Body.thinking;
 						}
 
 						if (rsp.Body.toolCalls != null)
 						{
-							if (currentAIMessage.CurrentVersion != null)
-								currentAIMessage.CurrentVersion.toolCalls = rsp.Body.toolCalls;
-							else if (currentAIMessage.message != null)
-								currentAIMessage.message.toolCalls = rsp.Body.toolCalls;
+							if (generatingMessage.CurrentVersion != null)
+								generatingMessage.CurrentVersion.toolCalls = rsp.Body.toolCalls;
+							else if (generatingMessage.message != null)
+								generatingMessage.message.toolCalls = rsp.Body.toolCalls;
 						}
 
 						if (autoScrollDown)
@@ -401,16 +412,10 @@
 						await InvokeAsync(StateHasChanged);
 					}
 
-					// 流式响应结束，标记为非流式状态
-					if (currentAIMessage != null)
-					{
-						currentAIMessage.IsStreaming = false;
-						ChatPluginPanelContainer?.OnAgentMessage(currentAIMessage);
-						await InvokeAsync(StateHasChanged);
-					}
-
-					// 防止被多轮对话时写入同样的消息
-					currentAIMessage = null;
+					// 流式响应结束，标记为完成状态
+					generatingMessage.GenerationState = MessageGenerationState.Completed;
+					ChatPluginPanelContainer?.OnAgentMessage(generatingMessage);
+					await InvokeAsync(StateHasChanged);
 				},
 				// 处理工具调用的回调
 				onToolCall: (toolCalls) =>
@@ -458,11 +463,10 @@
 		}
 		catch (Exception ex)
 		{
-
-			// 发生错误时，标记当前消息为非流式状态
-			if (currentAIMessage != null)
+			// 发生错误时，标记所有生成中的消息为完成状态
+			foreach (var msg in messages.Where(m => m.IsGenerating))
 			{
-				currentAIMessage.IsStreaming = false;
+				msg.GenerationState = MessageGenerationState.Completed;
 			}
 
 			if(throwExceptionInsteadOfPopupErrorMessage)
@@ -472,14 +476,13 @@
 			else
 			{
 				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
-			}	
+			}
 		}
 		finally
 		{
 			generating = false;
 			cts?.Dispose();
 			cts = null;
-			currentAIMessage = null;
 			GetDirty();
 			await Refresh();
 
@@ -496,17 +499,17 @@
 			cts = null;
 		}
 
-		// 如果有正在生成的消息，标记为非流式状态
-		if (currentAIMessage != null)
+		// 如果有正在生成的消息，标记为完成状态
+		var generatingMessage = GetGeneratingMessage();
+		if (generatingMessage != null)
 		{
-			currentAIMessage.IsStreaming = false;
-			currentAIMessage = null;
+			generatingMessage.GenerationState = MessageGenerationState.Completed;
 		}
 	}
 	async void DeleteMessage(Message message)
 	{
-		// 如果删除的是当前正在生成的消息，取消生成
-		if (message == currentAIMessage)
+		// 如果删除的是当前正在生成的消息，先取消生成
+		if (message.IsGenerating)
 		{
 			StopGeneration();
 		}
@@ -525,7 +528,7 @@
 		// 如果找不到消息，直接返回
 		if (messageIndex == -1) return;
 
-		// 保存当前消息作为版本
+		// 保存当前消息作为版本（如果内容不为空）
 		var currentContent = message.CurrentVersion?.Content ?? "";
 		var currentThinking = message.CurrentVersion?.thinking ?? "";
 		var currentToolCalls = message.CurrentVersion?.toolCalls;
@@ -542,8 +545,8 @@
 			message.AddVersion(versionMessage);
 		}
 
-		// 设置currentAIMessage为要重新生成的消息
-		currentAIMessage = message;
+		// 标记消息为 Regenerating 状态，AddLLMReplyStream 会识别这个状态
+		message.GenerationState = MessageGenerationState.Regenerating;
 
 		// 删除此消息之后的所有消息
 		for (int i = messages.Count - 1; i > messageIndex; i--)
@@ -555,7 +558,7 @@
 		GetDirty();
 		await Refresh();
 
-		// 启动新的AI回复生成（会复用currentAIMessage）
+		// 启动新的AI回复生成
 		new Task(AddLLMReplyStream).Start();
 	}
 	#endregion
