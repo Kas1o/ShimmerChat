@@ -138,6 +138,12 @@ namespace ShimmerChatLib
         /// </summary>
         [JsonIgnore]
         public bool IsRegenerating => _generationState == MessageGenerationState.Regenerating;
+
+        /// <summary>
+        /// 标记此消息是否使用继续功能（prefix continuation）
+        /// </summary>
+        [JsonIgnore]
+        public bool IsContinuation { get; set; } = false;
         
         // 添加版本管理方法
         public void AddVersion(ChatMessage newVersion)

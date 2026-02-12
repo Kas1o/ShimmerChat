@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -146,5 +146,8 @@
   </data>
   <data name="Temperature" xml:space="preserve">
     <value />
+  </data>
+  <data name="启用继续功能（对最后一条AI消息附加prefix）" xml:space="preserve">
+    <value>Enable continuation (add prefix to last AI message)</value>
   </data>
 </root>

@@ -37,5 +37,21 @@ namespace ShimmerChatLib.Interface
             Action<List<SharperLLM.API.ToolCall>> onToolCall,
             Action<(string name, string resp, string id)> onToolResult,
             CancellationToken cancellationToken);
+
+        /// <summary>
+        /// 流式继续生成，对指定消息附加 prefix: true 参数
+        /// </summary>
+        /// <param name="agent">代理对象</param>
+        /// <param name="chat">聊天对象</param>
+        /// <param name="continuationMessage">需要继续的消息</param>
+        /// <param name="handleStreamResponses">流式响应处理函数</param>
+        /// <param name="cancellationToken">取消令牌</param>
+        /// <returns>Task</returns>
+        Task GenerateContinuationStreamAsync(
+            Agent agent,
+            Chat chat,
+            Message continuationMessage,
+            Func<IAsyncEnumerable<ResponseEx>, Task> handleStreamResponses,
+            CancellationToken cancellationToken);
     }
 }

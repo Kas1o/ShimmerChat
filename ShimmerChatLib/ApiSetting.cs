@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using SharperLLM.API;
+﻿﻿﻿﻿﻿﻿using SharperLLM.API;
 using System.Text.Json.Serialization;
 
 namespace ShimmerChatLib
@@ -21,6 +21,11 @@ namespace ShimmerChatLib
 		public string? OpenAIModel { get; set; } = "gpt-4o";
 		public bool OpenAIStream { get; set; } = true;
 		public int OpenAICtx { get; set; } = 16384;
+
+		/// <summary>
+		/// 是否启用继续功能（prefix continuation），对最后一条AI消息附加 prefix: true 参数
+		/// </summary>
+		public bool OpenAIEnableContinuation { get; set; } = false;
 
 		// Ollama 配置（可后续扩展）
 		public string? OllamaUrl { get; set; }
@@ -74,6 +79,7 @@ namespace ShimmerChatLib
 				OpenAIModel = OpenAIModel,
 				OpenAIStream = OpenAIStream,
 				OpenAICtx = OpenAICtx,
+				OpenAIEnableContinuation = OpenAIEnableContinuation,
 
 				OllamaUrl = OllamaUrl,
 				OllamaModel = OllamaModel,

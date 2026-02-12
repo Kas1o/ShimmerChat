@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -131,6 +131,9 @@
   </data>
   <data name="BUTTON_REGENERATE" xml:space="preserve">
     <value>重生成</value>
+  </data>
+  <data name="BUTTON_CONTINUE" xml:space="preserve">
+    <value>继续</value>
   </data>
   <data name="BUTTON_SAVE" xml:space="preserve">
     <value>保存</value>

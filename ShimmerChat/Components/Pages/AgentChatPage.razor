@@ -22,7 +22,7 @@
 		</div>
 		<div id="chat-main" @ref="ChatMainElement">
 			<Virtualize  Items="messages" Context="message" >
-				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" Chat="@chat" Agent="@agent" />
+				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" Chat="@chat" Agent="@agent" />
 			</Virtualize>
 			<br />
 			<br />
@@ -490,6 +490,105 @@
 			await ShowNotificationWhenCompleted();
 		}
 	}
+
+	/// <summary>
+	/// 继续生成流式响应，对指定消息附加 prefix: true 参数
+	/// </summary>
+	async void AddLLMReplyStreamContinuation(Message continuationMessage)
+	{
+		if (agent == null || chat == null || continuationMessage == null)
+			return;
+
+		generating = true;
+
+		// 创建新的CancellationTokenSource
+		cts = new CancellationTokenSource();
+		var cancellationToken = cts.Token;
+
+		try
+		{
+			await aiGenerationService.GenerateContinuationStreamAsync(
+				agent, chat,
+				continuationMessage,
+				// 处理流式响应的函数
+				handleStreamResponses: async (responseStream) =>
+				{
+					// 使用现有的消息进行继续生成
+					continuationMessage.GenerationState = MessageGenerationState.Generating;
+
+					// 保存原始内容
+					string originalContent = continuationMessage.CurrentVersion?.Content ?? "";
+
+					await InvokeAsync(StateHasChanged);
+
+					await foreach (var rsp in responseStream.WithCancellation(cancellationToken))
+					{
+						// 流式响应更新 - 将新内容追加到原始内容后面
+						if (!string.IsNullOrEmpty(rsp.Body.Content))
+						{
+							if (continuationMessage.CurrentVersion != null)
+								continuationMessage.CurrentVersion.Content = originalContent + rsp.Body.Content;
+						}
+
+						// 如果有思考内容，更新思考内容
+						if (rsp.Body.thinking != null)
+						{
+							if (continuationMessage.CurrentVersion != null)
+								continuationMessage.CurrentVersion.thinking = rsp.Body.thinking;
+						}
+
+						if (autoScrollDown)
+						{
+							await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+						}
+
+						// 立即触发UI刷新，确保流式内容实时显示
+						await InvokeAsync(StateHasChanged);
+					}
+
+					// 流式响应结束，标记为完成状态
+					continuationMessage.GenerationState = MessageGenerationState.Completed;
+					continuationMessage.IsContinuation = false;
+					ChatPluginPanelContainer?.OnAgentMessage(continuationMessage);
+					await InvokeAsync(StateHasChanged);
+				},
+				cancellationToken
+			);
+		}
+		catch (OperationCanceledException)
+		{
+			// 操作被用户取消，这是预期行为，不需要显示错误
+		}
+		catch (Exception ex)
+		{
+			// 发生错误时，标记所有生成中的消息为完成状态
+			foreach (var msg in messages.Where(m => m.IsGenerating))
+			{
+				msg.GenerationState = MessageGenerationState.Completed;
+			}
+
+			if(throwExceptionInsteadOfPopupErrorMessage)
+			{
+				throw;
+			}
+			else
+			{
+				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
+			}
+		}
+		finally
+		{
+			generating = false;
+			cts?.Dispose();
+			cts = null;
+			GetDirty();
+			await Refresh();
+
+			// AI生成完成时调用通知
+			await ShowNotificationWhenCompleted();
+		}
+	}
+
 	void CancelPreviousGeneration()
 	{
 		if (cts != null)
@@ -560,6 +659,34 @@
 
 		// 启动新的AI回复生成
 		new Task(AddLLMReplyStream).Start();
+	}
+
+	/// <summary>
+	/// 从指定消息继续生成（使用 prefix continuation 功能）
+	/// </summary>
+	async void ContinueFromMessage(Message message)
+	{
+		// 停止当前可能正在进行的生成
+		StopGeneration();
+
+		// 找到消息的索引
+		int messageIndex = messages.IndexOf(message);
+
+		// 如果找不到消息，直接返回
+		if (messageIndex == -1) return;
+
+		// 确保是AI消息
+		if (message.sender != ShimmerChatLib.Sender.AI) return;
+
+		// 标记消息为继续状态
+		message.IsContinuation = true;
+
+		// 保存更改
+		GetDirty();
+		await Refresh();
+
+		// 启动继续生成
+		new Task(() => AddLLMReplyStreamContinuation(message)).Start();
 	}
 	#endregion
 

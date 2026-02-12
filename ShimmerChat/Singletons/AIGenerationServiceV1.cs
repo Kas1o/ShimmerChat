@@ -242,36 +242,36 @@ namespace ShimmerChat.Singletons
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 var globalTools = _toolService.GetEnabledToolDefinitions();
                 var agentTools = _toolService.GetAgentToolDefinitions(agent);
                 var toolDefinitions = globalTools.Concat(agentTools).Distinct().ToList();
                 var promptBuilder = _contextBuilderService.BuildPromptBuilderWithTools(chat, agent, toolDefinitions);
-                
+
                 // 累积流式响应
                 ResponseEx accumulatedResponse = new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = "" }, FinishReason = FinishReason.None };
-                
+
                 try
                 {
                     // 创建一个自定义的异步流，处理累积响应
                     var responseStream = GetAccumulatedResponseStream(
-                        _completionService.GenerateChatExStreamAsync(promptBuilder, cancellationToken), 
+                        _completionService.GenerateChatExStreamAsync(promptBuilder, cancellationToken),
                         cancellationToken,
                         r => accumulatedResponse += r); // 回调函数，在处理流时同时累积响应
-                    
+
                     // 让调用方处理流式响应
                     await handleStreamResponses(responseStream);
-                    
+
                     // 检查是否需要调用工具
-                    bool hasToolCalls = accumulatedResponse.FinishReason == FinishReason.FunctionCall && 
-                        accumulatedResponse.Body.toolCalls != null && 
+                    bool hasToolCalls = accumulatedResponse.FinishReason == FinishReason.FunctionCall &&
+                        accumulatedResponse.Body.toolCalls != null &&
                         accumulatedResponse.Body.toolCalls.Count > 0;
-                    
+
                     if (hasToolCalls)
                     {
                         // 通知调用方有工具调用
                         onToolCall(accumulatedResponse.Body.toolCalls);
-                        
+
                         // 执行工具调用
                         foreach (ToolCall toolCall in accumulatedResponse.Body.toolCalls)
                         {
@@ -292,6 +292,43 @@ namespace ShimmerChat.Singletons
                     // 取消操作时，不需要特殊处理，调用方已经从流中收到了累积的内容
                     throw;
                 }
+            }
+        }
+
+        /// <summary>
+        /// 流式继续生成，对指定消息附加 prefix: true 参数
+        /// </summary>
+        public async Task GenerateContinuationStreamAsync(
+            Agent agent,
+            Chat chat,
+            Message continuationMessage,
+            Func<IAsyncEnumerable<ResponseEx>, Task> handleStreamResponses,
+            CancellationToken cancellationToken)
+        {
+            var globalTools = _toolService.GetEnabledToolDefinitions();
+            var agentTools = _toolService.GetAgentToolDefinitions(agent);
+            var toolDefinitions = globalTools.Concat(agentTools).Distinct().ToList();
+
+            // 使用特殊的PromptBuilder构建方法，对最后一条AI消息附加 prefix: true
+            var promptBuilder = _contextBuilderService.BuildPromptBuilderForContinuation(chat, agent, toolDefinitions, continuationMessage);
+
+            // 累积流式响应
+            ResponseEx accumulatedResponse = new ResponseEx { Body = new SharperLLM.Util.ChatMessage { Content = "" }, FinishReason = FinishReason.None };
+
+            try
+            {
+                // 创建一个自定义的异步流，处理累积响应
+                var responseStream = GetAccumulatedResponseStream(
+                    _completionService.GenerateChatExStreamAsync(promptBuilder, cancellationToken),
+                    cancellationToken,
+                    r => accumulatedResponse += r);
+
+                // 让调用方处理流式响应
+                await handleStreamResponses(responseStream);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
         }
     }

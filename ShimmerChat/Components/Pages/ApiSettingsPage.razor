@@ -165,6 +165,8 @@
                 <input class="shimmer-input" @bind="topAPISetting.OpenAICtx" />
                 <label>@l["启用流式输出"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIStream" />
+                <label>@l["启用继续功能（对最后一条AI消息附加prefix）"]</label>
+                <input type="checkbox" @bind="topAPISetting.OpenAIEnableContinuation" />
             }
         </div>
     </div>

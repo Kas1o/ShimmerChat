@@ -150,4 +150,7 @@
   <data name="Temperature" xml:space="preserve">
     <value>温度</value>
   </data>
+  <data name="启用继续功能（对最后一条AI消息附加prefix）" xml:space="preserve">
+    <value>启用继续功能（对最后一条AI消息附加prefix）</value>
+  </data>
 </root>
