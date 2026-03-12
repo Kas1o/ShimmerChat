@@ -20,6 +20,9 @@
 
 	<input type="checkbox" class="form-check-input" id="auto-scroll-down" @bind="_autoScrollDown" />
 	<label class="form-check-label" for="auto-scroll-down">Auto scroll down</label>
+
+	<input type="checkbox" class="form-check-input" id="auto-scroll-down" @bind="_virtualize" />
+	<label class="form-check-label" for="auto-scroll-down">Virtualize</label>
 </div>
 
 <div class="shimmer-group">
@@ -74,6 +77,17 @@
 		}
 	} = true;
 
+	private bool _virtualize
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = false;
+
 
 	private string notificationPermissionStatus = "Unknown";
 
@@ -84,6 +98,7 @@
 		KVData.Write("App", "throw_exception", _throwExceptionInsteadOfPopupErrorMessage ? "true": "false");
 		KVData.Write("App", "enable_notifications", _enableNotifications ? "true": "false");
 		KVData.Write("App", "auto_scroll_down", _autoScrollDown ? "true": "false");
+		KVData.Write("App", "virtualize", _virtualize ? "true" : "false");
 		KVData.Write("User", "username", _UserName);
 	}
 
@@ -98,6 +113,10 @@
 		if (bool.TryParse(KVData.Read("App", "auto_scroll_down"), out var autoscroll))
 		{
 			_autoScrollDown = autoscroll;
+		}
+		if (bool.TryParse(KVData.Read("App", "virtualize"), out var virtualize))
+		{
+			_virtualize = virtualize;
 		}
 		_UserName = KVData.Read("User", "username") ?? "";
 		Initialized = true;

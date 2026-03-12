@@ -21,9 +21,19 @@
 			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.name</h2>
 		</div>
 		<div id="chat-main" @ref="ChatMainElement">
-			<Virtualize  Items="messages" Context="message" >
-				<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" Chat="@chat" Agent="@agent" />
-			</Virtualize>
+			@if (virtualize)
+			{
+				<Virtualize  Items="messages" Context="message" >
+					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" Chat="@chat" Agent="@agent" />
+				</Virtualize>
+			}
+			else
+			{
+				@foreach(var message in messages)
+				{
+					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" Chat="@chat" Agent="@agent" />
+				}
+			}
 			<br />
 			<br />
 		</div>
@@ -221,6 +231,7 @@
 
 	bool throwExceptionInsteadOfPopupErrorMessage = false; // 抛出异常设置
 	bool autoScrollDown = true; // 自动滚动设置
+	bool virtualize = false;
 
 	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
 	#endregion
@@ -700,6 +711,10 @@
 		if (bool.TryParse(KVData.Read("App", "auto_scroll_down"), out var autoscroll))
 		{
 			autoScrollDown = autoscroll;
+		}
+		if (bool.TryParse(KVData.Read("App", "virtualize"), out var virt))
+		{
+			virtualize = virt;
 		}
 	}
 	protected override void OnParametersSet()
