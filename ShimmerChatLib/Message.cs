@@ -30,10 +30,11 @@ namespace ShimmerChatLib
         private int _currentVersionIndex = 0;
         
         // 为了兼容旧版本，保留原始message属性的访问方式
-        public ChatMessage message 
+        [JsonIgnore]
+        public ChatMessage message
         {
             get => CurrentVersion;
-            set 
+            set
             {
                 // 如果是首次设置，添加到版本列表
                 if (_versions.Count == 0)
@@ -46,7 +47,7 @@ namespace ShimmerChatLib
                     // 替换当前版本
                     string oldContent = CurrentVersion?.Content ?? string.Empty;
                     _versions[_currentVersionIndex] = value;
-                    
+
                     // 如果内容发生变化，触发事件
                     if (oldContent != value?.Content && ContentChanged != null)
                     {
@@ -59,11 +60,12 @@ namespace ShimmerChatLib
         // 版本管理相关属性
         [JsonIgnore]
         public IReadOnlyList<ChatMessage> Versions => _versions.AsReadOnly();
-        
-        public int CurrentVersionIndex 
-        { 
+
+        [JsonIgnore]
+        public int CurrentVersionIndex
+        {
             get => _currentVersionIndex;
-            set 
+            set
             {
                 if (_versions != null && _versions.Count > 0 && value >= 0 && value < _versions.Count)
                 {

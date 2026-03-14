@@ -1,0 +1,136 @@
+﻿@using Newtonsoft.Json.Linq
+
+<div class="json-tree-node ms-2">
+    @if (Token is JObject jObject)
+    {
+        <div class="d-flex align-items-center">
+            <span class="text-secondary me-2"
+                  style="width: 20px; cursor: pointer;"
+                  @onclick="ToggleExpand">
+                @if (_isExpanded)
+                {
+                    <small>▼</small>
+                }
+                else
+                {
+
+                    <small>▶</small>
+                }
+            </span>
+            <span class="text-muted small me-2">Object</span>
+            @if (!_isExpanded)
+            {
+                <span class="text-muted small fst-italic">{ @jObject.Count properties }</span>
+            }
+        </div>
+
+        @if (_isExpanded)
+        {
+            <div class="border-start ps-3 mt-1">
+                @foreach (var property in jObject.Properties())
+                {
+                    <div class="mb-1">
+                        <span class="fw-bold text-primary user-select-none">@property.Name</span>:
+                        <JsonTreeView Token="property.Value"
+                                      CurrentLevel="@(CurrentLevel + 1)"
+                                      DefaultExpandLevel="DefaultExpandLevel" />
+                    </div>
+                }
+            </div>
+        }
+    }
+    else if (Token is JArray jArray)
+    {
+        <div class="d-flex align-items-center">
+            <span class="text-secondary me-2"
+                  style="width: 20px; cursor: pointer;"
+                  @onclick="ToggleExpand">
+                @if (_isExpanded)
+                {
+                    <small>▼</small>
+                }
+                else
+                {
+
+                    <small>▶</small>
+                }
+            </span>
+            <span class="text-muted small me-2">Array[@jArray.Count]</span>
+            @if (!_isExpanded)
+            {
+                <span class="text-muted small fst-italic">[ ... ]</span>
+            }
+        </div>
+
+        @if (_isExpanded)
+        {
+            <div class="border-start ps-3 mt-1">
+                @for (int i = 0; i < jArray.Count; i++)
+                {
+                    <div class="mb-1">
+                        <span class="text-muted small user-select-none">[@i]</span>:
+                        <JsonTreeView Token="jArray[i]"
+                                      CurrentLevel="@(CurrentLevel + 1)"
+                                      DefaultExpandLevel="DefaultExpandLevel" />
+                    </div>
+                }
+            </div>
+        }
+    }
+    else if (Token is JValue jValue)
+    {
+        <span class="json-value @GetTypeClass(jValue)">
+            @GetValueString(jValue)
+        </span>
+    }
+    else
+    {
+        <span class="text-muted">Unknown Type</span>
+    }
+</div>
+
+@code
+{
+    [Parameter] public JToken Token { get; set; }
+    [Parameter] public int CurrentLevel { get; set; } = 0;
+    [Parameter] public int DefaultExpandLevel { get; set; } = 2;
+
+    private bool _isExpanded;
+
+    protected override void OnInitialized()
+    {
+        _isExpanded = CurrentLevel < DefaultExpandLevel;
+    }
+
+    private void ToggleExpand()
+    {
+        _isExpanded = !_isExpanded;
+        StateHasChanged();
+    }
+
+    private string GetTypeClass(JValue value)
+    {
+        return value.Type switch
+        {
+            JTokenType.String => "text-success font-monospace",
+            JTokenType.Integer or JTokenType.Float => "text-primary font-monospace",
+            JTokenType.Boolean => "text-danger font-monospace",
+            JTokenType.Null or JTokenType.Undefined => "text-muted font-monospace",
+            _ => "text-dark font-monospace"
+        };
+    }
+
+    private string GetValueString(JValue value)
+    {
+        return value.Type switch
+        {
+            JTokenType.String => $""""{value.Value<string>()}"""",
+            JTokenType.Integer => value.Value<long>().ToString(),
+            JTokenType.Float => value.Value<double>().ToString(),
+            JTokenType.Boolean => value.Value<bool>().ToString().ToLower(),
+            JTokenType.Null => "null",
+            JTokenType.Undefined => "undefined",
+            _ => value.ToString()
+        };
+    }
+}

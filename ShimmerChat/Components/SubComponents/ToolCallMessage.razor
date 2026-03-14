@@ -1,5 +1,6 @@
 ﻿@using Markdig
 @using Markdig.Extensions.Tables
+@using Newtonsoft.Json.Linq
 
 @inject IStringLocalizer<Message> l
 @inject IJSRuntime JS
@@ -9,10 +10,22 @@
 	<div class="shimmer-message-head">
 		<h3>⚙️</h3>
 	</div>
-	<details>
-	<summary>@summary</summary>
-	@stringContent
-	</details>
+	<div class="toolcall-content">
+		@foreach (var toolCall in message?.message?.toolCalls ?? [])
+		{
+			<div class="toolcall-item">
+				<div class="toolcall-name">
+					<span class="toolcall-badge">@toolCall.name</span>
+				</div>
+				@if (!string.IsNullOrEmpty(toolCall.arguments))
+				{
+					<div class="toolcall-arguments">
+						<JsonTreeView Token="ParseArguments(toolCall.arguments)" DefaultExpandLevel="1" />
+					</div>
+				}
+			</div>
+		}
+	</div>
 </div>
 
 
@@ -21,8 +34,17 @@
 	[Parameter]
 	public ShimmerChatLib.Message message { get; set; } = null!; // The message object to display
 
-	string stringContent => string.Join("\n", message?.message?.toolCalls?.Select(x => $"{x.name??""}|{x.arguments??""}") ?? []) ?? ""; // The string content of the message
-	string summary => string.Join(" ", message?.message?.toolCalls?.Select(x => $"{x.name ?? ""}") ?? []) ?? "";
-
 	string sender => message.sender;
+
+	private JToken ParseArguments(string arguments)
+	{
+		try
+		{
+			return JToken.Parse(arguments);
+		}
+		catch
+		{
+			return JValue.CreateString(arguments);
+		}
+	}
 }
