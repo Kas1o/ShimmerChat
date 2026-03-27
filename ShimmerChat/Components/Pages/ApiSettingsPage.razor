@@ -163,10 +163,12 @@
                 <input class="shimmer-input" @bind="topAPISetting.OpenAIModel" />
                 <label>@l["API GENERATION LENGTH"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.OpenAICtx" />
-                <label>@l["启用流式输出"]</label>
+                <label>@l["API ENABLE STREAM"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIStream" />
-                <label>@l["启用继续功能（对最后一条AI消息附加prefix）"]</label>
+                <label>@l["API ENABLE CONTINUE"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIEnableContinuation" />
+                <label>@l["API ASIS"]</label>
+                <input type="checkbox" @bind="topAPISetting.OpenAIAsIs" />
             }
         </div>
     </div>

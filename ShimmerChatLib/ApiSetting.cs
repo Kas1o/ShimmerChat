@@ -11,11 +11,13 @@ namespace ShimmerChatLib
 		[JsonConverter(typeof(JsonStringEnumConverter))]
 		public ApiSettingType Type { get; set; }
 
-		// Kobold 配置（仅当 Type == Kobold 时有效）
+		#region Kobold
 		public string? KoboldUrl { get; set; } = "http://localhost:5001/api";
 		public KoboldAPI.KoboldAPIConf? KoboldConf { get; set; } = new();
 
-		// OpenAI 配置（仅当 Type == OpenAI 时有效）
+		#endregion
+
+		#region OpenAI
 		public string? OpenAIUrl { get; set; } = "http://localhost:5001/api/v1";
 		public string? OpenAIApiKey { get; set; } = "key";
 		public string? OpenAIModel { get; set; } = "gpt-4o";
@@ -26,10 +28,18 @@ namespace ShimmerChatLib
 		/// 是否启用继续功能（prefix continuation），对最后一条AI消息附加 prefix: true 参数
 		/// </summary>
 		public bool OpenAIEnableContinuation { get; set; } = false;
+		/// <summary>
+		/// 用于高级调试的原版输出模式，不会对消息做防御性修改
+		/// </summary>
+		public bool OpenAIAsIs { get; set; } = false;
 
-		// Ollama 配置（可后续扩展）
+		#endregion OpenAI
+
+		#region Ollama
 		public string? OllamaUrl { get; set; }
 		public string? OllamaModel { get; set; }
+
+		#endregion
 
 		// Completion settings
 		public CompletionType CompletionType { get; set; } = CompletionType.ChatCompletion;
@@ -54,7 +64,8 @@ namespace ShimmerChatLib
 						_url: OpenAIUrl ?? "https://api.openai.com/v1",
 						_apiKey: OpenAIApiKey ?? throw new InvalidOperationException("OpenAI API key is required."),
 						_model: OpenAIModel ?? "gpt-4o",
-						_max_tokens: OpenAICtx
+						_max_tokens: OpenAICtx,
+						_as_is: OpenAIAsIs
 					),
 
 					ApiSettingType.Ollama => throw new NotImplementedException("Ollama support not implemented yet."),
@@ -80,6 +91,7 @@ namespace ShimmerChatLib
 				OpenAIStream = OpenAIStream,
 				OpenAICtx = OpenAICtx,
 				OpenAIEnableContinuation = OpenAIEnableContinuation,
+				OpenAIAsIs = OpenAIAsIs,
 
 				OllamaUrl = OllamaUrl,
 				OllamaModel = OllamaModel,

@@ -150,4 +150,16 @@
   <data name="启用继续功能（对最后一条AI消息附加prefix）" xml:space="preserve">
     <value>Enable continuation (add prefix to last AI message)</value>
   </data>
+  <data name="Clone Current Api Setting Profile" xml:space="preserve">
+    <value> </value>
+  </data>
+  <data name="API ASIS" xml:space="preserve">
+    <value />
+  </data>
+  <data name="API ENABLE STREAM" xml:space="preserve">
+    <value />
+  </data>
+  <data name="API ENABLE CONTINUE" xml:space="preserve">
+    <value />
+  </data>
 </root>
