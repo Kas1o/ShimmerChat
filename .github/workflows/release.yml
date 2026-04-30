@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'  # 如 v1.0.0, v0.5.2
 
+
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: windows-latest
@@ -84,7 +88,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v3.0.0
         with:
-          tag_name: ${{ github.ref }}
+
           name: ${{ steps.version.outputs.version }}
           body: |
             ## What's Changed
@@ -97,5 +101,3 @@ jobs:
           prerelease: false
           generate_release_notes: false
           files: ${{ env.ZIP_FILE }}  # 只上传 zip 文件
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}  # 必须是具有 write:contents 权限的 PAT
