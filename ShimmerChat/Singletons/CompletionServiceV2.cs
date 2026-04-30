@@ -101,8 +101,8 @@ namespace ShimmerChat.Singletons
         {
             var apiSetting = ApiSettings[SelectedAPIIndex];
             
-            // 对于OpenAI类型的API，根据OpenAIStream属性决定是否使用流式调用
-            if (apiSetting.Type == ApiSettingType.OpenAI && apiSetting.OpenAIStream)
+            // 根据当前API类型的Stream配置决定是否使用流式调用
+            if (apiSetting.EnableStream)
             {
                 // 使用流式API
                 await foreach (var response in apiSetting.LLMApi.GenerateChatExStream(promptBuilder, cancellationToken))
@@ -112,7 +112,7 @@ namespace ShimmerChat.Singletons
             }
             else
             {
-                // 对于非OpenAI类型或未启用流式的情况，使用非流式API并模拟流式输出
+                // 对于非流式类型或未启用流式的情况，使用非流式API并模拟流式输出
                 var response = await apiSetting.LLMApi.GenerateChatEx(promptBuilder);
                 yield return response;
             }

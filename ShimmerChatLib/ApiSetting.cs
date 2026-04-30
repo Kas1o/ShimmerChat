@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using SharperLLM.API;
+﻿﻿﻿using SharperLLM.API;
 using System.Text.Json.Serialization;
 
 namespace ShimmerChatLib
@@ -69,6 +69,17 @@ namespace ShimmerChatLib
 		{
 			ApiSettingType.OpenAI => OpenAIEnableContinuation,
 			ApiSettingType.DeepSeek => DeepSeekEnableContinuation,
+			_ => false
+		};
+
+		/// <summary>
+		/// 获取当前 API 类型是否启用了流式输出
+		/// </summary>
+		[Newtonsoft.Json.JsonIgnore]
+		public bool EnableStream => Type switch
+		{
+			ApiSettingType.OpenAI => OpenAIStream,
+			ApiSettingType.DeepSeek => DeepSeekStream,
 			_ => false
 		};
 
