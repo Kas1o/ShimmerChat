@@ -25,6 +25,7 @@
         <select @bind="topAPISetting.Type" class="form-select">
             <option value="@ApiSettingType.Kobold">kobold</option>
             <option value="@ApiSettingType.OpenAI">openai</option>
+            <option value="@ApiSettingType.DeepSeek">deepseek</option>
             <option value="@ApiSettingType.Ollama">ollama</option>
         </select>
         
@@ -169,6 +170,26 @@
                 <input type="checkbox" @bind="topAPISetting.OpenAIEnableContinuation" />
                 <label>@l["API ASIS"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIAsIs" />
+            }
+
+            @if (topAPISetting.Type == ApiSettingType.DeepSeek)
+            {
+                <label>@l["API URL"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.DeepSeekUrl" />
+                <label>@l["API KEY"]</label>
+                <input type="password" class="shimmer-input" @bind="topAPISetting.DeepSeekApiKey" />
+                <label>@l["API MODEL"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.DeepSeekModel" />
+                <label>@l["API GENERATION LENGTH"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.DeepSeekCtx" />
+                <label>@l["API ENABLE STREAM"]</label>
+                <input type="checkbox" @bind="topAPISetting.DeepSeekStream" />
+                <label>@l["API ENABLE CONTINUE"]</label>
+                <input type="checkbox" @bind="topAPISetting.DeepSeekEnableContinuation" />
+                <label>@l["API ASIS"]</label>
+                <input type="checkbox" @bind="topAPISetting.DeepSeekAsIs" />
+                <label>@l["API ENABLE THINKING"]</label>
+                <input type="checkbox" @bind="topAPISetting.DeepSeekEnableThinking" />
             }
         </div>
     </div>

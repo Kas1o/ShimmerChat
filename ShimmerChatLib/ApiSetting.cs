@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿using SharperLLM.API;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using SharperLLM.API;
 using System.Text.Json.Serialization;
 
 namespace ShimmerChatLib
@@ -35,6 +35,21 @@ namespace ShimmerChatLib
 
 		#endregion OpenAI
 
+		#region DeepSeek
+		public string? DeepSeekUrl { get; set; } = "https://api.deepseek.com/v1";
+		public string? DeepSeekApiKey { get; set; } = "";
+		public string? DeepSeekModel { get; set; } = "deepseek-v4-flash";
+		public bool DeepSeekStream { get; set; } = true;
+		public int DeepSeekCtx { get; set; } = 8192;
+		public bool DeepSeekEnableContinuation { get; set; } = false;
+		public bool DeepSeekAsIs { get; set; } = false;
+		/// <summary>
+		/// 是否启用 DeepSeek 思考模式 (reasoning)
+		/// </summary>
+		public bool DeepSeekEnableThinking { get; set; } = false;
+
+		#endregion DeepSeek
+
 		#region Ollama
 		public string? OllamaUrl { get; set; }
 		public string? OllamaModel { get; set; }
@@ -45,6 +60,17 @@ namespace ShimmerChatLib
 		public CompletionType CompletionType { get; set; } = CompletionType.ChatCompletion;
 		public List<TextCompletionSetting>? TextCompletionSettings { get; set; } = new List<TextCompletionSetting>();
 		public int SelectedTextCompletionSettingIndex { get; set; } = 0;
+
+		/// <summary>
+		/// 获取当前 API 类型是否启用了继续功能
+		/// </summary>
+		[Newtonsoft.Json.JsonIgnore]
+		public bool EnableContinuation => Type switch
+		{
+			ApiSettingType.OpenAI => OpenAIEnableContinuation,
+			ApiSettingType.DeepSeek => DeepSeekEnableContinuation,
+			_ => false
+		};
 
 		/// <summary>
 		/// 根据当前配置创建对应的 ILLMAPI 实例。
@@ -67,6 +93,19 @@ namespace ShimmerChatLib
 						_max_tokens: OpenAICtx,
 						_as_is: OpenAIAsIs
 					),
+
+					ApiSettingType.DeepSeek => new OpenAIAPI(
+						_url: DeepSeekUrl ?? "https://api.deepseek.com/v1",
+						_apiKey: DeepSeekApiKey ?? throw new InvalidOperationException("DeepSeek API key is required."),
+						_model: DeepSeekModel ?? "deepseek-v4-flash",
+						_max_tokens: DeepSeekCtx,
+						_as_is: DeepSeekAsIs
+					)
+					{
+						CustomRequestProperties = DeepSeekEnableThinking
+							? new Dictionary<string, object> { ["thinking"] = new { type = "enabled" } }
+							: new Dictionary<string, object> { ["thinking"] = new { type = "disabled" } }
+					},
 
 					ApiSettingType.Ollama => throw new NotImplementedException("Ollama support not implemented yet."),
 
@@ -93,6 +132,15 @@ namespace ShimmerChatLib
 				OpenAIEnableContinuation = OpenAIEnableContinuation,
 				OpenAIAsIs = OpenAIAsIs,
 
+				DeepSeekUrl = DeepSeekUrl,
+				DeepSeekApiKey = DeepSeekApiKey,
+				DeepSeekModel = DeepSeekModel,
+				DeepSeekStream = DeepSeekStream,
+				DeepSeekCtx = DeepSeekCtx,
+				DeepSeekEnableContinuation = DeepSeekEnableContinuation,
+				DeepSeekAsIs = DeepSeekAsIs,
+				DeepSeekEnableThinking = DeepSeekEnableThinking,
+
 				OllamaUrl = OllamaUrl,
 				OllamaModel = OllamaModel,
 
@@ -107,6 +155,7 @@ namespace ShimmerChatLib
 	{
 		Kobold,
 		Ollama,
-		OpenAI
+		OpenAI,
+		DeepSeek
 	}
 }

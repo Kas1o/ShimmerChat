@@ -266,7 +266,7 @@
 		var selectedIndex = KVData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
 		if (int.TryParse(selectedIndex, out var index) && index >= 0 && index < apiSettings.Count)
 		{
-			return apiSettings[index].OpenAIEnableContinuation;
+			return apiSettings[index].EnableContinuation;
 		}
 		return false;
 	}
