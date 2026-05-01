@@ -25,27 +25,48 @@ namespace ShimmerChatBuiltin.DynPrompt
 		};
 
 		public void ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
+	{
+		var data = pluginData.Read("DynPrompt", "DynPromptSets");
+		var sets = JsonConvert.DeserializeObject<List<DynPromptSet>>(data ?? "[]") ?? [];
+
+		var set = sets.FindLast(s => s.Name.Trim() == input.Trim());
+		if(set == null)
+			throw new InvalidOperationException($"No DynPromptSet found with name '{input}'");
+
+		// 使用递归方式处理 DynPromptSet
+		ProcessDynPromptSet(promptBuilder, set, sets, new HashSet<string>());
+	}
+
+	/// <summary>
+	/// 递归处理 DynPromptSet，支持 Term 之间的递归触发
+	/// </summary>
+	private void ProcessDynPromptSet(PromptBuilder promptBuilder, DynPromptSet set, List<DynPromptSet> allSets, HashSet<string> processedTermNames)
+	{
+		// 处理每个动态提示项
+		foreach (var term in set.Terms)
 		{
-			var data = pluginData.Read("DynPrompt", "DynPromptSets");
-			var sets = JsonConvert.DeserializeObject<List<DynPromptSet>>(data ?? "[]") ?? [];
-
-			var set = sets.FindLast(s => s.Name.Trim() == input.Trim());
-			if(set == null)
-				throw new InvalidOperationException($"No DynPromptSet found with name '{input}'");
-
-			// 收集所有消息内容用于规则评估
+			// 每次评估前重新收集上下文（因为之前的 term 可能已经注入了内容）
 			string contextText = CollectContextText(promptBuilder);
 
-			// 处理每个动态提示项
-			foreach (var term in set.Terms)
+			// 如果没有触发规则或者规则评估为true，则注入内容
+			if (string.IsNullOrEmpty(term.TriggerRule) || EvaluateTriggerRule(term.TriggerRule, contextText))
 			{
-				// 如果没有触发规则或者规则评估为true，则注入内容
-				if (string.IsNullOrEmpty(term.TriggerRule) || EvaluateTriggerRule(term.TriggerRule, contextText))
+				InjectTerm(promptBuilder, term);
+
+				// 递归处理：如果该 term 允许被递归触发，则查找并处理同名的 DynPromptSet
+				if (term.AllowBeTriggeredByRecursive && !processedTermNames.Contains(term.Name))
 				{
-					InjectTerm(promptBuilder, term);
+					var nestedSet = allSets.FindLast(s => s.Name.Trim() == term.Name.Trim());
+					if (nestedSet != null)
+					{
+						processedTermNames.Add(term.Name);
+						ProcessDynPromptSet(promptBuilder, nestedSet, allSets, processedTermNames);
+						processedTermNames.Remove(term.Name);
+					}
 				}
 			}
 		}
+	}
 
 		/// <summary>
 		/// 收集上下文中的所有文本内容
