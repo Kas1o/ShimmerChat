@@ -40,7 +40,6 @@
 		<div id="input-box" class="shimmer-shadow-box">
 			<!-- 输入框内容 -->
 			<textarea value="@inputText" @oninput="OnInput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
-			<p>@inputText</p>
 			<div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
 				@if (generating)
 				{
