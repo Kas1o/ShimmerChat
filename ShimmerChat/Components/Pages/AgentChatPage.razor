@@ -39,7 +39,8 @@
 		</div>
 		<div id="input-box" class="shimmer-shadow-box">
 			<!-- 输入框内容 -->
-			<textarea  @bind="inputText" @bind:event="oninput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
+			<textarea value="@inputText" @oninput="OnInput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
+			<p>@inputText</p>
 			<div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
 				@if (generating)
 				{
@@ -237,10 +238,22 @@
 	#endregion
 
 	#region 交互
+	private bool _skipNextInput;
+
+	private void OnInput(ChangeEventArgs e)
+	{
+		if (_skipNextInput)
+		{
+			_skipNextInput = false;
+			return; // 直接丢弃 keydown 后的 oninput 覆盖
+		}
+		inputText = e.Value?.ToString() ?? string.Empty;
+	}
 	void CheckEnter(KeyboardEventArgs e)
 	{
 		if (e.Key == "Enter" && !e.ShiftKey && !generating) // 检测是否按下 Enter 键
 		{
+			_skipNextInput = true;      // 标记：下次 oninput 不更新
 			Send(); // 无论输入是否为空，都调用Send方法
 		}
 	}
@@ -274,7 +287,7 @@
 			if (inputText.Trim().Length > 0)
 			{
 				var message = new Message()
-			{
+				{
 					message = new SharperLLM.Util.ChatMessage
 					{
 						Content= inputText // 使用输入框的内容
