@@ -149,9 +149,7 @@ static void ExecuteAutoMigration(WebApplication app)
     bool alreadyMigrated = marker.IsMigrationCompleted(migrateFrom.Value, targetType);
     if (alreadyMigrated && !config.ForceMigration)
     {
-        var markerInfo = marker.GetMarkerInfo();
-        Console.WriteLine($"Migration already completed at {markerInfo?.MigrationTime:yyyy-MM-dd HH:mm:ss UTC}.");
-        Console.WriteLine($"Migrated {markerInfo?.MigratedCount} entries from {markerInfo?.SourceStorage} to {markerInfo?.TargetStorage}.");
+        Console.WriteLine($"Skipping migration: data was already migrated from {migrateFrom} to {targetType}.");
         Console.WriteLine("To force re-migration, set 'ForceMigration: true' in configuration.");
         return;
     }
