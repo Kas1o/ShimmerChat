@@ -30,37 +30,105 @@ LiteDB 是默认的存储方案，相比传统文件存储具有以下优势：
 
 ---
 
-## 使用传统文件存储
+## 目录结构
 
-如需切换回传统的 LocalFileStorage 文件存储方式，请按以下步骤操作：
+```
+AppBaseDirectory/
+├── KVData/                    # LocalFileStorage 数据目录
+│   ├── .migration_marker      # 迁移标记文件（记录迁移历史）
+│   ├── Space1/                # 空间数据文件夹
+│   │   ├── key1.json
+│   │   └── key2.json
+│   └── Space2/
+│       └── ...
+└── LiteDBKVData/              # LiteDB 数据目录
+    └── data.db                # LiteDB 数据库文件
+```
 
-### 1. 修改配置文件
+---
+
+## 配置说明
+
+### 完整配置示例
 
 编辑 `appsettings.json`：
 
 ```json
 {
   "KVDataStorage": {
-    "StorageType": "LocalFileStorage",
-    "AutoMigrateOnStartup": false,
-    "AutoMigrateFrom": null,
-    "ClearSourceAfterMigration": false
+    "StorageType": "LiteDB",
+    "AutoMigrateOnStartup": true,
+    "AutoMigrateFrom": "LocalFileStorage",
+    "ClearSourceAfterMigration": false,
+    "ForceMigration": false
   }
 }
 ```
 
-### 2. 配置项说明
+### 配置项说明
 
-| 配置项 | 说明 | 可选值 |
-|--------|------|--------|
-| `StorageType` | 存储类型 | `"LiteDB"` / `"LocalFileStorage"` |
-| `AutoMigrateOnStartup` | 启动时自动迁移 | `true` / `false` |
-| `AutoMigrateFrom` | 迁移源存储类型 | `"LiteDB"` / `"LocalFileStorage"` / `null` |
-| `ClearSourceAfterMigration` | 迁移后清空源数据 | `true` / `false` |
+| 配置项 | 说明 | 默认值 | 可选值 |
+|--------|------|--------|--------|
+| `StorageType` | 存储类型 | `"LiteDB"` | `"LiteDB"` / `"LocalFileStorage"` |
+| `AutoMigrateOnStartup` | 启动时自动迁移 | `true` | `true` / `false` |
+| `AutoMigrateFrom` | 迁移源存储类型 | `"LocalFileStorage"` | `"LiteDB"` / `"LocalFileStorage"` / `null` |
+| `ClearSourceAfterMigration` | 迁移后清空源数据 | `false` | `true` / `false` |
+| `ForceMigration` | 强制重新迁移（需 CLI 确认） | `false` | `true` / `false` |
 
-### 3. 数据迁移（可选）
+---
 
-如需将 LiteDB 中的数据迁移回文件存储：
+## 数据迁移
+
+### 自动迁移（首次）
+
+默认配置下，应用启动时会自动检测并执行迁移：
+- 从 `LocalFileStorage` 迁移到 `LiteDB`
+- 迁移完成后在 `KVData/.migration_marker` 创建标记文件
+- 下次启动时检测到标记会自动跳过迁移
+
+### 迁移标记
+
+迁移标记文件记录了迁移历史信息：
+
+```json
+{
+  "MigrationTime": "2026-05-10T05:30:00Z",
+  "SourceStorage": "LocalFileStorage",
+  "TargetStorage": "LiteDB",
+  "MigratedCount": 150,
+  "SourceCleared": false,
+  "Version": 1
+}
+```
+
+### 强制重新迁移
+
+如需重新执行迁移（例如数据损坏或需要同步新数据）：
+
+1. 修改配置启用强制迁移：
+```json
+{
+  "KVDataStorage": {
+    "ForceMigration": true
+  }
+}
+```
+
+2. 启动应用，CLI 会提示确认：
+```
+⚠️  WARNING: Force migration is enabled!
+This will re-migrate all data from LocalFileStorage to LiteDB.
+Existing data in target storage may be duplicated.
+Do you want to continue? (yes/no):
+```
+
+3. 输入 `yes` 确认后执行迁移，输入其他内容则取消
+
+4. 迁移完成后建议将 `ForceMigration` 改回 `false`
+
+### 反向迁移（LiteDB → LocalFileStorage）
+
+如需切换回文件存储：
 
 ```json
 {
@@ -68,12 +136,29 @@ LiteDB 是默认的存储方案，相比传统文件存储具有以下优势：
     "StorageType": "LocalFileStorage",
     "AutoMigrateOnStartup": true,
     "AutoMigrateFrom": "LiteDB",
-    "ClearSourceAfterMigration": false
+    "ClearSourceAfterMigration": false,
+    "ForceMigration": false
   }
 }
 ```
 
-启动应用后，数据将自动从 LiteDB 迁移到文件存储。
+---
+
+## 使用传统文件存储
+
+如需完全禁用 LiteDB，使用传统的 LocalFileStorage：
+
+```json
+{
+  "KVDataStorage": {
+    "StorageType": "LocalFileStorage",
+    "AutoMigrateOnStartup": false,
+    "AutoMigrateFrom": null,
+    "ClearSourceAfterMigration": false,
+    "ForceMigration": false
+  }
+}
+```
 
 ---
 
@@ -96,3 +181,4 @@ LiteDB 是默认的存储方案，相比传统文件存储具有以下优势：
 - **生产环境**：推荐使用 **LiteDB**，性能和可靠性更好
 - **开发调试**：可根据需要切换为 **LocalFileStorage**，便于直接查看和修改数据
 - **数据迁移**：切换存储类型时建议先备份数据，或启用自动迁移功能
+- **强制迁移**：仅在必要时使用，可能导致目标存储数据重复

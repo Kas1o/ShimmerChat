@@ -30,7 +30,7 @@ namespace ShimmerChat.Singletons
         /// </summary>
         public LiteDBKVData()
         {
-            string dbPath = Path.Combine(AppContext.BaseDirectory, "KVData", "data.db");
+            string dbPath = Path.Combine(AppContext.BaseDirectory, "LiteDBKVData", "data.db");
             string? directory = Path.GetDirectoryName(dbPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {

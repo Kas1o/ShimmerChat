@@ -258,14 +258,16 @@ namespace ShimmerChat.Singletons
         }
 
         /// <summary>
-        /// 清空所有数据
+        /// 清空所有数据（只删除 LocalFileStorage 的子目录，保留根目录本身）
         /// </summary>
         public void ClearAll()
         {
             if (Directory.Exists(root))
             {
-                Directory.Delete(root, true);
-                InitializeKVDataFolder();
+                foreach (var dir in Directory.GetDirectories(root))
+                {
+                    Directory.Delete(dir, true);
+                }
             }
         }
     }

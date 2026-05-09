@@ -95,6 +95,9 @@ static void ConfigureKVDataStorage(WebApplicationBuilder builder)
     var config = builder.Configuration.GetSection("KVDataStorage").Get<KVDataStorageConfig>() ?? new KVDataStorageConfig();
     builder.Services.AddSingleton(config);
 
+    // 注册迁移标记管理器
+    builder.Services.AddSingleton<KVDataMigrationMarker>();
+
     // 始终注册两种存储实现（用于迁移服务）
     builder.Services.AddSingleton<LocalFileStorageKVData>();
     builder.Services.AddSingleton<LiteDBKVData>();
@@ -125,6 +128,7 @@ static void ExecuteAutoMigration(WebApplication app)
         return;
 
     var migrationService = scope.ServiceProvider.GetRequiredService<KVDataMigrationService>();
+    var marker = scope.ServiceProvider.GetRequiredService<KVDataMigrationMarker>();
     var migrateFrom = config.GetAutoMigrateFromType();
 
     if (migrateFrom == null)
@@ -141,6 +145,35 @@ static void ExecuteAutoMigration(WebApplication app)
         return;
     }
 
+    // 检查是否已经完成过迁移
+    bool alreadyMigrated = marker.IsMigrationCompleted(migrateFrom.Value, targetType);
+    if (alreadyMigrated && !config.ForceMigration)
+    {
+        var markerInfo = marker.GetMarkerInfo();
+        Console.WriteLine($"Migration already completed at {markerInfo?.MigrationTime:yyyy-MM-dd HH:mm:ss UTC}.");
+        Console.WriteLine($"Migrated {markerInfo?.MigratedCount} entries from {markerInfo?.SourceStorage} to {markerInfo?.TargetStorage}.");
+        Console.WriteLine("To force re-migration, set 'ForceMigration: true' in configuration.");
+        return;
+    }
+
+    // 强制迁移需要 CLI 确认
+    if (alreadyMigrated && config.ForceMigration)
+    {
+        Console.WriteLine("⚠️  WARNING: Force migration is enabled!");
+        Console.WriteLine($"This will re-migrate all data from {migrateFrom} to {targetType}.");
+        Console.WriteLine("Existing data in target storage may be duplicated.");
+        Console.Write("Do you want to continue? (yes/no): ");
+
+        string? response = Console.ReadLine();
+        if (!string.Equals(response, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Force migration cancelled by user.");
+            return;
+        }
+
+        Console.WriteLine("Force migration confirmed. Proceeding...");
+    }
+
     try
     {
         int migratedCount = 0;
@@ -155,6 +188,9 @@ static void ExecuteAutoMigration(WebApplication app)
             Console.WriteLine("Auto-migrating data from LiteDB to LocalFileStorage...");
             migratedCount = migrationService.MigrateToLocalFileStorage(config.ClearSourceAfterMigration);
         }
+
+        // 记录迁移标记
+        marker.MarkMigrationCompleted(migrateFrom.Value, targetType, migratedCount, config.ClearSourceAfterMigration);
 
         Console.WriteLine($"Auto-migration completed. Migrated {migratedCount} entries.");
     }

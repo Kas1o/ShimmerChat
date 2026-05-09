@@ -26,6 +26,12 @@ namespace ShimmerChat.Singletons
         public bool ClearSourceAfterMigration { get; set; } = false;
 
         /// <summary>
+        /// 强制迁移模式（即使已经有迁移标记也执行迁移）
+        /// 需要 CLI 确认
+        /// </summary>
+        public bool ForceMigration { get; set; } = false;
+
+        /// <summary>
         /// 获取存储类型枚举
         /// </summary>
         /// <returns>存储类型枚举值</returns>
