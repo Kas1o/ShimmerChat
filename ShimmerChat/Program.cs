@@ -28,6 +28,9 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddLocalization(option => option.ResourcesPath = "Resources");
 
+// 配置 KV 数据存储
+ConfigureKVDataStorage(builder);
+
 builder.Services.AddSingleton<ICompletionService, CompletionServiceV1>();
 builder.Services.AddSingleton<ICompletionServiceV2, CompletionServiceV2>();
 builder.Services.AddSingleton<IContextBuilderService, ContextBuilderServiceV1>();
@@ -37,11 +40,13 @@ builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
 builder.Services.AddSingleton<IToolService, ToolServiceV1>();
 builder.Services.AddSingleton<IPopupService, PopupService>();
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
-builder.Services.AddSingleton<IKVDataService, LocalFileStorageKVData>();
 builder.Services.AddSingleton<IContextModifierService, ContextModifierServiceV1>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
 
 var app = builder.Build();
+
+// 执行自动迁移（如果需要）
+ExecuteAutoMigration(app);
 
 var supportedCultures = new[]
 {
@@ -81,3 +86,80 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.Run();
+
+return;
+
+// 配置 KV 数据存储服务
+static void ConfigureKVDataStorage(WebApplicationBuilder builder)
+{
+    var config = builder.Configuration.GetSection("KVDataStorage").Get<KVDataStorageConfig>() ?? new KVDataStorageConfig();
+    builder.Services.AddSingleton(config);
+
+    // 始终注册两种存储实现（用于迁移服务）
+    builder.Services.AddSingleton<LocalFileStorageKVData>();
+    builder.Services.AddSingleton<LiteDBKVData>();
+    builder.Services.AddSingleton<KVDataMigrationService>();
+
+    // 根据配置注册 IKVDataService 的实现
+    switch (config.GetStorageType())
+    {
+        case KVStorageType.LiteDB:
+            Console.WriteLine("Using LiteDB for KV data storage");
+            builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LiteDBKVData>());
+            break;
+        case KVStorageType.LocalFileStorage:
+        default:
+            Console.WriteLine("Using LocalFileStorage for KV data storage");
+            builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LocalFileStorageKVData>());
+            break;
+    }
+}
+
+// 执行自动迁移
+static void ExecuteAutoMigration(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var config = scope.ServiceProvider.GetRequiredService<KVDataStorageConfig>();
+
+    if (!config.AutoMigrateOnStartup || string.IsNullOrEmpty(config.AutoMigrateFrom))
+        return;
+
+    var migrationService = scope.ServiceProvider.GetRequiredService<KVDataMigrationService>();
+    var migrateFrom = config.GetAutoMigrateFromType();
+
+    if (migrateFrom == null)
+    {
+        Console.WriteLine($"Warning: Invalid AutoMigrateFrom value: {config.AutoMigrateFrom}");
+        return;
+    }
+
+    var targetType = config.GetStorageType();
+
+    if (migrateFrom == targetType)
+    {
+        Console.WriteLine("Warning: AutoMigrateFrom is the same as target storage type, skipping migration");
+        return;
+    }
+
+    try
+    {
+        int migratedCount = 0;
+
+        if (migrateFrom == KVStorageType.LocalFileStorage && targetType == KVStorageType.LiteDB)
+        {
+            Console.WriteLine("Auto-migrating data from LocalFileStorage to LiteDB...");
+            migratedCount = migrationService.MigrateToLiteDB(config.ClearSourceAfterMigration);
+        }
+        else if (migrateFrom == KVStorageType.LiteDB && targetType == KVStorageType.LocalFileStorage)
+        {
+            Console.WriteLine("Auto-migrating data from LiteDB to LocalFileStorage...");
+            migratedCount = migrationService.MigrateToLocalFileStorage(config.ClearSourceAfterMigration);
+        }
+
+        Console.WriteLine($"Auto-migration completed. Migrated {migratedCount} entries.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error during auto-migration: {ex.Message}");
+    }
+}

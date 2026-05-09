@@ -1,16 +1,32 @@
 using ShimmerChatLib.Interface;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
 namespace ShimmerChat.Singletons
 {
     /// <summary>
+    /// KV 数据条目
+    /// </summary>
+    public class KVDataItem
+    {
+        public string SpaceId { get; set; } = string.Empty;
+        public string Key { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+    }
+
+    /// <summary>
     /// 本地文件存储KV数据服务实现
     /// </summary>
     public class LocalFileStorageKVData : IKVDataService
     {
         private readonly string root;
+
+        /// <summary>
+        /// 获取根目录路径
+        /// </summary>
+        public string RootPath => root;
 
 		/// <summary>
 		/// 初始化 LocalFileStorageKVData 实例
@@ -168,6 +184,89 @@ namespace ShimmerChat.Singletons
                 sanitized = sanitized.Replace(c, '_');
             }
             return sanitized;
+        }
+
+        /// <summary>
+        /// 获取所有空间 ID 列表
+        /// </summary>
+        /// <returns>空间 ID 列表</returns>
+        public IEnumerable<string> GetAllSpaceIds()
+        {
+            if (!Directory.Exists(root))
+                yield break;
+
+            foreach (var dir in Directory.GetDirectories(root))
+            {
+                yield return Path.GetFileName(dir);
+            }
+        }
+
+        /// <summary>
+        /// 获取指定空间下的所有键
+        /// </summary>
+        /// <param name="spaceId">空间 ID</param>
+        /// <returns>键列表</returns>
+        public IEnumerable<string> GetAllKeys(string spaceId)
+        {
+            string spaceFolder = GetSpaceFolderPath(spaceId);
+            if (!Directory.Exists(spaceFolder))
+                yield break;
+
+            foreach (var file in Directory.GetFiles(spaceFolder, "*.json"))
+            {
+                yield return Path.GetFileNameWithoutExtension(file);
+            }
+        }
+
+        /// <summary>
+        /// 获取指定空间下的所有条目
+        /// </summary>
+        /// <param name="spaceId">空间 ID</param>
+        /// <returns>条目列表</returns>
+        public IEnumerable<KVDataItem> GetAllEntries(string spaceId)
+        {
+            string spaceFolder = GetSpaceFolderPath(spaceId);
+            if (!Directory.Exists(spaceFolder))
+                yield break;
+
+            foreach (var file in Directory.GetFiles(spaceFolder, "*.json"))
+            {
+                string key = Path.GetFileNameWithoutExtension(file);
+                string? value = Read(spaceId, key);
+                if (value != null)
+                {
+                    yield return new KVDataItem
+                    {
+                        SpaceId = spaceId,
+                        Key = key,
+                        Value = value
+                    };
+                }
+            }
+        }
+
+        /// <summary>
+        /// 批量写入条目
+        /// </summary>
+        /// <param name="entries">条目列表</param>
+        public void BulkWrite(IEnumerable<KVDataItem> entries)
+        {
+            foreach (var entry in entries)
+            {
+                Write(entry.SpaceId, entry.Key, entry.Value);
+            }
+        }
+
+        /// <summary>
+        /// 清空所有数据
+        /// </summary>
+        public void ClearAll()
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, true);
+                InitializeKVDataFolder();
+            }
         }
     }
 }
