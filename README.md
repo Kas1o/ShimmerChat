@@ -148,7 +148,9 @@ ShimmerChat 提供了灵活的插件系统，自带了以下功能扩展：
 
 ## 📄 第三方许可
 
+- [LiteDB](https://github.com/mbdavid/LiteDB) - MIT license
 - [Markdig](https://github.com/xoofx/markdig) - BSD-2-Clause license
+- [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) - MIT license
 - [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) - MIT license
 - [qdrant-dotnet](https://github.com/qdrant/qdrant-dotnet) - Apache-2.0 license
 - [SharperLLM](https://github.com/Kas1o/SharperLLM) - MIT license
