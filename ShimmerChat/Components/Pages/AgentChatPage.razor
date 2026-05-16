@@ -20,7 +20,7 @@
 			<label>You are having chat with: </label>
 			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.name</h2>
 		</div>
-		<div id="chat-main" @ref="ChatMainElement">
+		<div id="chat-main" @ref="ChatMainElement" @onscroll="OnChatScroll">
 			@if (virtualize)
 			{
 				<Virtualize  Items="messages" Context="message" >
@@ -37,6 +37,14 @@
 			<br />
 			<br />
 		</div>
+		@if (!isUserAtBottom)
+		{
+			<button id="scroll-to-bottom-btn" @onclick="ScrollToBottomManually">
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+					<path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+				</svg>
+			</button>
+		}
 		<div id="input-box" class="shimmer-shadow-box">
 			<!-- 输入框内容 -->
 			<textarea value="@inputText" @oninput="OnInput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
@@ -100,6 +108,32 @@
 		padding: 15px;
 		z-index: 100;
 		box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+		}
+
+		/* 回到底部按钮 */
+		#scroll-to-bottom-btn {
+			position: absolute;
+			bottom: 120px;
+			left: 50%;
+			transform: translateX(-50%);
+			z-index: 200;
+			width: 40px;
+			height: 40px;
+			border-radius: 50%;
+			border: none;
+			background-color: var(--color-primary);
+			color: var(--color-text-on-primary);
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			box-shadow: var(--shadow-md);
+			transition: var(--transition);
+		}
+
+		#scroll-to-bottom-btn:hover {
+			background-color: var(--color-primary-dark);
+			box-shadow: var(--shadow-lg);
 		}
 
 		#input-box > textarea{
@@ -232,6 +266,7 @@
 	bool throwExceptionInsteadOfPopupErrorMessage = false; // 抛出异常设置
 	bool autoScrollDown = true; // 自动滚动设置
 	bool virtualize = false;
+	bool isUserAtBottom = true; // 用户是否位于底部
 
 	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
 	#endregion
@@ -267,6 +302,33 @@
 	void BackToAgentPage()
 	{
 		navigation.NavigateTo($"/agent/{AgentGuid}");
+	}
+	async void OnChatScroll()
+	{
+		try
+		{
+			bool atBottom = await JS.InvokeAsync<bool>("isScrolledToBottom", ChatMainElement, 50);
+			if (isUserAtBottom != atBottom)
+			{
+				isUserAtBottom = atBottom;
+				await InvokeAsync(StateHasChanged);
+			}
+		}
+		catch (Exception)
+		{
+		}
+	}
+	async void ScrollToBottomManually()
+	{
+		try
+		{
+			await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+			isUserAtBottom = true;
+			await InvokeAsync(StateHasChanged);
+		}
+		catch (Exception)
+		{
+		}
 	}
 	#endregion
 
@@ -426,7 +488,7 @@
 								generatingMessage.message.toolCalls = rsp.Body.toolCalls;
 						}
 
-						if (autoScrollDown)
+						if (autoScrollDown && isUserAtBottom)
 						{
 							await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
 						}
@@ -470,7 +532,7 @@
 
 					ChatPluginPanelContainer?.OnToolCallResult(newMessage);
 
-					if (autoScrollDown)
+					if (autoScrollDown && isUserAtBottom)
 					{
 						JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
 					}
@@ -560,7 +622,7 @@
 								continuationMessage.CurrentVersion.thinking = rsp.Body.thinking;
 						}
 
-						if (autoScrollDown)
+						if (autoScrollDown && isUserAtBottom)
 						{
 							await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
 						}

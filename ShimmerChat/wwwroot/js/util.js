@@ -84,3 +84,15 @@ window.scrollToBottom = function (element) {
         console.error('Error scrolling to bottom:', error);
     }
 };
+
+// 检查元素是否滚动到底部（允许一定误差）
+window.isScrolledToBottom = function (element, threshold) {
+    try {
+        if (!element) return true;
+        var diff = element.scrollHeight - element.scrollTop - element.clientHeight;
+        return diff <= threshold;
+    } catch (error) {
+        console.error('Error checking scroll position:', error);
+        return true;
+    }
+};
