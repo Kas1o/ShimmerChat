@@ -162,4 +162,10 @@
   <data name="API ENABLE CONTINUE" xml:space="preserve">
     <value />
   </data>
+  <data name="API REASONING EFFORT" xml:space="preserve">
+    <value />
+  </data>
+  <data name="API REASONING EFFORT OFF" xml:space="preserve">
+    <value />
+  </data>
 </root>

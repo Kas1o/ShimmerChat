@@ -188,8 +188,14 @@
                 <input type="checkbox" @bind="topAPISetting.DeepSeekEnableContinuation" />
                 <label>@l["API ASIS"]</label>
                 <input type="checkbox" @bind="topAPISetting.DeepSeekAsIs" />
-                <label>@l["API ENABLE THINKING"]</label>
-                <input type="checkbox" @bind="topAPISetting.DeepSeekEnableThinking" />
+                <div>
+                    <label>@l["API REASONING EFFORT"]</label>
+                    <select class="shimmer-input" @bind="topAPISetting.DeepSeekReasoningEffort">
+                        <option value="">@l["API REASONING EFFORT OFF"]</option>
+                        <option value="high">High</option>
+                        <option value="max">Max</option>
+                    </select>
+                </div>
             }
         </div>
     </div>

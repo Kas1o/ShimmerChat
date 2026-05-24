@@ -1,4 +1,4 @@
-﻿﻿﻿using SharperLLM.API;
+﻿using SharperLLM.API;
 using System.Text.Json.Serialization;
 
 namespace ShimmerChatLib
@@ -46,7 +46,7 @@ namespace ShimmerChatLib
 		/// <summary>
 		/// 是否启用 DeepSeek 思考模式 (reasoning)
 		/// </summary>
-		public bool DeepSeekEnableThinking { get; set; } = false;
+		public string? DeepSeekReasoningEffort { get; set; } = null;
 
 		#endregion DeepSeek
 
@@ -113,8 +113,12 @@ namespace ShimmerChatLib
 						_as_is: DeepSeekAsIs
 					)
 					{
-						CustomRequestProperties = DeepSeekEnableThinking
-							? new Dictionary<string, object> { ["thinking"] = new { type = "enabled" } }
+						CustomRequestProperties = !string.IsNullOrEmpty(DeepSeekReasoningEffort)
+							? new Dictionary<string, object>
+							{
+								["reasoning_effort"] = DeepSeekReasoningEffort,
+								["thinking"] = new { type = "enabled" }
+							}
 							: new Dictionary<string, object> { ["thinking"] = new { type = "disabled" } }
 					},
 
@@ -150,7 +154,7 @@ namespace ShimmerChatLib
 				DeepSeekCtx = DeepSeekCtx,
 				DeepSeekEnableContinuation = DeepSeekEnableContinuation,
 				DeepSeekAsIs = DeepSeekAsIs,
-				DeepSeekEnableThinking = DeepSeekEnableThinking,
+				DeepSeekReasoningEffort = DeepSeekReasoningEffort,
 
 				OllamaUrl = OllamaUrl,
 				OllamaModel = OllamaModel,
