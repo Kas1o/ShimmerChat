@@ -123,7 +123,11 @@ namespace ShimmerChatBuiltin.SubAgent
                     {
                         var toolResult = await _toolService.ExecuteToolAsync(
                             toolCall.name, toolCall.arguments ?? "", subChat, subAgent);
-                        allMessages.Add((new ChatMessage { Content = toolResult ?? "" }, PromptBuilder.From.tool_result));
+                        allMessages.Add((new ChatMessage
+                        {
+                            Content = toolResult ?? "",
+                            id = toolCall.id
+                        }, PromptBuilder.From.tool_result));
                     }
                 }
                 else
@@ -229,17 +233,27 @@ namespace ShimmerChatBuiltin.SubAgent
             return outputMode switch
             {
                 "FullJson" => JsonConvert.SerializeObject(
-                    messages.Select(m => new
+                    messages.Select(m =>
                     {
-                        role = m.Item2 switch
+                        var obj = new Dictionary<string, object>
                         {
-                            PromptBuilder.From.assistant => "assistant",
-                            PromptBuilder.From.tool_result => "tool_result",
-                            _ => m.Item2.ToString()
-                        },
-                        content = m.Item1.Content,
-                        tool_calls = m.Item1.toolCalls,
-                        thinking = m.Item1.thinking
+                            ["role"] = m.Item2 switch
+                            {
+                                PromptBuilder.From.assistant => "assistant",
+                                PromptBuilder.From.tool_result => "tool",
+                                PromptBuilder.From.system => "system",
+                                PromptBuilder.From.user => "user",
+                                _ => m.Item2.ToString()
+                            },
+                            ["content"] = m.Item1.Content
+                        };
+                        if (m.Item1.toolCalls != null)
+                            obj["tool_calls"] = m.Item1.toolCalls;
+                        if (m.Item1.thinking != null)
+                            obj["thinking"] = m.Item1.thinking;
+                        if (m.Item1.id != null)
+                            obj["tool_call_id"] = m.Item1.id;
+                        return obj;
                     }),
                     Formatting.Indented),
                 _ => messages[^1].Item1.Content
