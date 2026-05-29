@@ -168,4 +168,10 @@
   <data name="API REASONING EFFORT OFF" xml:space="preserve">
     <value />
   </data>
+  <data name="PseudoAPI Info Title" xml:space="preserve">
+    <value>Pseudo API (No Generation)</value>
+  </data>
+  <data name="PseudoAPI Info Description" xml:space="preserve">
+    <value>This API type does not perform any AI generation. Instead, it directly returns the last message content as the response. It is intended for advanced custom Agentic workflows. Regular users do not need to use this.</value>
+  </data>
 </root>

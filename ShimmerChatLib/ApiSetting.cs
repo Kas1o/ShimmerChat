@@ -122,9 +122,11 @@ namespace ShimmerChatLib
 							: new Dictionary<string, object> { ["thinking"] = new { type = "disabled" } }
 					},
 
-					ApiSettingType.Ollama => throw new NotImplementedException("Ollama support not implemented yet."),
+		ApiSettingType.Ollama => throw new NotImplementedException("Ollama support not implemented yet."),
 
-					_ => throw new InvalidOperationException($"Unsupported API type: {Type}")
+				ApiSettingType.Pseudo => new PseudoAPI(),
+
+				_ => throw new InvalidOperationException($"Unsupported API type: {Type}")
 				};
 			}
 		}
@@ -171,6 +173,7 @@ namespace ShimmerChatLib
 		Kobold,
 		Ollama,
 		OpenAI,
-		DeepSeek
+		DeepSeek,
+		Pseudo
 	}
 }

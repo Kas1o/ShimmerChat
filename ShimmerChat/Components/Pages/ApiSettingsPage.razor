@@ -27,7 +27,16 @@
             <option value="@ApiSettingType.OpenAI">openai</option>
             <option value="@ApiSettingType.DeepSeek">deepseek</option>
             <option value="@ApiSettingType.Ollama">ollama</option>
+            <option value="@ApiSettingType.Pseudo">pseudo</option>
         </select>
+        
+        @if (topAPISetting.Type == ApiSettingType.Pseudo)
+        {
+            <div class="alert alert-info" style="margin-top: 12px; padding: 12px; background-color: #e8f4fd; border: 1px solid #b6d4fe; border-radius: 4px;">
+                <strong>@l["PseudoAPI Info Title"]</strong><br/>
+                @l["PseudoAPI Info Description"]
+            </div>
+        }
         
         <!-- Completion Type Selection -->
         <h5>@l["Completion Type:"]</h5>

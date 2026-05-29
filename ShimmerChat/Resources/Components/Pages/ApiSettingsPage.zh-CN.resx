@@ -168,4 +168,10 @@
   <data name="API REASONING EFFORT OFF" xml:space="preserve">
     <value>关闭</value>
   </data>
+  <data name="PseudoAPI Info Title" xml:space="preserve">
+    <value>伪 API（不进行生成）</value>
+  </data>
+  <data name="PseudoAPI Info Description" xml:space="preserve">
+    <value>此 API 类型不会执行任何 AI 生成，而是直接返回最后一段消息内容作为响应。它专为高级自定义的 Agentic 工作流而设计，普通用户无需使用。</value>
+  </data>
 </root>

@@ -1,0 +1,327 @@
+@attribute [PluginPanel("SubAgentConfiguration", "Configure sub-agents for advanced Agentic workflows", PanelDisplayPlace.Settings)]
+
+@using ShimmerChatLib.Interface
+@using ShimmerChatBuiltin.SubAgent
+@using ShimmerChatLib
+@using Newtonsoft.Json
+
+@inject IKVDataService pluginData
+@inject IToolService toolService
+@inject IContextModifierService contextModifierService
+
+
+
+<div class="shimmer-content p-4">
+    <h2>SubAgent Configuration</h2>
+    <p class="text-muted">Configure sub-agents for use with the SubAgentGeneration context modifier.</p>
+
+    <div class="shimmer-group">
+        <div class="d-flex gap-3 mt-3 align-items-center flex-wrap">
+            <input type="text" class="shimmer-input" @bind="newConfigName" placeholder="New sub-agent name" />
+            <button class="btn btn-primary" @onclick="CreateNewConfig" disabled="@string.IsNullOrWhiteSpace(newConfigName)">
+                Create
+            </button>
+        </div>
+    </div>
+
+    <div class="shimmer-group mt-4">
+        <h4>Existing Sub-Agents (@configs.Count)</h4>
+        @if (configs.Count == 0)
+        {
+            <p class="text-muted">No sub-agents configured yet.</p>
+        }
+        else
+        {
+            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:12px;">
+                @foreach (var cfg in configs)
+                {
+                    <div class="card p-3 cursor-pointer @(selectedConfig == cfg ? "border-primary shadow-md" : "")"
+                         style="min-width:200px;"
+                         @onclick="() => SelectConfig(cfg)">
+                        <div class="d-flex justify-content-between w-100">
+                            <strong>@cfg.Name</strong>
+                            <button class="btn btn-sm bg-danger text-white" @onclick:stopPropagation
+                                    @onclick="async () => await DeleteConfig(cfg)" title="Delete">
+                                X
+                            </button>
+                        </div>
+                        <div class="text-sm text-muted mt-1">
+                            API: @(GetApiName(cfg.SelectedApiIndex))
+                        </div>
+                        <div class="text-sm text-muted">
+                            Tools: @cfg.EnabledToolNames.Count | Modifiers: @cfg.EnabledModifiers.Count | Output: @cfg.OutputMode
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (selectedConfig != null)
+    {
+        <div class="shimmer-group mt-4">
+            <h3>Edit: @selectedConfig.Name</h3>
+
+            <div class="mt-3">
+                <label><strong>Name</strong></label>
+                <input type="text" class="shimmer-input" @bind="selectedConfig.Name" />
+            </div>
+
+            <div class="mt-3">
+                <label><strong>API Setting</strong></label>
+                <select class="form-select" @bind="selectedConfig.SelectedApiIndex">
+                    <option value="-1">Inherit Global</option>
+                    @for (int i = 0; i < apiSettings.Count; i++)
+                    {
+                        <option value="@i">@apiSettings[i].Name (@apiSettings[i].Type)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="mt-3">
+                <label><strong>Output Mode</strong></label>
+                <select class="form-select" @bind="selectedConfig.OutputMode">
+                    <option value="LastMessage">Last Message (text only)</option>
+                    <option value="FullJson">Full JSON (serialized interaction)</option>
+                </select>
+                <p class="text-sm text-muted mt-1">
+                    <em>Last Message: returns only the final AI message text. Full JSON: serializes the entire sub-agent interaction (AI + tool calls + results).</em>
+                </p>
+            </div>
+
+            <div class="mt-4">
+                <h5>Tools</h5>
+                <p class="text-sm text-muted">Select tools available to this sub-agent.</p>
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    @foreach (var tool in toolService.LoadedTools)
+                    {
+                        var toolName = tool.GetToolDefinition().name;
+                        var isChecked = selectedConfig.EnabledToolNames.Contains(toolName);
+                        <label class="d-flex align-items-center gap-1" style="cursor:pointer;">
+                            <input type="checkbox" checked="@isChecked"
+                                   @onchange="e => ToggleTool(toolName, (bool)(e.Value ?? false))" />
+                            @toolName
+                        </label>
+                    }
+                </div>
+                @if (toolService.LoadedTools.Count == 0)
+                {
+                    <p class="text-muted">No tools available.</p>
+                }
+            </div>
+
+            <div class="mt-4">
+                <h5>Context Modifiers</h5>
+                <p class="text-sm text-muted">Context modifiers applied to this sub-agent's generation.</p>
+                
+                @if (selectedConfig.EnabledModifiers.Count > 0)
+                {
+                    <table class="table table-sm mt-2">
+                        <thead>
+                            <tr>
+                                <th>Modifier</th>
+                                <th>Input</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int i = 0; i < selectedConfig.EnabledModifiers.Count; i++)
+                            {
+                                var mod = selectedConfig.EnabledModifiers[i];
+                                var capturedIndex = i;
+                                <tr>
+                                    <td>@mod.Name</td>
+                                    <td>
+                                        <input type="text" class="shimmer-input" @bind="mod.Input" style="min-width:200px;" />
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm bg-danger text-white"
+                                                @onclick="() => RemoveModifier(capturedIndex)">
+                                            X
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">No context modifiers configured.</p>
+                }
+
+                <div class="d-flex gap-2 mt-2 align-items-center">
+                    <select class="form-select" @bind="selectedModifierName" style="max-width:300px;">
+                        <option value="">-- Select modifier --</option>
+                        @foreach (var mod in availableModifierNames)
+                        {
+                            <option value="@mod">@mod</option>
+                        }
+                    </select>
+                    <input type="text" class="shimmer-input" @bind="selectedModifierInput"
+                           placeholder="Input value" style="max-width:300px;" />
+                    <button class="btn btn-secondary" @onclick="AddModifier"
+                            disabled="@(string.IsNullOrWhiteSpace(selectedModifierName))">
+                        Add
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button class="btn btn-primary" @onclick="SaveAll" disabled="@isLoading">
+                    @(isLoading ? "Saving..." : "Save All")
+                </button>
+                @if (!string.IsNullOrEmpty(statusMessage))
+                {
+                    <span class="ms-3 @(statusType == "success" ? "text-success" : "text-danger")">
+                        @statusMessage
+                    </span>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    List<SubAgentConfig> configs = [];
+    SubAgentConfig? selectedConfig;
+    string newConfigName = "";
+    string selectedModifierName = "";
+    string selectedModifierInput = "";
+    bool isLoading;
+    string statusMessage = "";
+    string statusType = "success";
+
+    List<ApiSetting> apiSettings = [];
+    List<string> availableModifierNames = [];
+
+    protected override void OnInitialized()
+    {
+        LoadConfigs();
+        LoadApiSettings();
+        LoadModifierNames();
+    }
+
+    void LoadConfigs()
+    {
+        var json = pluginData.Read("SubAgent", "configs");
+        configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
+    }
+
+    void LoadApiSettings()
+    {
+        var json = pluginData.Read("ApiSettings", "apiSetting") ?? "[]";
+        apiSettings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? [];
+    }
+
+    void LoadModifierNames()
+    {
+        availableModifierNames = contextModifierService.LoadedModifiers
+            .Select(m => m.info.Name)
+            .OrderBy(n => n)
+            .ToList();
+    }
+
+    string GetApiName(int index)
+    {
+        if (index == -1)
+            return "Inherit Global";
+        if (index >= 0 && index < apiSettings.Count)
+            return apiSettings[index].Name;
+        return "Default";
+    }
+
+    void CreateNewConfig()
+    {
+        if (string.IsNullOrWhiteSpace(newConfigName))
+            return;
+
+        var config = new SubAgentConfig { Name = newConfigName.Trim() };
+        configs.Add(config);
+        selectedConfig = config;
+        newConfigName = "";
+    }
+
+    void SelectConfig(SubAgentConfig config)
+    {
+        selectedConfig = config;
+    }
+
+    async Task DeleteConfig(SubAgentConfig config)
+    {
+        configs.Remove(config);
+        if (selectedConfig == config)
+            selectedConfig = null;
+        await SaveConfigsAsync();
+    }
+
+    void ToggleTool(string toolName, bool isChecked)
+    {
+        if (selectedConfig == null) return;
+        if (isChecked && !selectedConfig.EnabledToolNames.Contains(toolName))
+            selectedConfig.EnabledToolNames.Add(toolName);
+        else if (!isChecked)
+            selectedConfig.EnabledToolNames.Remove(toolName);
+    }
+
+    void AddModifier()
+    {
+        if (selectedConfig == null || string.IsNullOrWhiteSpace(selectedModifierName))
+            return;
+
+        selectedConfig.EnabledModifiers.Add(new SubAgentModifierConfig
+        {
+            Name = selectedModifierName,
+            Input = selectedModifierInput
+        });
+        selectedModifierName = "";
+        selectedModifierInput = "";
+    }
+
+    void RemoveModifier(int index)
+    {
+        if (selectedConfig == null) return;
+        selectedConfig.EnabledModifiers.RemoveAt(index);
+    }
+
+    async Task SaveConfigsAsync()
+    {
+        try
+        {
+            var json = JsonConvert.SerializeObject(configs, Formatting.Indented);
+            pluginData.Write("SubAgent", "configs", json);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Save configs failed: {ex.Message}");
+        }
+    }
+
+    async void SaveAll()
+    {
+        try
+        {
+            isLoading = true;
+            await SaveConfigsAsync();
+            ShowStatus("Saved successfully", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Save failed: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    async void ShowStatus(string message, string type)
+    {
+        statusMessage = message;
+        statusType = type;
+        StateHasChanged();
+        await Task.Delay(3000);
+        statusMessage = "";
+        StateHasChanged();
+    }
+}
