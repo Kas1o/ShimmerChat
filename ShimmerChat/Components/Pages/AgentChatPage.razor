@@ -699,6 +699,7 @@
 		}
 
 		messages.Remove(message);
+		GetDirty();
 		await Refresh();
 	}
 	async void RegenerateFromMessage(Message message)
