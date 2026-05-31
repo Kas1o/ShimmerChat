@@ -47,6 +47,9 @@ namespace ShimmerChatBuiltin.SubAgent
                 await SubAgentRunner.RunAsync(llmApi, apiSetting, baseClone, config, toolDefinitions, subAgent, subChat, _toolService, _serviceProvider))
                 .GetAwaiter().GetResult();
 
+            if (config.OutputMode == "None")
+                return;
+
             var outputText = FormatOutput(outputMessages, config.OutputMode);
 
             var parentMessages = promptBuilder.Messages.ToList();

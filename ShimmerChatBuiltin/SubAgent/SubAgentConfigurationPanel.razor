@@ -83,9 +83,10 @@
                 <select class="form-select" @bind="selectedConfig.OutputMode">
                     <option value="LastMessage">Last Message (text only)</option>
                     <option value="FullJson">Full JSON (serialized interaction)</option>
+                    <option value="None">None (no output returned)</option>
                 </select>
                 <p class="text-sm text-muted mt-1">
-                    <em>Last Message: returns only the final AI message text. Full JSON: serializes the entire sub-agent interaction (AI + tool calls + results).</em>
+                    <em>Last Message: returns only the final AI message text. Full JSON: serializes the entire sub-agent interaction (AI + tool calls + results). None: sub-agent executes silently, no output is returned to parent.</em>
                 </p>
             </div>
 
