@@ -189,4 +189,52 @@
   <data name="USE_OPENAI_TEXT_COMPLETION_WARNING" xml:space="preserve">
     <value>不推荐同时使用 OpenAI API 和 文本补全模式 ，绝大多数API提供者不支持这样的组合。</value>
   </data>
+  <data name="PRESET_LABEL" xml:space="preserve">
+    <value>预设方案：</value>
+  </data>
+  <data name="PRESET_NEW" xml:space="preserve">
+    <value>新建</value>
+  </data>
+  <data name="PRESET_CLONE" xml:space="preserve">
+    <value>克隆</value>
+  </data>
+  <data name="PRESET_RENAME" xml:space="preserve">
+    <value>重命名</value>
+  </data>
+  <data name="PRESET_DELETE" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="PRESET_NEW_TITLE" xml:space="preserve">
+    <value>新建预设方案</value>
+  </data>
+  <data name="PRESET_RENAME_TITLE" xml:space="preserve">
+    <value>重命名预设方案</value>
+  </data>
+  <data name="PRESET_NAME_PLACEHOLDER" xml:space="preserve">
+    <value>输入预设方案名称...</value>
+  </data>
+  <data name="PRESET_DELETE_CONFIRM_TITLE" xml:space="preserve">
+    <value>确认删除</value>
+  </data>
+  <data name="PRESET_DELETE_CONFIRM_MSG" xml:space="preserve">
+    <value>确定要删除预设方案</value>
+  </data>
+  <data name="CANCEL" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="CONFIRM" xml:space="preserve">
+    <value>确认</value>
+  </data>
+  <data name="CONFIRM_DELETE" xml:space="preserve">
+    <value>确认删除</value>
+  </data>
+  <data name="EDIT" xml:space="preserve">
+    <value>编辑</value>
+  </data>
+  <data name="REMOVE" xml:space="preserve">
+    <value>移除</value>
+  </data>
+  <data name="SAVE" xml:space="preserve">
+    <value>保存</value>
+  </data>
 </root>

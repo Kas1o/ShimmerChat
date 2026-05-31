@@ -1,10 +1,10 @@
 @page "/contextmanager"
 @using ShimmerChat.Components.SubComponents
+@using ShimmerChatLib.Interface
 @inject NavigationManager Navigation
 @inject IStringLocalizer<ContextManagerPage> l
 @inject IContextModifierService contextModifierService
 @inject IPopupService popupService
-
 <h3>@l["TITLE"] </h3>
 
 @if (apiSettings != null)
@@ -26,12 +26,75 @@ else
     }
 }
 
-<!-- 上下文修改器 -->
-<h4>@l["CONTEXT_MODIFIER_TITLE"]</h4>
-
-<button class="btn btn-primary" style="margin:5px" @onclick="ShowAddModifierPopup">@l["CM_ADD"]</button>
-
+<!-- 预设管理栏 -->
 <div class="shimmer-group" style="margin-top:16px;">
+    <h5>@l["PRESET_LABEL"]</h5>
+    <select @bind="_selectedPresetId" class="form-select" style="max-width: 400px;">
+        @foreach (var preset in contextModifierService.Presets)
+        {
+            <option value="@preset.Id">@preset.Name</option>
+        }
+    </select>
+    <div style="margin-top: 8px;">
+        <button class="btn btn-primary btn-sm" @onclick="ShowNewPresetDialog">@l["PRESET_NEW"]</button>
+        <button class="btn btn-secondary btn-sm" style="margin-left: 5px;" @onclick="CloneCurrentPreset">@l["PRESET_CLONE"]</button>
+        <button class="btn btn-secondary btn-sm" style="margin-left: 5px;" @onclick="ShowRenamePresetDialog">@l["PRESET_RENAME"]</button>
+        <button class="btn btn-danger btn-sm" style="margin-left: 5px;" @onclick="() => DeleteCurrentPreset()"
+                disabled="@(contextModifierService.Presets.Count <= 1)">@l["PRESET_DELETE"]</button>
+    </div>
+</div>
+
+<!-- 预设命名弹窗 -->
+@if (_showPresetNameDialog)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@_presetNameDialogTitle</h5>
+                    <button type="button" class="btn-close" @onclick="HidePresetNameDialog"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control" @bind="_presetNameInput"
+                           @bind:event="oninput" placeholder="@l["PRESET_NAME_PLACEHOLDER"]" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HidePresetNameDialog">@l["CANCEL"]</button>
+                    <button type="button" class="btn btn-primary" @onclick="ConfirmPresetName"
+                            disabled="@string.IsNullOrWhiteSpace(_presetNameInput)">@l["CONFIRM"]</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- 删除确认弹窗 -->
+@if (_showDeleteConfirmDialog)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@l["PRESET_DELETE_CONFIRM_TITLE"]</h5>
+                    <button type="button" class="btn-close" @onclick="HideDeleteConfirm"></button>
+                </div>
+                <div class="modal-body">
+                    <p>@l["PRESET_DELETE_CONFIRM_MSG"] <strong>@contextModifierService.ActivePresetName</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideDeleteConfirm">@l["CANCEL"]</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDeletePreset">@l["CONFIRM_DELETE"]</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- 上下文修改器 -->
+<div class="shimmer-group" style="margin-top:16px;">
+    <h4>@l["CONTEXT_MODIFIER_TITLE"]</h4>
+    <button class="btn btn-primary" style="margin:5px" @onclick="ShowAddModifierPopup">@l["CM_ADD"]</button>
+
     <h5>@l["ACTIVE_CM"]</h5>
     @if (contextModifierService.ActivatedModifiers.Any())
     {
@@ -61,8 +124,8 @@ else
                         </div>
                     </div>
                     <div>
-                        <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => ShowEditModifierPopup(contextModifierService.ActivatedModifiers.IndexOf(modifier))">Edit</button>
-                        <button class="btn btn-danger btn-sm" @onclick="() => RemoveModifier(contextModifierService.ActivatedModifiers.IndexOf(modifier))">Remove</button>
+                        <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => ShowEditModifierPopup(contextModifierService.ActivatedModifiers.IndexOf(modifier))">@l["EDIT"]</button>
+                        <button class="btn btn-danger btn-sm" @onclick="() => RemoveModifier(contextModifierService.ActivatedModifiers.IndexOf(modifier))">@l["REMOVE"]</button>
                     </div>
                 </div>
             }
@@ -74,7 +137,7 @@ else
     }
 </div>
 
-<button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">Save</button>
+<button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">@l["SAVE"]</button>
 
     @if (_showAddModifierPopup)
     {
@@ -109,21 +172,17 @@ else
     {
         if (firstRender)
         {
-            // Load context modifiers after the component has rendered
-            await Task.Delay(1); // Small delay to ensure proper initialization
+            await Task.Delay(1);
             contextModifierService.LoadActivatedModifiers();
         }
     }
 
-    // 添加自定义弹窗组件引用
     private AddContextModifierPopup? _addModifierPopup;
     private EditContextModifierPopup? _editModifierPopup;
 
-    // ContextModifier相关变量
     private string? _selectedModifierName;
     private string _modifierInput = string.Empty;
 
-    // Edit ContextModifier相关变量
     private bool _showEditModifierPopup = false;
     private string? _editingModifierName;
     private string _editingModifierValue = string.Empty;
@@ -139,11 +198,9 @@ else
         contextModifierService.SaveActivatedModifiers();
         Navigation.NavigateTo(Navigation.Uri, true);
     }
-    
+
     private void NavigateToApiSettings()
     {
-        // 假设API设置页面的路由是 "/apisettings"
-        // 如果实际路由不同，请修改为正确的路由
         Navigation.NavigateTo("/apisettings");
     }
 
@@ -161,7 +218,6 @@ else
 
     private void OnAddModifierConfirmed(object result)
     {
-        // 解析弹窗返回的结果
         var modifierInfo = result as dynamic;
         if (modifierInfo != null)
         {
@@ -194,36 +250,22 @@ else
 
     private void OnEditModifierConfirmed(object result)
     {
-        // 解析弹窗返回的结果
         var modifierInfo = result as dynamic;
         if (modifierInfo != null && _editingModifierIndex >= 0)
         {
             string modifierName = modifierInfo.ModifierName;
             string inputValue = modifierInfo.InputValue;
-            
-            // 确保编辑的是正确的修改器（双重验证）
+
             if (_editingModifierIndex < contextModifierService.ActivatedModifiers.Count && 
                 contextModifierService.ActivatedModifiers[_editingModifierIndex].Name == modifierName)
             {
                 contextModifierService.ActivatedModifiers[_editingModifierIndex].Value = inputValue;
-                // 保存更改
                 contextModifierService.SaveActivatedModifiers();
             }
         }
         HideEditModifierPopup();
     }
 
-    private void AddModifier()
-    {
-        if (!string.IsNullOrEmpty(_selectedModifierName))
-        {
-            contextModifierService.ActivateModifier(_selectedModifierName, _modifierInput);
-            // 重置输入，以便添加下一个
-            _modifierInput = string.Empty;
-        }
-    }
-
-    // 拖拽排序相关变量和方法
     private int _dragIndex = -1;
     private int _dropTargetIndex = -1;
 
@@ -235,7 +277,6 @@ else
     private void HandleDragOver(int index)
     {
         _dropTargetIndex = index;
-        // 这里可以添加视觉反馈，比如高亮显示目标位置
     }
 
     private void HandleDrop()
@@ -251,5 +292,108 @@ else
     private void RemoveModifier(int modifierIdx)
     {
         contextModifierService.RemoveActivatedModifier(modifierIdx);
+    }
+
+    // ---- 预设管理 ----
+    private string _selectedPresetId
+    {
+        get => contextModifierService.ActivePresetId;
+        set
+        {
+            if (value != contextModifierService.ActivePresetId)
+                contextModifierService.SwitchToPreset(value);
+        }
+    }
+
+    private bool _showPresetNameDialog = false;
+    private string _presetNameDialogTitle = "";
+    private string _presetNameInput = "";
+    private bool _presetNameIsRename = false;
+
+    private bool _showDeleteConfirmDialog = false;
+
+    private void ShowNewPresetDialog()
+    {
+        _presetNameIsRename = false;
+        _presetNameInput = "";
+        _presetNameDialogTitle = l["PRESET_NEW_TITLE"];
+        _showPresetNameDialog = true;
+    }
+
+    private void ShowRenamePresetDialog()
+    {
+        _presetNameIsRename = true;
+        _presetNameInput = contextModifierService.ActivePresetName;
+        _presetNameDialogTitle = l["PRESET_RENAME_TITLE"];
+        _showPresetNameDialog = true;
+    }
+
+    private void HidePresetNameDialog()
+    {
+        _showPresetNameDialog = false;
+        _presetNameInput = "";
+    }
+
+    private void ConfirmPresetName()
+    {
+        if (string.IsNullOrWhiteSpace(_presetNameInput))
+            return;
+
+        if (_presetNameIsRename)
+        {
+            contextModifierService.RenamePreset(contextModifierService.ActivePresetId, _presetNameInput.Trim());
+        }
+        else
+        {
+            contextModifierService.CreatePreset(_presetNameInput.Trim());
+        }
+        HidePresetNameDialog();
+    }
+
+    private void CloneCurrentPreset()
+    {
+        var activePreset = contextModifierService.Presets
+            .FirstOrDefault(p => p.Id == contextModifierService.ActivePresetId);
+        if (activePreset == null)
+            return;
+
+        var baseName = activePreset.Name;
+        var newName = baseName + " - Copy";
+        var counter = 2;
+        while (contextModifierService.Presets.Any(p => p.Name == newName))
+        {
+            newName = $"{baseName} - Copy ({counter})";
+            counter++;
+        }
+
+        contextModifierService.CreatePreset(newName);
+
+        var newPreset = contextModifierService.Presets
+            .FirstOrDefault(p => p.Name == newName);
+        if (newPreset != null)
+        {
+            newPreset.Modifiers = activePreset.Modifiers
+                .Select(m => new ActivatedModifier { Name = m.Name, Value = m.Value, IsEnabled = m.IsEnabled })
+                .ToList();
+            contextModifierService.SaveActivatedModifiers();
+        }
+    }
+
+    private void DeleteCurrentPreset()
+    {
+        if (contextModifierService.Presets.Count <= 1)
+            return;
+        _showDeleteConfirmDialog = true;
+    }
+
+    private void HideDeleteConfirm()
+    {
+        _showDeleteConfirmDialog = false;
+    }
+
+    private void ConfirmDeletePreset()
+    {
+        contextModifierService.DeletePreset(contextModifierService.ActivePresetId);
+        _showDeleteConfirmDialog = false;
     }
 }

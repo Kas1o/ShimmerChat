@@ -189,4 +189,52 @@
   <data name="USE_OPENAI_TEXT_COMPLETION_WARNING" xml:space="preserve">
     <value>Use OpenAI API with Text Completion is not recommend. Most endpoints do not support it.</value>
   </data>
+  <data name="PRESET_LABEL" xml:space="preserve">
+    <value>Preset:</value>
+  </data>
+  <data name="PRESET_NEW" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="PRESET_CLONE" xml:space="preserve">
+    <value>Clone</value>
+  </data>
+  <data name="PRESET_RENAME" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="PRESET_DELETE" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="PRESET_NEW_TITLE" xml:space="preserve">
+    <value>New Preset</value>
+  </data>
+  <data name="PRESET_RENAME_TITLE" xml:space="preserve">
+    <value>Rename Preset</value>
+  </data>
+  <data name="PRESET_NAME_PLACEHOLDER" xml:space="preserve">
+    <value>Enter preset name...</value>
+  </data>
+  <data name="PRESET_DELETE_CONFIRM_TITLE" xml:space="preserve">
+    <value>Confirm Delete</value>
+  </data>
+  <data name="PRESET_DELETE_CONFIRM_MSG" xml:space="preserve">
+    <value>Are you sure you want to delete preset</value>
+  </data>
+  <data name="CANCEL" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="CONFIRM" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="CONFIRM_DELETE" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="EDIT" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="REMOVE" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
 </root>
