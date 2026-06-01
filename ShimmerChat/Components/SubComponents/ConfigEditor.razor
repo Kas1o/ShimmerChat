@@ -123,8 +123,6 @@
     private Dictionary<string, string> _errors = new();
     private string _legacyValue = "";
 
-    private Type? _lastConfigType;
-
     protected override void OnParametersSet()
     {
         _properties.Clear();
@@ -153,8 +151,6 @@
             else
             {
                 _config = (ModifierConfig)Activator.CreateInstance(configType)!;
-                if (Config is LegacyModifierConfig legacy && !string.IsNullOrEmpty(legacy.Value))
-                    MigrateLegacyValue(_config, legacy.Value);
                 OnConfigChanged.InvokeAsync(_config);
             }
 
@@ -162,7 +158,6 @@
                 .Where(p => p.CanRead && p.CanWrite)
                 .ToList();
             _legacyValue = "";
-            _lastConfigType = configType;
         }
         else
         {
@@ -176,27 +171,6 @@
                 _config = Config;
                 _legacyValue = "";
             }
-            _lastConfigType = null;
-        }
-    }
-
-    private static void MigrateLegacyValue(ModifierConfig target, string legacyValue)
-    {
-        var props = target.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.CanRead && p.CanWrite);
-
-        foreach (var prop in props)
-        {
-            if (prop.PropertyType == typeof(int) && int.TryParse(legacyValue, out var i))
-                { prop.SetValue(target, i); return; }
-            if (prop.PropertyType == typeof(float) && float.TryParse(legacyValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var f))
-                { prop.SetValue(target, f); return; }
-            if (prop.PropertyType == typeof(double) && double.TryParse(legacyValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d))
-                { prop.SetValue(target, d); return; }
-            if (prop.PropertyType == typeof(bool) && bool.TryParse(legacyValue, out var b))
-                { prop.SetValue(target, b); return; }
-            if (prop.PropertyType == typeof(string))
-                { prop.SetValue(target, legacyValue); return; }
         }
     }
 

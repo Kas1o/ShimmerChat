@@ -31,7 +31,7 @@ namespace ShimmerChatBuiltin.Misc
 
 		public void ModifyContext(ContextDocument context, ModifierConfig config, Chat chat, Agent agent)
 		{
-			var username = _kvData.Read("Username", "username") ?? "User";
+			var username = _kvData.Read("User", "username") ?? "User";
 			var charname = agent.name ?? agent.guid.ToString();
 
 			foreach (var segment in context.Segments)

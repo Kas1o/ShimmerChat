@@ -259,6 +259,14 @@ namespace ShimmerChat.Singletons
                 var modifier = LoadedModifiers.FirstOrDefault(m => m.info.Name == activatedModifier.Name);
                 if (modifier != null && activatedModifier.IsEnabled)
                 {
+                    var expectedType = modifier.ConfigType;
+                    if (expectedType != typeof(LegacyModifierConfig)
+                        && activatedModifier.Config.GetType() != expectedType)
+                    {
+                        throw new InvalidOperationException(
+                            $"ContextModifier \"{activatedModifier.Name}\" 的配置格式已过时，请到 /contextmanager 重新编辑该修改器以迁移到新的配置格式。");
+                    }
+
                     modifier.ModifyContext(context, activatedModifier.Config, chat, agent);
                 }
             }
@@ -266,9 +274,13 @@ namespace ShimmerChat.Singletons
 
         public void ApplyModifiers(PromptBuilder promptBuilder, Chat chat, Agent agent)
         {
-            var context = new ContextDocument { Template = promptBuilder };
+            var segments = promptBuilder.Messages
+                .Select(m => new ContextSegment { Message = m.Item1, From = m.Item2 })
+                .ToList();
+
+            var context = new ContextDocument { Segments = segments };
             ApplyModifiers(context, chat, agent);
-            context.RenderTo(promptBuilder);
+            promptBuilder.Messages = context.GetMessages();
         }
 
         public void CreatePreset(string name)

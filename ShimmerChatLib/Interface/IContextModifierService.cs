@@ -37,7 +37,7 @@ namespace ShimmerChatLib.Interface
 
         public string Value
         {
-            get => Config is LegacyModifierConfig l ? l.Value : Config.GetType().Name;
+            get => Config is LegacyModifierConfig l ? l.Value : Config.ToString() ?? "";
             set => Config = new LegacyModifierConfig { Value = value };
         }
     }

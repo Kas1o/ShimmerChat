@@ -132,16 +132,19 @@ namespace ShimmerChatBuiltin.SubAgent
         {
             var fresh = new PromptBuilder(baseClone)
             {
-                Messages = allMessages.ToArray(),
-                AvailableTools = toolDefinitions,
-                AvailableToolsFormatter = ToolPromptParser.Parse
+                Messages = allMessages.ToArray()
             };
+
+            if (toolDefinitions.Count > 0)
+            {
+                fresh.AvailableTools = toolDefinitions;
+                fresh.AvailableToolsFormatter = ToolPromptParser.Parse;
+            }
 
             if (config.EnabledModifiers.Count > 0)
             {
                 var context = new ContextDocument
                 {
-                    Template = fresh,
                     Segments = allMessages.Select(m => new ContextSegment
                     {
                         Message = m.Item1,
@@ -160,7 +163,7 @@ namespace ShimmerChatBuiltin.SubAgent
                     }
                 }
 
-                context.RenderTo(fresh);
+                fresh.Messages = context.GetMessages();
             }
 
             return fresh;

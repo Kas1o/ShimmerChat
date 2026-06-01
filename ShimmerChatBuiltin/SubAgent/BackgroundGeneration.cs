@@ -56,7 +56,8 @@ namespace ShimmerChatBuiltin.SubAgent
             var llmApi = apiSetting.LLMApi;
             var toolDefinitions = SubAgentRunner.GetToolDefinitions(subAgentConfig, _toolService);
 
-            var baseClone = SubAgentRunner.CreateBaseClone(context.Template);
+            var basePb = new PromptBuilder { Messages = context.GetMessages() };
+            var baseClone = SubAgentRunner.CreateBaseClone(basePb);
             var subChat = SubAgentRunner.CreateSubChat(subAgentConfig.Name);
 
             var subAgent = Agent.Create(subAgentConfig.Name, agent.description, "");
@@ -73,8 +74,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 return outputMessages.Count == 0 ? "" : outputMessages[^1].Item1.Content;
             });
 
-            if (subAgentConfig.OutputMode != "None")
-                SubAgentResultStore.Put(outputId, task);
+            SubAgentResultStore.Put(outputId, task);
         }
 
         private SubAgentConfig? LoadConfig(string name)

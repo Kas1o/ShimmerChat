@@ -54,7 +54,8 @@ namespace ShimmerChatBuiltin.SubAgent
             var llmApi = apiSetting.LLMApi;
             var toolDefinitions = SubAgentRunner.GetToolDefinitions(subAgentConfig, _toolService);
 
-            var baseClone = SubAgentRunner.CreateBaseClone(context.Template);
+            var basePb = new PromptBuilder { Messages = context.GetMessages() };
+            var baseClone = SubAgentRunner.CreateBaseClone(basePb);
             var subChat = SubAgentRunner.CreateSubChat(subAgentConfig.Name);
 
             var subAgent = Agent.Create(subAgentConfig.Name, agent.description, "");
@@ -74,7 +75,7 @@ namespace ShimmerChatBuiltin.SubAgent
             {
                 SourceType = typeof(SubAgentGeneration),
                 Message = new ChatMessage { Content = outputText },
-                From = PromptBuilder.From.system,
+                From = PromptBuilder.From.assistant,
                 Metadata = new Dictionary<string, object>
                 {
                     ["subAgentName"] = subAgentConfig.Name
@@ -82,37 +83,27 @@ namespace ShimmerChatBuiltin.SubAgent
             });
         }
 
-        private string FormatOutput(List<(ChatMessage, PromptBuilder.From)> messages, string outputMode)
+        private static string FormatOutput(List<(ChatMessage, PromptBuilder.From)> messages, string outputMode)
         {
             if (messages.Count == 0) return "";
 
             return outputMode switch
             {
                 "FullJson" => JsonConvert.SerializeObject(
-                    messages.Select(m =>
+                    messages.Select(m => new
                     {
-                        var obj = new Dictionary<string, object>
+                        role = m.Item2 switch
                         {
-                            ["role"] = m.Item2 switch
-                            {
-                                PromptBuilder.From.assistant => "assistant",
-                                PromptBuilder.From.tool_result => "tool",
-                                PromptBuilder.From.system => "system",
-                                PromptBuilder.From.user => "user",
-                                _ => m.Item2.ToString()
-                            },
-                            ["content"] = m.Item1.Content
-                        };
-                        if (m.Item1.toolCalls != null)
-                            obj["tool_calls"] = m.Item1.toolCalls;
-                        if (m.Item1.thinking != null)
-                            obj["thinking"] = m.Item1.thinking;
-                        if (m.Item1.id != null)
-                            obj["tool_call_id"] = m.Item1.id;
-                        return obj;
+                            PromptBuilder.From.assistant => "assistant",
+                            PromptBuilder.From.tool_result => "tool_result",
+                            _ => m.Item2.ToString()
+                        },
+                        content = m.Item1.Content,
+                        tool_calls = m.Item1.toolCalls,
+                        thinking = m.Item1.thinking
                     }),
                     Formatting.Indented),
-                _ => messages.Count > 0 ? messages[^1].Item1.Content : ""
+                _ => messages[^1].Item1.Content
             };
         }
 

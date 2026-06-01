@@ -99,9 +99,5 @@ namespace ShimmerChatBuiltin.Misc
 			Console.WriteLine($"Token count after limit: {tokenCounts.Sum()}");
 		}
 
-		public static implicit operator Type(TokenLimit v)
-		{
-			throw new NotImplementedException();
-		}
 	}
 }

@@ -79,12 +79,6 @@ namespace ShimmerChatBuiltin.DynPrompt
 		{
 			var sb = new System.Text.StringBuilder();
 
-			if (!string.IsNullOrEmpty(context.Template.System))
-			{
-				sb.Append(context.Template.System);
-				sb.Append(Environment.NewLine);
-			}
-
 			foreach (var segment in context.Segments)
 			{
 				sb.Append(segment.Message.Content);
@@ -109,8 +103,6 @@ namespace ShimmerChatBuiltin.DynPrompt
 
 		private void InjectTerm(ContextDocument context, DynPromptTerm term)
 		{
-			var newMessage = new ChatMessage { Content = term.Content };
-
 			switch (term.InjectionMode)
 			{
 				case DynPromptTermInjectionMode.BeforeSystem:
@@ -122,12 +114,12 @@ namespace ShimmerChatBuiltin.DynPrompt
 					}
 					else
 					{
-						string oldSystem = context.Template.System;
-						context.Template.System = term.Content;
-						if (!string.IsNullOrEmpty(oldSystem))
+						context.Segments.Insert(0, new ContextSegment
 						{
-							context.Template.System += Environment.NewLine + oldSystem;
-						}
+							SourceType = typeof(DynPrompt),
+							Message = new ChatMessage { Content = term.Content },
+							From = PromptBuilder.From.system
+						});
 					}
 					break;
 
@@ -140,11 +132,12 @@ namespace ShimmerChatBuiltin.DynPrompt
 					}
 					else
 					{
-						if (!string.IsNullOrEmpty(context.Template.System))
+						context.Segments.Insert(0, new ContextSegment
 						{
-							context.Template.System += Environment.NewLine;
-						}
-						context.Template.System += term.Content;
+							SourceType = typeof(DynPrompt),
+							Message = new ChatMessage { Content = term.Content },
+							From = PromptBuilder.From.system
+						});
 					}
 					break;
 
