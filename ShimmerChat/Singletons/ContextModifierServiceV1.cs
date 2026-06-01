@@ -334,9 +334,7 @@ namespace ShimmerChat.Singletons
 
         private static readonly JsonSerializerSettings PresetSerializerSettings = new()
         {
-            TypeNameHandling = TypeNameHandling.Auto,
-            TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
-            SerializationBinder = new ModifierConfigSerializationBinder()
+            TypeNameHandling = TypeNameHandling.Auto
         };
 
         private static string SerializePresetCollection(ContextModifierPresetCollection collection)
@@ -415,33 +413,5 @@ namespace ShimmerChat.Singletons
         }
 
         #endregion
-    }
-
-    public class ModifierConfigSerializationBinder : ISerializationBinder
-    {
-        public Type BindToType(string? assemblyName, string typeName)
-        {
-            if (string.IsNullOrEmpty(typeName))
-                throw new ArgumentNullException(nameof(typeName));
-
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                try
-                {
-                    var type = asm.GetType(typeName);
-                    if (type != null)
-                        return type;
-                }
-                catch { }
-            }
-
-            throw new TypeLoadException($"Cannot resolve type '{typeName}'");
-        }
-
-        public void BindToName(Type serializedType, out string? assemblyName, out string typeName)
-        {
-            assemblyName = null;
-            typeName = serializedType.FullName;
-        }
     }
 }

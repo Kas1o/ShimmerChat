@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using ShimmerChatLib.Context;
 
 namespace ShimmerChatBuiltin.SubAgent
@@ -17,6 +18,7 @@ namespace ShimmerChatBuiltin.SubAgent
         public string Name { get; set; } = "";
         public ModifierConfig Config { get; set; } = new LegacyModifierConfig { Value = "" };
 
+        [JsonIgnore]
         public string Input
         {
             get => Config is LegacyModifierConfig l ? l.Value : Config.GetType().Name;

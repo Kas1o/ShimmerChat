@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using ShimmerChatLib.Context;
 using SharperLLM.Util;
 using ShimmerChatLib;
@@ -35,6 +36,7 @@ namespace ShimmerChatLib.Interface
         public ModifierConfig Config { get; set; } = new LegacyModifierConfig { Value = "" };
         public bool IsEnabled { get; set; } = true;
 
+        [JsonIgnore]
         public string Value
         {
             get => Config is LegacyModifierConfig l ? l.Value : Config.ToString() ?? "";
