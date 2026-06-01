@@ -1,43 +1,28 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using SharperLLM.Util;
-using ShimmerChatBuiltin.Misc;
+﻿using SharperLLM.Util;
 using ShimmerChatLib;
 using ShimmerChatLib.Context;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace ShimmerChatBuiltin.ContextModifiers
+namespace ShimmerChatBuiltin.Misc
 {
+	public class MessagePrintConfig : ModifierConfig
+	{
+	}
+
 	public class MessagePrint : IContextModifier
 	{
-		private JsonSerializerSettings Settings;
-		public MessagePrint()
+		public ContextModifierInfo info => new ContextModifierInfo
 		{
-			Settings = new JsonSerializerSettings();
-			Settings.Converters.Add(new StringEnumConverter());
-		}
-
-		ContextModifierInfo IContextModifier.info => new ContextModifierInfo
-		{
-			Name = "MessagePrint",
-			Description = "print message dump to console. input true/false to colorize the output. default: true",
+			Name = nameof(MessagePrint),
+			Description = "Print the messages to the console."
 		};
 
-		void IContextModifier.ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
-		{
-			var colorize = true;
-			if (bool.TryParse(input, out var output))
-			{
-				colorize = output;
-			}
+		public Type ConfigType => typeof(MessagePrintConfig);
 
-			var json = JsonConvert.SerializeObject(promptBuilder.Messages, Settings);
-			if(colorize)
-				JsonColorizer.WriteToConsole(json);
-			else
-				Console.WriteLine(json);
+		public void ModifyContext(ContextDocument context, ModifierConfig config, Chat chat, Agent agent)
+		{
+			Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(context.Segments, Newtonsoft.Json.Formatting.Indented));
 		}
+
+		public (bool IsValid, string Error) Validate(ModifierConfig config) => (true, "");
 	}
 }

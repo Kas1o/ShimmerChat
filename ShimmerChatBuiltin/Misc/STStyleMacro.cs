@@ -2,37 +2,42 @@
 using ShimmerChatLib;
 using ShimmerChatLib.Context;
 using ShimmerChatLib.Interface;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Xml.Linq;
+using System.Text.RegularExpressions;
 
-namespace ShimmerChatBuiltin.ContextModifiers
+namespace ShimmerChatBuiltin.Misc
 {
+	public class STStyleMacroConfig : ModifierConfig
+	{
+	}
+
 	public class STStyleMacro : IContextModifier
 	{
-		IKVDataService KVData;
+		private readonly IKVDataService _kvData;
 
 		public STStyleMacro(IKVDataService kvData)
 		{
-			KVData = kvData;
+			_kvData = kvData;
 		}
 
-		ContextModifierInfo IContextModifier.info => new ContextModifierInfo
+		public ContextModifierInfo info => new ContextModifierInfo
 		{
 			Name = "ST Style Macro",
-			Description = "Adds support for SillyTavern style macros in prompts.",
+			Description = "Replace {{user}} and {{char}} macros in messages."
 		};
 
-		void IContextModifier.ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
-		{
-			var username = KVData.Read("User", "username") ?? "User";
-			var agentName = agent.name;
+		public Type ConfigType => typeof(STStyleMacroConfig);
 
-			foreach (var item in promptBuilder.Messages)
+		public (bool IsValid, string Error) Validate(ModifierConfig config) => (true, "");
+
+		public void ModifyContext(ContextDocument context, ModifierConfig config, Chat chat, Agent agent)
+		{
+			var username = _kvData.Read("Username", "username") ?? "User";
+			var charname = agent.name ?? agent.guid.ToString();
+
+			foreach (var segment in context.Segments)
 			{
-				item.Item1.Content = item.Item1.Content.Replace("{{user}}", username);
-				item.Item1.Content = item.Item1.Content.Replace("{{char}}", agentName);
+				segment.Message.Content = Regex.Replace(segment.Message.Content, @"\{\{user\}\}", username, RegexOptions.IgnoreCase);
+				segment.Message.Content = Regex.Replace(segment.Message.Content, @"\{\{char\}\}", charname, RegexOptions.IgnoreCase);
 			}
 		}
 	}

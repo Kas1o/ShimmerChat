@@ -3,6 +3,7 @@ using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using SharperLLM.Util;
 using ShimmerChatLib;
+using ShimmerChatLib.Context;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.SubAgent
@@ -26,12 +27,6 @@ namespace ShimmerChatBuiltin.SubAgent
         public static Chat CreateSubChat(string name)
         {
             return new Chat { Name = name, Guid = Guid.NewGuid() };
-        }
-
-        public static ILLMAPI GetLlmApi(SubAgentConfig config, IKVDataService kvData)
-        {
-            var apiSetting = GetApiSetting(config.SelectedApiIndex, kvData);
-            return apiSetting.LLMApi;
         }
 
         public static ApiSetting GetApiSetting(int index, IKVDataService kvData)
@@ -144,6 +139,16 @@ namespace ShimmerChatBuiltin.SubAgent
 
             if (config.EnabledModifiers.Count > 0)
             {
+                var context = new ContextDocument
+                {
+                    Template = fresh,
+                    Segments = allMessages.Select(m => new ContextSegment
+                    {
+                        Message = m.Item1,
+                        From = m.Item2
+                    }).ToList()
+                };
+
                 var modifierService = serviceProvider.GetService(typeof(IContextModifierService)) as IContextModifierService;
                 if (modifierService != null)
                 {
@@ -151,9 +156,11 @@ namespace ShimmerChatBuiltin.SubAgent
                     {
                         var modifier = modifierService.LoadedModifiers
                             .FirstOrDefault(m => m.info.Name == modConfig.Name);
-                        modifier?.ModifyContext(fresh, modConfig.Input, subChat, subAgent);
+                        modifier?.ModifyContext(context, modConfig.Config, subChat, subAgent);
                     }
                 }
+
+                context.RenderTo(fresh);
             }
 
             return fresh;

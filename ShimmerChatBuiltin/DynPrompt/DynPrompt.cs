@@ -2,17 +2,19 @@ using Newtonsoft.Json;
 using SharperLLM.Util;
 using ShimmerChatLib.Context;
 using ShimmerChatLib.Interface;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Linq;
 using ShimmerChatLib;
 
 namespace ShimmerChatBuiltin.DynPrompt
 {
+	public class DynPromptConfig : ModifierConfig
+	{
+		public string SetName { get; set; } = "";
+	}
+
 	public class DynPrompt : IContextModifier
 	{
 		IKVDataService pluginData;
+
 		public DynPrompt(IKVDataService pluginDataService)
 		{
 			this.pluginData = pluginDataService;
@@ -21,185 +23,164 @@ namespace ShimmerChatBuiltin.DynPrompt
 		public ContextModifierInfo info => new ContextModifierInfo
 		{
 			Name = "DynPrompt",
-			Description = "Inject prompt dynamically based on rules, input the set name."
+			Description = "Inject prompt dynamically based on trigger rules. Select a DynPromptSet by name."
 		};
 
-		public void ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
-	{
-		var data = pluginData.Read("DynPrompt", "DynPromptSets");
-		var sets = JsonConvert.DeserializeObject<List<DynPromptSet>>(data ?? "[]") ?? [];
+		public Type ConfigType => typeof(DynPromptConfig);
 
-		var set = sets.FindLast(s => s.Name.Trim() == input.Trim());
-		if(set == null)
-			throw new InvalidOperationException($"No DynPromptSet found with name '{input}'");
-
-		// 使用递归方式处理 DynPromptSet
-		ProcessDynPromptSet(promptBuilder, set, sets, new HashSet<string>());
-	}
-
-	/// <summary>
-	/// 递归处理 DynPromptSet，支持 Term 之间的递归触发
-	/// </summary>
-	private void ProcessDynPromptSet(PromptBuilder promptBuilder, DynPromptSet set, List<DynPromptSet> allSets, HashSet<string> processedTermNames)
-	{
-		// 处理每个动态提示项
-		foreach (var term in set.Terms)
+		public (bool IsValid, string Error) Validate(ModifierConfig config)
 		{
-			// 每次评估前重新收集上下文（因为之前的 term 可能已经注入了内容）
-			string contextText = CollectContextText(promptBuilder);
+			var cfg = (DynPromptConfig)config;
+			if (string.IsNullOrWhiteSpace(cfg.SetName))
+				return (false, "SetName cannot be empty");
+			return (true, "");
+		}
 
-			// 如果没有触发规则或者规则评估为true，则注入内容
-			if (string.IsNullOrEmpty(term.TriggerRule) || EvaluateTriggerRule(term.TriggerRule, contextText))
+		public void ModifyContext(ContextDocument context, ModifierConfig config, Chat chat, Agent agent)
+		{
+			var cfg = (DynPromptConfig)config;
+			var input = cfg.SetName;
+
+			var data = pluginData.Read("DynPrompt", "DynPromptSets");
+			var sets = JsonConvert.DeserializeObject<List<DynPromptSet>>(data ?? "[]") ?? [];
+
+			var set = sets.FindLast(s => s.Name.Trim() == input.Trim());
+			if (set == null)
+				throw new InvalidOperationException($"No DynPromptSet found with name '{input}'");
+
+			ProcessDynPromptSet(context, set, sets, new HashSet<string>());
+		}
+
+		private void ProcessDynPromptSet(ContextDocument context, DynPromptSet set, List<DynPromptSet> allSets, HashSet<string> processedTermNames)
+		{
+			foreach (var term in set.Terms)
 			{
-				InjectTerm(promptBuilder, term);
+				string contextText = CollectContextText(context);
 
-				// 递归处理：如果该 term 允许被递归触发，则查找并处理同名的 DynPromptSet
-				if (term.AllowBeTriggeredByRecursive && !processedTermNames.Contains(term.Name))
+				if (string.IsNullOrEmpty(term.TriggerRule) || EvaluateTriggerRule(term.TriggerRule, contextText))
 				{
-					var nestedSet = allSets.FindLast(s => s.Name.Trim() == term.Name.Trim());
-					if (nestedSet != null)
+					InjectTerm(context, term);
+
+					if (term.AllowBeTriggeredByRecursive && !processedTermNames.Contains(term.Name))
 					{
-						processedTermNames.Add(term.Name);
-						ProcessDynPromptSet(promptBuilder, nestedSet, allSets, processedTermNames);
-						processedTermNames.Remove(term.Name);
+						var nestedSet = allSets.FindLast(s => s.Name.Trim() == term.Name.Trim());
+						if (nestedSet != null)
+						{
+							processedTermNames.Add(term.Name);
+							ProcessDynPromptSet(context, nestedSet, allSets, processedTermNames);
+							processedTermNames.Remove(term.Name);
+						}
 					}
 				}
 			}
 		}
-	}
 
-		/// <summary>
-		/// 收集上下文中的所有文本内容
-		/// </summary>
-		private string CollectContextText(PromptBuilder promptBuilder)
+		private string CollectContextText(ContextDocument context)
 		{
-			var sb = new StringBuilder();
-			
-			// 添加系统提示
-			if (!string.IsNullOrEmpty(promptBuilder.System))
+			var sb = new System.Text.StringBuilder();
+
+			if (!string.IsNullOrEmpty(context.Template.System))
 			{
-				sb.Append(promptBuilder.System);
+				sb.Append(context.Template.System);
 				sb.Append(Environment.NewLine);
 			}
-			
-			// 添加所有消息
-			foreach (var (message, _) in promptBuilder.Messages)
+
+			foreach (var segment in context.Segments)
 			{
-				sb.Append(message.Content);
+				sb.Append(segment.Message.Content);
 				sb.Append(Environment.NewLine);
 			}
-			
+
 			return sb.ToString();
 		}
 
-		/// <summary>
-		/// 评估触发规则
-		/// </summary>
 		private bool EvaluateTriggerRule(string rule, string contextText)
 		{
 			try
 			{
-				// 使用新的DynPromptEvaluator评估表达式
 				return DynPromptEvaluator.Evaluate(rule, contextText);
 			}
 			catch (Exception ex)
 			{
-				// 规则解析错误时默认不触发
 				Console.WriteLine($"Error evaluating trigger rule: {ex.Message}");
 				return false;
 			}
 		}
 
-		/// <summary>
-		/// 根据注入模式注入内容
-		/// </summary>
-		private void InjectTerm(PromptBuilder promptBuilder, DynPromptTerm term)
+		private void InjectTerm(ContextDocument context, DynPromptTerm term)
 		{
 			var newMessage = new ChatMessage { Content = term.Content };
-			
-			// 获取消息列表
-			List<(ChatMessage, PromptBuilder.From)> messages = promptBuilder.Messages.ToList();
-			int systemMessageIndex;
-			
+
 			switch (term.InjectionMode)
 			{
 				case DynPromptTermInjectionMode.BeforeSystem:
-					// 优先查找第一个role为system的消息
-					systemMessageIndex = messages.FindIndex(m => m.Item2 == PromptBuilder.From.system);
-					if (systemMessageIndex >= 0)
+					int systemIndex = context.Segments.FindIndex(s => s.From == PromptBuilder.From.system);
+					if (systemIndex >= 0)
 					{
-						// 修改第一个system消息的内容，在现有内容前添加新内容
-						var (message, from) = messages[systemMessageIndex];
-						string newContent = term.Content + Environment.NewLine + message.Content;
-						messages[systemMessageIndex] = (newContent, from);
-						promptBuilder.Messages = messages.ToArray();
+						var segment = context.Segments[systemIndex];
+						segment.Message.Content = term.Content + Environment.NewLine + segment.Message.Content;
 					}
 					else
 					{
-						// 如果没有system消息，则操作System字段
-						string oldSystem = promptBuilder.System;
-						promptBuilder.System = term.Content;
+						string oldSystem = context.Template.System;
+						context.Template.System = term.Content;
 						if (!string.IsNullOrEmpty(oldSystem))
 						{
-							promptBuilder.System += Environment.NewLine + oldSystem;
+							context.Template.System += Environment.NewLine + oldSystem;
 						}
 					}
 					break;
+
 				case DynPromptTermInjectionMode.AfterSystem:
-					// 优先查找第一个role为system的消息
-					systemMessageIndex = messages.FindIndex(m => m.Item2 == PromptBuilder.From.system);
-					if (systemMessageIndex >= 0)
+					systemIndex = context.Segments.FindIndex(s => s.From == PromptBuilder.From.system);
+					if (systemIndex >= 0)
 					{
-						// 在第一个system消息后追加内容
-						var (message, from) = messages[systemMessageIndex];
-						string newContent = message.Content + Environment.NewLine + term.Content;
-						messages[systemMessageIndex] = (newContent, from);
-						promptBuilder.Messages = messages.ToArray();
+						var segment = context.Segments[systemIndex];
+						segment.Message.Content = segment.Message.Content + Environment.NewLine + term.Content;
 					}
 					else
 					{
-						// 如果没有system消息，则操作System字段
-						if (!string.IsNullOrEmpty(promptBuilder.System))
+						if (!string.IsNullOrEmpty(context.Template.System))
 						{
-							promptBuilder.System += Environment.NewLine;
+							context.Template.System += Environment.NewLine;
 						}
-						promptBuilder.System += term.Content;
+						context.Template.System += term.Content;
 					}
 					break;
+
 				case DynPromptTermInjectionMode.AtDepth:
-					// 在指定深度添加内容
-					InjectAtDepth(promptBuilder, term);
+					InjectAtDepth(context, term);
 					break;
 			}
 		}
 
-		/// <summary>
-		/// 在指定深度注入内容
-		/// </summary>
-		private void InjectAtDepth(PromptBuilder promptBuilder, DynPromptTerm term)
+		private void InjectAtDepth(ContextDocument context, DynPromptTerm term)
 		{
-			List<(ChatMessage, PromptBuilder.From)> messages = promptBuilder.Messages.ToList();
 			int injectionDepth = term.InjectionDepth;
-			
-			// 处理负索引逻辑：当depth为负数时从末尾反着数
+
 			if (injectionDepth < 0)
 			{
-				// 计算实际索引：从末尾开始，-1表示最后一条消息后，-2表示倒数第二条消息后，以此类推
-				injectionDepth = Math.Max(0, messages.Count + 1 + injectionDepth);
+				injectionDepth = Math.Max(0, context.Segments.Count + 1 + injectionDepth);
 			}
-			
-			// 如果深度超过消息数量，则添加到末尾
-			if (injectionDepth >= messages.Count)
+
+			if (injectionDepth >= context.Segments.Count)
 			{
-				messages.Add((term.Content, PromptBuilder.From.system));
+				context.Segments.Add(new ContextSegment
+				{
+					SourceType = typeof(DynPrompt),
+					Message = new ChatMessage { Content = term.Content },
+					From = PromptBuilder.From.system
+				});
 			}
 			else
 			{
-				// 在指定深度插入内容
-				messages.Insert(injectionDepth, (term.Content, PromptBuilder.From.system));
+				context.Segments.Insert(injectionDepth, new ContextSegment
+				{
+					SourceType = typeof(DynPrompt),
+					Message = new ChatMessage { Content = term.Content },
+					From = PromptBuilder.From.system
+				});
 			}
-			
-			promptBuilder.Messages = messages.ToArray();
 		}
 	}
 }

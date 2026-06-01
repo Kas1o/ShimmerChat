@@ -19,15 +19,30 @@
                         }
                     </select>
                 </div>
-                
-                <div class="mb-3">
-                    <label for="modifier-input" class="form-label">输入值</label>
-                    <textarea id="modifier-input" @bind="_modifierInput" class="form-control" rows="3" placeholder="输入上下文修改器的值..."></textarea>
-                </div>
+
+                @if (_selectedModifier != null)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">配置</label>
+                    <ConfigEditor @ref="_configEditor"
+                                  Config="_currentConfig"
+                                  Modifier="_selectedModifier"
+                                  OnConfigChanged="OnConfigChanged"
+                                  OnErrorsChanged="OnErrorsChanged" />
+                    </div>
+
+                    @if (!_isValid)
+                    {
+                        <small class="text-danger">@_errorMessage</small>
+                    }
+                }
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" @onclick="Cancel">取消</button>
-                <button type="button" class="btn btn-primary" @onclick="Confirm" disabled="@string.IsNullOrEmpty(_selectedModifierName)">添加</button>
+                <button type="button" class="btn btn-primary" @onclick="Confirm"
+                        disabled="@(string.IsNullOrEmpty(_selectedModifierName) || !_isValid)">
+                    添加
+                </button>
             </div>
         </div>
     </div>
@@ -35,26 +50,53 @@
 
 @code {
     [Inject] private IContextModifierService _contextModifierService { get; set; } = null!;
-    
+
     [Parameter]
     public EventCallback<object> OnConfirm { get; set; }
-    
+
     [Parameter]
     public EventCallback OnClose { get; set; }
-    
+
     private string? _selectedModifierName;
-    private string _modifierInput = string.Empty;
-    
+    private IContextModifier? _selectedModifier;
+    private ModifierConfig _currentConfig = new LegacyModifierConfig { Value = "" };
+    private ConfigEditor? _configEditor;
+    private bool _isValid = true;
+    private string _errorMessage = "";
+
+    protected override void OnParametersSet()
+    {
+        _selectedModifier = _contextModifierService.LoadedModifiers
+            .FirstOrDefault(m => m.info.Name == _selectedModifierName);
+
+        if (_selectedModifier != null && _currentConfig.GetType() != _selectedModifier.ConfigType)
+        {
+            _currentConfig = (ModifierConfig)Activator.CreateInstance(_selectedModifier.ConfigType)!;
+        }
+    }
+
+    private async Task OnConfigChanged(ModifierConfig config)
+    {
+        _currentConfig = config;
+        await Task.CompletedTask;
+    }
+
+    private void OnErrorsChanged(Dictionary<string, string> errors)
+    {
+        _isValid = errors.Count == 0;
+        _errorMessage = string.Join("; ", errors.Values);
+    }
+
     private async Task Confirm()
     {
         if (!string.IsNullOrEmpty(_selectedModifierName))
         {
-            var result = new { ModifierName = _selectedModifierName, InputValue = _modifierInput };
+            var result = new { ModifierName = _selectedModifierName, Config = _currentConfig };
             await OnConfirm.InvokeAsync(result);
             await OnClose.InvokeAsync();
         }
     }
-    
+
     private async Task Cancel()
     {
         await OnClose.InvokeAsync();

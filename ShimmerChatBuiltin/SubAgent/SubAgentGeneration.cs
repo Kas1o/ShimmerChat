@@ -7,6 +7,12 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.SubAgent
 {
+    public class SubAgentGenerationConfig : ModifierConfig
+    {
+        [UiHint("SubAgent 配置", "选择已配置的 SubAgent")]
+        public string ConfigName { get; set; } = "";
+    }
+
     public class SubAgentGeneration : IContextModifier
     {
         private readonly IKVDataService _kvData;
@@ -23,38 +29,57 @@ namespace ShimmerChatBuiltin.SubAgent
         public ContextModifierInfo info => new()
         {
             Name = "SubAgentGeneration",
-            Description = "Run a sub-agent with independent configuration. Input: sub-agent config name."
+            Description = "Run a sub-agent with independent configuration, tools, and API settings."
         };
 
-        public void ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
+        public Type ConfigType => typeof(SubAgentGenerationConfig);
+
+        public (bool IsValid, string Error) Validate(ModifierConfig config)
         {
-            var config = LoadConfig(input);
-            if (config == null)
-                throw new InvalidOperationException($"SubAgent config '{input}' not found.");
+            var cfg = (SubAgentGenerationConfig)config;
+            if (string.IsNullOrWhiteSpace(cfg.ConfigName))
+                return (false, "ConfigName cannot be empty");
+            return (true, "");
+        }
 
-            var apiSetting = SubAgentRunner.GetApiSetting(config.SelectedApiIndex, _kvData);
+        public void ModifyContext(ContextDocument context, ModifierConfig config, Chat chat, Agent agent)
+        {
+            var cfg = (SubAgentGenerationConfig)config;
+
+            var subAgentConfig = LoadConfig(cfg.ConfigName);
+            if (subAgentConfig == null)
+                throw new InvalidOperationException($"SubAgent config '{cfg.ConfigName}' not found.");
+
+            var apiSetting = SubAgentRunner.GetApiSetting(subAgentConfig.SelectedApiIndex, _kvData);
             var llmApi = apiSetting.LLMApi;
-            var toolDefinitions = SubAgentRunner.GetToolDefinitions(config, _toolService);
+            var toolDefinitions = SubAgentRunner.GetToolDefinitions(subAgentConfig, _toolService);
 
-            var baseClone = SubAgentRunner.CreateBaseClone(promptBuilder);
-            var subChat = SubAgentRunner.CreateSubChat(config.Name);
+            var baseClone = SubAgentRunner.CreateBaseClone(context.Template);
+            var subChat = SubAgentRunner.CreateSubChat(subAgentConfig.Name);
 
-            var subAgent = Agent.Create(config.Name, agent.description, "");
-            subAgent.guid = config.Guid;
-            subAgent.CustomToolNames = config.EnabledToolNames;
+            var subAgent = Agent.Create(subAgentConfig.Name, agent.description, "");
+            subAgent.guid = subAgentConfig.Guid;
+            subAgent.CustomToolNames = subAgentConfig.EnabledToolNames;
 
             var outputMessages = Task.Run(async () =>
-                await SubAgentRunner.RunAsync(llmApi, apiSetting, baseClone, config, toolDefinitions, subAgent, subChat, _toolService, _serviceProvider))
+                await SubAgentRunner.RunAsync(llmApi, apiSetting, baseClone, subAgentConfig, toolDefinitions, subAgent, subChat, _toolService, _serviceProvider))
                 .GetAwaiter().GetResult();
 
-            if (config.OutputMode == "None")
+            if (subAgentConfig.OutputMode == "None")
                 return;
 
-            var outputText = FormatOutput(outputMessages, config.OutputMode);
+            var outputText = FormatOutput(outputMessages, subAgentConfig.OutputMode);
 
-            var parentMessages = promptBuilder.Messages.ToList();
-            parentMessages.Add((new ChatMessage { Content = outputText }, PromptBuilder.From.system));
-            promptBuilder.Messages = parentMessages.ToArray();
+            context.Segments.Add(new ContextSegment
+            {
+                SourceType = typeof(SubAgentGeneration),
+                Message = new ChatMessage { Content = outputText },
+                From = PromptBuilder.From.system,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["subAgentName"] = subAgentConfig.Name
+                }
+            });
         }
 
         private string FormatOutput(List<(ChatMessage, PromptBuilder.From)> messages, string outputMode)
@@ -87,7 +112,7 @@ namespace ShimmerChatBuiltin.SubAgent
                         return obj;
                     }),
                     Formatting.Indented),
-                _ => messages[^1].Item1.Content
+                _ => messages.Count > 0 ? messages[^1].Item1.Content : ""
             };
         }
 

@@ -12,10 +12,12 @@ namespace ShimmerChatLib.Interface
         string ActivePresetId { get; }
         string ActivePresetName { get; }
 
+        void ActivateModifier(string modifierName, ModifierConfig config);
         void ActivateModifier(string modifierName, string inputValue);
         void RemoveActivatedModifier(int index);
         void ReorderActivatedModifier(int oldIndex, int newIndex);
         void ClearActivatedModifiers();
+        void ApplyModifiers(ContextDocument context, Chat chat, Agent agent);
         void ApplyModifiers(PromptBuilder promptBuilder, Chat chat, Agent agent);
 
         void SaveActivatedModifiers();
@@ -30,8 +32,14 @@ namespace ShimmerChatLib.Interface
     public class ActivatedModifier
     {
         public required string Name { get; set; }
-        public required string Value { get; set; }
+        public ModifierConfig Config { get; set; } = new LegacyModifierConfig { Value = "" };
         public bool IsEnabled { get; set; } = true;
+
+        public string Value
+        {
+            get => Config is LegacyModifierConfig l ? l.Value : Config.GetType().Name;
+            set => Config = new LegacyModifierConfig { Value = value };
+        }
     }
 
     public class ContextModifierPreset

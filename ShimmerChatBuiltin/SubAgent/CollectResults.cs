@@ -1,23 +1,33 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml;
 using SharperLLM.Util;
 using ShimmerChatLib;
 using ShimmerChatLib.Context;
 
 namespace ShimmerChatBuiltin.SubAgent
 {
+    public class CollectResultsConfig : ModifierConfig
+    {
+        [UiHint("输出 ID 列表", "逗号分隔的 BackgroundGeneration 输出 ID")]
+        public string OutputIds { get; set; } = "";
+    }
+
     public class CollectResults : IContextModifier
     {
         public ContextModifierInfo info => new()
         {
             Name = "CollectResults",
-            Description = "Collect background generation results. Input: comma-separated output IDs."
+            Description = "Collect background generation results."
         };
 
-        public void ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
+        public Type ConfigType => typeof(CollectResultsConfig);
+
+        public (bool IsValid, string Error) Validate(ModifierConfig config) => (true, "");
+
+        public void ModifyContext(ContextDocument context, ModifierConfig config, Chat chat, Agent agent)
         {
-            var ids = input.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var cfg = (CollectResultsConfig)config;
+            var ids = cfg.OutputIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (ids.Length == 0) return;
 
             var sb = new StringBuilder();
@@ -35,9 +45,12 @@ namespace ShimmerChatBuiltin.SubAgent
 
             if (sb.Length > 0)
             {
-                var parentMessages = promptBuilder.Messages.ToList();
-                parentMessages.Add((new ChatMessage { Content = sb.ToString().TrimEnd() }, PromptBuilder.From.system));
-                promptBuilder.Messages = parentMessages.ToArray();
+                context.Segments.Add(new ContextSegment
+                {
+                    SourceType = typeof(CollectResults),
+                    Message = new ChatMessage { Content = sb.ToString().TrimEnd() },
+                    From = PromptBuilder.From.system
+                });
             }
         }
 

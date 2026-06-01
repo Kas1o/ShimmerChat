@@ -1,0 +1,261 @@
+@using ShimmerChatLib.Context
+@using System.Reflection
+
+<div class="config-editor">
+    @if (_customComponentType != null)
+    {
+        <DynamicComponent Type="_customComponentType"
+                          Parameters="_customComponentParams" />
+    }
+    else if (_properties.Count > 0)
+    {
+        foreach (var propInfo in _properties)
+        {
+            var hint = propInfo.GetCustomAttribute<UiHintAttribute>();
+            var label = hint?.Label ?? propInfo.Name;
+            var desc = hint?.Description ?? "";
+            var val = propInfo.GetValue(_config);
+            var error = _errors.GetValueOrDefault(propInfo.Name);
+
+            <div class="mb-2">
+                <label class="form-label fw-bold">@label</label>
+                @if (!string.IsNullOrEmpty(desc))
+                {
+                    <small class="d-block text-muted mb-1">@desc</small>
+                }
+
+                @switch (val)
+                {
+                    case bool boolVal:
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   checked="@boolVal"
+                                   @onchange="(e) => SetProperty(propInfo, (bool)(e.Value ?? false))" />
+                        </div>
+                        break;
+
+                    case int intVal:
+                        <input type="number" class="form-control form-control-sm"
+                               value="@intVal"
+                               min="@(hint?.Min?.ToString() ?? "")"
+                               max="@(hint?.Max?.ToString() ?? "")"
+                               step="1"
+                               @onchange="(e) => SetPropertyInt(propInfo, e.Value?.ToString())" />
+                        break;
+
+                    case float floatVal:
+                        <input type="number" class="form-control form-control-sm"
+                               value="@floatVal.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                               min="@(hint?.Min?.ToString() ?? "")"
+                               max="@(hint?.Max?.ToString() ?? "")"
+                               step="0.1"
+                               @onchange="(e) => SetPropertyFloat(propInfo, e.Value?.ToString())" />
+                        break;
+
+                    case double doubleVal:
+                        <input type="number" class="form-control form-control-sm"
+                               value="@doubleVal.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                               min="@(hint?.Min?.ToString() ?? "")"
+                               max="@(hint?.Max?.ToString() ?? "")"
+                               step="0.1"
+                               @onchange="(e) => SetPropertyDouble(propInfo, e.Value?.ToString())" />
+                        break;
+
+                    case string strVal:
+                        <textarea class="form-control form-control-sm" rows="2"
+                                  @bind="strVal" @bind:event="oninput"
+                                  @bind:after="() => SetPropertyString(propInfo, strVal)">
+                        </textarea>
+                        break;
+
+                    default:
+                        if (propInfo.PropertyType.IsEnum)
+                        {
+                            <select class="form-select form-select-sm"
+                                    @bind="val" @bind:after="() => SetPropertyEnum(propInfo, val)">
+                                @foreach (var enumVal in Enum.GetValues(propInfo.PropertyType))
+                                {
+                                    <option value="@enumVal">@enumVal.ToString()</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <input type="text" class="form-control form-control-sm"
+                                   value="@(val?.ToString() ?? "")"
+                                   @onchange="(e) => SetPropertyString(propInfo, e.Value?.ToString())" />
+                        }
+                        break;
+                }
+
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <small class="text-danger">@error</small>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <input type="text" class="form-control form-control-sm"
+               value="@_legacyValue"
+               @onchange="(e) => OnLegacyValueChanged(e.Value?.ToString())" />
+    }
+</div>
+
+@code {
+    [Parameter]
+    public ModifierConfig Config { get; set; } = default!;
+
+    [Parameter]
+    public IContextModifier? Modifier { get; set; }
+
+    [Parameter]
+    public EventCallback<ModifierConfig> OnConfigChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<Dictionary<string, string>> OnErrorsChanged { get; set; }
+
+    private Type? _customComponentType;
+    private Dictionary<string, object> _customComponentParams = new();
+    private ModifierConfig _config = default!;
+    private List<PropertyInfo> _properties = new();
+    private Dictionary<string, string> _errors = new();
+    private string _legacyValue = "";
+
+    private Type? _lastConfigType;
+
+    protected override void OnParametersSet()
+    {
+        _properties.Clear();
+        _customComponentType = null;
+        _customComponentParams = new();
+
+        if (Modifier is ShimmerChatLib.Context.IContextModifierConfigUI uiProvider)
+        {
+            _customComponentType = uiProvider.EditorComponentType;
+            _customComponentParams = new Dictionary<string, object>
+            {
+                ["Config"] = Config,
+                ["OnConfigChanged"] = OnConfigChanged
+            };
+            _config = Config;
+            return;
+        }
+
+        var configType = Modifier?.ConfigType;
+        if (configType != null && configType != typeof(LegacyModifierConfig))
+        {
+            if (Config.GetType() == configType)
+            {
+                _config = Config;
+            }
+            else
+            {
+                _config = (ModifierConfig)Activator.CreateInstance(configType)!;
+                if (Config is LegacyModifierConfig legacy && !string.IsNullOrEmpty(legacy.Value))
+                    MigrateLegacyValue(_config, legacy.Value);
+                OnConfigChanged.InvokeAsync(_config);
+            }
+
+            _properties = configType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(p => p.CanRead && p.CanWrite)
+                .ToList();
+            _legacyValue = "";
+            _lastConfigType = configType;
+        }
+        else
+        {
+            if (Config is LegacyModifierConfig legacy)
+            {
+                _config = legacy;
+                _legacyValue = legacy.Value;
+            }
+            else
+            {
+                _config = Config;
+                _legacyValue = "";
+            }
+            _lastConfigType = null;
+        }
+    }
+
+    private static void MigrateLegacyValue(ModifierConfig target, string legacyValue)
+    {
+        var props = target.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanRead && p.CanWrite);
+
+        foreach (var prop in props)
+        {
+            if (prop.PropertyType == typeof(int) && int.TryParse(legacyValue, out var i))
+                { prop.SetValue(target, i); return; }
+            if (prop.PropertyType == typeof(float) && float.TryParse(legacyValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var f))
+                { prop.SetValue(target, f); return; }
+            if (prop.PropertyType == typeof(double) && double.TryParse(legacyValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d))
+                { prop.SetValue(target, d); return; }
+            if (prop.PropertyType == typeof(bool) && bool.TryParse(legacyValue, out var b))
+                { prop.SetValue(target, b); return; }
+            if (prop.PropertyType == typeof(string))
+                { prop.SetValue(target, legacyValue); return; }
+        }
+    }
+
+    private async Task SetProperty(PropertyInfo prop, object? value)
+    {
+        prop.SetValue(_config, value);
+        await OnConfigChanged.InvokeAsync(_config);
+        await ValidateConfig();
+    }
+
+    private async Task SetPropertyInt(PropertyInfo prop, string? val)
+    {
+        if (int.TryParse(val, out var i))
+            await SetProperty(prop, i);
+    }
+
+    private async Task SetPropertyFloat(PropertyInfo prop, string? val)
+    {
+        if (float.TryParse(val, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var f))
+            await SetProperty(prop, f);
+    }
+
+    private async Task SetPropertyDouble(PropertyInfo prop, string? val)
+    {
+        if (double.TryParse(val, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d))
+            await SetProperty(prop, d);
+    }
+
+    private async Task SetPropertyString(PropertyInfo prop, string? val)
+    {
+        await SetProperty(prop, val ?? "");
+    }
+
+    private async Task SetPropertyEnum(PropertyInfo prop, object? val)
+    {
+        await SetProperty(prop, val);
+    }
+
+    private async Task OnLegacyValueChanged(string? val)
+    {
+        _legacyValue = val ?? "";
+        if (_config is LegacyModifierConfig legacy)
+        {
+            legacy.Value = _legacyValue;
+            await OnConfigChanged.InvokeAsync(_config);
+        }
+    }
+
+    private async Task ValidateConfig()
+    {
+        _errors.Clear();
+        if (Modifier != null)
+        {
+            var (isValid, error) = Modifier.Validate(_config);
+            if (!isValid)
+            {
+                _errors["_general"] = error;
+            }
+        }
+        await OnErrorsChanged.InvokeAsync(_errors);
+    }
+}

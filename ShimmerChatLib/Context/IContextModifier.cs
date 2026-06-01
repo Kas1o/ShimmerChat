@@ -1,14 +1,14 @@
 ﻿using SharperLLM.Util;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace ShimmerChatLib.Context
 {
 	public interface IContextModifier
 	{
 		public ContextModifierInfo info { get; }
-		public void ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent);
+		public Type ConfigType { get; }
+
+		public void ModifyContext(ContextDocument context, ModifierConfig config, Chat chat, Agent agent);
+		public (bool IsValid, string Error) Validate(ModifierConfig config);
 	}
 
 	public struct ContextModifierInfo

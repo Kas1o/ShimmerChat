@@ -1,5 +1,8 @@
 using System.Reflection;
 using System.Text.Json;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using ShimmerChatLib.Context;
 using ShimmerChatLib.Interface;
 using SharperLLM.Util;
@@ -92,8 +95,7 @@ namespace ShimmerChat.Singletons
                 var json = _pluginDataService.Read(PluginId, PresetKey);
                 if (!string.IsNullOrEmpty(json))
                 {
-                    _presetCollection = JsonSerializer.Deserialize<ContextModifierPresetCollection>(json)
-                        ?? new ContextModifierPresetCollection();
+                    _presetCollection = DeserializePresetCollection(json);
                 }
                 else
                 {
@@ -131,13 +133,20 @@ namespace ShimmerChat.Singletons
                 var legacyJson = _pluginDataService.Read(PluginId, LegacyActivatedModifiersKey);
                 if (!string.IsNullOrEmpty(legacyJson))
                 {
-                    var legacyModifiers = JsonSerializer.Deserialize<List<ActivatedModifier>>(legacyJson);
+                    var legacyModifiers = JsonConvert.DeserializeObject<List<LegacyActivatedModifier>>(legacyJson);
                     if (legacyModifiers != null && legacyModifiers.Count > 0)
                     {
                         var defaultPreset = new ContextModifierPreset
                         {
                             Name = "Default",
                             Modifiers = legacyModifiers
+                                .Select(m => new ActivatedModifier
+                                {
+                                    Name = m.Name,
+                                    Config = new LegacyModifierConfig { Value = m.Value },
+                                    IsEnabled = m.IsEnabled
+                                })
+                                .ToList()
                         };
                         _presetCollection.Presets.Add(defaultPreset);
                         _presetCollection.ActivePresetId = defaultPreset.Id;
@@ -161,7 +170,7 @@ namespace ShimmerChat.Singletons
         {
             try
             {
-                var json = JsonSerializer.Serialize(_presetCollection);
+                var json = SerializePresetCollection(_presetCollection);
                 _pluginDataService.Write(PluginId, PresetKey, json);
             }
             catch (Exception ex)
@@ -172,7 +181,6 @@ namespace ShimmerChat.Singletons
 
         public void LoadActivatedModifiers()
         {
-            // No-op: data is loaded in constructor via LoadPresets()
         }
 
         public void SaveActivatedModifiers()
@@ -180,7 +188,7 @@ namespace ShimmerChat.Singletons
             SavePresets();
         }
 
-        public void ActivateModifier(string modifierName, string inputValue)
+        public void ActivateModifier(string modifierName, ModifierConfig config)
         {
             var modifier = LoadedModifiers.FirstOrDefault(m => m.info.Name == modifierName);
             if (modifier != null)
@@ -191,10 +199,22 @@ namespace ShimmerChat.Singletons
                     preset.Modifiers.Add(new ActivatedModifier
                     {
                         Name = modifierName,
-                        Value = inputValue
+                        Config = config
                     });
                     SavePresets();
                 }
+            }
+        }
+
+        public void ActivateModifier(string modifierName, string inputValue)
+        {
+            var modifier = LoadedModifiers.FirstOrDefault(m => m.info.Name == modifierName);
+            if (modifier != null)
+            {
+                var config = Activator.CreateInstance(modifier.ConfigType) as ModifierConfig;
+                if (config is LegacyModifierConfig legacy)
+                    legacy.Value = inputValue;
+                ActivateModifier(modifierName, config ?? new LegacyModifierConfig { Value = inputValue });
             }
         }
 
@@ -230,6 +250,25 @@ namespace ShimmerChat.Singletons
                 preset.Modifiers.Clear();
                 SavePresets();
             }
+        }
+
+        public void ApplyModifiers(ContextDocument context, Chat chat, Agent agent)
+        {
+            foreach (var activatedModifier in ActivatedModifiers)
+            {
+                var modifier = LoadedModifiers.FirstOrDefault(m => m.info.Name == activatedModifier.Name);
+                if (modifier != null && activatedModifier.IsEnabled)
+                {
+                    modifier.ModifyContext(context, activatedModifier.Config, chat, agent);
+                }
+            }
+        }
+
+        public void ApplyModifiers(PromptBuilder promptBuilder, Chat chat, Agent agent)
+        {
+            var context = new ContextDocument { Template = promptBuilder };
+            ApplyModifiers(context, chat, agent);
+            context.RenderTo(promptBuilder);
         }
 
         public void CreatePreset(string name)
@@ -279,17 +318,118 @@ namespace ShimmerChat.Singletons
             }
         }
 
-        public void ApplyModifiers(PromptBuilder promptBuilder, Chat chat, Agent agent)
+        #region Serialization
+
+        private static readonly JsonSerializerSettings PresetSerializerSettings = new()
         {
-            foreach (var activatedModifier in ActivatedModifiers)
+            TypeNameHandling = TypeNameHandling.Auto,
+            TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
+            SerializationBinder = new ModifierConfigSerializationBinder()
+        };
+
+        private static string SerializePresetCollection(ContextModifierPresetCollection collection)
+        {
+            return JsonConvert.SerializeObject(collection, PresetSerializerSettings);
+        }
+
+        private static ContextModifierPresetCollection DeserializePresetCollection(string json)
+        {
+            try
             {
-                var modifier = LoadedModifiers.FirstOrDefault(m => m.info.Name == activatedModifier.Name);
-                if (modifier != null && activatedModifier.IsEnabled)
-                {
-                    var modifierInput = activatedModifier.Value;
-                    modifier.ModifyContext(promptBuilder, modifierInput, chat, agent);
-                }
+                return JsonConvert.DeserializeObject<ContextModifierPresetCollection>(json, PresetSerializerSettings)
+                    ?? new ContextModifierPresetCollection();
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Deserialization with TypeNameHandling failed, trying legacy format: {ex.Message}");
+                return DeserializeLegacyPresetCollection(json);
+            }
+        }
+
+        private static ContextModifierPresetCollection DeserializeLegacyPresetCollection(string json)
+        {
+            var dto = JsonConvert.DeserializeObject<LegacyPresetCollectionDto>(json);
+            if (dto == null)
+                return new ContextModifierPresetCollection();
+
+            var collection = new ContextModifierPresetCollection
+            {
+                ActivePresetId = dto.ActivePresetId
+            };
+
+            foreach (var presetDto in dto.Presets)
+            {
+                var preset = new ContextModifierPreset
+                {
+                    Id = presetDto.Id,
+                    Name = presetDto.Name,
+                    Modifiers = presetDto.Modifiers
+                        .Select(m => new ActivatedModifier
+                        {
+                            Name = m.Name,
+                            Config = new LegacyModifierConfig { Value = m.Value },
+                            IsEnabled = m.IsEnabled
+                        })
+                        .ToList()
+                };
+                collection.Presets.Add(preset);
+            }
+
+            return collection;
+        }
+
+        #endregion
+
+        #region Serialization DTOs
+
+        private class LegacyActivatedModifier
+        {
+            public string Name { get; set; } = "";
+            public string Value { get; set; } = "";
+            public bool IsEnabled { get; set; } = true;
+        }
+
+        private class LegacyPresetDto
+        {
+            public string Id { get; set; } = "";
+            public string Name { get; set; } = "Default";
+            public List<LegacyActivatedModifier> Modifiers { get; set; } = new();
+        }
+
+        private class LegacyPresetCollectionDto
+        {
+            public string ActivePresetId { get; set; } = "";
+            public List<LegacyPresetDto> Presets { get; set; } = new();
+        }
+
+        #endregion
+    }
+
+    public class ModifierConfigSerializationBinder : ISerializationBinder
+    {
+        public Type BindToType(string? assemblyName, string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName))
+                throw new ArgumentNullException(nameof(typeName));
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    var type = asm.GetType(typeName);
+                    if (type != null)
+                        return type;
+                }
+                catch { }
+            }
+
+            throw new TypeLoadException($"Cannot resolve type '{typeName}'");
+        }
+
+        public void BindToName(Type serializedType, out string? assemblyName, out string typeName)
+        {
+            assemblyName = null;
+            typeName = serializedType.FullName;
         }
     }
 }

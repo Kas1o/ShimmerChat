@@ -1,3 +1,5 @@
+using ShimmerChatLib.Context;
+
 namespace ShimmerChatBuiltin.SubAgent
 {
     public class SubAgentConfig
@@ -13,6 +15,12 @@ namespace ShimmerChatBuiltin.SubAgent
     public class SubAgentModifierConfig
     {
         public string Name { get; set; } = "";
-        public string Input { get; set; } = "";
+        public ModifierConfig Config { get; set; } = new LegacyModifierConfig { Value = "" };
+
+        public string Input
+        {
+            get => Config is LegacyModifierConfig l ? l.Value : Config.GetType().Name;
+            set => Config = new LegacyModifierConfig { Value = value };
+        }
     }
 }

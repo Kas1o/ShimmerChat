@@ -5,22 +5,27 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ShimmerChatBuiltin.ContextModifiers
+namespace ShimmerChatBuiltin.Misc
 {
+	public class PrintConfig : ModifierConfig
+	{
+	}
+
 	public class Print : IContextModifier
 	{
-		ContextModifierInfo IContextModifier.info => new ContextModifierInfo
+		public ContextModifierInfo info => new ContextModifierInfo
 		{
-			Name = "Print",
-			Description = "Prints input to the console. {time} macro supports",
+			Name = nameof(Print),
+			Description = "Print the context to the console for debugging"
 		};
 
-		void IContextModifier.ModifyContext(PromptBuilder promptBuilder, string input, Chat chat, Agent agent)
+		public Type ConfigType => typeof(PrintConfig);
+
+		public void ModifyContext(ContextDocument context, ModifierConfig config, Chat chat, Agent agent)
 		{
-			Console.WriteLine(input
-				.Replace("{time}", DateTime.Now.ToString("g"))
-				.Replace("{total_len}", promptBuilder.Messages.Select(x => x.Item1.Content.Length).Sum().ToString())
-				);
+			Console.WriteLine(context.Template.GenerateCleanPrompt());
 		}
+
+		public (bool IsValid, string Error) Validate(ModifierConfig config) => (true, "");
 	}
 }

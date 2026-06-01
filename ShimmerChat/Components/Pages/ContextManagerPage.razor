@@ -1,6 +1,7 @@
 @page "/contextmanager"
 @using ShimmerChat.Components.SubComponents
 @using ShimmerChatLib.Interface
+@using ShimmerChatLib.Context
 @inject NavigationManager Navigation
 @inject IStringLocalizer<ContextManagerPage> l
 @inject IContextModifierService contextModifierService
@@ -148,7 +149,7 @@ else
     {
         <EditContextModifierPopup @ref="_editModifierPopup" 
                                   ModifierName="@_editingModifierName" 
-                                  ModifierValue="@_editingModifierValue"
+                                  Config="@_editingModifierConfig"
                                   OnConfirm="(result) => OnEditModifierConfirmed(result)" 
                                   OnClose="() => HideEditModifierPopup()" />
     }
@@ -185,7 +186,7 @@ else
 
     private bool _showEditModifierPopup = false;
     private string? _editingModifierName;
-    private string _editingModifierValue = string.Empty;
+    private ModifierConfig? _editingModifierConfig;
     private int _editingModifierIndex = -1;
 
     private bool UsingOpenAIAndTextCompletion =>
@@ -222,8 +223,8 @@ else
         if (modifierInfo != null)
         {
             string modifierName = modifierInfo.ModifierName;
-            string inputValue = modifierInfo.InputValue;
-            contextModifierService.ActivateModifier(modifierName, inputValue);
+            ModifierConfig config = modifierInfo.Config;
+            contextModifierService.ActivateModifier(modifierName, config);
         }
         HideAddModifierPopup();
     }
@@ -235,7 +236,7 @@ else
             _editingModifierIndex = index;
             var modifier = contextModifierService.ActivatedModifiers[index];
             _editingModifierName = modifier.Name;
-            _editingModifierValue = modifier.Value;
+            _editingModifierConfig = modifier.Config;
             _showEditModifierPopup = true;
         }
     }
@@ -245,7 +246,7 @@ else
         _showEditModifierPopup = false;
         _editingModifierIndex = -1;
         _editingModifierName = null;
-        _editingModifierValue = string.Empty;
+        _editingModifierConfig = null;
     }
 
     private void OnEditModifierConfirmed(object result)
@@ -254,12 +255,12 @@ else
         if (modifierInfo != null && _editingModifierIndex >= 0)
         {
             string modifierName = modifierInfo.ModifierName;
-            string inputValue = modifierInfo.InputValue;
+            ModifierConfig config = modifierInfo.Config;
 
             if (_editingModifierIndex < contextModifierService.ActivatedModifiers.Count && 
                 contextModifierService.ActivatedModifiers[_editingModifierIndex].Name == modifierName)
             {
-                contextModifierService.ActivatedModifiers[_editingModifierIndex].Value = inputValue;
+                contextModifierService.ActivatedModifiers[_editingModifierIndex].Config = config;
                 contextModifierService.SaveActivatedModifiers();
             }
         }
