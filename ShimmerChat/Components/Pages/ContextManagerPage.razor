@@ -119,7 +119,7 @@ else
                                 </label>
                             </div>
                             @{
-                                var preview = modifier.Config.ToString();
+                                var preview = modifier.Config?.ToString() ?? "";
                             }
                             @if (!string.IsNullOrEmpty(preview))
                             {
@@ -183,9 +183,6 @@ else
 
     private AddContextModifierPopup? _addModifierPopup;
     private EditContextModifierPopup? _editModifierPopup;
-
-    private string? _selectedModifierName;
-    private string _modifierInput = string.Empty;
 
     private bool _showEditModifierPopup = false;
     private string? _editingModifierName;

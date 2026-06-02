@@ -207,11 +207,23 @@ namespace ShimmerChat.Singletons
                     preset.Modifiers.Add(new ActivatedModifier
                     {
                         Name = modifierName,
-                        Config = config
+                        Config = EnsureProperConfig(modifier, config)
                     });
                     SavePresets();
                 }
             }
+        }
+
+        private static ModifierConfig EnsureProperConfig(IContextModifier modifier, ModifierConfig config)
+        {
+            var expectedType = modifier.ConfigType;
+            if (expectedType == typeof(LegacyModifierConfig))
+                return config;
+
+            if (config == null || config.GetType() != expectedType)
+                return (ModifierConfig)Activator.CreateInstance(expectedType)!;
+
+            return config;
         }
 
         public void RemoveActivatedModifier(int index)
@@ -255,15 +267,15 @@ namespace ShimmerChat.Singletons
                 var modifier = LoadedModifiers.FirstOrDefault(m => m.info.Name == activatedModifier.Name);
                 if (modifier != null && activatedModifier.IsEnabled)
                 {
-                    var expectedType = modifier.ConfigType;
-                    if (expectedType != typeof(LegacyModifierConfig)
-                        && activatedModifier.Config.GetType() != expectedType)
+                    var config = activatedModifier.Config;
+                    if (config == null || (config is LegacyModifierConfig
+                                            && modifier.ConfigType != typeof(LegacyModifierConfig)))
                     {
                         throw new InvalidOperationException(
                             $"ContextModifier \"{activatedModifier.Name}\" 的配置格式已过时，请到 /contextmanager 重新编辑该修改器以迁移到新的配置格式。");
                     }
 
-                    modifier.ModifyContext(context, activatedModifier.Config, chat, agent);
+                    modifier.ModifyContext(context, config!, chat, agent);
                 }
             }
         }

@@ -31,7 +31,7 @@ namespace ShimmerChatLib.Interface
     public class ActivatedModifier
     {
         public required string Name { get; set; }
-        public ModifierConfig Config { get; set; } = new LegacyModifierConfig { Value = "" };
+        public ModifierConfig? Config { get; set; }
         public bool IsEnabled { get; set; } = true;
     }
 
