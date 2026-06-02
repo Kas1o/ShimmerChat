@@ -1,5 +1,6 @@
 @attribute [PluginPanel("SubAgentConfiguration", "Configure sub-agents for advanced Agentic workflows", PanelDisplayPlace.Settings)]
 
+@using ShimmerChatLib.Context
 @using ShimmerChatLib.Interface
 @using ShimmerChatBuiltin.SubAgent
 @using ShimmerChatLib
@@ -133,7 +134,7 @@
                                 <tr>
                                     <td>@mod.Name</td>
                                     <td>
-                                        <input type="text" class="shimmer-input" @bind="mod.Input" style="min-width:200px;" />
+                                        <span class="text-muted">@mod.Config.ToString()</span>
                                     </td>
                                     <td>
                                         <button class="btn btn-sm bg-danger text-white"
@@ -273,7 +274,7 @@
         selectedConfig.EnabledModifiers.Add(new SubAgentModifierConfig
         {
             Name = selectedModifierName,
-            Input = selectedModifierInput
+            Config = new LegacyModifierConfig { Value = selectedModifierInput }
         });
         selectedModifierName = "";
         selectedModifierInput = "";

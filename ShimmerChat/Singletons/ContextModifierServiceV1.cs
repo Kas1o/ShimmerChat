@@ -88,6 +88,9 @@ namespace ShimmerChat.Singletons
             LoadedModifiers = modifierDict.Values.ToList();
         }
 
+        /// <summary>
+        /// 在启动时加载所有预设用
+        /// </summary>
         private void LoadPresets()
         {
             try
@@ -97,22 +100,24 @@ namespace ShimmerChat.Singletons
                 {
                     _presetCollection = DeserializePresetCollection(json);
                 }
-                else
+                else // 如果为空，则意味着可能存在陈旧数据，尝试进行迁移。
                 {
-                    TryMigrateLegacyData();
-                }
+                    TryMigrateLegacyData(); // （如果也不存在陈旧数据的话，会直接返回，_presetCollection 会保持new() 的默认状态。
+				}
 
-                if (_presetCollection.Presets.Count == 0)
+                if (_presetCollection.Presets.Count == 0) // 如果没有任何数据（通常因为首次启动）
                 {
-                    var defaultPreset = new ContextModifierPreset { Name = "Default" };
+					// 创建一个空的默认预设并保存
+					var defaultPreset = new ContextModifierPreset { Name = "Default" }; 
                     _presetCollection.Presets.Add(defaultPreset);
                     _presetCollection.ActivePresetId = defaultPreset.Id;
                     SavePresets();
                 }
                 else if (string.IsNullOrEmpty(_presetCollection.ActivePresetId)
-                    || !_presetCollection.Presets.Any(p => p.Id == _presetCollection.ActivePresetId))
+                    || !_presetCollection.Presets.Any(p => p.Id == _presetCollection.ActivePresetId)) 
                 {
-                    _presetCollection.ActivePresetId = _presetCollection.Presets[0].Id;
+					// 如果存在预设但没有选中任意一个，选中第一个并保存。
+					_presetCollection.ActivePresetId = _presetCollection.Presets[0].Id;
                     SavePresets();
                 }
             }
@@ -126,6 +131,9 @@ namespace ShimmerChat.Singletons
             }
         }
 
+        /// <summary>
+        /// 如果存在旧的单一序列激活修改器，创建Default预设，迁移到预设中
+        /// </summary>
         private void TryMigrateLegacyData()
         {
             try
@@ -143,7 +151,7 @@ namespace ShimmerChat.Singletons
                                 .Select(m => new ActivatedModifier
                                 {
                                     Name = m.Name,
-                                    Config = new LegacyModifierConfig { Value = m.Value },
+                                    Config = new LegacyModifierConfig { Value = m.Value }, // 这里的迁移导致
                                     IsEnabled = m.IsEnabled
                                 })
                                 .ToList()
@@ -203,18 +211,6 @@ namespace ShimmerChat.Singletons
                     });
                     SavePresets();
                 }
-            }
-        }
-
-        public void ActivateModifier(string modifierName, string inputValue)
-        {
-            var modifier = LoadedModifiers.FirstOrDefault(m => m.info.Name == modifierName);
-            if (modifier != null)
-            {
-                var config = Activator.CreateInstance(modifier.ConfigType) as ModifierConfig;
-                if (config is LegacyModifierConfig legacy)
-                    legacy.Value = inputValue;
-                ActivateModifier(modifierName, config ?? new LegacyModifierConfig { Value = inputValue });
             }
         }
 

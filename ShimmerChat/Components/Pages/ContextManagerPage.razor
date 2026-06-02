@@ -118,9 +118,12 @@ else
                                     <strong>@modifier.Name</strong>
                                 </label>
                             </div>
-                            @if (!string.IsNullOrEmpty(modifier.Value))
+                            @{
+                                var preview = modifier.Config.ToString();
+                            }
+                            @if (!string.IsNullOrEmpty(preview))
                             {
-                                <small class="d-block text-muted">@modifier.Value</small>
+                                <small class="d-block text-muted">@preview</small>
                             }
                         </div>
                     </div>
@@ -374,7 +377,7 @@ else
         if (newPreset != null)
         {
             newPreset.Modifiers = activePreset.Modifiers
-                .Select(m => new ActivatedModifier { Name = m.Name, Value = m.Value, IsEnabled = m.IsEnabled })
+                .Select(m => new ActivatedModifier { Name = m.Name, Config = m.Config, IsEnabled = m.IsEnabled })
                 .ToList();
             contextModifierService.SaveActivatedModifiers();
         }

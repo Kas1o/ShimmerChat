@@ -1,4 +1,3 @@
-using Newtonsoft.Json;
 using ShimmerChatLib.Context;
 using SharperLLM.Util;
 using ShimmerChatLib;
@@ -14,7 +13,6 @@ namespace ShimmerChatLib.Interface
         string ActivePresetName { get; }
 
         void ActivateModifier(string modifierName, ModifierConfig config);
-        void ActivateModifier(string modifierName, string inputValue);
         void RemoveActivatedModifier(int index);
         void ReorderActivatedModifier(int oldIndex, int newIndex);
         void ClearActivatedModifiers();
@@ -35,13 +33,6 @@ namespace ShimmerChatLib.Interface
         public required string Name { get; set; }
         public ModifierConfig Config { get; set; } = new LegacyModifierConfig { Value = "" };
         public bool IsEnabled { get; set; } = true;
-
-        [JsonIgnore]
-        public string Value
-        {
-            get => Config is LegacyModifierConfig l ? l.Value : Config.ToString() ?? "";
-            set => Config = new LegacyModifierConfig { Value = value };
-        }
     }
 
     public class ContextModifierPreset
