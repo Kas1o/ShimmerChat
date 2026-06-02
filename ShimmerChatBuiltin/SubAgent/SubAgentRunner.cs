@@ -141,29 +141,32 @@ namespace ShimmerChatBuiltin.SubAgent
                 fresh.AvailableToolsFormatter = ToolPromptParser.Parse;
             }
 
-            if (config.EnabledModifiers.Count > 0)
+            if (!string.IsNullOrEmpty(config.ModifierPresetId))
             {
-                var context = new ContextDocument
-                {
-                    Segments = allMessages.Select(m => new ContextSegment
-                    {
-                        Message = m.Item1,
-                        From = m.Item2
-                    }).ToList()
-                };
-
                 var modifierService = serviceProvider.GetService(typeof(IContextModifierService)) as IContextModifierService;
-                if (modifierService != null)
+                var presetModifiers = modifierService?.Presets
+                    .FirstOrDefault(p => p.Id == config.ModifierPresetId)?.Modifiers;
+
+                if (presetModifiers != null && presetModifiers.Count > 0)
                 {
-                    foreach (var modConfig in config.EnabledModifiers)
+                    var context = new ContextDocument
+                    {
+                        Segments = allMessages.Select(m => new ContextSegment
+                        {
+                            Message = m.Item1,
+                            From = m.Item2
+                        }).ToList()
+                    };
+
+                    foreach (var activatedModifier in presetModifiers.Where(m => m.IsEnabled))
                     {
                         var modifier = modifierService.LoadedModifiers
-                            .FirstOrDefault(m => m.info.Name == modConfig.Name);
-                        modifier?.ModifyContext(context, modConfig.Config, subChat, subAgent);
+                            .FirstOrDefault(m => m.info.Name == activatedModifier.Name);
+                        modifier?.ModifyContext(context, activatedModifier.Config, subChat, subAgent);
                     }
-                }
 
-                fresh.Messages = context.GetMessages();
+                    fresh.Messages = context.GetMessages();
+                }
             }
 
             return fresh;

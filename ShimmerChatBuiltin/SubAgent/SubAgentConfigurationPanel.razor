@@ -50,7 +50,7 @@
                             API: @(GetApiName(cfg.SelectedApiIndex))
                         </div>
                         <div class="text-sm text-muted">
-                            Tools: @cfg.EnabledToolNames.Count | Modifiers: @cfg.EnabledModifiers.Count | Output: @cfg.OutputMode
+                            Tools: @cfg.EnabledToolNames.Count | Preset: @GetPresetName(cfg.ModifierPresetId) | Output: @cfg.OutputMode
                         </div>
                     </div>
                 }
@@ -114,59 +114,15 @@
 
             <div class="mt-4">
                 <h5>Context Modifiers</h5>
-                <p class="text-sm text-muted">Context modifiers applied to this sub-agent's generation.</p>
-                
-                @if (selectedConfig.EnabledModifiers.Count > 0)
-                {
-                    <table class="table table-sm mt-2">
-                        <thead>
-                            <tr>
-                                <th>Modifier</th>
-                                <th>Input</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @for (int i = 0; i < selectedConfig.EnabledModifiers.Count; i++)
-                            {
-                                var mod = selectedConfig.EnabledModifiers[i];
-                                var capturedIndex = i;
-                                <tr>
-                                    <td>@mod.Name</td>
-                                    <td>
-                                        <span class="text-muted">@mod.Config.ToString()</span>
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-sm bg-danger text-white"
-                                                @onclick="() => RemoveModifier(capturedIndex)">
-                                            X
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
-                else
-                {
-                    <p class="text-muted">No context modifiers configured.</p>
-                }
+                <p class="text-sm text-muted">Select a context modifier preset, or leave empty to inherit none.</p>
 
-                <div class="d-flex gap-2 mt-2 align-items-center">
-                    <select class="form-select" @bind="selectedModifierName" style="max-width:300px;">
-                        <option value="">-- Select modifier --</option>
-                        @foreach (var mod in availableModifierNames)
-                        {
-                            <option value="@mod">@mod</option>
-                        }
-                    </select>
-                    <input type="text" class="shimmer-input" @bind="selectedModifierInput"
-                           placeholder="Input value" style="max-width:300px;" />
-                    <button class="btn btn-secondary" @onclick="AddModifier"
-                            disabled="@(string.IsNullOrWhiteSpace(selectedModifierName))">
-                        Add
-                    </button>
-                </div>
+                <select class="form-select mt-2" @bind="selectedConfig.ModifierPresetId" style="max-width: 400px;">
+                    <option value="">— None —</option>
+                    @foreach (var preset in contextModifierService.Presets)
+                    {
+                        <option value="@preset.Id">@preset.Name</option>
+                    }
+                </select>
             </div>
 
             <div class="mt-4">
@@ -188,20 +144,16 @@
     List<SubAgentConfig> configs = [];
     SubAgentConfig? selectedConfig;
     string newConfigName = "";
-    string selectedModifierName = "";
-    string selectedModifierInput = "";
     bool isLoading;
     string statusMessage = "";
     string statusType = "success";
 
     List<ApiSetting> apiSettings = [];
-    List<string> availableModifierNames = [];
 
     protected override void OnInitialized()
     {
         LoadConfigs();
         LoadApiSettings();
-        LoadModifierNames();
     }
 
     void LoadConfigs()
@@ -216,12 +168,12 @@
         apiSettings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? [];
     }
 
-    void LoadModifierNames()
+    string GetPresetName(string presetId)
     {
-        availableModifierNames = contextModifierService.LoadedModifiers
-            .Select(m => m.info.Name)
-            .OrderBy(n => n)
-            .ToList();
+        if (string.IsNullOrEmpty(presetId))
+            return "None";
+        var preset = contextModifierService.Presets.FirstOrDefault(p => p.Id == presetId);
+        return preset?.Name ?? "—";
     }
 
     string GetApiName(int index)
@@ -264,26 +216,6 @@
             selectedConfig.EnabledToolNames.Add(toolName);
         else if (!isChecked)
             selectedConfig.EnabledToolNames.Remove(toolName);
-    }
-
-    void AddModifier()
-    {
-        if (selectedConfig == null || string.IsNullOrWhiteSpace(selectedModifierName))
-            return;
-
-        selectedConfig.EnabledModifiers.Add(new SubAgentModifierConfig
-        {
-            Name = selectedModifierName,
-            Config = new LegacyModifierConfig { Value = selectedModifierInput }
-        });
-        selectedModifierName = "";
-        selectedModifierInput = "";
-    }
-
-    void RemoveModifier(int index)
-    {
-        if (selectedConfig == null) return;
-        selectedConfig.EnabledModifiers.RemoveAt(index);
     }
 
     async Task SaveConfigsAsync()

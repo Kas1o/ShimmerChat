@@ -1,5 +1,3 @@
-using ShimmerChatLib.Context;
-
 namespace ShimmerChatBuiltin.SubAgent
 {
     public class SubAgentConfig
@@ -8,13 +6,7 @@ namespace ShimmerChatBuiltin.SubAgent
         public Guid Guid { get; set; } = Guid.NewGuid();
         public int SelectedApiIndex { get; set; } = -1;
         public List<string> EnabledToolNames { get; set; } = [];
-        public List<SubAgentModifierConfig> EnabledModifiers { get; set; } = [];
+        public string ModifierPresetId { get; set; } = "";
         public string OutputMode { get; set; } = "LastMessage";
-    }
-
-    public class SubAgentModifierConfig
-    {
-        public string Name { get; set; } = "";
-        public ModifierConfig Config { get; set; } = new LegacyModifierConfig { Value = "" };
     }
 }
