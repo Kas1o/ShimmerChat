@@ -141,32 +141,41 @@ namespace ShimmerChatBuiltin.SubAgent
                 fresh.AvailableToolsFormatter = ToolPromptParser.Parse;
             }
 
-            if (!string.IsNullOrEmpty(config.ModifierPresetId))
+            List<ActivatedModifier>? activeModifiers = null;
+
+            if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
             {
                 var modifierService = serviceProvider.GetService(typeof(IContextModifierService)) as IContextModifierService;
-                var presetModifiers = modifierService?.Presets
+                activeModifiers = modifierService?.Presets
                     .FirstOrDefault(p => p.Id == config.ModifierPresetId)?.Modifiers;
+            }
+            else if (!config.UseSharedPreset && config.IndependentModifiers.Count > 0)
+            {
+                var modifierService = serviceProvider.GetService(typeof(IContextModifierService)) as IContextModifierService;
+                activeModifiers = config.IndependentModifiers;
+            }
 
-                if (presetModifiers != null && presetModifiers.Count > 0)
+            if (activeModifiers != null && activeModifiers.Count > 0)
+            {
+                var modifierService = serviceProvider.GetService(typeof(IContextModifierService)) as IContextModifierService;
+
+                var context = new ContextDocument
                 {
-                    var context = new ContextDocument
+                    Segments = allMessages.Select(m => new ContextSegment
                     {
-                        Segments = allMessages.Select(m => new ContextSegment
-                        {
-                            Message = m.Item1,
-                            From = m.Item2
-                        }).ToList()
-                    };
+                        Message = m.Item1,
+                        From = m.Item2
+                    }).ToList()
+                };
 
-                    foreach (var activatedModifier in presetModifiers.Where(m => m.IsEnabled))
-                    {
-                        var modifier = modifierService.LoadedModifiers
-                            .FirstOrDefault(m => m.info.Name == activatedModifier.Name);
-                        modifier?.ModifyContext(context, activatedModifier.Config, subChat, subAgent);
-                    }
-
-                    fresh.Messages = context.GetMessages();
+                foreach (var activatedModifier in activeModifiers.Where(m => m.IsEnabled))
+                {
+                    var modifier = modifierService?.LoadedModifiers
+                        .FirstOrDefault(m => m.info.Name == activatedModifier.Name);
+                    modifier?.ModifyContext(context, activatedModifier.Config, subChat, subAgent);
                 }
+
+                fresh.Messages = context.GetMessages();
             }
 
             return fresh;
