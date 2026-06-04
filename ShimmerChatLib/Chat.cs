@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text.Json;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
 
@@ -16,12 +15,16 @@ namespace ShimmerChatLib
 			{
 				field = value;
 			}
-		} // The name of the chat
-		public Guid Guid { get; set; } // The unique identifier of the chat
-		public ObservableCollection<Message> Messages { get;set; } // List of messages in the chat
+		}
+		public Guid Guid { get; set; }
+
+		[JsonIgnore]
+		public ObservableCollection<Message> Messages { get; set; }
 
 		public DateTime CreateTime { get; set; }
 		public DateTime LastModifyTime { get; set; }
+		public string LastMessagePreview { get; set; } = string.Empty;
+		public int MessageCount { get; set; }
 
 		public Chat()
 		{
@@ -43,14 +46,108 @@ namespace ShimmerChatLib
                 throw new InvalidOperationException($"Chat with GUID '{guid}' not found.");
             }
             var chat = JsonConvert.DeserializeObject<Chat>(chatJson);
+            chat.Messages = new ObservableCollection<Message>();
             return chat;
         }
 
-		public void AddMessage(Message message, IKVDataService kvDataService = null)
+        public static Chat LoadAndMigrate(Guid guid, IKVDataService kvDataService, IMessageStoreService messageStore)
+        {
+            var chatJson = kvDataService.Read("Chats", guid.ToString());
+            if (chatJson == null)
+            {
+                throw new InvalidOperationException($"Chat with GUID '{guid}' not found.");
+            }
+
+            var chat = JsonConvert.DeserializeObject<Chat>(chatJson);
+            chat.Messages = new ObservableCollection<Message>();
+
+            int existingCount = messageStore.GetMessageCount(guid);
+            if (existingCount == 0)
+            {
+                try
+                {
+                    var legacy = JsonConvert.DeserializeObject<LegacyChatData>(chatJson);
+                    if (legacy?.Messages != null && legacy.Messages.Count > 0)
+                    {
+                        foreach (var msg in legacy.Messages)
+                        {
+                            if (msg.Id == Guid.Empty) msg.Id = Guid.NewGuid();
+                            messageStore.InsertMessage(guid, msg);
+                        }
+                        chat.LastMessagePreview = messageStore.GetLastMessagePreview(guid) ?? string.Empty;
+                        chat.MessageCount = legacy.Messages.Count;
+                        chat.Save(kvDataService);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Migration warning for chat {guid}: {ex.Message}");
+                }
+            }
+            else
+            {
+                chat.MessageCount = existingCount;
+                chat.LastMessagePreview = messageStore.GetLastMessagePreview(guid) ?? string.Empty;
+            }
+
+            return chat;
+        }
+
+        private class LegacyChatData
+        {
+            public List<Message>? Messages { get; set; }
+        }
+
+		public void AddMessage(Message message)
 		{
 			Messages.Add(message);
-            // Save the chat if kvDataService is provided
-            kvDataService?.Write("Chats", Guid.ToString(), JsonConvert.SerializeObject(this));
+		}
+
+		public void LoadMessages(IMessageStoreService messageStore, int skip, int take)
+		{
+			if (Messages == null)
+				Messages = new ObservableCollection<Message>();
+			else
+				Messages.Clear();
+
+			var loaded = messageStore.GetMessages(Guid, skip, take);
+			foreach (var msg in loaded)
+				Messages.Add(msg);
+
+			MessageCount = messageStore.GetMessageCount(Guid);
+			LastMessagePreview = messageStore.GetLastMessagePreview(Guid) ?? string.Empty;
+		}
+
+		public void SaveMessage(IMessageStoreService messageStore, Message message)
+		{
+			var existing = messageStore.GetMessage(Guid, message.Id);
+			if (existing != null)
+				messageStore.UpdateMessage(Guid, message);
+			else
+				messageStore.InsertMessage(Guid, message);
+
+			MessageCount = messageStore.GetMessageCount(Guid);
+			LastMessagePreview = messageStore.GetLastMessagePreview(Guid) ?? string.Empty;
+		}
+
+		public void DeleteMessage(IMessageStoreService messageStore, Message message)
+		{
+			messageStore.DeleteMessage(Guid, message);
+			Messages.Remove(message);
+
+			MessageCount = messageStore.GetMessageCount(Guid);
+			LastMessagePreview = messageStore.GetLastMessagePreview(Guid) ?? string.Empty;
+		}
+
+		public void SaveAllMessages(IMessageStoreService messageStore)
+		{
+			messageStore.DeleteAllMessages(Guid);
+			foreach (var message in Messages)
+			{
+				messageStore.InsertMessage(Guid, message);
+			}
+			MessageCount = Messages.Count;
+			LastMessagePreview = messageStore.GetLastMessagePreview(Guid) ?? string.Empty;
 		}
 	}
 }

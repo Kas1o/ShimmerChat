@@ -11,6 +11,7 @@
 @inject IPopupService popupService
 @inject IJSRuntime JS
 @inject IKVDataService KVData
+@inject IMessageStoreService messageStore
 @inject NavigationManager navigation
 
 @if (chat != null)
@@ -21,6 +22,14 @@
 			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.name</h2>
 		</div>
 		<div id="chat-main" @ref="ChatMainElement" @onscroll="OnChatScroll">
+			@if (hasMoreMessages)
+			{
+				<div style="text-align:center; padding: 10px;">
+					<button class="btn" @onclick="LoadOlderMessagesAsync" disabled="@loadingOlderMessages">
+						@(loadingOlderMessages ? "加载中..." : "加载更多消息")
+					</button>
+				</div>
+			}
 			@if (virtualize)
 			{
 				<Virtualize  Items="messages" Context="message" >
@@ -143,7 +152,7 @@
 			border-radius: 15px;
 			padding: 5px;
 		}
-		
+
 		/* 打字指示器动画 */
 		.shimmer-typing-indicator {
 			display: inline-block;
@@ -151,7 +160,7 @@
 			font-weight: bold;
 			font-size: 1.2em;
 		}
-		
+
 		@@keyframes blink {
 			0%, 50% { opacity: 1; }
 			51%, 100% { opacity: 0; }
@@ -258,15 +267,19 @@
 	private Chat? chat; // 当前对话的引用
 
 	/// <summary>
-	/// 消息列表的引用，由 <see cref="OnParametersSet" /> 设置为对 <see cref="Chat.Messages"/> 的 引用。
+	/// 消息列表的引用，由 <see cref="OnParametersSetAsync" /> 设置为对 <see cref="Chat.Messages"/> 的 引用。
 	/// </summary>
-	ObservableCollection<Message> messages = new ObservableCollection<Message>(); 
+	ObservableCollection<Message> messages = new ObservableCollection<Message>();
 	string inputText { get; set; } = ""; // 当前正在输入的文本。
 
 	bool throwExceptionInsteadOfPopupErrorMessage = false; // 抛出异常设置
 	bool autoScrollDown = true; // 自动滚动设置
 	bool virtualize = false;
 	bool isUserAtBottom = true; // 用户是否位于底部
+	bool hasMoreMessages = false;
+	bool loadingOlderMessages = false;
+	int loadedMessageOffset = 0;
+	private const int MessagesPerPage = 50;
 
 	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
 	#endregion
@@ -283,27 +296,27 @@
 		}
 		inputText = e.Value?.ToString() ?? string.Empty;
 	}
-	void CheckEnter(KeyboardEventArgs e)
+	async Task CheckEnter(KeyboardEventArgs e)
 	{
 		if (e.Key == "Enter" && !e.ShiftKey && !generating) // 检测是否按下 Enter 键
 		{
 			_skipNextInput = true;      // 标记：下次 oninput 不更新
-			Send(); // 无论输入是否为空，都调用Send方法
+			await Send(); // 无论输入是否为空，都调用Send方法
 		}
 	}
-	void OnClickStopGenerationButton()
+	async Task OnClickStopGenerationButton()
 	{
 		StopGeneration();
 	}
-	void OnClickSendButton()
+	async Task OnClickSendButton()
 	{
-		Send();
+		await Send();
 	}
 	void BackToAgentPage()
 	{
 		navigation.NavigateTo($"/agent/{AgentGuid}");
 	}
-	async void OnChatScroll()
+	async Task OnChatScroll()
 	{
 		try
 		{
@@ -318,7 +331,7 @@
 		{
 		}
 	}
-	async void ScrollToBottomManually()
+	async Task ScrollToBottomManually()
 	{
 		try
 		{
@@ -330,10 +343,40 @@
 		{
 		}
 	}
+	async Task LoadOlderMessagesAsync()
+	{
+		if (!hasMoreMessages || loadingOlderMessages || chat == null)
+			return;
+
+		loadingOlderMessages = true;
+		await InvokeAsync(StateHasChanged);
+
+		try
+		{
+			var newOffset = Math.Max(0, loadedMessageOffset - MessagesPerPage);
+			var count = loadedMessageOffset - newOffset;
+			var olderMessages = messageStore.GetMessages(chat.Guid, newOffset, count);
+
+			hasMoreMessages = newOffset > 0;
+			loadedMessageOffset = newOffset;
+
+			for (int i = olderMessages.Count - 1; i >= 0; i--)
+				messages.Insert(0, olderMessages[i]);
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Failed to load older messages: {ex.Message}");
+		}
+		finally
+		{
+			loadingOlderMessages = false;
+			await InvokeAsync(StateHasChanged);
+		}
+	}
 	#endregion
 
 	#region 逻辑
-	async void Send()
+	async Task Send()
 	{
 		// 取消之前可能存在的生成任务
 		CancelPreviousGeneration();
@@ -359,13 +402,14 @@
 
 				// 添加消息到聊天
 				chat.AddMessage(message);
+				chat.SaveMessage(messageStore, message);
 				ChatPluginPanelContainer?.OnUserMessage(message);
 				inputText = ""; // 清空输入框
 				GetDirty(); // 标记为脏数据以保存
 			}
 
 		// 无论输入是否为空，都启动AI生成任务
-		new Task(AddLLMReplyStream).Start();
+		_ = Task.Run(AddLLMReplyStream);
 	}
 	/// <summary>
 	/// 获取当前正在生成的消息
@@ -408,7 +452,7 @@
 			}
 		}
 	}
-	async void AddLLMReplyStream()
+	async Task AddLLMReplyStream()
 	{
 		if (agent == null || chat == null)
 			return;
@@ -418,8 +462,6 @@
 		// 创建新的CancellationTokenSource
 		cts = new CancellationTokenSource();
 		var cancellationToken = cts.Token;
-
-
 
 		try
 		{
@@ -443,6 +485,7 @@
 							generatingMessage.CurrentVersion.toolCalls = null;
 						}
 						generatingMessage.GenerationState = MessageGenerationState.Generating;
+						chat.SaveMessage(messageStore, generatingMessage);
 					}
 					else
 					{
@@ -455,6 +498,7 @@
 							GenerationState = MessageGenerationState.Generating
 						};
 						messages.Add(generatingMessage);
+						chat.SaveMessage(messageStore, generatingMessage);
 					}
 
 					await InvokeAsync(StateHasChanged);
@@ -499,22 +543,13 @@
 
 					// 流式响应结束，标记为完成状态
 					generatingMessage.GenerationState = MessageGenerationState.Completed;
+					chat.SaveMessage(messageStore, generatingMessage);
 					ChatPluginPanelContainer?.OnAgentMessage(generatingMessage);
 					await InvokeAsync(StateHasChanged);
 				},
 				// 处理工具调用的回调
 				onToolCall: (toolCalls) =>
 				{
-					// 添加工具调用消息 （已经集成，不再使用单独的 ToolCall Message）
-					/*
-					messages.Add(new Message
-					{
-						message = new SharperLLM.Util.ChatMessage{Content= null, thinking = null,  toolCalls = toolCalls },
-						timestamp = DateTime.Now,
-						sender = ShimmerChatLib.Sender.ToolCall
-						});
-					*/
-
 					// 触发UI刷新
 					InvokeAsync(StateHasChanged);
 				},
@@ -529,6 +564,7 @@
 					};
 					// 工具调用结果
 					messages.Add(newMessage);
+					chat.SaveMessage(messageStore, newMessage);
 
 					ChatPluginPanelContainer?.OnToolCallResult(newMessage);
 
@@ -579,7 +615,7 @@
 	/// <summary>
 	/// 继续生成流式响应，对指定消息附加 prefix: true 参数
 	/// </summary>
-	async void AddLLMReplyStreamContinuation(Message continuationMessage)
+	async Task AddLLMReplyStreamContinuation(Message continuationMessage)
 	{
 		if (agent == null || chat == null || continuationMessage == null)
 			return;
@@ -634,6 +670,7 @@
 					// 流式响应结束，标记为完成状态
 					continuationMessage.GenerationState = MessageGenerationState.Completed;
 					continuationMessage.IsContinuation = false;
+					chat.SaveMessage(messageStore, continuationMessage);
 					ChatPluginPanelContainer?.OnAgentMessage(continuationMessage);
 					await InvokeAsync(StateHasChanged);
 				},
@@ -690,7 +727,7 @@
 			generatingMessage.GenerationState = MessageGenerationState.Completed;
 		}
 	}
-	async void DeleteMessage(Message message)
+	async Task DeleteMessage(Message message)
 	{
 		// 如果删除的是当前正在生成的消息，先取消生成
 		if (message.IsGenerating)
@@ -698,11 +735,11 @@
 			StopGeneration();
 		}
 
-		messages.Remove(message);
+		chat?.DeleteMessage(messageStore, message);
 		GetDirty();
 		await Refresh();
 	}
-	async void RegenerateFromMessage(Message message)
+	async Task RegenerateFromMessage(Message message)
 	{
 		// 停止当前可能正在进行的生成
 		StopGeneration();
@@ -739,18 +776,21 @@
 			messages.RemoveAt(i);
 		}
 
+		// 重新持久化所有剩余消息
+		chat?.SaveAllMessages(messageStore);
+
 		// 保存更改
 		GetDirty();
 		await Refresh();
 
 		// 启动新的AI回复生成
-		new Task(AddLLMReplyStream).Start();
+		_ = Task.Run(AddLLMReplyStream);
 	}
 
 	/// <summary>
 	/// 从指定消息继续生成（使用 prefix continuation 功能）
 	/// </summary>
-	async void ContinueFromMessage(Message message)
+	async Task ContinueFromMessage(Message message)
 	{
 		// 停止当前可能正在进行的生成
 		StopGeneration();
@@ -772,7 +812,7 @@
 		await Refresh();
 
 		// 启动继续生成
-		new Task(() => AddLLMReplyStreamContinuation(message)).Start();
+		_ = Task.Run(() => AddLLMReplyStreamContinuation(message));
 	}
 	#endregion
 
@@ -792,13 +832,13 @@
 			virtualize = virt;
 		}
 	}
-	protected override void OnParametersSet()
+	protected override async Task OnParametersSetAsync()
 	{
-		base.OnParametersSet();
-
 		agent = null;
 		chat = null;
 		messages = new ObservableCollection<Message>();
+		hasMoreMessages = false;
+		loadedMessageOffset = 0;
 
 		if (Guid.TryParse(AgentGuid, out var guid))
 		{
@@ -807,11 +847,17 @@
 				agent = Agent.Load(guid, KVData);
 				if (agent != null)
 				{
-					var chats = agent.GetChats(KVData);
-					chat = chats.FirstOrDefault(c => c.Guid.ToString() == ChatGuid);
-					if (chat != null)
+					if (Guid.TryParse(ChatGuid, out var chatGuid) && agent.chatGuids.Contains(chatGuid))
 					{
-						messages = chat.Messages ?? new ObservableCollection<Message>();
+						chat = Chat.LoadAndMigrate(chatGuid, KVData, messageStore);
+
+						int totalCount = messageStore.GetMessageCount(chatGuid);
+						var skip = Math.Max(0, totalCount - MessagesPerPage);
+						chat.LoadMessages(messageStore, skip, MessagesPerPage);
+						messages = chat.Messages;
+
+						hasMoreMessages = skip > 0;
+						loadedMessageOffset = skip;
 					}
 				}
 			}
@@ -822,6 +868,8 @@
 				messages = new ObservableCollection<Message>();
 			}
 		}
+
+		await base.OnParametersSetAsync();
 	}
 	#endregion
 
@@ -867,14 +915,11 @@
 	}
 	void GetDirty()
 	{
+		if (chat == null) return;
 		chat.LastModifyTime = DateTime.Now;
-
-		// Save the chat and agent directly
-		if (chat != null)
-			chat.Save(KVData);
+		chat.Save(KVData);
 		if (agent != null)
 		{
-			// 将当前聊天移到列表开头（表示最新更新）
 			agent.MoveChatToTop(chat.Guid);
 			agent.Save(KVData);
 		}
@@ -885,4 +930,3 @@
 	}
 	#endregion
 }
-

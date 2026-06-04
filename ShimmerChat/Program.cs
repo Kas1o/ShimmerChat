@@ -95,25 +95,42 @@ static void ConfigureKVDataStorage(WebApplicationBuilder builder)
     var config = builder.Configuration.GetSection("KVDataStorage").Get<KVDataStorageConfig>() ?? new KVDataStorageConfig();
     builder.Services.AddSingleton(config);
 
+    // 创建共享的 LiteDatabase 实例（消息存储和 KV 存储共用）
+    string dbPath = Path.Combine(AppContext.BaseDirectory, "LiteDBKVData", "data.db");
+    string? dbDir = Path.GetDirectoryName(dbPath);
+    if (!string.IsNullOrEmpty(dbDir) && !Directory.Exists(dbDir))
+    {
+        Directory.CreateDirectory(dbDir);
+    }
+    var sharedDatabase = new LiteDB.LiteDatabase(dbPath);
+    builder.Services.AddSingleton(sharedDatabase);
+
+    // 始终注册两种消息存储实现（用于迁移服务）
+    builder.Services.AddSingleton<FileMessageStoreService>();
+    builder.Services.AddSingleton<LiteDBMessageStoreService>();
+    builder.Services.AddSingleton<MessageStoreMigrationService>();
+
     // 注册迁移标记管理器
     builder.Services.AddSingleton<KVDataMigrationMarker>();
 
-    // 始终注册两种存储实现（用于迁移服务）
+    // 始终注册两种 KV 存储实现（用于迁移服务）
     builder.Services.AddSingleton<LocalFileStorageKVData>();
     builder.Services.AddSingleton<LiteDBKVData>();
     builder.Services.AddSingleton<KVDataMigrationService>();
 
-    // 根据配置注册 IKVDataService 的实现
+    // 根据配置注册 IKVDataService 和 IMessageStoreService 的实现
     switch (config.GetStorageType())
     {
         case KVStorageType.LiteDB:
             Console.WriteLine("Using LiteDB for KV data storage");
             builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LiteDBKVData>());
+            builder.Services.AddSingleton<IMessageStoreService>(sp => sp.GetRequiredService<LiteDBMessageStoreService>());
             break;
         case KVStorageType.LocalFileStorage:
         default:
             Console.WriteLine("Using LocalFileStorage for KV data storage");
             builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LocalFileStorageKVData>());
+            builder.Services.AddSingleton<IMessageStoreService>(sp => sp.GetRequiredService<FileMessageStoreService>());
             break;
     }
 }
@@ -128,6 +145,7 @@ static void ExecuteAutoMigration(WebApplication app)
         return;
 
     var migrationService = scope.ServiceProvider.GetRequiredService<KVDataMigrationService>();
+    var messageMigrationService = scope.ServiceProvider.GetRequiredService<MessageStoreMigrationService>();
     var marker = scope.ServiceProvider.GetRequiredService<KVDataMigrationMarker>();
     var migrateFrom = config.GetAutoMigrateFromType();
 
@@ -180,11 +198,21 @@ static void ExecuteAutoMigration(WebApplication app)
         {
             Console.WriteLine("Auto-migrating data from LocalFileStorage to LiteDB...");
             migratedCount = migrationService.MigrateToLiteDB(config.ClearSourceAfterMigration);
+
+            Console.WriteLine("Auto-migrating messages from File to LiteDB...");
+            int msgCount = messageMigrationService.MigrateFileToLite();
+            Console.WriteLine($"Migrated {msgCount} messages.");
+            migratedCount += msgCount;
         }
         else if (migrateFrom == KVStorageType.LiteDB && targetType == KVStorageType.LocalFileStorage)
         {
             Console.WriteLine("Auto-migrating data from LiteDB to LocalFileStorage...");
             migratedCount = migrationService.MigrateToLocalFileStorage(config.ClearSourceAfterMigration);
+
+            Console.WriteLine("Auto-migrating messages from LiteDB to File...");
+            int msgCount = messageMigrationService.MigrateLiteToFile();
+            Console.WriteLine($"Migrated {msgCount} messages.");
+            migratedCount += msgCount;
         }
 
         // 记录迁移标记

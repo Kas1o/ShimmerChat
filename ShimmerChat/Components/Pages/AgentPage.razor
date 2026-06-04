@@ -1,9 +1,11 @@
 @page "/agent/{agentguid}"
+@using ShimmerChatLib.Models
 @inject NavigationManager navigation
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService
 @inject IJSRuntime JS
 @inject IToolService ToolService
+@inject IMessageStoreService messageStore
 
 @if(agent != null)
 {
@@ -23,14 +25,14 @@
                         <div class="chat-last-message"></div>
                     </div>
 
-                    <Virtualize ItemsProvider="LoadChatsAsync" Context="chat" @ref="chatVirtualize">
+                    <Virtualize ItemsProvider="LoadChatSummariesAsync" Context="summary" @ref="chatVirtualize">
                         <ItemContent>
-                            <div class="chat-item" @onclick="() => OpenChat(chat)">
+                            <div class="chat-item" @onclick="() => OpenChatSummary(summary)">
                                 <div class="chat-info">
-                                    <div class="chat-name">@chat.Name</div>
-                                    <div class="chat-last-message">@GetLastMessageContent(chat)</div>
+                                    <div class="chat-name">@summary.Name</div>
+                                    <div class="chat-last-message">@summary.LastMessagePreview</div>
                                 </div>
-                                <button class="chat-delete-btn" @onclick:stopPropagation @onclick="() => ShowDeleteChatConfirmation(chat)">
+                                <button class="chat-delete-btn" @onclick:stopPropagation @onclick="() => ShowDeleteChatConfirmation(summary)">
                                     ×
                                 </button>
                             </div>
@@ -547,6 +549,7 @@
             welcomeMessage.CurrentVersionIndex = 0;
 
             chat.AddMessage(welcomeMessage);
+            chat.SaveMessage(messageStore, welcomeMessage);
         }
 
         // Save the chat first
@@ -566,6 +569,11 @@
         navigation.NavigateTo(navigation.Uri + "/" + chat.Guid.ToString());
     }
 
+    void OpenChatSummary(ChatSummary summary)
+    {
+        navigation.NavigateTo(navigation.Uri + "/" + summary.Guid.ToString());
+    }
+
     private async Task Export()
     {
         if (agent == null)
@@ -583,28 +591,16 @@
     #region Chat Management
     
     bool DeleteChatPopupVisible { get; set; } = false;
-    Chat? ChatToDelete { get; set; } = null;
+    ChatSummary? ChatToDelete { get; set; } = null;
 
-    string GetLastMessageContent(Chat chat)
+    string GetLastMessagePreview(ChatSummary summary)
     {
-        if (chat.Messages == null || chat.Messages.Count == 0)
-            return string.Empty;
-        
-        var lastMessage = chat.Messages.LastOrDefault();
-        if (lastMessage?.message?.Content != null)
-        {
-            // Limit the message length to prevent overly long previews
-            var content = lastMessage.message.Content;
-            if (content.Length > 50)
-                return content.Substring(0, 50) + "...";
-            return content;
-        }
-        return string.Empty;
+        return summary.LastMessagePreview;
     }
 
-    void ShowDeleteChatConfirmation(Chat chat)
+    void ShowDeleteChatConfirmation(ChatSummary summary)
     {
-        ChatToDelete = chat;
+        ChatToDelete = summary;
         DeleteChatPopupVisible = true;
     }
 
@@ -612,15 +608,14 @@
     {
         if (ChatToDelete != null && agent != null)
         {
-            // Remove the chat from the agent's chat list
             agent.RemoveChatGuid(ChatToDelete.Guid);
             agent.Save(kvDataService);
 
-            // Reset popup state
+            messageStore.DeleteAllMessages(ChatToDelete.Guid);
+
             DeleteChatPopupVisible = false;
             ChatToDelete = null;
 
-            // Refresh the Virtualize component
             if (chatVirtualize != null)
             {
                 await chatVirtualize.RefreshDataAsync();
@@ -632,20 +627,19 @@
 
     #region Virtualize Chat Loading
 
-    private Virtualize<Chat>? chatVirtualize;
+    private Virtualize<ChatSummary>? chatVirtualize;
 
-    private ValueTask<ItemsProviderResult<Chat>> LoadChatsAsync(ItemsProviderRequest request)
+    private ValueTask<ItemsProviderResult<ChatSummary>> LoadChatSummariesAsync(ItemsProviderRequest request)
     {
         if (agent == null)
         {
-            return ValueTask.FromResult(new ItemsProviderResult<Chat>(Array.Empty<Chat>(), 0));
+            return ValueTask.FromResult(new ItemsProviderResult<ChatSummary>(Array.Empty<ChatSummary>(), 0));
         }
 
-        // 使用 GetChatsRange 只加载指定范围的聊天，实现真正的惰性加载
         var totalCount = agent.GetChatCount();
-        var chats = agent.GetChatsRange(kvDataService, request.StartIndex, request.Count);
+        var summaries = agent.GetChatSummariesRange(kvDataService, request.StartIndex, request.Count);
 
-        return ValueTask.FromResult(new ItemsProviderResult<Chat>(chats, totalCount));
+        return ValueTask.FromResult(new ItemsProviderResult<ChatSummary>(summaries, totalCount));
     }
 
     private async Task RefreshChatsAsync()

@@ -23,6 +23,8 @@ namespace ShimmerChatLib
 
 	public class Message
     {
+        public Guid Id { get; set; } = Guid.NewGuid();
+
         [JsonProperty]
         private List<ChatMessage> _versions = new List<ChatMessage>();
         
