@@ -174,11 +174,6 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            await Task.Delay(1);
-            contextModifierService.LoadActivatedModifiers();
-        }
     }
 
     private AddContextModifierPopup? _addModifierPopup;
@@ -196,7 +191,7 @@ else
 
     private void SaveAll()
     {
-        contextModifierService.SaveActivatedModifiers();
+        contextModifierService.SavePresets();
         Navigation.NavigateTo(Navigation.Uri, true);
     }
 
@@ -261,7 +256,7 @@ else
                 contextModifierService.ActivatedModifiers[_editingModifierIndex].Name == modifierName)
             {
                 contextModifierService.ActivatedModifiers[_editingModifierIndex].Config = config;
-                contextModifierService.SaveActivatedModifiers();
+                contextModifierService.SavePresets();
             }
         }
         HideEditModifierPopup();
@@ -376,7 +371,7 @@ else
             newPreset.Modifiers = activePreset.Modifiers
                 .Select(m => new ActivatedModifier { Name = m.Name, Config = m.Config, IsEnabled = m.IsEnabled })
                 .ToList();
-            contextModifierService.SaveActivatedModifiers();
+            contextModifierService.SavePresets();
         }
     }
 

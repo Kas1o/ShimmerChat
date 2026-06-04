@@ -18,10 +18,7 @@ namespace ShimmerChatLib.Interface
         void ClearActivatedModifiers();
         void ApplyModifiers(ContextDocument context, Chat chat, Agent agent);
         void ApplyModifiers(PromptBuilder promptBuilder, Chat chat, Agent agent);
-
-        void SaveActivatedModifiers();
-        void LoadActivatedModifiers();
-
+        void SavePresets();
         void CreatePreset(string name);
         void DeletePreset(string presetId);
         void RenamePreset(string presetId, string newName);

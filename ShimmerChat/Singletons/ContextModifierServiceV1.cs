@@ -174,7 +174,7 @@ namespace ShimmerChat.Singletons
             return _presetCollection.Presets.FirstOrDefault(p => p.Id == _presetCollection.ActivePresetId);
         }
 
-        private void SavePresets()
+        public void SavePresets()
         {
             try
             {
@@ -185,15 +185,6 @@ namespace ShimmerChat.Singletons
             {
                 Console.WriteLine($"保存ContextModifier预设失败: {ex.Message}");
             }
-        }
-
-        public void LoadActivatedModifiers()
-        {
-        }
-
-        public void SaveActivatedModifiers()
-        {
-            SavePresets();
         }
 
         public void ActivateModifier(string modifierName, ModifierConfig config)
