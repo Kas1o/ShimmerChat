@@ -8,11 +8,10 @@ namespace ShimmerChat.Singletons
     /// <summary>
     /// LiteDB 实现的 KV 数据存储服务
     /// </summary>
-    public class LiteDBKVData : IKVDataService, IDisposable
+    public class LiteDBKVData : IKVDataService
     {
         private readonly LiteDatabase _database;
         private readonly ILiteCollection<KVDataEntry> _collection;
-        private bool _disposed;
 
         /// <summary>
         /// KV 数据条目实体
@@ -28,16 +27,9 @@ namespace ShimmerChat.Singletons
         /// <summary>
         /// 初始化 LiteDBKVData 实例
         /// </summary>
-        public LiteDBKVData()
+        public LiteDBKVData(LiteDatabase database)
         {
-            string dbPath = Path.Combine(AppContext.BaseDirectory, "LiteDBKVData", "data.db");
-            string? directory = Path.GetDirectoryName(dbPath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            _database = new LiteDatabase(dbPath);
+            _database = database;
             _collection = _database.GetCollection<KVDataEntry>("kvdata");
             _collection.EnsureIndex(x => x.SpaceId);
             _collection.EnsureIndex(x => new { x.SpaceId, x.Key }, true);
@@ -182,16 +174,5 @@ namespace ShimmerChat.Singletons
             _collection.DeleteAll();
         }
 
-        /// <summary>
-        /// 释放资源
-        /// </summary>
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                _database?.Dispose();
-                _disposed = true;
-            }
-        }
     }
 }

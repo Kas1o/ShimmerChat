@@ -1,10 +1,11 @@
-﻿﻿﻿﻿using System;
+﻿using System;
 using System.Buffers.Text;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
+using ShimmerChatLib.Models;
 
 namespace ShimmerChatLib
 {
@@ -219,6 +220,52 @@ namespace ShimmerChatLib
             }
 
             return chats;
+        }
+
+        public List<ChatSummary> GetChatSummariesRange(IKVDataService kvDataService, int startIndex, int count)
+        {
+            var rangeGuids = chatGuids
+                .Skip(startIndex)
+                .Take(count)
+                .ToList();
+
+            var summaries = new List<ChatSummary>();
+            foreach (var chatGuid in rangeGuids)
+            {
+                try
+                {
+                    var chat = Chat.Load(chatGuid, kvDataService);
+                    summaries.Add(new ChatSummary
+                    {
+                        Guid = chat.Guid,
+                        Name = chat.Name,
+                        CreateTime = chat.CreateTime,
+                        LastModifyTime = chat.LastModifyTime,
+                        LastMessagePreview = chat.LastMessagePreview,
+                        MessageCount = chat.MessageCount
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to load chat summary for GUID '{chatGuid}': {ex.Message}");
+                }
+            }
+
+            return summaries;
+        }
+
+        public ChatSummary GetChatSummary(Guid chatGuid, IKVDataService kvDataService)
+        {
+            var chat = Chat.Load(chatGuid, kvDataService);
+            return new ChatSummary
+            {
+                Guid = chat.Guid,
+                Name = chat.Name,
+                CreateTime = chat.CreateTime,
+                LastModifyTime = chat.LastModifyTime,
+                LastMessagePreview = chat.LastMessagePreview,
+                MessageCount = chat.MessageCount
+            };
         }
 
         /// <summary>

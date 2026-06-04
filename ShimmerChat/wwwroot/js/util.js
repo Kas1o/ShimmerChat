@@ -96,3 +96,14 @@ window.isScrolledToBottom = function (element, threshold) {
         return true;
     }
 };
+
+// 检查元素是否滚动到顶部（允许一定误差）
+window.isScrolledToTop = function (element, threshold) {
+    try {
+        if (!element) return true;
+        return element.scrollTop <= threshold;
+    } catch (error) {
+        console.error('Error checking scroll position:', error);
+        return true;
+    }
+};
