@@ -22,14 +22,6 @@
 			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.name</h2>
 		</div>
 		<div id="chat-main" @ref="ChatMainElement" @onscroll="OnChatScroll">
-			@if (hasMoreMessages)
-			{
-				<div style="text-align:center; padding: 10px;">
-					<button class="btn" @onclick="LoadOlderMessagesAsync" disabled="@loadingOlderMessages">
-						@(loadingOlderMessages ? "加载中..." : "加载更多消息")
-					</button>
-				</div>
-			}
 			@if (virtualize)
 			{
 				<Virtualize  Items="messages" Context="message" >
@@ -274,12 +266,8 @@
 
 	bool throwExceptionInsteadOfPopupErrorMessage = false; // 抛出异常设置
 	bool autoScrollDown = true; // 自动滚动设置
-	bool virtualize = false;
+	bool virtualize = true;
 	bool isUserAtBottom = true; // 用户是否位于底部
-	bool hasMoreMessages = false;
-	bool loadingOlderMessages = false;
-	int loadedMessageOffset = 0;
-	private const int MessagesPerPage = 50;
 
 	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
 	#endregion
@@ -341,36 +329,6 @@
 		}
 		catch (Exception)
 		{
-		}
-	}
-	async Task LoadOlderMessagesAsync()
-	{
-		if (!hasMoreMessages || loadingOlderMessages || chat == null)
-			return;
-
-		loadingOlderMessages = true;
-		await InvokeAsync(StateHasChanged);
-
-		try
-		{
-			var newOffset = Math.Max(0, loadedMessageOffset - MessagesPerPage);
-			var count = loadedMessageOffset - newOffset;
-			var olderMessages = messageStore.GetMessages(chat.Guid, newOffset, count);
-
-			hasMoreMessages = newOffset > 0;
-			loadedMessageOffset = newOffset;
-
-			for (int i = olderMessages.Count - 1; i >= 0; i--)
-				messages.Insert(0, olderMessages[i]);
-		}
-		catch (Exception ex)
-		{
-			Console.WriteLine($"Failed to load older messages: {ex.Message}");
-		}
-		finally
-		{
-			loadingOlderMessages = false;
-			await InvokeAsync(StateHasChanged);
 		}
 	}
 	#endregion
@@ -837,8 +795,6 @@
 		agent = null;
 		chat = null;
 		messages = new ObservableCollection<Message>();
-		hasMoreMessages = false;
-		loadedMessageOffset = 0;
 
 		if (Guid.TryParse(AgentGuid, out var guid))
 		{
@@ -850,14 +806,8 @@
 					if (Guid.TryParse(ChatGuid, out var chatGuid) && agent.chatGuids.Contains(chatGuid))
 					{
 						chat = Chat.LoadAndMigrate(chatGuid, KVData, messageStore);
-
-						int totalCount = messageStore.GetMessageCount(chatGuid);
-						var skip = Math.Max(0, totalCount - MessagesPerPage);
-						chat.LoadMessages(messageStore, skip, MessagesPerPage);
+						chat.LoadAllMessages(messageStore);
 						messages = chat.Messages;
-
-						hasMoreMessages = skip > 0;
-						loadedMessageOffset = skip;
 					}
 				}
 			}

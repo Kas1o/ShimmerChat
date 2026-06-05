@@ -77,18 +77,18 @@ public class ChatTests
     }
 
     [Fact]
-    public void LoadMessages_LoadsFromStore()
+    public void LoadAllMessages_LoadsFromStore()
     {
         var chat = new Chat { Name = "Test" };
         var messages = new List<Message>
         {
             new() { sender = Sender.User, timestamp = DateTime.UtcNow, Id = Guid.NewGuid() }
         };
-        _msgStoreMock.Setup(m => m.GetMessages(chat.Guid, 0, 50)).Returns(messages);
         _msgStoreMock.Setup(m => m.GetMessageCount(chat.Guid)).Returns(1);
+        _msgStoreMock.Setup(m => m.GetMessages(chat.Guid, 0, 1)).Returns(messages);
         _msgStoreMock.Setup(m => m.GetLastMessagePreview(chat.Guid)).Returns("hello");
 
-        chat.LoadMessages(_msgStoreMock.Object, 0, 50);
+        chat.LoadAllMessages(_msgStoreMock.Object);
 
         chat.Messages.Should().HaveCount(1);
         chat.MessageCount.Should().Be(1);
@@ -96,7 +96,7 @@ public class ChatTests
     }
 
     [Fact]
-    public void LoadMessages_ReplacesExisting()
+    public void LoadAllMessages_ReplacesExisting()
     {
         var chat = new Chat { Name = "Test" };
         var oldMsg = new Message { sender = Sender.User, timestamp = DateTime.UtcNow };
@@ -106,11 +106,11 @@ public class ChatTests
         {
             new() { sender = Sender.AI, timestamp = DateTime.UtcNow, Id = Guid.NewGuid() }
         };
-        _msgStoreMock.Setup(m => m.GetMessages(chat.Guid, 0, 50)).Returns(newMessages);
         _msgStoreMock.Setup(m => m.GetMessageCount(chat.Guid)).Returns(1);
+        _msgStoreMock.Setup(m => m.GetMessages(chat.Guid, 0, 1)).Returns(newMessages);
         _msgStoreMock.Setup(m => m.GetLastMessagePreview(chat.Guid)).Returns((string?)null);
 
-        chat.LoadMessages(_msgStoreMock.Object, 0, 50);
+        chat.LoadAllMessages(_msgStoreMock.Object);
 
         chat.Messages.Should().HaveCount(1);
         chat.Messages[0].sender.Should().Be(Sender.AI);

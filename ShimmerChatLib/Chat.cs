@@ -103,18 +103,18 @@ namespace ShimmerChatLib
 			Messages.Add(message);
 		}
 
-		public void LoadMessages(IMessageStoreService messageStore, int skip, int take)
+		public void LoadAllMessages(IMessageStoreService messageStore)
 		{
 			if (Messages == null)
 				Messages = new ObservableCollection<Message>();
 			else
 				Messages.Clear();
 
-			var loaded = messageStore.GetMessages(Guid, skip, take);
+			MessageCount = messageStore.GetMessageCount(Guid);
+			var loaded = messageStore.GetMessages(Guid, 0, MessageCount);
 			foreach (var msg in loaded)
 				Messages.Add(msg);
 
-			MessageCount = messageStore.GetMessageCount(Guid);
 			LastMessagePreview = messageStore.GetLastMessagePreview(Guid) ?? string.Empty;
 		}
 
