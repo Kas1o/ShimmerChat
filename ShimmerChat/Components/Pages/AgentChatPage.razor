@@ -266,7 +266,7 @@
 
 	bool throwExceptionInsteadOfPopupErrorMessage = false; // 抛出异常设置
 	bool autoScrollDown = true; // 自动滚动设置
-	bool virtualize = true;
+	bool virtualize = false;
 	bool isUserAtBottom = true; // 用户是否位于底部
 
 	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
@@ -820,6 +820,22 @@
 		}
 
 		await base.OnParametersSetAsync();
+	}
+
+	private bool _hasRendered;
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			_hasRendered = true;
+		}
+
+		if (_hasRendered && autoScrollDown && chat != null)
+		{
+			await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+			_hasRendered = false;
+		}
 	}
 	#endregion
 
