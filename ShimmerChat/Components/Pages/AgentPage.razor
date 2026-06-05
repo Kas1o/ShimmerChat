@@ -72,8 +72,40 @@
                 <textarea class="shimmer-textarea" @bind="Greeting" />
                 <label>User Introduction</label><br />
                 <textarea class="shimmer-textarea" @bind="UserIntro" />
-                <label>Tags (comma separated)</label><br />
-                <input class="shimmer-input" @bind="TagsString" />
+                <label>Tags</label><br />
+                <div class="tag-editor-wrapper">
+                    <div class="tag-editor-chips">
+                        @if (agent?.tags != null)
+                        {
+                            @foreach (var tag in agent.tags)
+                            {
+                                <span class="agent-tag-chip">
+                                    @tag
+                                    <button class="tag-remove-btn" @onclick="() => RemoveTag(tag)">×</button>
+                                </span>
+                            }
+                        }
+                    </div>
+                    <div class="tag-input-wrapper">
+                        <input class="shimmer-input tag-autocomplete-input" type="text"
+                            @bind="NewTagInput" @bind:event="oninput"
+                            @onkeydown="OnTagKeyDown"
+                            @onfocus="() => ShowTagAutocomplete = true"
+                            @onfocusout="OnTagAutocompleteFocusOut"
+                            placeholder="Add tag..." />
+                        @if (ShowTagAutocomplete && TagSuggestions.Count > 0)
+                        {
+                            <div class="tag-suggestions-dropdown">
+                                @foreach (var suggestion in TagSuggestions)
+                                {
+                                    <div class="tag-suggestion-item" @onmousedown="() => SelectTagSuggestion(suggestion)" @onmousedown:preventDefault>
+                                        @suggestion
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
                 <label>Alternative Greetings</label><br />
                 <textarea class="shimmer-textarea" @bind="AlternativeGreetings" placeholder="Enter alternative greetings, sep by '<|>'" rows="4" />
                 <label>Avatar</label><br />
@@ -356,6 +388,76 @@
             font-weight: 500;
             color: var(--color-text-primary);
         }
+
+        .tag-editor-wrapper {
+            margin-bottom: 12px;
+        }
+
+        .tag-editor-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+            min-height: 24px;
+        }
+
+        .agent-tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px 3px 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-radius: 14px;
+            background-color: var(--color-primary-light);
+            color: var(--color-primary);
+            border: 1px solid var(--color-primary);
+        }
+
+        .tag-remove-btn {
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: 1.1rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 2px;
+            opacity: 0.6;
+            transition: opacity 0.15s;
+        }
+
+        .tag-remove-btn:hover {
+            opacity: 1;
+        }
+
+        .tag-input-wrapper {
+            position: relative;
+        }
+
+        .tag-suggestions-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 0 0 var(--radius-md) var(--radius-md);
+            box-shadow: var(--shadow-md);
+            z-index: 100;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .tag-suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            color: var(--color-text-primary);
+            transition: background-color 0.15s;
+        }
+
+        .tag-suggestion-item:hover {
+            background-color: var(--color-surface);
+        }
     </style>
     </div>
 }
@@ -442,6 +544,102 @@
         }
     }
 
+    string NewTagInput { get; set; } = "";
+    bool ShowTagAutocomplete { get; set; } = false;
+    List<string>? _allExistingTagsCache = null;
+
+    List<string> AllExistingTags
+    {
+        get
+        {
+            if (_allExistingTagsCache != null)
+                return _allExistingTagsCache;
+            LoadAllTags();
+            return _allExistingTagsCache!;
+        }
+    }
+
+    void LoadAllTags()
+    {
+        var allGuids = Agent.GetAllAgentGuids(kvDataService);
+        var allTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var guid in allGuids)
+        {
+            try
+            {
+                var a = Agent.Load(guid, kvDataService);
+                if (a.tags != null)
+                {
+                    foreach (var t in a.tags)
+                        allTags.Add(t);
+                }
+            }
+            catch { }
+        }
+        _allExistingTagsCache = allTags.OrderBy(t => t).ToList();
+    }
+
+    List<string> TagSuggestions
+    {
+        get
+        {
+            var input = (NewTagInput ?? "").Trim();
+            var all = AllExistingTags;
+            if (agent?.tags != null)
+                all = all.Where(t => !agent.tags.Contains(t)).ToList();
+            if (string.IsNullOrEmpty(input))
+                return all;
+            return all.Where(t => t.Contains(input, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+    }
+
+    void AddTag(string tag)
+    {
+        if (agent == null || string.IsNullOrWhiteSpace(tag))
+            return;
+        agent.tags ??= new List<string>();
+        if (!agent.tags.Any(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase)))
+        {
+            agent.tags.Add(tag);
+            agent.Save(kvDataService);
+            if (_allExistingTagsCache != null && !_allExistingTagsCache.Contains(tag, StringComparer.OrdinalIgnoreCase))
+                _allExistingTagsCache.Add(tag);
+        }
+        NewTagInput = "";
+        ShowTagAutocomplete = false;
+    }
+
+    void RemoveTag(string tag)
+    {
+        if (agent?.tags == null)
+            return;
+        agent.tags.RemoveAll(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase));
+        agent.Save(kvDataService);
+    }
+
+    async Task OnTagKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddTag(NewTagInput);
+        }
+        else if (e.Key == "Escape")
+        {
+            ShowTagAutocomplete = false;
+        }
+    }
+
+    async Task OnTagAutocompleteFocusOut()
+    {
+        await Task.Delay(200);
+        ShowTagAutocomplete = false;
+    }
+
+    void SelectTagSuggestion(string tag)
+    {
+        AddTag(tag);
+    }
+
     string AlternativeGreetings
     {
         get => agent?.alternativeGreetings != null ? string.Join("<|>", agent.alternativeGreetings) : string.Empty;
@@ -486,6 +684,7 @@
 
         // Load available tools after agent is loaded
         LoadAvailableTools();
+        LoadAllTags();
     }
 
     private async void InputAvatar(InputFileChangeEventArgs e)
