@@ -6,18 +6,88 @@
 @inject IPopupService PopupService
 
 <h3>@l["AgentSelectPage"]</h3>
-<div style="display:flex">
-	<button class="btn btn-primary" @onclick="OpenCreateAgentMenu">@l["Create New Agent"]</button>
-	<div>
-		<InputFile OnChange="InputFileChanged"/>
-		<button class="btn btn-primary"	@onclick="Import" >Import</button>
+<div class="agent-toolbar">
+	<div class="toolbar-left">
+		<button class="btn btn-primary" @onclick="OpenCreateAgentMenu">@l["Create New Agent"]</button>
+		<div class="import-group">
+			<InputFile OnChange="InputFileChanged" />
+			<button class="btn btn-primary" @onclick="Import">Import</button>
+		</div>
+	</div>
+	<div class="toolbar-right">
+		<button class="btn btn-secondary view-toggle-btn" @onclick="ToggleViewMode" title="@(IsDetailMode ? l["Switch to Grid View"] : l["Switch to Detail View"])">
+			<i class="bi @(IsDetailMode ? "bi-grid-3x3-gap-fill" : "bi-list-ul")"></i>
+		</button>
 	</div>
 </div>
-<div class="shimmer-group">
-	<div class="shimmer-grid">
-		@foreach (var agent in agents)
+
+<div class="search-filter-bar">
+	<div class="search-input-wrapper">
+		<input class="shimmer-input search-input" type="text" @bind="SearchQuery" @bind:event="oninput" placeholder="@l["Search agents..."]" />
+	</div>
+	<div class="filter-input-wrapper">
+		<input class="shimmer-input filter-input" type="text" @bind="FilterTag" @bind:event="oninput"
+			@onfocus="OnFilterFocus" @onfocusout="OnFilterFocusOut" placeholder="@l["Filter by tag..."]" />
+		@if (ShowTagSuggestions && TagSuggestions.Count > 0)
 		{
-			<div class="shimmer-grid-item shimmer-grid-agent-item fixed-size">
+			<div class="tag-suggestions-dropdown">
+				@foreach (var suggestion in TagSuggestions)
+				{
+					<div class="tag-suggestion-item" @onmousedown="() => SelectTagSuggestion(suggestion)" @onmousedown:preventDefault>
+						<span class="mini-tag" style="@GetTagStyle(suggestion)">@suggestion</span>
+					</div>
+				}
+			</div>
+		}
+	</div>
+</div>
+
+@if (IsDetailMode)
+{
+	<div class="shimmer-group">
+		<div class="agent-detail-list">
+			@foreach (var agent in FilteredAgents)
+			{
+				<div class="agent-detail-row" @onclick="()=> NavigateToAgent(agent.guid.ToString())">
+					<div class="agent-detail-avatar">
+						<img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.name" />
+					</div>
+					<div class="agent-detail-divider"></div>
+					<div class="agent-detail-info">
+						<div class="agent-detail-name">@agent.name</div>
+						@if (agent.tags != null && agent.tags.Count > 0)
+						{
+							<div class="agent-detail-tags">
+								@foreach (var tag in agent.tags)
+								{
+									<span class="agent-tag" style="@GetTagStyle(tag)">@tag</span>
+								}
+							</div>
+						}
+						@if (!string.IsNullOrEmpty(agent.userIntro))
+						{
+							<div class="agent-detail-intro">@agent.userIntro</div>
+						}
+					</div>
+					<button class="agent-delete-btn" @onclick:stopPropagation @onclick="()=> ShowDeleteConfirmation(agent)">
+						×
+					</button>
+				</div>
+			}
+			@if (!FilteredAgents.Any())
+			{
+				<div class="agent-empty">@l["No agents found"]</div>
+			}
+		</div>
+	</div>
+}
+else
+{
+	<div class="shimmer-group">
+		<div class="shimmer-grid">
+			@foreach (var agent in FilteredAgents)
+			{
+				<div class="shimmer-grid-item shimmer-grid-agent-item fixed-size">
 					<div class="content-wrapper">
 						<div class="agent-item-content" style="background-image: url('/userimages/@(agent.AvatarGuid).png');" @onclick="()=> NavigateToAgent( agent.guid.ToString())">
 							@agent.name
@@ -27,9 +97,14 @@
 						×
 					</button>
 				</div>
-		}
+			}
+			@if (!FilteredAgents.Any())
+			{
+				<div class="agent-empty" style="grid-column: 1 / -1; text-align: center; padding: 40px;">@l["No agents found"]</div>
+			}
+		</div>
 	</div>
-</div>
+}
 
 @if (CreatePopupVisible)
 {
@@ -62,6 +137,186 @@
 }
 
 <style>
+	.agent-toolbar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 12px;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.toolbar-left {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+
+	.import-group {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.toolbar-right {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.view-toggle-btn {
+		padding: 6px 12px;
+		font-size: 1.2rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.search-filter-bar {
+		display: flex;
+		gap: 12px;
+		margin-bottom: 12px;
+	}
+
+	.search-input-wrapper {
+		flex: 3;
+		position: relative;
+	}
+
+	.filter-input-wrapper {
+		flex: 1;
+		position: relative;
+	}
+
+	.search-input, .filter-input {
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	.tag-suggestions-dropdown {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		right: 0;
+		background-color: var(--color-card);
+		border: 1px solid var(--color-border);
+		border-radius: 0 0 var(--radius-md) var(--radius-md);
+		box-shadow: var(--shadow-md);
+		z-index: 100;
+		max-height: 200px;
+		overflow-y: auto;
+	}
+
+	.tag-suggestion-item {
+		padding: 8px 12px;
+		cursor: pointer;
+		transition: background-color 0.15s;
+	}
+
+	.tag-suggestion-item:hover {
+		background-color: var(--color-surface);
+	}
+
+	.mini-tag {
+		display: inline-block;
+		padding: 2px 10px;
+		font-size: 0.8rem;
+		font-weight: 500;
+		border-radius: 12px;
+	}
+
+	.agent-detail-list {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.agent-detail-row {
+		display: flex;
+		align-items: stretch;
+		padding: 0 16px 0 0;
+		min-height: 100px;
+		background-color: var(--color-card);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		cursor: pointer;
+		transition: var(--transition);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.agent-detail-row:hover {
+		border-color: var(--color-primary);
+		background-color: var(--color-surface);
+		box-shadow: var(--shadow-md);
+	}
+
+	.agent-detail-avatar {
+		flex-shrink: 0;
+		width: 100px;
+		overflow: hidden;
+		border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+	}
+
+	.agent-detail-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.agent-detail-divider {
+		flex-shrink: 0;
+		width: 1px;
+		background: var(--color-border);
+		margin: 12px 16px;
+		align-self: stretch;
+	}
+
+	.agent-detail-info {
+		flex: 1;
+		min-width: 0;
+		padding: 12px 0;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 4px;
+	}
+
+	.agent-detail-name {
+		font-size: 1.15rem;
+		font-weight: 600;
+		color: var(--color-text-primary);
+	}
+
+	.agent-detail-intro {
+		font-size: 0.9rem;
+		color: var(--color-text-secondary);
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	.agent-detail-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.agent-tag {
+		display: inline-block;
+		padding: 2px 10px;
+		font-size: 0.8rem;
+		font-weight: 500;
+		border-radius: 12px;
+	}
+
+	.agent-empty {
+		text-align: center;
+		padding: 40px;
+		color: var(--color-text-tertiary);
+		font-size: 1rem;
+	}
+
 	.shimmer-grid-agent-item {
 		position: relative;
 		color: var(--color-text-primary);
@@ -72,7 +327,6 @@
 		overflow: hidden;
 	}
 
-	/* 固定尺寸的网格项 */
 	.shimmer-grid-item.fixed-size {
 		width: 280px;
 		height: 420px;
@@ -81,7 +335,6 @@
 		overflow: hidden;
 	}
 
-	/* 用于保持固定尺寸的容器 */
 	.shimmer-grid-item.fixed-size .content-wrapper {
 		position: absolute;
 		top: 0;
@@ -146,7 +399,8 @@
 		transition: all 0.3s ease;
 	}
 
-	.shimmer-grid-agent-item:hover .agent-delete-btn {
+	.shimmer-grid-agent-item:hover .agent-delete-btn,
+	.agent-detail-row:hover .agent-delete-btn {
 		opacity: 1;
 	}
 
@@ -175,7 +429,6 @@
 		backdrop-filter: blur(4px);
 	}
 
-
 	.shimmer-popup-content {
 		background-color: var(--color-card);
 		padding: 24px;
@@ -194,31 +447,143 @@
 	bool CreatePopupVisible { get; set; } = false;
 	bool DeletePopupVisible { get; set; } = false;
 	Agent? AgentToDelete { get; set; } = null;
+	bool IsDetailMode { get; set; } = false;
+
+	string SearchQuery { get; set; } = "";
+	string FilterTag { get; set; } = "";
+	bool ShowTagSuggestions { get; set; } = false;
+
+	static readonly string[] TagPalette = new[]
+	{
+		"#e74c3c", "#e67e22", "#f1c40f", "#2ecc71", "#1abc9c",
+		"#3498db", "#9b59b6", "#e91e63", "#00bcd4", "#ff5722",
+		"#795548", "#607d8b", "#8bc34a", "#ff9800", "#03a9f4",
+	};
+
+	static string GetTagColor(string tag)
+	{
+		var hash = 0;
+		foreach (var c in tag)
+		{
+			hash = ((hash << 5) + hash) ^ c; // DJB2 variant
+		}
+		return TagPalette[Math.Abs(hash) % TagPalette.Length];
+	}
+
+	static string GetTagStyle(string tag)
+	{
+		var color = GetTagColor(tag);
+		return $"background-color: {color}22; color: {color}; border: 1px solid {color}66;";
+	}
+
+	List<string> AllTags
+	{
+		get
+		{
+			return AllAgents
+				.Where(a => a.tags != null)
+				.SelectMany(a => a.tags)
+				.Distinct(StringComparer.OrdinalIgnoreCase)
+				.OrderBy(t => t)
+				.ToList();
+		}
+	}
+
+	List<string> TagSuggestions
+	{
+		get
+		{
+			var input = (FilterTag ?? "").Trim();
+			if (string.IsNullOrEmpty(input))
+				return AllTags;
+			return AllTags
+				.Where(t => t.Contains(input, StringComparison.OrdinalIgnoreCase))
+				.ToList();
+		}
+	}
 
 	#region Popup
 	string popupNewAgentName { get; set; } = "new agent";
 	string popupNewAgentDescription { get; set; } = "this is a cool agent!";
 	string popupNewAgentGreeting { get; set; } = "Hello! How can I help you today?";
 	#endregion
-	List<Agent> agents
+
+	List<Agent> AllAgents { get; set; } = new();
+
+	List<Agent> FilteredAgents
 	{
-		get 
+		get
 		{
-			var agentGuids = Agent.GetAllAgentGuids(kvDataService);
-			var result = new List<Agent>();
-			foreach (var guid in agentGuids)
+			var query = (SearchQuery ?? "").Trim();
+			var tag = (FilterTag ?? "").Trim();
+
+			var filtered = AllAgents.AsEnumerable();
+
+			if (!string.IsNullOrEmpty(query))
 			{
-				try
-				{
-					result.Add(Agent.Load(guid, kvDataService));
-				}
-				catch (Exception ex)
-				{
-					// Skip any agents that fail to load
-				}
+				filtered = filtered.Where(a =>
+					(a.name != null && a.name.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+					(a.userIntro != null && a.userIntro.Contains(query, StringComparison.OrdinalIgnoreCase))
+				);
 			}
-			return result;
+
+			if (!string.IsNullOrEmpty(tag))
+			{
+				filtered = filtered.Where(a =>
+					a.tags != null && a.tags.Any(t => t.Contains(tag, StringComparison.OrdinalIgnoreCase))
+				);
+			}
+
+			return filtered.ToList();
 		}
+	}
+
+	protected override void OnInitialized()
+	{
+		LoadAgents();
+		var saved = kvDataService.Read("Settings", "AgentSelectViewMode");
+		if (saved != null && bool.TryParse(saved, out var mode))
+			IsDetailMode = mode;
+	}
+
+	void LoadAgents()
+	{
+		var agentGuids = Agent.GetAllAgentGuids(kvDataService);
+		var result = new List<Agent>();
+		foreach (var guid in agentGuids)
+		{
+			try
+			{
+				result.Add(Agent.Load(guid, kvDataService));
+			}
+			catch (Exception)
+			{
+			}
+		}
+		AllAgents = result;
+	}
+
+	void ToggleViewMode()
+	{
+		IsDetailMode = !IsDetailMode;
+		kvDataService.Write("Settings", "AgentSelectViewMode", IsDetailMode.ToString());
+	}
+
+	void OnFilterFocus()
+	{
+		ShowTagSuggestions = true;
+	}
+
+	async Task OnFilterFocusOut()
+	{
+		await Task.Delay(200);
+		ShowTagSuggestions = false;
+	}
+
+	void SelectTagSuggestion(string tag)
+	{
+		FilterTag = tag;
+		ShowTagSuggestions = false;
 	}
 
 	void OpenCreateAgentMenu()
@@ -228,11 +593,9 @@
 
 	void CreateNewAgent()
 	{
-		// Validate input
 		if (popupNewAgentName == "")
-			popupNewAgentName = "new agent"; // Default name if empty"
+			popupNewAgentName = "new agent";
 
-		// Create the new agent
 		var newAgent = Agent.Create
 		(
 			popupNewAgentName,
@@ -240,12 +603,9 @@
 			popupNewAgentGreeting
 		);
 
-		// Save the agent
 		newAgent.Save(kvDataService);
-
-		// Add the agent to the all agents list
 		Agent.AddAgentToAll(newAgent, kvDataService);
-
+		LoadAgents();
 		CreatePopupVisible = false;
 	}
 
@@ -264,10 +624,8 @@
 	{
 		if (AgentToDelete != null)
 		{
-			// Remove agent from the __AllAgents__ list
 			Agent.RemoveAgentFromAll(AgentToDelete, kvDataService);
-
-			// Reset popup state
+			LoadAgents();
 			DeletePopupVisible = false;
 			AgentToDelete = null;
 		}
@@ -282,7 +640,7 @@
 	async Task<byte[]> ReadFullyAsync(Stream stream)
 	{
 		using var memoryStream = new MemoryStream();
-		var buffer = new byte[16384]; // 16KB 缓冲
+		var buffer = new byte[16384];
 		int bytesRead;
 		while ((bytesRead = await stream.ReadAsync(buffer)) > 0)
 		{
@@ -291,7 +649,6 @@
 		return memoryStream.ToArray();
 	}
 
-	// 使用：
 	async Task Import()
 	{
 		if(File == null)
@@ -304,12 +661,12 @@
 		var content = System.Text.Encoding.UTF8.GetString(buffer);
 
 		var newAgent = Agent.Import(content);
-		if (agents.Any(x => x.guid == newAgent.guid))
+		if (AllAgents.Any(x => x.guid == newAgent.guid))
 		{
 			await PopupService.ShowAsync("已经存在同Agent");
 		}
 
 		Agent.AddAgentToAll(newAgent, kvDataService);
-		StateHasChanged();
+		LoadAgents();
 	}
 }

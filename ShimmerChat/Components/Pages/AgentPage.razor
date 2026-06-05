@@ -70,6 +70,10 @@
                 <textarea class="shimmer-textarea" @bind="Description" />
                 <label>Greeting</label><br />
                 <textarea class="shimmer-textarea" @bind="Greeting" />
+                <label>User Introduction</label><br />
+                <textarea class="shimmer-textarea" @bind="UserIntro" />
+                <label>Tags (comma separated)</label><br />
+                <input class="shimmer-input" @bind="TagsString" />
                 <label>Alternative Greetings</label><br />
                 <textarea class="shimmer-textarea" @bind="AlternativeGreetings" placeholder="Enter alternative greetings, sep by '<|>'" rows="4" />
                 <label>Avatar</label><br />
@@ -400,6 +404,39 @@
             if (agent != null)
             {
                 agent.greeting = value;
+                agent.Save(kvDataService);
+            }
+        }
+    }
+
+    string UserIntro
+    {
+        get => agent?.userIntro ?? string.Empty;
+        set
+        {
+            if (agent != null)
+            {
+                agent.userIntro = value;
+                agent.Save(kvDataService);
+            }
+        }
+    }
+
+    string TagsString
+    {
+        get => agent?.tags != null ? string.Join(", ", agent.tags) : string.Empty;
+        set
+        {
+            if (agent != null)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    agent.tags = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                }
+                else
+                {
+                    agent.tags = new List<string>();
+                }
                 agent.Save(kvDataService);
             }
         }

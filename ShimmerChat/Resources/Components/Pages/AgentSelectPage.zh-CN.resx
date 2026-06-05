@@ -147,4 +147,22 @@
   <data name="Delete" xml:space="preserve">
     <value>删除</value>
   </data>
+  <data name="Search agents..." xml:space="preserve">
+    <value>搜索智能体...</value>
+  </data>
+  <data name="Filter by tag..." xml:space="preserve">
+    <value>按标签筛选...</value>
+  </data>
+  <data name="Switch to Grid View" xml:space="preserve">
+    <value>切换到网格视图</value>
+  </data>
+  <data name="Switch to Detail View" xml:space="preserve">
+    <value>切换到详细视图</value>
+  </data>
+  <data name="No agents found" xml:space="preserve">
+    <value>未找到智能体</value>
+  </data>
+  <data name="Greeting:" xml:space="preserve">
+    <value>问候语：</value>
+  </data>
 </root>

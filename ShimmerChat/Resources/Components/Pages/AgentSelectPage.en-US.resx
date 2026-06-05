@@ -147,4 +147,22 @@
   <data name="Delete" xml:space="preserve">
     <value>Delete</value>
   </data>
+  <data name="Search agents..." xml:space="preserve">
+    <value>Search agents...</value>
+  </data>
+  <data name="Filter by tag..." xml:space="preserve">
+    <value>Filter by tag...</value>
+  </data>
+  <data name="Switch to Grid View" xml:space="preserve">
+    <value>Switch to Grid View</value>
+  </data>
+  <data name="Switch to Detail View" xml:space="preserve">
+    <value>Switch to Detail View</value>
+  </data>
+  <data name="No agents found" xml:space="preserve">
+    <value>No agents found</value>
+  </data>
+  <data name="Greeting:" xml:space="preserve">
+    <value>Greeting:</value>
+  </data>
 </root>

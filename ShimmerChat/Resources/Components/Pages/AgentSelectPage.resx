@@ -135,4 +135,34 @@
   <data name="Name:" xml:space="preserve">
     <value />
   </data>
+  <data name="Greeting:" xml:space="preserve">
+    <value />
+  </data>
+  <data name="Delete Agent popup title" xml:space="preserve">
+    <value />
+  </data>
+  <data name="Delete Agent confirmation message" xml:space="preserve">
+    <value />
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value />
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value />
+  </data>
+  <data name="Search agents..." xml:space="preserve">
+    <value />
+  </data>
+  <data name="Filter by tag..." xml:space="preserve">
+    <value />
+  </data>
+  <data name="Switch to Grid View" xml:space="preserve">
+    <value />
+  </data>
+  <data name="Switch to Detail View" xml:space="preserve">
+    <value />
+  </data>
+  <data name="No agents found" xml:space="preserve">
+    <value />
+  </data>
 </root>

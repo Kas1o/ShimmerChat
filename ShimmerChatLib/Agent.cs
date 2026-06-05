@@ -24,9 +24,11 @@ namespace ShimmerChatLib
                 field = value;
             }
         }
-        public Guid? AvatarGuid { get; set; }
+		public Guid? AvatarGuid { get; set; }
         public Guid? BackgroundGuid { get; set; }
         public List<string> CustomToolNames { get; set; } = new List<string>(); // Custom tools for this agent
+		public string userIntro { get; set; } = "";
+		public List<string> tags { get; set; } = new List<string>();
 
 		#region Export & Import
         public string Export(bool clearChat = true)
@@ -303,7 +305,9 @@ namespace ShimmerChatLib
 				guid= Guid.NewGuid(),
 				greeting = greeting,
 				alternativeGreetings = alternativeGreetings ?? new List<string>(),
-				CustomToolNames = new List<string>()
+				CustomToolNames = new List<string>(),
+				userIntro = "",
+				tags = new List<string>()
 			};
 		}
 		#region Equal
