@@ -50,7 +50,7 @@
                             API: @(GetApiName(cfg.SelectedApiIndex))
                         </div>
                         <div class="text-sm text-muted">
-                            Tools: @cfg.EnabledToolNames.Count | Preset: @GetPresetName(cfg.ModifierPresetId) | Output: @cfg.OutputMode
+                            Tools: @cfg.EnabledToolNames.Count | Preset: @GetPresetName(cfg) | Output: @cfg.OutputMode
                         </div>
                     </div>
                 }
@@ -114,15 +114,49 @@
 
             <div class="mt-4">
                 <h5>Context Modifiers</h5>
-                <p class="text-sm text-muted">Select a context modifier preset, or leave empty to inherit none.</p>
 
-                <select class="form-select mt-2" @bind="selectedConfig.ModifierPresetId" style="max-width: 400px;">
-                    <option value="">— None —</option>
-                    @foreach (var preset in contextModifierService.Presets)
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="useSharedPresetSwitch"
+                           checked="@selectedConfig.UseSharedPreset"
+                           @onchange="e => TogglePresetMode((bool)(e.Value ?? false))" />
+                    <label class="form-check-label" for="useSharedPresetSwitch">
+                        <strong>Use Shared Preset</strong>
+                    </label>
+                </div>
+
+                @if (selectedConfig.UseSharedPreset)
+                {
+                    <p class="text-sm text-muted">Select a shared context modifier preset.</p>
+                    <select class="form-select mt-2" @bind="selectedConfig.ModifierPresetId" style="max-width: 400px;">
+                        <option value="">— None —</option>
+                        @foreach (var preset in contextModifierService.Presets)
+                        {
+                            <option value="@preset.Id">@preset.Name</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <p class="text-sm text-muted">Configure independent modifiers for this sub-agent.</p>
+                    <button class="btn btn-sm btn-outline-secondary mt-2" @onclick="() => _showIndependentEditor = !_showIndependentEditor">
+                        @(_showIndependentEditor ? "▼ Hide" : "▶ Show") Independent Modifier Editor
+                    </button>
+                    @if (_showIndependentEditor)
                     {
-                        <option value="@preset.Id">@preset.Name</option>
+                        <div class="mt-3 p-3 border rounded">
+                            @{
+                                var independentPreset = new ContextModifierPreset
+                                {
+                                    Id = selectedConfig.Guid.ToString(),
+                                    Name = selectedConfig.Name,
+                                    Modifiers = selectedConfig.IndependentModifiers
+                                };
+                            }
+                            <PresetEditor Preset="independentPreset" Changed="OnIndependentPresetChanged" />
+                        </div>
                     }
-                </select>
+                }
             </div>
 
             <div class="mt-4">
@@ -168,11 +202,13 @@
         apiSettings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? [];
     }
 
-    string GetPresetName(string presetId)
+    string GetPresetName(SubAgentConfig cfg)
     {
-        if (string.IsNullOrEmpty(presetId))
+        if (!cfg.UseSharedPreset)
+            return $"Independent ({cfg.IndependentModifiers.Count})";
+        if (string.IsNullOrEmpty(cfg.ModifierPresetId))
             return "None";
-        var preset = contextModifierService.Presets.FirstOrDefault(p => p.Id == presetId);
+        var preset = contextModifierService.Presets.FirstOrDefault(p => p.Id == cfg.ModifierPresetId);
         return preset?.Name ?? "—";
     }
 
@@ -257,5 +293,19 @@
         await Task.Delay(3000);
         statusMessage = "";
         StateHasChanged();
+    }
+
+    bool _showIndependentEditor;
+
+    void TogglePresetMode(bool useShared)
+    {
+        if (selectedConfig == null) return;
+        selectedConfig.UseSharedPreset = useShared;
+    }
+
+    void OnIndependentPresetChanged(ContextModifierPreset changed)
+    {
+        if (selectedConfig == null) return;
+        selectedConfig.IndependentModifiers = changed.Modifiers;
     }
 }

@@ -1,11 +1,9 @@
 @page "/contextmanager"
-@using ShimmerChat.Components.SubComponents
 @using ShimmerChatLib.Interface
 @using ShimmerChatLib.Context
 @inject NavigationManager Navigation
 @inject IStringLocalizer<ContextManagerPage> l
 @inject IContextModifierService contextModifierService
-@inject IPopupService popupService
 <h3>@l["TITLE"] </h3>
 
 @if (apiSettings != null)
@@ -92,70 +90,19 @@ else
 }
 
 <!-- 上下文修改器 -->
-<div class="shimmer-group" style="margin-top:16px;">
+<div style="margin-top:16px;">
     <h4>@l["CONTEXT_MODIFIER_TITLE"]</h4>
-    <button class="btn btn-primary" style="margin:5px" @onclick="ShowAddModifierPopup">@l["CM_ADD"]</button>
-
-    <h5>@l["ACTIVE_CM"]</h5>
-    @if (contextModifierService.ActivatedModifiers.Any())
-    {
-        <div class="list-group" ondragover="event.preventDefault();" @ondrop="() => HandleDrop()">
-            @foreach (var modifier in contextModifierService.ActivatedModifiers)
-            {
-                <div class="list-group-item d-flex justify-content-between align-items-center" 
-                     draggable="true" 
-                     @ondragstart="() => HandleDragStart(contextModifierService.ActivatedModifiers.IndexOf(modifier))"
-                     @ondragover="() => HandleDragOver(contextModifierService.ActivatedModifiers.IndexOf(modifier))"
-                     data-index="@contextModifierService.ActivatedModifiers.IndexOf(modifier)">
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-grip-vertical" style="margin-right: 10px; cursor: move; color: #6c757d;"></i>
-                        <div class="me-2">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" 
-                                       id="enableSwitch_@contextModifierService.ActivatedModifiers.IndexOf(modifier)" 
-                                       @bind="modifier.IsEnabled">
-                                <label class="form-check-label" for="enableSwitch_@contextModifierService.ActivatedModifiers.IndexOf(modifier)">
-                                    <strong>@modifier.Name</strong>
-                                </label>
-                            </div>
-                            @{
-                                var preview = modifier.Config?.ToString() ?? "";
-                            }
-                            @if (!string.IsNullOrEmpty(preview))
-                            {
-                                <small class="d-block text-muted">@preview</small>
-                            }
-                        </div>
-                    </div>
-                    <div>
-                        <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => ShowEditModifierPopup(contextModifierService.ActivatedModifiers.IndexOf(modifier))">@l["EDIT"]</button>
-                        <button class="btn btn-danger btn-sm" @onclick="() => RemoveModifier(contextModifierService.ActivatedModifiers.IndexOf(modifier))">@l["REMOVE"]</button>
-                    </div>
-                </div>
-            }
-        </div>
+    @{
+        var activePreset = contextModifierService.Presets
+            .FirstOrDefault(p => p.Id == contextModifierService.ActivePresetId);
     }
-    else
+    @if (activePreset != null)
     {
-        <p class="text-muted">@l["NO_ACTIVE_CM"]</p>
+        <PresetEditor Preset="activePreset" Changed="OnPresetChanged" />
     }
 </div>
 
 <button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">@l["SAVE"]</button>
-
-    @if (_showAddModifierPopup)
-    {
-        <AddContextModifierPopup @ref="_addModifierPopup" OnConfirm="(result) => OnAddModifierConfirmed(result)" OnClose="() => HideAddModifierPopup()" />
-    }
-    
-    @if (_showEditModifierPopup)
-    {
-        <EditContextModifierPopup @ref="_editModifierPopup" 
-                                  ModifierName="@_editingModifierName" 
-                                  Config="@_editingModifierConfig"
-                                  OnConfirm="(result) => OnEditModifierConfirmed(result)" 
-                                  OnClose="() => HideEditModifierPopup()" />
-    }
 
 @code {
     [Inject]
@@ -172,17 +119,11 @@ else
         _selectedAPIIndex = int.Parse(selectedIndex);
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private async Task OnPresetChanged(ContextModifierPreset changed)
     {
+        contextModifierService.SavePresets();
+        await Task.CompletedTask;
     }
-
-    private AddContextModifierPopup? _addModifierPopup;
-    private EditContextModifierPopup? _editModifierPopup;
-
-    private bool _showEditModifierPopup = false;
-    private string? _editingModifierName;
-    private ModifierConfig? _editingModifierConfig;
-    private int _editingModifierIndex = -1;
 
     private bool UsingOpenAIAndTextCompletion =>
         apiSettings.Count > 0 && _selectedAPIIndex >= 0 && _selectedAPIIndex < apiSettings.Count
@@ -198,96 +139,6 @@ else
     private void NavigateToApiSettings()
     {
         Navigation.NavigateTo("/apisettings");
-    }
-
-    private bool _showAddModifierPopup = false;
-
-    private void ShowAddModifierPopup()
-    {
-        _showAddModifierPopup = true;
-    }
-
-    private void HideAddModifierPopup()
-    {
-        _showAddModifierPopup = false;
-    }
-
-    private void OnAddModifierConfirmed(object result)
-    {
-        var modifierInfo = result as dynamic;
-        if (modifierInfo != null)
-        {
-            string modifierName = modifierInfo.ModifierName;
-            ModifierConfig config = modifierInfo.Config;
-            contextModifierService.ActivateModifier(modifierName, config);
-        }
-        HideAddModifierPopup();
-    }
-
-    private void ShowEditModifierPopup(int index)
-    {
-        if (index >= 0 && index < contextModifierService.ActivatedModifiers.Count)
-        {
-            _editingModifierIndex = index;
-            var modifier = contextModifierService.ActivatedModifiers[index];
-            _editingModifierName = modifier.Name;
-            _editingModifierConfig = modifier.Config;
-            _showEditModifierPopup = true;
-        }
-    }
-
-    private void HideEditModifierPopup()
-    {
-        _showEditModifierPopup = false;
-        _editingModifierIndex = -1;
-        _editingModifierName = null;
-        _editingModifierConfig = null;
-    }
-
-    private void OnEditModifierConfirmed(object result)
-    {
-        var modifierInfo = result as dynamic;
-        if (modifierInfo != null && _editingModifierIndex >= 0)
-        {
-            string modifierName = modifierInfo.ModifierName;
-            ModifierConfig config = modifierInfo.Config;
-
-            if (_editingModifierIndex < contextModifierService.ActivatedModifiers.Count && 
-                contextModifierService.ActivatedModifiers[_editingModifierIndex].Name == modifierName)
-            {
-                contextModifierService.ActivatedModifiers[_editingModifierIndex].Config = config;
-                contextModifierService.SavePresets();
-            }
-        }
-        HideEditModifierPopup();
-    }
-
-    private int _dragIndex = -1;
-    private int _dropTargetIndex = -1;
-
-    private void HandleDragStart(int index)
-    {
-        _dragIndex = index;
-    }
-
-    private void HandleDragOver(int index)
-    {
-        _dropTargetIndex = index;
-    }
-
-    private void HandleDrop()
-    {
-        if (_dragIndex == -1 || _dropTargetIndex == -1 || _dragIndex == _dropTargetIndex)
-            return;
-
-        contextModifierService.ReorderActivatedModifier(_dragIndex, _dropTargetIndex);
-        _dragIndex = -1;
-        _dropTargetIndex = -1;
-    }
-
-    private void RemoveModifier(int modifierIdx)
-    {
-        contextModifierService.RemoveActivatedModifier(modifierIdx);
     }
 
     // ---- 预设管理 ----
