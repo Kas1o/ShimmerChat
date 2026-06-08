@@ -6,7 +6,7 @@ using Newtonsoft.Json.Serialization;
 using ShimmerChatLib.Context;
 using ShimmerChatLib.Interface;
 using SharperLLM.Util;
-using ShimmerChatBuiltinTools;
+using ShimmerChatBuiltin;
 using ShimmerChatLib;
 
 namespace ShimmerChat.Singletons
@@ -60,7 +60,7 @@ namespace ShimmerChat.Singletons
 
             try
             {
-                var builtinAssembly = typeof(ShimmerChatBuiltinTools.Target).Assembly;
+                var builtinAssembly = typeof(Target).Assembly;
                 var builtinModifiers = _pluginLoaderService.LoadImplementationsFromAssembly<IContextModifier>(builtinAssembly);
 
                 foreach (var modifier in builtinModifiers)

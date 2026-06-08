@@ -8,6 +8,7 @@ using System.Linq;
 using System.IO;
 using System;
 using System.Text;
+using ShimmerChatBuiltin;
 using ShimmerChatLib;
 
 namespace ShimmerChat.Singletons
@@ -88,7 +89,7 @@ namespace ShimmerChat.Singletons
             // 1. 加载 ShimmerChatBuiltin 项目的 RenderModifier
             try
             {
-                var builtinAssembly = typeof(ShimmerChatBuiltinTools.Target).Assembly;
+                var builtinAssembly = typeof(Target).Assembly;
                 var builtinModifiers = _pluginLoaderService.LoadImplementationsFromAssembly<IMessageRenderModifier>(builtinAssembly);
                 
                 foreach (var modifier in builtinModifiers)

@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using ShimmerChatBuiltin;
 using ShimmerChatLib.Panel;
 using ShimmerChatLib.Tool;
-using ShimmerChatBuiltinTools;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
@@ -50,7 +50,7 @@ namespace ShimmerChat.Singletons
                     try
                     {
                         Console.WriteLine("加载内置插件面板...");
-                        var builtinAssembly = typeof(ShimmerChatBuiltinTools.Target).Assembly;
+                        var builtinAssembly = typeof(Target).Assembly;
                         var builtinPanelTypes = _pluginLoaderService.GetTypesWithAttributeFromAssembly<PluginPanelAttribute>(builtinAssembly);
                         
                         Console.WriteLine($"找到 {builtinPanelTypes.Count} 个内置面板类型");

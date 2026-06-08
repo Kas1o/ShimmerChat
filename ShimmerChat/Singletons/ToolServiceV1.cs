@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using ShimmerChatLib.Tool;
 using SharperLLM.FunctionCalling;
+using ShimmerChatBuiltin;
 using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 
@@ -36,7 +37,7 @@ namespace ShimmerChat.Singletons
 			// 1. 加载 ShimmerChatBuiltinTools 项目的工具
 			try
 			{
-				var builtinAssembly = typeof(ShimmerChatBuiltinTools.Target).Assembly;
+				var builtinAssembly = typeof(Target).Assembly;
 				var builtinTools = _pluginLoaderService.LoadImplementationsFromAssembly<ITool>(builtinAssembly);
 				
 				foreach (var tool in builtinTools)
