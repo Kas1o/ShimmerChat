@@ -40,7 +40,7 @@ namespace ShimmerChatBuiltin.Variable
 				input = "all";
 			}
 
-			var variables = VariableManager.GetAggregatedVariables(_kvData, chat.Guid, agent.guid);
+			var variables = VariableManager.GetAggregatedVariables(_kvData, chat.Guid, agent.Guid);
 			var selectedVariables = new List<Variable>();
 
 			if (input.Equals("all", StringComparison.OrdinalIgnoreCase))

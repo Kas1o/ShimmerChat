@@ -54,14 +54,14 @@ namespace ShimmerChat.Singletons
 
         public ContextDocument BuildContextDocument(Chat chat, Agent agent)
         {
-            var context = CreateContextDocument(chat, agent.description);
+            var context = CreateContextDocument(chat, agent.Description);
             _contextModifierService.ApplyModifiers(context, chat, agent);
             return context;
         }
 
         public ContextDocument BuildContextDocumentWithTools(Chat chat, Agent agent, List<Tool> toolDefinitions)
         {
-            var context = CreateContextDocument(chat, agent.description);
+            var context = CreateContextDocument(chat, agent.Description);
             _contextModifierService.ApplyModifiers(context, chat, agent);
             return context;
         }
@@ -103,7 +103,7 @@ namespace ShimmerChat.Singletons
                             var n => throw new InvalidOperationException($"Unsupported sender Type: {n}")
                         }
                 ).ToList();
-            p.Insert(0, (agent.description, PromptBuilder.From.system));
+            p.Insert(0, (agent.Description, PromptBuilder.From.system));
             pb.Messages = p.ToArray();
             return pb;
         }
@@ -141,7 +141,7 @@ namespace ShimmerChat.Singletons
                         return (message, from);
                     }
                 ).ToList();
-            p.Insert(0, (agent.description, PromptBuilder.From.system));
+            p.Insert(0, (agent.Description, PromptBuilder.From.system));
             pb.Messages = p.ToArray();
             if (toolDefinitions != null && toolDefinitions.Count > 0)
             {

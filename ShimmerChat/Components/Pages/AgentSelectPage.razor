@@ -48,25 +48,25 @@
 		<div class="agent-detail-list">
 			@foreach (var agent in FilteredAgents)
 			{
-				<div class="agent-detail-row" @onclick="()=> NavigateToAgent(agent.guid.ToString())">
+				<div class="agent-detail-row" @onclick="()=> NavigateToAgent(agent.Guid.ToString())">
 					<div class="agent-detail-avatar">
-						<img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.name" />
+						<img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
 					</div>
 					<div class="agent-detail-divider"></div>
 					<div class="agent-detail-info">
-						<div class="agent-detail-name">@agent.name</div>
-						@if (agent.tags != null && agent.tags.Count > 0)
+						<div class="agent-detail-name">@agent.Name</div>
+						@if (agent.Tags != null && agent.Tags.Count > 0)
 						{
 							<div class="agent-detail-tags">
-								@foreach (var tag in agent.tags)
+								@foreach (var tag in agent.Tags)
 								{
 									<span class="agent-tag" style="@GetTagStyle(tag)">@tag</span>
 								}
 							</div>
 						}
-						@if (!string.IsNullOrEmpty(agent.userIntro))
+						@if (!string.IsNullOrEmpty(agent.UserIntro))
 						{
-							<div class="agent-detail-intro">@agent.userIntro</div>
+							<div class="agent-detail-intro">@agent.UserIntro</div>
 						}
 					</div>
 					<button class="agent-delete-btn" @onclick:stopPropagation @onclick="()=> ShowDeleteConfirmation(agent)">
@@ -89,8 +89,8 @@ else
 			{
 				<div class="shimmer-grid-item shimmer-grid-agent-item fixed-size">
 					<div class="content-wrapper">
-						<div class="agent-item-content" style="background-image: url('/userimages/@(agent.AvatarGuid).png');" @onclick="()=> NavigateToAgent( agent.guid.ToString())">
-							@agent.name
+						<div class="agent-item-content" style="background-image: url('/userimages/@(agent.AvatarGuid).png');" @onclick="()=> NavigateToAgent( agent.Guid.ToString())">
+							@agent.Name
 						</div>
 					</div>
 					<button class="agent-delete-btn" @onclick:stopPropagation @onclick="()=> ShowDeleteConfirmation(agent)">
@@ -127,7 +127,7 @@ else
 	<div class="shimmer-popup-overlay" @onclick="() => DeletePopupVisible=false">
 		<div class="shimmer-popup-content" @onclick:stopPropagation>
 			<h5>@l["Delete Agent popup title"]</h5>
-			<p>@string.Format(l["Delete Agent confirmation message"], AgentToDelete?.name)</p>
+			<p>@string.Format(l["Delete Agent confirmation message"], AgentToDelete?.Name)</p>
 			<div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
 				<button class="btn btn-secondary" @onclick="() => DeletePopupVisible=false">@l["Cancel"]</button>
 				<button class="btn btn-danger" @onclick="DeleteAgentConfirmed">@l["Delete"]</button>
@@ -481,8 +481,8 @@ else
 		get
 		{
 			return AllAgents
-				.Where(a => a.tags != null)
-				.SelectMany(a => a.tags)
+				.Where(a => a.Tags != null)
+				.SelectMany(a => a.Tags)
 				.Distinct(StringComparer.OrdinalIgnoreCase)
 				.OrderBy(t => t)
 				.ToList();
@@ -522,15 +522,15 @@ else
 			if (!string.IsNullOrEmpty(query))
 			{
 				filtered = filtered.Where(a =>
-					(a.name != null && a.name.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-					(a.userIntro != null && a.userIntro.Contains(query, StringComparison.OrdinalIgnoreCase))
+					(a.Name != null && a.Name.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+					(a.UserIntro != null && a.UserIntro.Contains(query, StringComparison.OrdinalIgnoreCase))
 				);
 			}
 
 			if (!string.IsNullOrEmpty(tag))
 			{
 				filtered = filtered.Where(a =>
-					a.tags != null && a.tags.Any(t => t.Contains(tag, StringComparison.OrdinalIgnoreCase))
+					a.Tags != null && a.Tags.Any(t => t.Contains(tag, StringComparison.OrdinalIgnoreCase))
 				);
 			}
 
@@ -661,7 +661,7 @@ else
 		var content = System.Text.Encoding.UTF8.GetString(buffer);
 
 		var newAgent = Agent.Import(content);
-		if (AllAgents.Any(x => x.guid == newAgent.guid))
+		if (AllAgents.Any(x => x.Guid == newAgent.Guid))
 		{
 			await PopupService.ShowAsync("已经存在同Agent");
 		}

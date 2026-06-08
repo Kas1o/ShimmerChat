@@ -91,7 +91,7 @@ namespace ShimmerChatBuiltin.Memory
 
 			OpenAIAPI api = new OpenAIAPI(eUri, eApiKey, eModelName);
 
-			var collections = qclient.CollectionExistsAsync($"{agent.guid}").Result;
+			var collections = qclient.CollectionExistsAsync($"{agent.Guid}").Result;
 			if (!collections)
 			{
 				return;
@@ -114,7 +114,7 @@ namespace ShimmerChatBuiltin.Memory
 			{
 				var actual_threshold = (1f - (0.9f * (weight - 1) / (vectors.Aggregate((x, y) => x.weight > y.weight ? x : y).weight - 1))) * threshold;
 				var results = qclient.SearchAsync(
-					collectionName: $"{agent.guid}",
+					collectionName: $"{agent.Guid}",
 					vector: vector.ToArray().AsMemory(),
 					limit: 3,
 					scoreThreshold: actual_threshold

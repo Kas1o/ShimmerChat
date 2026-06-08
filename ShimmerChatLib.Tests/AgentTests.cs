@@ -15,7 +15,7 @@ public class AgentTests
     {
         var a1 = Agent.Create("Agent1", "desc");
         var a2 = Agent.Create("Agent2", "desc");
-        a1.guid.Should().NotBe(a2.guid);
+        a1.Guid.Should().NotBe(a2.Guid);
     }
 
     [Fact]
@@ -23,11 +23,11 @@ public class AgentTests
     {
         var agent = Agent.Create("TestAgent", "Test description", "Hello!", new List<string> { "Hi", "Hey" });
 
-        agent.name.Should().Be("TestAgent");
-        agent.description.Should().Be("Test description");
-        agent.greeting.Should().Be("Hello!");
-        agent.alternativeGreetings.Should().BeEquivalentTo(["Hi", "Hey"]);
-        agent.chatGuids.Should().BeEmpty();
+        agent.Name.Should().Be("TestAgent");
+        agent.Description.Should().Be("Test description");
+        agent.Greeting.Should().Be("Hello!");
+        agent.AlternativeGreetings.Should().BeEquivalentTo(["Hi", "Hey"]);
+        agent.ChatGuids.Should().BeEmpty();
         agent.CustomToolNames.Should().BeEmpty();
     }
 
@@ -35,7 +35,7 @@ public class AgentTests
     public void Create_NullAlternativeGreetings_CreatesEmptyList()
     {
         var agent = Agent.Create("A", "d");
-        agent.alternativeGreetings.Should().NotBeNull().And.BeEmpty();
+        agent.AlternativeGreetings.Should().NotBeNull().And.BeEmpty();
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class AgentTests
         agent.AddChatGuid(g1);
         agent.AddChatGuid(g2);
 
-        agent.chatGuids.Should().Equal(g2, g1); // newest first
+        agent.ChatGuids.Should().Equal(g2, g1); // newest first
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class AgentTests
         agent.AddChatGuid(guid);
         agent.AddChatGuid(guid);
 
-        agent.chatGuids.Should().HaveCount(1);
+        agent.ChatGuids.Should().HaveCount(1);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public class AgentTests
 
         agent.RemoveChatGuid(g1);
 
-        agent.chatGuids.Should().Equal(g2);
+        agent.ChatGuids.Should().Equal(g2);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class AgentTests
 
         agent.MoveChatToTop(g2);
 
-        agent.chatGuids.Should().Equal(g2, g3, g1);
+        agent.ChatGuids.Should().Equal(g2, g3, g1);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class AgentTests
 
         agent.MoveChatToTop(Guid.NewGuid());
 
-        agent.chatGuids.Should().Equal(g1);
+        agent.ChatGuids.Should().Equal(g1);
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public class AgentTests
     {
         var agent = Agent.Create("SaveTest", "desc");
         string? writtenJson = null;
-        _kvDataMock.Setup(k => k.Write("Agents", agent.guid.ToString(), It.IsAny<string>()))
+        _kvDataMock.Setup(k => k.Write("Agents", agent.Guid.ToString(), It.IsAny<string>()))
             .Callback<string, string, string>((_, _, json) => writtenJson = json);
 
         agent.Save(_kvDataMock.Object);
@@ -117,8 +117,8 @@ public class AgentTests
         writtenJson.Should().NotBeNull();
         var deserialized = JsonConvert.DeserializeObject<Agent>(writtenJson!);
         deserialized.Should().NotBeNull();
-        deserialized!.guid.Should().Be(agent.guid);
-        deserialized.name.Should().Be(agent.name);
+        deserialized!.Guid.Should().Be(agent.Guid);
+        deserialized.Name.Should().Be(agent.Name);
     }
 
     [Fact]
@@ -126,12 +126,12 @@ public class AgentTests
     {
         var agent = Agent.Create("LoadTest", "desc");
         var json = JsonConvert.SerializeObject(agent);
-        _kvDataMock.Setup(k => k.Read("Agents", agent.guid.ToString())).Returns(json);
+        _kvDataMock.Setup(k => k.Read("Agents", agent.Guid.ToString())).Returns(json);
 
-        var loaded = Agent.Load(agent.guid, _kvDataMock.Object);
+        var loaded = Agent.Load(agent.Guid, _kvDataMock.Object);
 
-        loaded.guid.Should().Be(agent.guid);
-        loaded.name.Should().Be(agent.name);
+        loaded.Guid.Should().Be(agent.Guid);
+        loaded.Name.Should().Be(agent.Name);
     }
 
     [Fact]
@@ -178,14 +178,14 @@ public class AgentTests
 
         saved.Should().NotBeNull();
         var list = JsonConvert.DeserializeObject<List<Guid>>(saved!);
-        list.Should().Contain(agent.guid);
+        list.Should().Contain(agent.Guid);
     }
 
     [Fact]
     public void AddAgentToAll_AlreadyPresent_DoesNotDuplicate()
     {
         var agent = Agent.Create("A", "d");
-        var existingList = new List<Guid> { agent.guid };
+        var existingList = new List<Guid> { agent.Guid };
         _kvDataMock.Setup(k => k.Read("Agents", "__AllAgents__")).Returns(JsonConvert.SerializeObject(existingList));
 
         Agent.AddAgentToAll(agent, _kvDataMock.Object);
@@ -197,7 +197,7 @@ public class AgentTests
     public void RemoveAgentFromAll_RemovesCorrectly()
     {
         var agent = Agent.Create("A", "d");
-        var existingList = new List<Guid> { agent.guid, Guid.NewGuid() };
+        var existingList = new List<Guid> { agent.Guid, Guid.NewGuid() };
         _kvDataMock.Setup(k => k.Read("Agents", "__AllAgents__")).Returns(JsonConvert.SerializeObject(existingList));
         string? saved = null;
         _kvDataMock.Setup(k => k.Write("Agents", "__AllAgents__", It.IsAny<string>()))
@@ -206,7 +206,7 @@ public class AgentTests
         Agent.RemoveAgentFromAll(agent, _kvDataMock.Object);
 
         var list = JsonConvert.DeserializeObject<List<Guid>>(saved!);
-        list.Should().NotContain(agent.guid);
+        list.Should().NotContain(agent.Guid);
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public class AgentTests
     {
         var a1 = Agent.Create("A", "d");
         var a2 = Agent.Create("B", "d2");
-        typeof(Agent).GetProperty(nameof(Agent.guid))!.SetValue(a2, a1.guid);
+        typeof(Agent).GetProperty(nameof(Agent.Guid))!.SetValue(a2, a1.Guid);
 
         a1.Equals(a2).Should().BeTrue();
     }
@@ -232,7 +232,7 @@ public class AgentTests
     public void GetHashCode_BasedOnGuid()
     {
         var agent = Agent.Create("A", "d");
-        agent.GetHashCode().Should().Be(agent.guid.GetHashCode());
+        agent.GetHashCode().Should().Be(agent.Guid.GetHashCode());
     }
 
     [Fact]
@@ -243,8 +243,8 @@ public class AgentTests
 
         var importStructure = JsonConvert.DeserializeObject<AgentExportStructure>(json);
         importStructure.Should().NotBeNull();
-        importStructure!.Agent!.name.Should().Be("ExportTest");
-        importStructure.Agent.chatGuids.Should().BeEmpty();
+        importStructure!.Agent!.Name.Should().Be("ExportTest");
+        importStructure.Agent.ChatGuids.Should().BeEmpty();
     }
 
     [Fact]
@@ -257,7 +257,7 @@ public class AgentTests
         var json = agent.Export(clearChat: false);
 
         var importStructure = JsonConvert.DeserializeObject<AgentExportStructure>(json);
-        importStructure!.Agent!.chatGuids.Should().Contain(chatGuid);
+        importStructure!.Agent!.ChatGuids.Should().Contain(chatGuid);
     }
 
     [Fact]
@@ -268,9 +268,9 @@ public class AgentTests
 
         var imported = Agent.Import(json);
 
-        imported.name.Should().Be("ImportTest");
-        imported.description.Should().Be("desc");
-        imported.guid.Should().Be(agent.guid);
+        imported.Name.Should().Be("ImportTest");
+        imported.Description.Should().Be("desc");
+        imported.Guid.Should().Be(agent.Guid);
     }
 
     [Fact]

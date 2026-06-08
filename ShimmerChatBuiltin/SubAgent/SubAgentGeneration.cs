@@ -58,8 +58,8 @@ namespace ShimmerChatBuiltin.SubAgent
             var baseClone = SubAgentRunner.CreateBaseClone(basePb);
             var subChat = SubAgentRunner.CreateSubChat(subAgentConfig.Name);
 
-            var subAgent = Agent.Create(subAgentConfig.Name, agent.description, "");
-            subAgent.guid = subAgentConfig.Guid;
+            var subAgent = Agent.Create(subAgentConfig.Name, agent.Description, "");
+            subAgent.Guid = subAgentConfig.Guid;
             subAgent.CustomToolNames = subAgentConfig.EnabledToolNames;
 
             var outputMessages = Task.Run(async () =>

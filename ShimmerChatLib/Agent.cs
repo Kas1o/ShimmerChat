@@ -17,27 +17,27 @@ namespace ShimmerChatLib
         /// <summary>
         /// 智能体GUID
         /// </summary>
-		public Guid guid { get; set; }
+		public Guid Guid { get; set; }
         /// <summary>
         /// 智能体名称，用于显示
         /// </summary>
-		public string name { get; set; }
+		public string Name { get; set; }
         /// <summary>
         /// 描述，SystemPrompt组织中的主要部分
         /// </summary>
-        public string description { get; set; }
+        public string Description { get; set; }
         /// <summary>
         /// Greeting，新对话时以AI Role发送的第一天Message，可为空
         /// </summary>
-		public string greeting { get; set; }
+		public string? Greeting { get; set; }
         /// <summary>
         /// 其他Greeting，新对话时添加至 <see cref="Message.Versions"/>
         /// </summary>
-		public List<string> alternativeGreetings { get; set; } = new List<string>();
+		public List<string> AlternativeGreetings { get; set; } = new List<string>();
         /// <summary>
         /// 在此智能体进行的对话的Guids
         /// </summary>
-		public List<Guid> chatGuids
+		public List<Guid> ChatGuids
         {
             get => field;
             set
@@ -60,11 +60,11 @@ namespace ShimmerChatLib
         /// <summary>
         /// 仅用户可见的介绍文本
         /// </summary>
-		public string userIntro { get; set; } = "";
+		public string UserIntro { get; set; } = "";
         /// <summary>
         /// Tag，辅助检索用
         /// </summary>
-		public List<string> tags { get; set; } = new List<string>();
+		public List<string> Tags { get; set; } = new List<string>();
 
 		#region Export & Import
         /// <summary>
@@ -76,24 +76,24 @@ namespace ShimmerChatLib
         {
             var copy = this.MemberwiseClone() as Agent;
             if (clearChat)
-                copy.chatGuids = [];
+                copy!.ChatGuids = [];
 
             string? avatar = null;
             string? background = null;
-			string AvatarPath = $"{AppContext.BaseDirectory}/UserUploadImage/{this.AvatarGuid}.png";
-			string BackgroudPath = $"{AppContext.BaseDirectory}/UserUploadImage/{this.BackgroundGuid}.png";
+			string avatarPath = $"{AppContext.BaseDirectory}/UserUploadImage/{this.AvatarGuid}.png";
+			string backgroundPath = $"{AppContext.BaseDirectory}/UserUploadImage/{this.BackgroundGuid}.png";
 
 			if (AvatarGuid != null)
-            if (File.Exists(AvatarPath))
+            if (File.Exists(avatarPath))
             {
-                var content = File.ReadAllBytes(AvatarPath);
+                var content = File.ReadAllBytes(avatarPath);
                 avatar = Convert.ToBase64String(content);
             }
 
 			if (BackgroundGuid != null)
-			if (File.Exists(BackgroudPath))
+			if (File.Exists(backgroundPath))
 			{
-				var content = File.ReadAllBytes(BackgroudPath);
+				var content = File.ReadAllBytes(backgroundPath);
 				background = Convert.ToBase64String(content);
 			}
 
@@ -118,10 +118,16 @@ namespace ShimmerChatLib
         public static Agent Import(string importJson, bool clearChat = true)
         {
             var importStructure = JsonConvert.DeserializeObject<AgentExportStructure>(importJson);
+
+            if (importStructure?.Agent == null)
+            {
+                throw new InvalidOperationException($"Agent Import Failed, Invalid JSON.");
+            }
+            
             var agent = importStructure.Agent;
             if (clearChat)
             {
-                agent.chatGuids = new List<Guid>();
+                agent.ChatGuids = [];
             }
             if (!string.IsNullOrEmpty(importStructure.AvatarBase64))
             {
@@ -150,7 +156,7 @@ namespace ShimmerChatLib
 		public void Save(IKVDataService kvDataService)
         {
             var agentJson = JsonConvert.SerializeObject(this);
-            kvDataService.Write("Agents", guid.ToString(), agentJson);
+            kvDataService.Write("Agents", Guid.ToString(), agentJson);
         }
 
         /// <summary>
@@ -167,7 +173,7 @@ namespace ShimmerChatLib
             {
                 throw new InvalidOperationException($"Agent with GUID '{guid}' not found.");
             }
-            return JsonConvert.DeserializeObject<Agent>(agentJson);
+            return JsonConvert.DeserializeObject<Agent>(agentJson) ?? throw new InvalidOperationException($"Agent with GUID '{guid}' not found.");
         }
 		#endregion
 		#region Statics
@@ -176,7 +182,7 @@ namespace ShimmerChatLib
         /// </summary>
         /// <param name="kvDataService"></param>
         /// <returns>所有Agent 的 GUIDs 的列表</returns>
-        /// <exception cref="IO Exception"/>
+        /// <exception cref="IOException"/>
 		public static List<Guid> GetAllAgentGuids(IKVDataService kvDataService)
         {
             var agentsJson = kvDataService.Read("Agents", "__AllAgents__");
@@ -206,9 +212,9 @@ namespace ShimmerChatLib
         public static void AddAgentToAll(Agent agent, IKVDataService kvDataService)
         {
             var agentGuids = GetAllAgentGuids(kvDataService);
-            if (!agentGuids.Contains(agent.guid))
+            if (!agentGuids.Contains(agent.Guid))
             {
-                agentGuids.Add(agent.guid);
+                agentGuids.Add(agent.Guid);
                 SaveAllAgentGuids(kvDataService, agentGuids);
             }
         }
@@ -221,9 +227,9 @@ namespace ShimmerChatLib
         public static void RemoveAgentFromAll(Agent agent, IKVDataService kvDataService)
         {
             var agentGuids = GetAllAgentGuids(kvDataService);
-            if (agentGuids.Contains(agent.guid))
+            if (agentGuids.Contains(agent.Guid))
             {
-                agentGuids.Remove(agent.guid);
+                agentGuids.Remove(agent.Guid);
                 SaveAllAgentGuids(kvDataService, agentGuids);
             }
         }
@@ -235,9 +241,9 @@ namespace ShimmerChatLib
         /// <param name="chatGuid">要添加的对话 GUID</param>
         public void AddChatGuid(Guid chatGuid)
         {
-            if (!chatGuids.Contains(chatGuid))
+            if (!ChatGuids.Contains(chatGuid))
             {
-                chatGuids.Insert(0, chatGuid);
+                ChatGuids.Insert(0, chatGuid);
             }
         }
 
@@ -247,7 +253,7 @@ namespace ShimmerChatLib
         /// <param name="chatGuid">要移除的对话 GUID</param>
         public void RemoveChatGuid(Guid chatGuid)
         {
-            chatGuids.Remove(chatGuid);
+            ChatGuids.Remove(chatGuid);
         }
 
         /// <summary>
@@ -255,10 +261,10 @@ namespace ShimmerChatLib
         /// </summary>
         public void MoveChatToTop(Guid chatGuid)
         {
-            if (chatGuids.Contains(chatGuid))
+            if (ChatGuids.Contains(chatGuid))
             {
-                chatGuids.Remove(chatGuid);
-                chatGuids.Insert(0, chatGuid);
+                ChatGuids.Remove(chatGuid);
+                ChatGuids.Insert(0, chatGuid);
             }
         }
 
@@ -270,7 +276,7 @@ namespace ShimmerChatLib
         public List<Chat> GetChats(IKVDataService kvDataService)
         {
             var chats = new List<Chat>();
-            foreach (var chatGuid in chatGuids)
+            foreach (var chatGuid in ChatGuids)
             {
                 try
                 {
@@ -292,7 +298,7 @@ namespace ShimmerChatLib
         /// </summary>
         public List<Chat> GetChatsRange(IKVDataService kvDataService, int startIndex, int count)
         {
-            var rangeGuids = chatGuids
+            var rangeGuids = ChatGuids
                 .Skip(startIndex)
                 .Take(count)
                 .ToList();
@@ -324,7 +330,7 @@ namespace ShimmerChatLib
         /// <returns>对话摘要列表</returns>
         public List<ChatSummary> GetChatSummariesRange(IKVDataService kvDataService, int startIndex, int count)
         {
-            var rangeGuids = chatGuids
+            var rangeGuids = ChatGuids
                 .Skip(startIndex)
                 .Take(count)
                 .ToList();
@@ -379,7 +385,7 @@ namespace ShimmerChatLib
         /// </summary>
         public int GetChatCount()
         {
-            return chatGuids.Count;
+            return ChatGuids.Count;
         }
 
         /// <summary>
@@ -391,7 +397,7 @@ namespace ShimmerChatLib
         /// <exception cref="InvalidOperationException">当对话 GUID 不存在于此智能体中时抛出</exception>
         public Chat GetChat(Guid chatGuid, IKVDataService kvDataService)
         {
-            if (!chatGuids.Contains(chatGuid))
+            if (!ChatGuids.Contains(chatGuid))
             {
                 throw new InvalidOperationException($"Chat with GUID '{chatGuid}' not found in agent.");
             }
@@ -401,32 +407,33 @@ namespace ShimmerChatLib
         /// <summary>
         /// 留由 Newtonsoft.Json 使用。
         /// </summary>
+        #pragma warning disable CS8618
         private Agent()
         {
 
         }
-
+        #pragma warning restore CS8618
         /// <summary>
         /// 创建一个新的智能体实例
         /// </summary>
-        /// <param name="Name">智能体名称</param>
+        /// <param name="name">智能体名称</param>
         /// <param name="desc">描述</param>
         /// <param name="greeting">欢迎语，可为空</param>
         /// <param name="alternativeGreetings">备选欢迎语列表，可为空</param>
         /// <returns>新创建的 Agent 实例</returns>
-        public static Agent Create(string Name, string desc, string greeting = null, List<string> alternativeGreetings = null)
+        public static Agent Create(string name, string desc, string? greeting = null, List<string>? alternativeGreetings = null)
 		{
 			return new Agent
 			{
-				chatGuids = new List<Guid>(),
-				name = Name,
-				description = desc,
-				guid= Guid.NewGuid(),
-				greeting = greeting,
-				alternativeGreetings = alternativeGreetings ?? new List<string>(),
+				ChatGuids = new List<Guid>(),
+				Name = name,
+				Description = desc,
+				Guid= Guid.NewGuid(),
+				Greeting = greeting,
+				AlternativeGreetings = alternativeGreetings ?? new List<string>(),
 				CustomToolNames = new List<string>(),
-				userIntro = "",
-				tags = new List<string>()
+				UserIntro = "",
+				Tags = new List<string>()
 			};
 		}
 		#region Equal
@@ -439,7 +446,7 @@ namespace ShimmerChatLib
 		{
 			if(obj is Agent agent)
 			{
-				return agent.guid == this.guid;
+				return agent.Guid == this.Guid;
 			}
 			return false;
 		}
@@ -450,7 +457,7 @@ namespace ShimmerChatLib
         /// <returns>GUID 的哈希码</returns>
         public override int GetHashCode()
 		{
-			return guid.GetHashCode();
+			return Guid.GetHashCode();
 		}
 		#endregion
 	}

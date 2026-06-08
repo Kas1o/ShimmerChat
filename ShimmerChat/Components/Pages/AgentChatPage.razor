@@ -19,20 +19,20 @@
 	<div id="container">
 		<div id="chat-info" class="shimmer-shadow-box">
 			<label>You are having chat with: </label>
-			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.name</h2>
+			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.Name</h2>
 		</div>
 		<div id="chat-main" @ref="ChatMainElement" @onscroll="OnChatScroll">
 			@if (virtualize)
 			{
 				<Virtualize  Items="messages" Context="message" >
-					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" Chat="@chat" Agent="@agent" />
+					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
 				</Virtualize>
 			}
 			else
 			{
 				@foreach(var message in messages)
 				{
-					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.name" Chat="@chat" Agent="@agent" />
+					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
 				}
 			}
 			<br />
@@ -61,7 +61,7 @@
 			</div>
 		</div>
 	</div>
-	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.guid" ChatGuid="chat.Guid" @ref="ChatPluginPanelContainer"/>
+	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.Guid" ChatGuid="chat.Guid" @ref="ChatPluginPanelContainer"/>
 	<style>
 
 		.shimmer-content {
@@ -803,7 +803,7 @@
 				agent = Agent.Load(guid, KVData);
 				if (agent != null)
 				{
-					if (Guid.TryParse(ChatGuid, out var chatGuid) && agent.chatGuids.Contains(chatGuid))
+					if (Guid.TryParse(ChatGuid, out var chatGuid) && agent.ChatGuids.Contains(chatGuid))
 					{
 						chat = Chat.LoadAndMigrate(chatGuid, KVData, messageStore);
 						chat.LoadAllMessages(messageStore);
@@ -870,7 +870,7 @@
 				};
 
 				// 调用JavaScript中的通知函数
-				await JS.InvokeVoidAsync("showNotification", $"来自 {agent?.name} 的新消息", notificationOptions);
+				await JS.InvokeVoidAsync("showNotification", $"来自 {agent?.Name} 的新消息", notificationOptions);
 			}
 		}
 		catch (Exception ex)

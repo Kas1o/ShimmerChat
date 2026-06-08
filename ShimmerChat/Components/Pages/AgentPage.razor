@@ -18,7 +18,7 @@
         <div class="content-wrapper">
             <div id="left-section">
                 <label>agent name</label>
-                <h3>@agent.name</h3>
+                <h3>@agent.Name</h3>
                 <div class="chat-section chat-list">
                     <div class="chat-item new-chat-item" @onclick="NewChat">
                         <div class="chat-name">Add New Chat</div>
@@ -75,9 +75,9 @@
                 <label>Tags</label><br />
                 <div class="tag-editor-wrapper">
                     <div class="tag-editor-chips">
-                        @if (agent?.tags != null)
+                        @if (agent?.Tags != null)
                         {
-                            @foreach (var tag in agent.tags)
+                            @foreach (var tag in agent.Tags)
                             {
                                 <span class="agent-tag-chip">
                                     @tag
@@ -476,36 +476,36 @@
     private Agent? agent;
     string Name
     {
-        get => agent?.name ?? string.Empty;
+        get => agent?.Name ?? string.Empty;
         set
         {
             if (agent != null)
             {
-                agent.name = value;
+                agent.Name = value;
                 agent.Save(kvDataService); // Save the specific agent after changing the name
             }
         }
     }
     string Description
     {
-        get => agent?.description ?? string.Empty;
+        get => agent?.Description ?? string.Empty;
         set
         {
             if (agent != null)
             {
-                agent.description = value;
+                agent.Description = value;
                 agent.Save(kvDataService); // Save the specific agent after changing the description
             }
         }
     }
     string Greeting
     {
-        get => agent?.greeting ?? string.Empty;
+        get => agent?.Greeting ?? string.Empty;
         set
         {
             if (agent != null)
             {
-                agent.greeting = value;
+                agent.Greeting = value;
                 agent.Save(kvDataService);
             }
         }
@@ -513,12 +513,12 @@
 
     string UserIntro
     {
-        get => agent?.userIntro ?? string.Empty;
+        get => agent?.UserIntro ?? string.Empty;
         set
         {
             if (agent != null)
             {
-                agent.userIntro = value;
+                agent.UserIntro = value;
                 agent.Save(kvDataService);
             }
         }
@@ -526,18 +526,18 @@
 
     string TagsString
     {
-        get => agent?.tags != null ? string.Join(", ", agent.tags) : string.Empty;
+        get => agent?.Tags != null ? string.Join(", ", agent.Tags) : string.Empty;
         set
         {
             if (agent != null)
             {
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    agent.tags = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                    agent.Tags = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
                 }
                 else
                 {
-                    agent.tags = new List<string>();
+                    agent.Tags = new List<string>();
                 }
                 agent.Save(kvDataService);
             }
@@ -568,9 +568,9 @@
             try
             {
                 var a = Agent.Load(guid, kvDataService);
-                if (a.tags != null)
+                if (a.Tags != null)
                 {
-                    foreach (var t in a.tags)
+                    foreach (var t in a.Tags)
                         allTags.Add(t);
                 }
             }
@@ -585,8 +585,8 @@
         {
             var input = (NewTagInput ?? "").Trim();
             var all = AllExistingTags;
-            if (agent?.tags != null)
-                all = all.Where(t => !agent.tags.Contains(t)).ToList();
+            if (agent?.Tags != null)
+                all = all.Where(t => !agent.Tags.Contains(t)).ToList();
             if (string.IsNullOrEmpty(input))
                 return all;
             return all.Where(t => t.Contains(input, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -597,10 +597,10 @@
     {
         if (agent == null || string.IsNullOrWhiteSpace(tag))
             return;
-        agent.tags ??= new List<string>();
-        if (!agent.tags.Any(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase)))
+        agent.Tags ??= new List<string>();
+        if (!agent.Tags.Any(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase)))
         {
-            agent.tags.Add(tag);
+            agent.Tags.Add(tag);
             agent.Save(kvDataService);
             if (_allExistingTagsCache != null && !_allExistingTagsCache.Contains(tag, StringComparer.OrdinalIgnoreCase))
                 _allExistingTagsCache.Add(tag);
@@ -611,9 +611,9 @@
 
     void RemoveTag(string tag)
     {
-        if (agent?.tags == null)
+        if (agent?.Tags == null)
             return;
-        agent.tags.RemoveAll(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase));
+        agent.Tags.RemoveAll(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase));
         agent.Save(kvDataService);
     }
 
@@ -642,7 +642,7 @@
 
     string AlternativeGreetings
     {
-        get => agent?.alternativeGreetings != null ? string.Join("<|>", agent.alternativeGreetings) : string.Empty;
+        get => agent?.AlternativeGreetings != null ? string.Join("<|>", agent.AlternativeGreetings) : string.Empty;
         set
         {
             if (agent != null)
@@ -650,11 +650,11 @@
                 // 将多行文本分割成列表
                 if (!string.IsNullOrEmpty(value))
                 {
-                    agent.alternativeGreetings = value.Split("<|>", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                    agent.AlternativeGreetings = value.Split("<|>", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
                 }
                 else
                 {
-                    agent.alternativeGreetings = new List<string>();
+                    agent.AlternativeGreetings = new List<string>();
                 }
                 agent.Save(kvDataService);
             }
@@ -755,7 +755,7 @@
             LastModifyTime = DateTime.Now
         };
 
-        if (!string.IsNullOrEmpty(agent.greeting) || (agent.alternativeGreetings != null && agent.alternativeGreetings.Count > 0))
+        if (!string.IsNullOrEmpty(agent.Greeting) || (agent.AlternativeGreetings != null && agent.AlternativeGreetings.Count > 0))
         {
             var welcomeMessage = new Message
             {
@@ -763,16 +763,16 @@
                 timestamp = DateTime.Now,
                 message = new SharperLLM.Util.ChatMessage
                 {
-                    Content = agent.greeting ?? ""
+                    Content = agent.Greeting ?? ""
                 }
             };
 
             // 如果有替代问候语，将它们添加为版本
-            if (agent.alternativeGreetings != null)
+            if (agent.AlternativeGreetings != null)
             {
-                foreach (var altGreeting in agent.alternativeGreetings)
+                foreach (var altGreeting in agent.AlternativeGreetings)
                 {
-                    if (!string.IsNullOrEmpty(altGreeting) && altGreeting != agent.greeting)
+                    if (!string.IsNullOrEmpty(altGreeting) && altGreeting != agent.Greeting)
                     {
                         var altMessage = new SharperLLM.Util.ChatMessage
                         {
@@ -817,7 +817,7 @@
         var content = agent.Export();
         var bytes = System.Text.Encoding.UTF8.GetBytes(content);
         var fileStream = new MemoryStream(bytes);
-        var fileName = $"{agent.name}.json";
+        var fileName = $"{agent.Name}.json";
         using (var streamRef = new DotNetStreamReference(stream: fileStream))
         {
             await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);

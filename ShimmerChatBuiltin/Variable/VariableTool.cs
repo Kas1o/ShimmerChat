@@ -48,7 +48,7 @@ namespace ShimmerChatBuiltin.Variable
                 return Task.FromResult("Error: Variable name is required for 'get' action.");
             }
 
-            var variable = VariableManager.GetVariableFromAggregated(_kvData, chat.Guid, agent.guid, action.Name);
+            var variable = VariableManager.GetVariableFromAggregated(_kvData, chat.Guid, agent.Guid, action.Name);
             if (variable == null)
             {
                 return Task.FromResult($"Variable '{action.Name}' not found.");
@@ -101,7 +101,7 @@ namespace ShimmerChatBuiltin.Variable
 
             if (scope == VariableScope.Agent)
             {
-                VariableManager.SetAgentVariable(_kvData, agent.guid, variable);
+                VariableManager.SetAgentVariable(_kvData, agent.Guid, variable);
             }
             else
             {
@@ -128,7 +128,7 @@ namespace ShimmerChatBuiltin.Variable
 
             if (scope == VariableScope.Agent)
             {
-                VariableManager.RemoveAgentVariable(_kvData, agent.guid, action.Name);
+                VariableManager.RemoveAgentVariable(_kvData, agent.Guid, action.Name);
             }
             else
             {
@@ -141,7 +141,7 @@ namespace ShimmerChatBuiltin.Variable
 
         private Task<string> HandleList(VariableAction action, Chat chat, Agent agent)
         {
-            var variables = VariableManager.GetAggregatedVariables(_kvData, chat.Guid, agent.guid);
+            var variables = VariableManager.GetAggregatedVariables(_kvData, chat.Guid, agent.Guid);
             var filteredVariables = variables.Variables;
 
             if (!string.IsNullOrEmpty(action.Scope))
@@ -179,7 +179,7 @@ namespace ShimmerChatBuiltin.Variable
                 return Task.FromResult("Error: Search pattern is required for 'search' action.");
             }
 
-            var variables = VariableManager.GetAggregatedVariables(_kvData, chat.Guid, agent.guid);
+            var variables = VariableManager.GetAggregatedVariables(_kvData, chat.Guid, agent.Guid);
             var matchedVariables = variables.Variables
                 .Where(v => v.Name.Contains(action.Name, StringComparison.OrdinalIgnoreCase))
                 .ToList();

@@ -57,7 +57,7 @@
 
 	void SaveToFile(string content)
 	{
-		var fileName = $"{Agent.Load(AgentGuid, KVData).name}-{Chat.Load(ChatGuid,KVData).Name}.json";
+		var fileName = $"{Agent.Load(AgentGuid, KVData).Name}-{Chat.Load(ChatGuid,KVData).Name}.json";
 		if(!string.IsNullOrEmpty(ExportPath))
 		{
 			File.WriteAllText(Path.Combine(ExportPath, fileName), content);

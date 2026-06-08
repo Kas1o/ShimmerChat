@@ -46,12 +46,12 @@ namespace ShimmerChatBuiltin.Memory
 			OpenAIAPI api = new OpenAIAPI(eUri, eApiKey, eModelName);
 
 			// 查看存在对应 collection 与否
-			var collections = qclient.CollectionExistsAsync($"{agent.guid}").Result;
+			var collections = qclient.CollectionExistsAsync($"{agent.Guid}").Result;
 			if (!collections)
 			{
 				// 创建 collection
 				await qclient.CreateCollectionAsync(
-					$"{agent.guid}",
+					$"{agent.Guid}",
 					vectorsConfig: new VectorParams
 					{
 						Size = vectorSize,
@@ -78,7 +78,7 @@ namespace ShimmerChatBuiltin.Memory
 						}
 					};
 					await qclient.UpsertAsync(
-						collectionName: $"{agent.guid}",
+						collectionName: $"{agent.Guid}",
 						points: [point]
 					);
 
@@ -87,7 +87,7 @@ namespace ShimmerChatBuiltin.Memory
 					if (action.id == null)
 						return "ID cannot be null when deleting memory.";
 					var result = await qclient.DeleteAsync(
-						collectionName: $"{agent.guid}",
+						collectionName: $"{agent.Guid}",
 						id: Guid.Parse(action.id)
 					);
 					return $"Memory with ID {action.id} deleted with result status {result.Status}.";
@@ -98,7 +98,7 @@ namespace ShimmerChatBuiltin.Memory
 					{
 						var searchEmbd = await api.GetEmbedding(action.content);
 						var searchResult = await qclient.SearchAsync(
-							collectionName: $"{agent.guid}",
+							collectionName: $"{agent.Guid}",
 							vector: searchEmbd.ToArray(),
 							limit: 5
 						 );
@@ -117,7 +117,7 @@ namespace ShimmerChatBuiltin.Memory
 					{
 						var filter = MatchText("content", action.content);
 						var searchResult = await qclient.ScrollAsync(
-							collectionName: $"{agent.guid}",
+							collectionName: $"{agent.Guid}",
 							filter: filter,
 							limit: 5
 						 );
