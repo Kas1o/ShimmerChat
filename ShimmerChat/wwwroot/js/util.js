@@ -51,6 +51,7 @@ window.showNotification = async (title, options) => {
     // 权限已授予，显示通知
     try {
         const notification = new Notification(title, options);
+        notification.onclick = () => { window.focus(); };
         return Promise.resolve(true);
     } catch (error) {
         console.error("显示通知时出错:", error);
