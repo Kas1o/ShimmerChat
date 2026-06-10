@@ -182,15 +182,14 @@
             margin-left: 0;
             margin-top: 0;
             height: auto;
-            min-height: calc(100vh - 48px);
+            min-height: calc(100vh - 48px - var(--topbar-height, 0px));
         }
 
         .content-wrapper {
             display: flex;
             width: 100%;
-            height: 100%;
             margin-top: 20px;
-            height: calc(100vh - 200px);
+            height: calc(100vh - 200px - var(--topbar-height, 0px));
             gap: 20px;
         }
 

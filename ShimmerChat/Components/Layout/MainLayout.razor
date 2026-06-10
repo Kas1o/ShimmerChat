@@ -56,6 +56,11 @@
         height: 100vh;
         width: 100vw;
         overflow: hidden;
+        --topbar-height: 0px;
+    }
+
+    .shimmer-layout.portrait {
+        --topbar-height: 56px;
     }
 
     .shimmer-layout.landscape {
@@ -91,7 +96,7 @@
         border-bottom: 1px solid var(--color-border);
         padding: 0 16px;
         gap: 12px;
-        z-index: 20;
+        z-index: 110;
     }
 
     .hamburger-btn {
@@ -128,7 +133,7 @@
     .topbar-title {
         font-size: 1.1rem;
         font-weight: 700;
-        color: var(--color-primary);
+        color: var(--color-text-primary);
         white-space: nowrap;
     }
 
@@ -144,7 +149,7 @@
         right: 0;
         bottom: 0;
         background-color: rgba(0, 0, 0, 0.4);
-        z-index: 30;
+        z-index: 120;
         animation: fadeIn 0.2s ease;
     }
 
