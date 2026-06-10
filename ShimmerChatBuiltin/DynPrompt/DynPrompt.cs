@@ -106,11 +106,10 @@ namespace ShimmerChatBuiltin.DynPrompt
 			switch (term.InjectionMode)
 			{
 				case DynPromptTermInjectionMode.BeforeSystem:
-					int systemIndex = context.Segments.FindIndex(s => s.From == PromptBuilder.From.system);
-					if (systemIndex >= 0)
+					var firstSegment = context.Segments.FirstOrDefault();
+					if (firstSegment != null && firstSegment.From == PromptBuilder.From.system)
 					{
-						var segment = context.Segments[systemIndex];
-						segment.Message.Content = term.Content + Environment.NewLine + segment.Message.Content;
+						firstSegment.Message.Content = term.Content + Environment.NewLine + firstSegment.Message.Content;
 					}
 					else
 					{
@@ -124,11 +123,10 @@ namespace ShimmerChatBuiltin.DynPrompt
 					break;
 
 				case DynPromptTermInjectionMode.AfterSystem:
-					systemIndex = context.Segments.FindIndex(s => s.From == PromptBuilder.From.system);
-					if (systemIndex >= 0)
+					firstSegment = context.Segments.FirstOrDefault();
+					if (firstSegment != null && firstSegment.From == PromptBuilder.From.system)
 					{
-						var segment = context.Segments[systemIndex];
-						segment.Message.Content = segment.Message.Content + Environment.NewLine + term.Content;
+						firstSegment.Message.Content = term.Content + Environment.NewLine + firstSegment.Message.Content;
 					}
 					else
 					{
