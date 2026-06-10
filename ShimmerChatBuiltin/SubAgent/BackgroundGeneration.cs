@@ -80,7 +80,7 @@ namespace ShimmerChatBuiltin.SubAgent
         private SubAgentConfig? LoadConfig(string name)
         {
             var json = _kvData.Read("SubAgent", "configs");
-            var configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
+            var configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]", new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Auto }) ?? [];
             return configs.FirstOrDefault(c => c.Name == name);
         }
     }

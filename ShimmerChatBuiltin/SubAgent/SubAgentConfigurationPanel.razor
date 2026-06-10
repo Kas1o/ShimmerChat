@@ -190,10 +190,31 @@
         LoadApiSettings();
     }
 
+    static readonly JsonSerializerSettings _configSerializerSettings = new()
+    {
+        TypeNameHandling = TypeNameHandling.Auto
+    };
+
     void LoadConfigs()
     {
         var json = pluginData.Read("SubAgent", "configs");
-        configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
+        try
+        {
+            configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]", _configSerializerSettings) ?? [];
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Deserialization with TypeNameHandling failed, trying legacy format: {ex.Message}");
+            try
+            {
+                configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
+            }
+            catch (Exception ex2)
+            {
+                Console.WriteLine($"Legacy deserialization also failed: {ex2.Message}");
+                configs = [];
+            }
+        }
     }
 
     void LoadApiSettings()
@@ -258,7 +279,7 @@
     {
         try
         {
-            var json = JsonConvert.SerializeObject(configs, Formatting.Indented);
+            var json = JsonConvert.SerializeObject(configs, Formatting.Indented, _configSerializerSettings);
             pluginData.Write("SubAgent", "configs", json);
         }
         catch (Exception ex)
