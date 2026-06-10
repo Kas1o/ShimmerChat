@@ -4,15 +4,18 @@
 @inject IStringLocalizer<NavMenu> l
 @implements IDisposable
 
-<div class="shimmer-sidebar">
-    <div class="shimmer-nav-header">
-        <div class="shimmer-nav-brand">
-            <img src="@(ThemeService.CurrentTheme?.IsDarkMode == true ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="ShimmerChat Logo" class="shimmer-nav-logo" />
-            <h1 class="shimmer-nav-title">@l["ShimmerChat"]</h1>
+<div class="@(IsPortrait ? "shimmer-nav-portrait" : "shimmer-sidebar")">
+    @if (!IsPortrait)
+    {
+        <div class="shimmer-nav-header">
+            <div class="shimmer-nav-brand">
+                <img src="@(ThemeService.CurrentTheme?.IsDarkMode == true ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="ShimmerChat Logo" class="shimmer-nav-logo" />
+                <h1 class="shimmer-nav-title">@l["ShimmerChat"]</h1>
+            </div>
         </div>
-    </div>
 
-    <div class="shimmer-nav-divider"></div>
+        <div class="shimmer-nav-divider"></div>
+    }
 
     <nav class="shimmer-nav-menu">
         <div class="shimmer-nav-list">
@@ -99,11 +102,14 @@
         </div>
     </nav>
 
+    @if (!IsPortrait)
+    {
     <div class="shimmer-nav-footer">
         <div class="shimmer-nav-version">
             <span>版本 @Version</span>
         </div>
     </div>
+    }
 </div>
 
 <style>
@@ -242,9 +248,29 @@
     .shimmer-mobile-theme-toggle {
         display: none;
     }
+
+    /* 竖屏模式导航面板 */
+    .shimmer-nav-portrait {
+        background-color: var(--color-surface);
+        display: flex;
+        flex-direction: column;
+        padding: 8px 0;
+    }
+
+    .shimmer-nav-portrait .shimmer-nav-item {
+        margin: 2px 8px;
+        border-radius: var(--radius-md);
+    }
+
+    .shimmer-nav-portrait .shimmer-nav-menu {
+        padding: 8px 0;
+    }
 </style>
 
 @code {
+    [Parameter]
+    public bool IsPortrait { get; set; }
+
     [Inject]
     public required IThemeService ThemeService { get; set; }
 

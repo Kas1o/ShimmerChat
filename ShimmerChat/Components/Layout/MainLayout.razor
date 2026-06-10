@@ -1,17 +1,39 @@
 @inherits LayoutComponentBase
-@implements IDisposable
+@implements IAsyncDisposable
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject IThemeService ThemeService
 
-<div class="shimmer-layout">
-    <!-- 侧边导航栏 -->
-    <aside class="shimmer-sidebar">
-        <NavMenu />
-    </aside>
+<div class="shimmer-layout @(isPortrait ? "portrait" : "landscape")">
+    @if (isPortrait)
+    {
+        <header class="shimmer-topbar">
+            <button class="hamburger-btn" @onclick="ToggleNav" aria-label="Toggle navigation">
+                <i class="bi @(isNavExpanded ? "bi-x-lg" : "bi-list")"></i>
+            </button>
+            <div class="topbar-brand">
+                <img src="@(ThemeService.CurrentTheme?.IsDarkMode == true ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="ShimmerChat Logo" class="topbar-logo" />
+                <span class="topbar-title">ShimmerChat</span>
+            </div>
+            <div class="topbar-spacer"></div>
+        </header>
+        @if (isNavExpanded)
+        {
+            <div class="shimmer-nav-overlay" @onclick="CloseNav">
+                <nav class="shimmer-nav-dropdown" @onclick:stopPropagation="true">
+                    <NavMenu IsPortrait="true" />
+                </nav>
+            </div>
+        }
+    }
+    else
+    {
+        <aside class="shimmer-sidebar">
+            <NavMenu />
+        </aside>
+    }
 
-    <!-- 主内容区域 -->
     <main class="shimmer-main">
-
-        <!-- 内容区域 -->
         <article class="shimmer-content">
             @Body
         </article>
@@ -36,6 +58,14 @@
         overflow: hidden;
     }
 
+    .shimmer-layout.landscape {
+        flex-direction: row;
+    }
+
+    .shimmer-layout.portrait {
+        flex-direction: column;
+    }
+
     .shimmer-main {
         flex: 1;
         display: flex;
@@ -50,41 +80,151 @@
         overflow-y: auto;
         overflow-x: hidden;
     }
+
+    /* 竖屏顶部导航栏 */
+    .shimmer-topbar {
+        display: flex;
+        align-items: center;
+        height: 56px;
+        min-height: 56px;
+        background-color: var(--color-surface);
+        border-bottom: 1px solid var(--color-border);
+        padding: 0 16px;
+        gap: 12px;
+        z-index: 20;
+    }
+
+    .hamburger-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border: none;
+        background: transparent;
+        color: var(--color-text);
+        font-size: 1.5rem;
+        cursor: pointer;
+        border-radius: var(--radius-md);
+        transition: background-color 0.2s;
+        flex-shrink: 0;
+    }
+
+    .hamburger-btn:hover {
+        background-color: var(--color-hover);
+    }
+
+    .topbar-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .topbar-logo {
+        height: 28px;
+        width: 28px;
+    }
+
+    .topbar-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--color-primary);
+        white-space: nowrap;
+    }
+
+    .topbar-spacer {
+        flex: 1;
+    }
+
+    /* 竖屏导航下拉覆盖层 */
+    .shimmer-nav-overlay {
+        position: fixed;
+        top: 56px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.4);
+        z-index: 30;
+        animation: fadeIn 0.2s ease;
+    }
+
+    .shimmer-nav-dropdown {
+        background-color: var(--color-surface);
+        border-bottom: 1px solid var(--color-border);
+        max-height: calc(100vh - 56px);
+        overflow-y: auto;
+        animation: slideDown 0.25s ease;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @@keyframes slideDown {
+        from { transform: translateY(-10px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* 竖屏内容区域调整 */
+    .shimmer-layout.portrait .shimmer-content {
+        padding: 16px;
+    }
 </style>
 @code {
-    protected override void OnAfterRender(bool firstRender)
+    private bool isPortrait;
+    private bool isNavExpanded;
+    private DotNetObjectReference<MainLayout>? dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // 初始化错误UI事件处理
-            InitializeErrorHandlers();
+            dotNetRef = DotNetObjectReference.Create(this);
+            isPortrait = await JS.InvokeAsync<bool>("getIsPortrait");
+            await JS.InvokeVoidAsync("listenOrientation", dotNetRef);
+            NavigationManager.LocationChanged += OnLocationChanged;
+            StateHasChanged();
         }
     }
 
-    private void InitializeErrorHandlers()
+    [JSInvokable]
+    public void OnOrientationChanged(bool portrait)
     {
-        // 这里可以添加JavaScript互操作来处理错误UI的事件
+        if (isPortrait != portrait)
+        {
+            isPortrait = portrait;
+            isNavExpanded = false;
+            StateHasChanged();
+        }
     }
 
-    private string currentPath = "";
-
-    protected override void OnInitialized()
+    private void ToggleNav()
     {
-        // 订阅导航事件
-        NavigationManager.LocationChanged += OnLocationChanged;
-        currentPath = NavigationManager.Uri;
+        isNavExpanded = !isNavExpanded;
+    }
+
+    private void CloseNav()
+    {
+        isNavExpanded = false;
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        currentPath = e.Location; // 或使用 NavigationManager.ToBaseRelativePath(e.Location)
-        Console.WriteLine(currentPath);
+        if (isPortrait && isNavExpanded)
+        {
+            isNavExpanded = false;
+            StateHasChanged();
+        }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        // 避免内存泄漏，取消订阅
         NavigationManager.LocationChanged -= OnLocationChanged;
+        if (dotNetRef != null)
+        {
+            await JS.InvokeVoidAsync("unlistenOrientation");
+            dotNetRef.Dispose();
+        }
     }
 }
-

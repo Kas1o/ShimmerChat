@@ -98,6 +98,28 @@ window.isScrolledToBottom = function (element, threshold) {
     }
 };
 
+// 检测屏幕方向
+window.getIsPortrait = function () {
+    return window.innerHeight > window.innerWidth;
+};
+
+// 监听屏幕方向变化
+window.listenOrientation = function (dotNetRef) {
+    var handler = function () {
+        dotNetRef.invokeMethodAsync('OnOrientationChanged', window.innerHeight > window.innerWidth);
+    };
+    window.addEventListener('resize', handler);
+    window.__orientationHandler = handler;
+};
+
+// 移除屏幕方向监听
+window.unlistenOrientation = function () {
+    if (window.__orientationHandler) {
+        window.removeEventListener('resize', window.__orientationHandler);
+        window.__orientationHandler = null;
+    }
+};
+
 // 检查元素是否滚动到顶部（允许一定误差）
 window.isScrolledToTop = function (element, threshold) {
     try {
