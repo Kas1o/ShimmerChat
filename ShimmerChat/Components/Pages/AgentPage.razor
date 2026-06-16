@@ -25,8 +25,34 @@
                         <div class="chat-last-message"></div>
                     </div>
 
-                    <Virtualize ItemsProvider="LoadChatSummariesAsync" Context="summary" @ref="chatVirtualize">
-                        <ItemContent>
+                    @if (virtualize)
+                    {
+                        <Virtualize ItemsProvider="LoadChatSummariesAsync" Context="summary" @ref="chatVirtualize">
+                            <ItemContent>
+                                <div class="chat-item" @onclick="() => OpenChatSummary(summary)">
+                                    <div class="chat-info">
+                                        <div class="chat-name">@summary.Name</div>
+                                        <div class="chat-last-message">@summary.LastMessagePreview</div>
+                                    </div>
+                                    <button class="chat-delete-btn" @onclick:stopPropagation @onclick="() => ShowDeleteChatConfirmation(summary)">
+                                        ×
+                                    </button>
+                                </div>
+                            </ItemContent>
+                            <Placeholder>
+                                <div class="chat-item">
+                                    <div class="chat-info">
+                                        <div class="chat-name">Loading...</div>
+                                        <div class="chat-last-message">Please wait</div>
+                                    </div>
+                                </div>
+                            </Placeholder>
+                        </Virtualize>
+                    }
+                    else
+                    {
+                        @foreach (var summary in allChatSummaries)
+                        {
                             <div class="chat-item" @onclick="() => OpenChatSummary(summary)">
                                 <div class="chat-info">
                                     <div class="chat-name">@summary.Name</div>
@@ -36,16 +62,8 @@
                                     ×
                                 </button>
                             </div>
-                        </ItemContent>
-                        <Placeholder>
-                            <div class="chat-item">
-                                <div class="chat-info">
-                                    <div class="chat-name">Loading...</div>
-                                    <div class="chat-last-message">Please wait</div>
-                                </div>
-                            </div>
-                        </Placeholder>
-                    </Virtualize>
+                        }
+                    }
                 </div>
                 
                 @if (DeleteChatPopupVisible)
@@ -663,6 +681,17 @@
     string AvatarPath => $"/userimages/{agent.AvatarGuid}.png";
     string BackgroudPath => $"/userimages/{agent.BackgroundGuid}.png";
 
+    bool virtualize = false;
+    List<ChatSummary> allChatSummaries = new();
+
+    protected override void OnInitialized()
+    {
+        if (bool.TryParse(kvDataService.Read("App", "virtualize"), out var virt))
+        {
+            virtualize = virt;
+        }
+    }
+
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
@@ -684,6 +713,7 @@
         // Load available tools after agent is loaded
         LoadAvailableTools();
         LoadAllTags();
+        LoadAllChatSummaries();
     }
 
     private async void InputAvatar(InputFileChangeEventArgs e)
@@ -851,18 +881,27 @@
             DeleteChatPopupVisible = false;
             ChatToDelete = null;
 
-            if (chatVirtualize != null)
-            {
-                await chatVirtualize.RefreshDataAsync();
-            }
+            await RefreshChatsAsync();
         }
     }
 
     #endregion
 
-    #region Virtualize Chat Loading
+    #region Chat Loading
 
     private Virtualize<ChatSummary>? chatVirtualize;
+
+    private void LoadAllChatSummaries()
+    {
+        if (agent == null)
+        {
+            allChatSummaries = new();
+            return;
+        }
+
+        var totalCount = agent.GetChatCount();
+        allChatSummaries = agent.GetChatSummariesRange(kvDataService, 0, totalCount).ToList();
+    }
 
     private ValueTask<ItemsProviderResult<ChatSummary>> LoadChatSummariesAsync(ItemsProviderRequest request)
     {
@@ -879,9 +918,17 @@
 
     private async Task RefreshChatsAsync()
     {
-        if (chatVirtualize != null)
+        if (virtualize)
         {
-            await chatVirtualize.RefreshDataAsync();
+            if (chatVirtualize != null)
+            {
+                await chatVirtualize.RefreshDataAsync();
+            }
+        }
+        else
+        {
+            LoadAllChatSummaries();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
