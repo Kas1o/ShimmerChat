@@ -101,7 +101,7 @@ input, textarea, select {
 input:focus, textarea:focus, select:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(123, 52, 235, 0.2);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
 /* 卡片样式 */
