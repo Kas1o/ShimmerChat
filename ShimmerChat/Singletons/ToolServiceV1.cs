@@ -115,6 +115,50 @@ namespace ShimmerChat.Singletons
 			}
 		}
 
+		public void EnableToolsByPath(string path)
+		{
+			var pathNormalized = (path ?? "").TrimEnd('/');
+			foreach (var tool in LoadedTools)
+			{
+				var toolPath = (tool.Path ?? "").TrimEnd('/');
+				if (ToolBelongsToPath(toolPath, pathNormalized) && !EnabledTools.Contains(tool))
+				{
+					EnabledTools.Add(tool);
+				}
+			}
+			SaveEnabledTools();
+		}
+
+		public void DisableToolsByPath(string path)
+		{
+			var pathNormalized = (path ?? "").TrimEnd('/');
+			var toRemove = new List<ITool>();
+			foreach (var tool in EnabledTools)
+			{
+				var toolPath = (tool.Path ?? "").TrimEnd('/');
+				if (ToolBelongsToPath(toolPath, pathNormalized))
+				{
+					toRemove.Add(tool);
+				}
+			}
+			foreach (var tool in toRemove)
+			{
+				EnabledTools.Remove(tool);
+			}
+			SaveEnabledTools();
+		}
+
+		private static bool ToolBelongsToPath(string toolPath, string groupPath)
+		{
+			if (string.IsNullOrEmpty(groupPath))
+				return string.IsNullOrEmpty(toolPath);
+			if (toolPath == groupPath)
+				return true;
+			if (toolPath.StartsWith(groupPath + "/", StringComparison.OrdinalIgnoreCase))
+				return true;
+			return false;
+		}
+
 		public IEnumerable<Tool> GetEnabledToolDefinitions()
 		{
 			return EnabledTools.Select(t => t.GetToolDefinition());

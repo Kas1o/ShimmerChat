@@ -9,6 +9,13 @@ namespace ShimmerChatLib.Tool
     public interface ITool
     {
 		/// <summary>
+		/// The path / group this tool belongs to. Tools under the same path are displayed as a group in the Tool Manager.
+		/// Use "/" as separator for nested groups, e.g. "Dev/Code".
+		/// Default is empty string (uncategorized).
+		/// </summary>
+		public string Path => "";
+
+		/// <summary>
 		/// Executes a chat operation using the specified input, chat context, and agent, and returns the result as an
 		/// asynchronous operation.
 		/// </summary>

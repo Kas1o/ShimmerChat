@@ -12,6 +12,7 @@ namespace ShimmerChatBuiltin
 {
 	public class SetChatNameTool : ITool
 	{
+		string ITool.Path => "Chat";
 
 		IKVDataService KVDataService { get; set; }
 		public SetChatNameTool(IKVDataService kvDataService)

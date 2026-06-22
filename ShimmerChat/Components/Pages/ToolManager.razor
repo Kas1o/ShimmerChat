@@ -12,85 +12,204 @@
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>@l["Enabled"]</th>
-                <th>@l["Name"]</th>
-                <th>@l["Description"]</th>
-                <th>@l["Actions"]</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var tool in tools)
+    <div class="tool-manager-table">
+        <div class="tm-header tm-row">
+            <div>@l["Enabled"]</div>
+            <div>@l["Name"]</div>
+            <div>@l["Description"]</div>
+            <div>@l["Actions"]</div>
+        </div>
+
+        @foreach (var item in flatItems)
+        {
+            if (item.IsGroup)
             {
-                var def = tool.GetToolDefinition();
-                bool enabled = enabledNames.Contains(def.name);
-                <tr>
-                    <td>
-                        <input type="checkbox" checked="@enabled" @onchange="() => ToggleTool(def.name, enabled)" />
-                    </td>
-                    <td>@def.name</td>
-                    <td>@def.description</td>
-                    <td>
-                        <button class="btn btn-sm btn-secondary" @onclick="() => ShowDetail(tool)">@l["Detail"]</button>
-                        <button class="btn btn-sm btn-primary" @onclick="() => ShowTest(tool)" disabled="@(enabled ? null : "disabled")">@l["Test"]</button>
-                    </td>
-                </tr>
+                var allEnabled = AreAllToolsInGroupEnabled(item.FullPath);
+                <div class="tm-group tm-row" style="--indent:@(item.Depth)">
+                    <div>
+                        <input type="checkbox"
+                               checked="@allEnabled"
+                               @onchange="() => ToggleGroup(item.FullPath, allEnabled)"
+                               title="@l["Enable/Disable all tools in this group"]" />
+                    </div>
+                    <div class="tm-group-name" @onclick="() => ToggleExpand(item.FullPath)">
+                        <span class="tm-caret">@(IsExpanded(item.FullPath) ? "▼" : "▶")</span>
+                        <span>@item.Name</span>
+                        <span class="tm-count">(@GetGroupToolCount(item.FullPath))</span>
+                    </div>
+                    <div></div>
+                    <div></div>
+                </div>
             }
-        </tbody>
-    </table>
-}
+            else if (item.Tool != null)
+            {
+                var def = item.Tool.GetToolDefinition();
+                var enabled = enabledNames.Contains(def.name);
+                var isExpanded = expandedToolName == def.name;
 
-@if (showDetailTool != null)
-{
-    var def = showDetailTool.GetToolDefinition();
-    <div class="alert alert-custom">
-        <strong>@def.name</strong><br />
-        <span>@def.description</span>
-        @if (def.parameters != null)
-        {
-            <ul>
-                @foreach (var p in def.parameters)
+                <div class="tm-tool tm-row" style="--indent:@(item.Depth + 1)">
+                    <div>
+                        <input type="checkbox" checked="@enabled" @onchange="() => ToggleTool(def.name, enabled)" />
+                    </div>
+                    <div class="tm-tool-name">@def.name</div>
+                    <div class="tm-tool-desc">@def.description</div>
+                    <div class="tm-actions">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenInlinePanel(def.name, InlinePanelMode.Detail)">@l["Detail"]</button>
+                        <button class="btn btn-sm btn-primary" @onclick="() => OpenInlinePanel(def.name, InlinePanelMode.Test)" disabled="@(enabled ? null : "disabled")">@l["Test"]</button>
+                    </div>
+                </div>
+
+                @if (isExpanded)
                 {
-                    <li>
-                        <b>@p.parameter.name</b> (@p.parameter.type):
-                        @if (p.required)
+                    <div class="tm-inline" style="--indent:@(item.Depth + 1)">
+                        @if (inlinePanelMode == InlinePanelMode.Detail)
                         {
-                            <span class="text-required">[Required]</span>
+                            <div class="tm-panel-title">@l["Tool Detail"]</div>
+                            <div class="tm-panel-desc">@def.description</div>
+                            @if (def.parameters != null && def.parameters.Count > 0)
+                            {
+                                <div class="tm-param-list">
+                                    @foreach (var p in def.parameters)
+                                    {
+                                        <div class="tm-param-item">
+                                            <code>@p.parameter.name</code>
+                                            <span class="tm-param-type">@p.parameter.type</span>
+                                            @if (p.required)
+                                            {
+                                                <span class="tm-required">Required</span>
+                                            }
+                                            <div class="tm-param-desc">@p.parameter.description</div>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         }
-                        <pre> @p.parameter.description</pre>
-                        
-                    </li>
+                        else if (inlinePanelMode == InlinePanelMode.Test)
+                        {
+                            <div class="tm-panel-title">@l["Test Tool"]: @def.name</div>
+                            <textarea class="form-control" @bind="testInput" rows="3" placeholder="@l["Input argument (JSON or string)"]"></textarea>
+                            <div class="tm-panel-actions">
+                                <button class="btn btn-sm btn-primary" @onclick="() => TestToolAsync(item.Tool)">@l["Run"]</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="CloseInlinePanel">@l["Close"]</button>
+                            </div>
+                            @if (testResult != null)
+                            {
+                                <pre class="tm-result">@testResult</pre>
+                            }
+                        }
+                    </div>
                 }
-            </ul>
-        }
-        <button class="btn btn-sm btn-secondary" @onclick="() => showDetailTool = null">@l["Close"]</button>
-    </div>
-}
-
-@if (showTestTool != null)
-{
-    <div class="alert alert-custom-test">
-        <h5>@l["Test Tool"]: @showTestTool.GetToolDefinition().name</h5>
-        <textarea class="form-control" @bind="testInput" rows="2" placeholder="@l["Input argument (JSON or string)"]"></textarea>
-        <button class="btn btn-primary mt-2" @onclick="TestToolAsync">@l["Run"]</button>
-        <button class="btn btn-secondary mt-2" @onclick="() => { showTestTool = null; testResult = null; }">@l["Cancel"]</button>
-        @if (testResult != null)
-        {
-            <div class="mt-2">
-                <b>@l["Result"]:</b>
-                <pre class="result-output">@testResult</pre>
-            </div>
+            }
         }
     </div>
 }
 
 <style>
-    .table{
-        --bs-table-bg: var(--color-background);
-        --bs-table-color: var(--color-text-primary);
-        --bs-table-border-color: var(--color-text-secondary);
+    .tool-manager-table {
+        border: 1px solid color-mix(in srgb, var(--color-text-secondary) 40%, transparent);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .tm-row {
+        display: grid;
+        grid-template-columns: 56px minmax(220px, 1.2fr) minmax(320px, 2fr) minmax(180px, auto);
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        border-bottom: 1px solid color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+    }
+    .tm-header {
+        background: color-mix(in srgb, var(--color-background) 88%, var(--color-text-primary));
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+    .tm-group {
+        background: color-mix(in srgb, var(--color-background) 95%, var(--color-text-primary));
+    }
+    .tm-group-name {
+        cursor: pointer;
+        user-select: none;
+        padding-left: calc(var(--indent) * 18px);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .tm-caret {
+        width: 14px;
+        text-align: center;
+        font-size: 12px;
+    }
+    .tm-count {
+        color: var(--color-text-secondary);
+        font-size: 0.9em;
+    }
+    .tm-tool {
+        background: var(--color-background);
+    }
+    .tm-tool-name {
+        font-weight: 500;
+        padding-left: calc(var(--indent) * 18px);
+    }
+    .tm-tool-desc {
+        color: var(--color-text-secondary);
+    }
+    .tm-actions {
+        display: flex;
+        gap: 6px;
+        justify-content: flex-end;
+    }
+    .tm-inline {
+        margin-left: calc((var(--indent) * 18px) + 56px);
+        margin-right: 12px;
+        margin-bottom: 10px;
+        padding: 12px;
+    }
+    .tm-panel-title {
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+    .tm-panel-desc {
+        margin-bottom: 10px;
+        color: var(--color-text-secondary);
+    }
+    .tm-param-list {
+        display: grid;
+        gap: 8px;
+    }
+    .tm-param-item {
+        border: 1px solid color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+        border-radius: 6px;
+        padding: 8px;
+    }
+    .tm-param-type {
+        margin-left: 8px;
+        color: var(--color-text-secondary);
+        font-size: 0.9em;
+    }
+    .tm-required {
+        margin-left: 8px;
+        font-size: 0.8em;
+        color: #b00020;
+        font-weight: 600;
+    }
+    .tm-param-desc {
+        margin-top: 6px;
+        white-space: pre-wrap;
+        color: var(--color-text-secondary);
+        font-size: 0.92em;
+    }
+    .tm-panel-actions {
+        margin-top: 8px;
+        display: flex;
+        gap: 8px;
+    }
+    .tm-result {
+        margin-top: 8px;
+        padding: 8px;
+        border-radius: 6px;
+        background: color-mix(in srgb, var(--color-background) 85%, #000);
+        border: 1px solid color-mix(in srgb, var(--color-text-secondary) 20%, transparent);
+        white-space: pre-wrap;
     }
 </style>
 
@@ -98,8 +217,10 @@ else
 @code {
     List<ITool>? tools;
     HashSet<string> enabledNames = new();
-    ITool? showDetailTool;
-    ITool? showTestTool;
+    HashSet<string> expandedPaths = new(StringComparer.OrdinalIgnoreCase);
+    List<FlatItem> flatItems = new();
+    string? expandedToolName;
+    InlinePanelMode inlinePanelMode = InlinePanelMode.None;
     string? testInput;
     string? testResult;
     bool throwExceptionInsteadOfPopupErrorMessage = false;
@@ -107,13 +228,139 @@ else
     protected override void OnInitialized()
     {
         tools = ToolService.LoadedTools;
-        enabledNames = ToolService.EnabledTools
-            .Select(t => t.GetToolDefinition().name)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        RefreshEnabledNames();
+        RebuildFlatList();
         if (bool.TryParse(KVData.Read("App", "throw_exception"), out var result))
         {
             throwExceptionInsteadOfPopupErrorMessage = result;
         }
+    }
+
+    void RefreshEnabledNames()
+    {
+        enabledNames = ToolService.EnabledTools
+            .Select(t => t.GetToolDefinition().name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private TreeGroupNode BuildTree()
+    {
+        var root = new TreeGroupNode { Name = "Root", FullPath = "" };
+        foreach (var tool in tools!)
+        {
+            var path = (tool.Path ?? "").Trim('/');
+            var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+            var current = root;
+            var currentPath = "";
+            foreach (var seg in segments)
+            {
+                currentPath = string.IsNullOrEmpty(currentPath) ? seg : $"{currentPath}/{seg}";
+                var child = current.Children.FirstOrDefault(c => c.Name == seg);
+                if (child == null)
+                {
+                    child = new TreeGroupNode { Name = seg, FullPath = currentPath };
+                    current.Children.Add(child);
+                }
+                current = child;
+            }
+            current.DirectTools.Add(tool);
+        }
+        return root;
+    }
+
+    private void RebuildFlatList()
+    {
+        var treeRoot = BuildTree();
+        var list = new List<FlatItem>();
+
+        foreach (var tool in treeRoot.DirectTools.OrderBy(t => t.GetToolDefinition().name, StringComparer.OrdinalIgnoreCase))
+        {
+            list.Add(new FlatItem { Depth = 0, IsGroup = false, Name = tool.GetToolDefinition().name, Tool = tool });
+        }
+
+        FlattenChildren(treeRoot, 0, list);
+        flatItems = list;
+    }
+
+    private void FlattenChildren(TreeGroupNode node, int depth, List<FlatItem> result)
+    {
+        foreach (var child in node.Children.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            var isExpanded = IsExpanded(child.FullPath);
+            result.Add(new FlatItem
+            {
+                Depth = depth,
+                IsGroup = true,
+                Name = child.Name,
+                FullPath = child.FullPath,
+                IsExpanded = isExpanded
+            });
+
+            if (!isExpanded)
+                continue;
+
+            foreach (var tool in child.DirectTools.OrderBy(t => t.GetToolDefinition().name, StringComparer.OrdinalIgnoreCase))
+            {
+                result.Add(new FlatItem
+                {
+                    Depth = depth,
+                    IsGroup = false,
+                    Name = tool.GetToolDefinition().name,
+                    Tool = tool
+                });
+            }
+
+            FlattenChildren(child, depth + 1, result);
+        }
+    }
+
+    private bool AreAllToolsInGroupEnabled(string path)
+    {
+        var toolsInGroup = GetToolsUnderPath(path);
+        if (toolsInGroup.Count == 0)
+            return false;
+        return toolsInGroup.All(t => enabledNames.Contains(t.GetToolDefinition().name));
+    }
+
+    private List<ITool> GetToolsUnderPath(string path)
+    {
+        var pathNormalized = (path ?? "").TrimEnd('/');
+        return tools!.Where(t =>
+        {
+            var tp = (t.Path ?? "").TrimEnd('/');
+            if (string.IsNullOrEmpty(pathNormalized))
+                return string.IsNullOrEmpty(tp);
+            return tp == pathNormalized
+                || tp.StartsWith(pathNormalized + "/", StringComparison.OrdinalIgnoreCase);
+        }).ToList();
+    }
+
+    private int GetGroupToolCount(string path)
+    {
+        return GetToolsUnderPath(path).Count;
+    }
+
+    bool IsExpanded(string path)
+    {
+        return expandedPaths.Contains(path);
+    }
+
+    void ToggleExpand(string path)
+    {
+        if (!expandedPaths.Remove(path))
+            expandedPaths.Add(path);
+        RebuildFlatList();
+    }
+
+    void ToggleGroup(string path, bool allEnabled)
+    {
+        if (allEnabled)
+            ToolService.DisableToolsByPath(path);
+        else
+            ToolService.EnableToolsByPath(path);
+        RefreshEnabledNames();
+        RebuildFlatList();
     }
 
     void ToggleTool(string name, bool enabled)
@@ -128,32 +375,38 @@ else
             ToolService.EnableTool(name);
             enabledNames.Add(name);
         }
-        StateHasChanged();
+        RebuildFlatList();
     }
 
-    void ShowDetail(ITool tool)
+    void OpenInlinePanel(string toolName, InlinePanelMode mode)
     {
-        showDetailTool = tool;
-        showTestTool = null;
+        if (expandedToolName == toolName && inlinePanelMode == mode)
+        {
+            CloseInlinePanel();
+            return;
+        }
+
+        expandedToolName = toolName;
+        inlinePanelMode = mode;
+        if (mode == InlinePanelMode.Test)
+            testInput ??= "";
         testResult = null;
     }
 
-    void ShowTest(ITool tool)
+    void CloseInlinePanel()
     {
-        showTestTool = tool;
-        showDetailTool = null;
-        testInput = "";
+        expandedToolName = null;
+        inlinePanelMode = InlinePanelMode.None;
         testResult = null;
     }
 
-    async Task TestToolAsync()
+    async Task TestToolAsync(ITool tool)
     {
-        if (showTestTool == null) return;
         testResult = "Running...";
         StateHasChanged();
         try
         {
-            testResult = await showTestTool.Execute(testInput ?? "", null, null);
+            testResult = await tool.Execute(testInput ?? "", null, null);
         }
         catch (Exception ex)
         {
@@ -164,5 +417,30 @@ else
             }
         }
         StateHasChanged();
+    }
+
+    enum InlinePanelMode
+    {
+        None,
+        Detail,
+        Test
+    }
+
+    class TreeGroupNode
+    {
+        public string Name { get; set; } = "";
+        public string FullPath { get; set; } = "";
+        public List<ITool> DirectTools { get; set; } = new();
+        public List<TreeGroupNode> Children { get; set; } = new();
+    }
+
+    class FlatItem
+    {
+        public int Depth { get; set; }
+        public bool IsGroup { get; set; }
+        public string Name { get; set; } = "";
+        public string FullPath { get; set; } = "";
+        public ITool? Tool { get; set; }
+        public bool IsExpanded { get; set; }
     }
 }

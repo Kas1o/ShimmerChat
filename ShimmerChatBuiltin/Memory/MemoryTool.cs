@@ -16,6 +16,8 @@ namespace ShimmerChatBuiltin.Memory
 {
 	public class MemoryTool : ITool
 	{
+		string ITool.Path => "Memory";
+
 		private IKVDataService KVData;
 		public MemoryTool(IKVDataService kVData)
 		{

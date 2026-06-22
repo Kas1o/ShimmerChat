@@ -7,6 +7,8 @@ namespace ShimmerChatBuiltin
 {
 	public class InvokeCSharp : ITool
 	{
+		string ITool.Path => "Development";
+
 		public async Task<string> Execute(string input, Chat? chat, Agent? agent)
 		{
 			Console.WriteLine(input);

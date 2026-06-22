@@ -10,6 +10,8 @@ namespace ShimmerChatBuiltin.Variable
 {
     public class VariableTool : ITool
     {
+        string ITool.Path => "Variable";
+
         private readonly IKVDataService _kvData;
 
         public VariableTool(IKVDataService kvData)
