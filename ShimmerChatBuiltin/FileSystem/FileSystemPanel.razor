@@ -1,0 +1,244 @@
+@attribute [PluginPanelAttribute("文件系统", "配置文件系统的 AllowList 和 BanList 访问规则", PanelDisplayPlace.Settings)]
+
+@using ShimmerChatLib.Interface
+@using ShimmerChatBuiltin.FileSystem
+@using Newtonsoft.Json
+@inject IKVDataService pluginData
+
+<div class="shimmer-content p-4">
+    <h2 class="text-2xl font-bold mb-4">File System Access Control</h2>
+    <p class="text-muted mb-4">Configure regex-based AllowList and BanList patterns to control which paths the File System tools can access.</p>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="shimmer-group">
+                <h3 class="text-xl font-semibold">AllowList</h3>
+                <p class="text-sm text-muted mb-2">Regex patterns for paths that are <strong>explicitly allowed</strong>. One pattern per line. If empty, all non-banned paths are allowed.</p>
+                <textarea class="shimmer-textarea w-100 font-mono" rows="8"
+                          @bind="allowListText" placeholder="C:\\Users\\.*"></textarea>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="shimmer-group">
+                <h3 class="text-xl font-semibold">BanList</h3>
+                <p class="text-sm text-muted mb-2">Regex patterns for paths that are <strong>always denied</strong>. One pattern per line. BanList takes precedence over AllowList.</p>
+                <textarea class="shimmer-textarea w-100 font-mono" rows="8"
+                          @bind="banListText" placeholder="C:\\Windows\\.*"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="shimmer-group mt-4">
+        <h3 class="text-xl font-semibold">Test Path</h3>
+        <div class="d-flex gap-3 mt-2 align-items-center flex-wrap">
+            <input type="text" class="shimmer-input flex-1" @bind="testPath" placeholder="Enter a path to test against the rules..." />
+            <button class="btn" @onclick="TestPath">Test</button>
+        </div>
+        @if (!string.IsNullOrEmpty(testResult))
+        {
+            <div class="mt-2 px-3 py-2 rounded @(testResultClass)">
+                @testResult
+            </div>
+        }
+    </div>
+
+    <div class="mt-5 pt-3 border-t d-flex justify-between items-center">
+        <button class="btn" @onclick="SaveConfig" disabled="@isLoading">Save Configuration</button>
+        <button class="btn" @onclick="ResetToDefaults">Reset to Defaults</button>
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="px-4 py-2 rounded text-sm @(statusType == "success" ? "bg-success/10 text-success" : "bg-danger/10 text-danger")">
+                @statusMessage
+            </div>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="shimmer-popup-overlay">
+            <div class="shimmer-popup-content text-center">
+                <div class="text-primary mb-3">Loading...</div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string allowListText = "";
+    private string banListText = "";
+    private string testPath = "";
+    private string testResult = "";
+    private string testResultClass = "";
+    private string statusMessage = "";
+    private string statusType = "success";
+    private bool isLoading;
+
+    protected override void OnInitialized()
+    {
+        LoadConfig();
+    }
+
+    private void LoadConfig()
+    {
+        try
+        {
+            isLoading = true;
+            var config = FileSystemConfigManager.Load(pluginData);
+            allowListText = string.Join(Environment.NewLine, config.AllowList);
+            banListText = string.Join(Environment.NewLine, config.BanList);
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Failed to load config: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void SaveConfig()
+    {
+        try
+        {
+            isLoading = true;
+
+            var config = new FileSystemConfig
+            {
+                AllowList = allowListText
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().TrimEnd('\r'))
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList(),
+                BanList = banListText
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().TrimEnd('\r'))
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList()
+            };
+
+            foreach (var pattern in config.AllowList.Concat(config.BanList))
+            {
+                try
+                {
+                    _ = System.Text.RegularExpressions.Regex.IsMatch("test", pattern);
+                }
+                catch (Exception ex)
+                {
+                    ShowStatus($"Invalid regex pattern: '{pattern}' - {ex.Message}", "error");
+                    isLoading = false;
+                    return;
+                }
+            }
+
+            FileSystemConfigManager.Save(pluginData, config);
+            ShowStatus("Configuration saved successfully.", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Failed to save config: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void TestPath()
+    {
+        if (string.IsNullOrWhiteSpace(testPath))
+        {
+            testResult = "Please enter a path to test.";
+            testResultClass = "bg-info/10 text-info";
+            return;
+        }
+
+        try
+        {
+            var fullPath = System.IO.Path.GetFullPath(testPath);
+            var normalized = fullPath.Replace('\\', '/');
+
+            var config = new FileSystemConfig
+            {
+                AllowList = allowListText
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().TrimEnd('\r'))
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList(),
+                BanList = banListText
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().TrimEnd('\r'))
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList()
+            };
+
+            if (config.BanList.Count > 0)
+            {
+                foreach (var pattern in config.BanList)
+                {
+                    if (string.IsNullOrWhiteSpace(pattern)) continue;
+                    try
+                    {
+                        if (System.Text.RegularExpressions.Regex.IsMatch(normalized, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                        {
+                            testResult = $"BLOCKED - Matched BanList pattern: '{pattern}' (Full path: {normalized})";
+                            testResultClass = "bg-danger/10 text-danger";
+                            return;
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            if (config.AllowList.Count == 0)
+            {
+                testResult = $"ALLOWED - No AllowList configured. (Full path: {normalized})";
+                testResultClass = "bg-success/10 text-success";
+                return;
+            }
+
+            foreach (var pattern in config.AllowList)
+            {
+                if (string.IsNullOrWhiteSpace(pattern)) continue;
+                try
+                {
+                    if (System.Text.RegularExpressions.Regex.IsMatch(normalized, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    {
+                        testResult = $"ALLOWED - Matched AllowList pattern: '{pattern}' (Full path: {normalized})";
+                        testResultClass = "bg-success/10 text-success";
+                        return;
+                    }
+                }
+                catch { }
+            }
+
+            testResult = $"BLOCKED - Did not match any AllowList pattern. (Full path: {normalized})";
+            testResultClass = "bg-danger/10 text-danger";
+        }
+        catch (Exception ex)
+        {
+            testResult = $"Error: {ex.Message}";
+            testResultClass = "bg-danger/10 text-danger";
+        }
+    }
+
+    private void ResetToDefaults()
+    {
+        allowListText = "";
+        banListText = "";
+        testResult = "";
+        ShowStatus("Form reset to defaults. Click Save to persist.", "success");
+    }
+
+    private void ShowStatus(string message, string type)
+    {
+        statusMessage = message;
+        statusType = type;
+        InvokeAsync(async () =>
+        {
+            await Task.Delay(3000);
+            statusMessage = "";
+            StateHasChanged();
+        });
+    }
+}
