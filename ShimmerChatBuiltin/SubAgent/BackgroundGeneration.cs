@@ -74,7 +74,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 return outputMessages.Count == 0 ? "" : outputMessages[^1].Item1.Content;
             });
 
-            SubAgentResultStore.Put(outputId, task);
+            context.SharedState[outputId] = task;
         }
 
         private SubAgentConfig? LoadConfig(string name)

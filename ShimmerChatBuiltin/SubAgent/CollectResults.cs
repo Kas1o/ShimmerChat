@@ -33,7 +33,19 @@ namespace ShimmerChatBuiltin.SubAgent
             var sb = new StringBuilder();
             foreach (var id in ids)
             {
-                var content = SubAgentResultStore.Take(id);
+                if (!context.SharedState.TryGetValue(id, out var taskObj))
+                    continue;
+                context.SharedState.Remove(id);
+
+                string? content;
+                try
+                {
+                    content = ((Task<string>)taskObj).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    content = $"[Error: {ex.Message}]";
+                }
                 if (content == null) continue;
 
                 var safeTag = SanitizeXmlTag(id);
