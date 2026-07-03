@@ -3,6 +3,7 @@ using System.Buffers.Text;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Diagnostics;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
@@ -65,6 +66,16 @@ namespace ShimmerChatLib
         /// Tag，辅助检索用
         /// </summary>
 		public List<string> Tags { get; set; } = new List<string>();
+
+		const bool EnablePerfLog = false;
+		static string PerfNow() => DateTime.Now.ToString("HH:mm:ss.fff");
+		static void PerfLog(string message)
+		{
+			if (EnablePerfLog)
+			{
+				Console.WriteLine($"[PERF][Agent][{PerfNow()}] {message}");
+			}
+		}
 
 		#region Export & Import
         /// <summary>
@@ -330,17 +341,26 @@ namespace ShimmerChatLib
         /// <returns>对话摘要列表</returns>
         public List<ChatSummary> GetChatSummariesRange(IKVDataService kvDataService, int startIndex, int count)
         {
+            var swTotal = Stopwatch.StartNew();
             var rangeGuids = ChatGuids
                 .Skip(startIndex)
                 .Take(count)
                 .ToList();
 
             var summaries = new List<ChatSummary>();
+            int successCount = 0;
+            int failedCount = 0;
+            long totalLoadTicks = 0;
+
             foreach (var chatGuid in rangeGuids)
             {
                 try
                 {
+                    var swLoad = Stopwatch.StartNew();
                     var chat = Chat.Load(chatGuid, kvDataService);
+                    swLoad.Stop();
+                    totalLoadTicks += swLoad.ElapsedTicks;
+
                     summaries.Add(new ChatSummary
                     {
                         Guid = chat.Guid,
@@ -350,12 +370,20 @@ namespace ShimmerChatLib
                         LastMessagePreview = chat.LastMessagePreview,
                         MessageCount = chat.MessageCount
                     });
+                    successCount++;
                 }
                 catch (Exception ex)
                 {
+                    failedCount++;
                     Console.WriteLine($"Failed to load chat summary for GUID '{chatGuid}': {ex.Message}");
                 }
             }
+
+            swTotal.Stop();
+            var avgLoadMs = successCount > 0
+                ? TimeSpan.FromTicks(totalLoadTicks).TotalMilliseconds / successCount
+                : 0;
+            PerfLog($"GetChatSummariesRange done: agentGuid={Guid}, start={startIndex}, count={count}, requested={rangeGuids.Count}, success={successCount}, failed={failedCount}, avgChatLoadMs={avgLoadMs:F3}, elapsedMs={swTotal.ElapsedMilliseconds}");
 
             return summaries;
         }
