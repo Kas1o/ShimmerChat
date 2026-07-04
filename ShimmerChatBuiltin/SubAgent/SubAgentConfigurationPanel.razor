@@ -160,6 +160,13 @@
             </div>
 
             <div class="mt-4">
+                <h5>Plugins</h5>
+                <PluginPanelContainer
+                    PanelDisplayPlace="PanelDisplayPlace.Agent"
+                    Parameters="SubAgentPluginParameters" />
+            </div>
+
+            <div class="mt-4">
                 <button class="btn btn-primary" @onclick="SaveAll" disabled="@isLoading">
                     @(isLoading ? "Saving..." : "Save All")
                 </button>
@@ -317,6 +324,12 @@
     }
 
     bool _showIndependentEditor;
+
+    private Dictionary<string, object> SubAgentPluginParameters => new()
+    {
+        ["AgentGuid"] = selectedConfig?.Guid ?? Guid.Empty,
+        ["EventHandlerReg"] = (Action<IChatPanelEventHandler>)(handler => { })
+    };
 
     void TogglePresetMode(bool useShared)
     {

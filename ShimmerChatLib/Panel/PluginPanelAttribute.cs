@@ -46,8 +46,22 @@ namespace ShimmerChatLib.Panel
 	
 	public enum PanelDisplayPlace
 	{
+		/// <summary>
+		/// 无特殊参数
+		/// </summary>
 		Settings,
-		Agent, // no implement
+		/// <summary>
+		/// 包含特殊参数：（[Parameter]）
+		/// Guid AgentGuid { get; set; }
+		/// Action<IChatPanelEventHandler> EventHandlerReg { get; set; }
+		/// </summary>
+		Agent,
+		/// <summary>
+		/// 实现需要包含特殊参数：（[Parameter]）
+		/// Guid ChatGuid { get; set; }
+		/// Guid AgentGuid { get; set; }
+		/// Action<IChatPanelEventHandler> EventHandlerReg { get; set; }
+		/// </summary>
 		Chat 
 	}
 }

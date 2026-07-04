@@ -265,6 +265,13 @@
                         </div>
                     </div>
 
+                    <div class="settings-group">
+                        <h4><i class="bi bi-puzzle"></i> Plugins</h4>
+                        <ShimmerChatLib.Components.PluginPanelContainer
+                            PanelDisplayPlace="ShimmerChatLib.Panel.PanelDisplayPlace.Agent"
+                            Parameters="AgentPluginParameters"/>
+                    </div>
+
                     <div class="settings-actions">
                         <button class="btn btn-primary" @onclick="Export">
                             <i class="bi bi-download"></i> Export Agent
@@ -882,6 +889,18 @@
 
     private Agent? agent;
     string activeTab = "chats";
+
+    private Dictionary<string, object> AgentPluginParameters => new()
+    {
+        ["AgentGuid"] = agent?.Guid ?? Guid.Empty,
+        ["EventHandlerReg"] = (Action<ShimmerChatLib.Panel.IChatPanelEventHandler>)(handler =>
+        {
+            if (handler != null)
+                _agentEventHandlers.Add(handler);
+        })
+    };
+
+    List<ShimmerChatLib.Panel.IChatPanelEventHandler> _agentEventHandlers = [];
     string Name
     {
         get => agent?.Name ?? string.Empty;
