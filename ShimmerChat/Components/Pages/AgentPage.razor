@@ -1099,6 +1099,9 @@
     bool virtualize = false;
     List<ChatSummary> allChatSummaries = new();
     List<ChatSummary> fullTextMatchedSummaries = new();
+    List<ChatSummary> currentPageSummaries = new();
+    int loadedPage = -1;
+    int loadedPageSize = -1;
 
     string ChatSearchQuery { get; set; } = string.Empty;
     bool EnableFullTextSearch { get; set; } = false;
@@ -1133,16 +1136,47 @@
         }
     }
 
-    int TotalPages => Math.Max(1, (int)Math.Ceiling((double)FilteredChatSummaries.Count / PageSize));
+    bool IsSearchActive => !string.IsNullOrWhiteSpace(ChatSearchQuery) || EnableFullTextSearch;
 
-    IReadOnlyList<ChatSummary> PagedChatSummaries => FilteredChatSummaries
-        .Skip((CurrentPage - 1) * PageSize)
-        .Take(PageSize)
-        .ToList();
+    int EffectiveTotalCount => IsSearchActive
+        ? FilteredChatSummaries.Count
+        : (agent?.GetChatCount() ?? 0);
+
+    int TotalPages => Math.Max(1, (int)Math.Ceiling((double)EffectiveTotalCount / PageSize));
+
+    IReadOnlyList<ChatSummary> PagedChatSummaries
+    {
+        get
+        {
+            if (IsSearchActive)
+            {
+                return FilteredChatSummaries
+                    .Skip((CurrentPage - 1) * PageSize)
+                    .Take(PageSize)
+                    .ToList();
+            }
+
+            if (loadedPage != CurrentPage || loadedPageSize != PageSize)
+            {
+                if (agent != null)
+                {
+                    currentPageSummaries = agent.GetChatSummariesRange(kvDataService, (CurrentPage - 1) * PageSize, PageSize);
+                }
+                else
+                {
+                    currentPageSummaries = new();
+                }
+                loadedPage = CurrentPage;
+                loadedPageSize = PageSize;
+            }
+
+            return currentPageSummaries;
+        }
+    }
 
     bool CanUseVirtualizedList => virtualize && string.IsNullOrWhiteSpace(ChatSearchQuery) && !EnableFullTextSearch;
 
-    const bool EnablePerfLog = false;
+    const bool EnablePerfLog = true;
     static string PerfNow() => DateTime.Now.ToString("HH:mm:ss.fff");
     static void PerfLog(string message)
     {
@@ -1195,18 +1229,10 @@
         swTags.Stop();
         PerfLog($"OnParametersSet LoadAllTags done: elapsedMs={swTags.ElapsedMilliseconds}");
 
-        if (!virtualize)
-        {
-            var swSummaries = Stopwatch.StartNew();
-            LoadAllChatSummaries();
-            swSummaries.Stop();
-            PerfLog($"OnParametersSet LoadAllChatSummaries done: summaryCount={allChatSummaries.Count}, elapsedMs={swSummaries.ElapsedMilliseconds}");
-        }
-        else
-        {
-            allChatSummaries = new();
-            fullTextMatchedSummaries = new();
-        }
+        allChatSummaries = new();
+        fullTextMatchedSummaries = new();
+        currentPageSummaries = new();
+        loadedPage = -1;
 
         CurrentPage = 1;
         swTotal.Stop();
@@ -1587,9 +1613,13 @@
         }
         else
         {
-            if ((allChatSummaries.Count == 0 || forceReload) && agent != null)
+            if (forceReload || (IsSearchActive && allChatSummaries.Count == 0))
             {
-                LoadAllChatSummaries();
+                if (IsSearchActive && agent != null)
+                {
+                    LoadAllChatSummaries();
+                }
+                loadedPage = -1;
             }
             await InvokeAsync(StateHasChanged);
         }
