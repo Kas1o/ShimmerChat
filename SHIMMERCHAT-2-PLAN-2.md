@@ -5,7 +5,7 @@
 
 ### 阶段 P0：稳定性与可观测性（最高优先级）
 
-#### P0-1 统一错误处理（禁止 silent fail）
+#### P0-1 统一错误处理（禁止 silent fail）（已经完成）
 - 处理范围：Node。
 - 实施动作：
   1. 定义统一执行结果结构（Success / Code / Message / Details）。
@@ -14,16 +14,6 @@
 - 验收标准：
   - 任意 preset 缺失、tool 解析失败、KVData 不可用时，界面可见可读错误。
   - 日志可看到节点名、preset 名、agent/chat 标识。
-
-#### P0-2 Generation 执行链路最小追踪
-- 处理范围：GenerationManagerV2、GenerationTreeExecutor。
-- 实施动作：
-  1. 为每个节点执行记录 start/end 事件。
-  2. 记录耗时、执行结果摘要、失败堆栈（必要时脱敏）。
-  3. 为一次生成分配 trace id，并串联节点日志。
-- 验收标准：
-  - 一次对话生成可按 trace id 追踪完整节点执行过程。
-  - 能快速定位失败节点与失败原因。
 
 ---
 
