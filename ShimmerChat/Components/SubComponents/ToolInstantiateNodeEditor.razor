@@ -1,0 +1,152 @@
+@using ShimmerChatLib.Generation
+@using ShimmerChatBuiltin.Generation.Nodes
+
+<div class="ti-editor">
+    <div class="ti-label">Select Tool</div>
+    @if (_selectedToolName != null)
+    {
+        <div class="ti-selected">
+            <span class="ti-sel-name">@_selectedToolName</span>
+            <button class="ti-sel-clear" @onclick="ClearSelection" title="Clear">✕</button>
+        </div>
+    }
+
+    @if (_showPicker)
+    {
+        <div class="ti-picker">
+            @foreach (var group in _groupedTools)
+            {
+                <div class="ti-group">
+                    <div class="ti-group-header">@group.Key</div>
+                    @foreach (var tool in group.Value)
+                    {
+                        <div class="ti-item @(tool.Name == _selectedToolName ? "ti-item-active" : "")"
+                             @onclick="() => SelectTool(tool)">
+                            <span class="ti-item-name">@tool.Name</span>
+                            <span class="ti-item-desc">@tool.Description</span>
+                        </div>
+                    }
+                </div>
+            }
+            @if (_groupedTools.Count == 0)
+            {
+                <div class="ti-empty">No tools discovered.</div>
+            }
+        </div>
+    }
+    else
+    {
+        <button class="ti-btn" @onclick="() => _showPicker = true">
+            @(_selectedToolName != null ? "Change Tool..." : "Choose Tool...")
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public IGenerationNode Node { get; set; } = default!;
+    [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
+    [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
+
+    private ToolInstantiateNode? _typedNode;
+    private bool _showPicker = true;
+    private string? _selectedToolName;
+    private Dictionary<string, List<ToolEntry>> _groupedTools = new();
+
+    private record ToolEntry(string Name, string Description, string Category, string TypeName);
+
+    protected override void OnInitialized()
+    {
+        _typedNode = Node as ToolInstantiateNode;
+        if (_typedNode == null)
+            return;
+
+        DiscoverTools();
+
+        if (!string.IsNullOrEmpty(_typedNode.ToolTypeName))
+        {
+            var match = _groupedTools.Values
+                .SelectMany(g => g)
+                .FirstOrDefault(t => t.TypeName == _typedNode.ToolTypeName);
+            if (match != null)
+            {
+                _selectedToolName = match.Name;
+                _showPicker = false;
+            }
+        }
+    }
+
+    private void DiscoverTools()
+    {
+        var all = new List<ToolEntry>();
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (asm.IsDynamic) continue;
+            try
+            {
+                foreach (var type in asm.GetExportedTypes())
+                {
+                    if (typeof(IAutoCreateToolV2).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
+                    {
+                        try
+                        {
+                            var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
+                            var nameProp = type.GetProperty("Name", flags);
+                            var descProp = type.GetProperty("Description", flags);
+                            var catProp = type.GetProperty("CategoryPath", flags);
+                            if (nameProp == null) continue;
+                            var name = (string)nameProp.GetValue(null)!;
+                            var desc = descProp != null ? (string)descProp.GetValue(null)! : "";
+                            var cat = catProp != null ? (string)catProp.GetValue(null)! : "";
+                            all.Add(new ToolEntry(name, desc, cat, type.FullName!));
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        _groupedTools = all
+            .OrderBy(t => t.Category).ThenBy(t => t.Name)
+            .GroupBy(t => string.IsNullOrEmpty(t.Category) ? "其他" : t.Category)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private void SelectTool(ToolEntry tool)
+    {
+        if (_typedNode == null) return;
+        _typedNode.ToolTypeName = tool.TypeName;
+        _selectedToolName = tool.Name;
+        _showPicker = false;
+        OnChanged.InvokeAsync(Node);
+    }
+
+    private void ClearSelection()
+    {
+        if (_typedNode == null) return;
+        _typedNode.ToolTypeName = "";
+        _selectedToolName = null;
+        _showPicker = true;
+        OnChanged.InvokeAsync(Node);
+    }
+}
+
+<style>
+.ti-editor { font-size: 0.82em; }
+.ti-label { font-size: 0.75em; color: #777; margin-bottom: 4px; }
+.ti-selected { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: rgba(100,200,100,0.08); border: 1px solid rgba(100,200,100,0.2); border-radius: 4px; margin-bottom: 6px; }
+.ti-sel-name { font-weight: 600; color: #9c9; flex: 1; }
+.ti-sel-clear { border: none; background: transparent; color: #999; cursor: pointer; font-size: 0.85em; padding: 2px 4px; }
+.ti-sel-clear:hover { color: #f66; }
+.ti-btn { width: 100%; padding: 6px 10px; border: 1px dashed rgba(255,255,255,0.12); border-radius: 4px; background: transparent; color: #999; font-size: 0.8em; cursor: pointer; text-align: left; }
+.ti-btn:hover { border-color: rgba(100,150,255,0.3); color: #ccc; }
+.ti-picker { max-height: 260px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; }
+.ti-group { }
+.ti-group-header { padding: 4px 8px; font-size: 0.7em; font-weight: 600; color: #888; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.05); position: sticky; top: 0; }
+.ti-item { padding: 5px 8px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); display: flex; gap: 8px; align-items: baseline; transition: background 0.1s; }
+.ti-item:hover { background: rgba(100,150,255,0.08); }
+.ti-item-active { background: rgba(100,150,255,0.12); }
+.ti-item-name { font-weight: 600; color: #ccc; white-space: nowrap; min-width: 110px; }
+.ti-item-desc { font-size: 0.72em; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ti-empty { padding: 12px; color: #555; text-align: center; font-style: italic; }
+</style>

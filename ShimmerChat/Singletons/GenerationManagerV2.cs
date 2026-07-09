@@ -175,7 +175,7 @@ namespace ShimmerChat.Singletons
 
                     foreach (var tc in accumulated.Body.toolCalls)
                     {
-                        var tool = tools.FirstOrDefault(t => t.Name == tc.name);
+                        var tool = tools.FirstOrDefault(t => t.GetDefinition().name == tc.name);
                         string result;
                         if (tool != null)
                         {

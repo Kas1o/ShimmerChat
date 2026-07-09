@@ -6,12 +6,15 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin
 {
     /// <summary>
-    /// IToolV2 版本的 InvokeCSharp
+    /// IAutoCreateToolV2 版本。无外部依赖，Create 直接 new。
     /// </summary>
-    public class InvokeCSharpV2 : IToolV2
+    public class InvokeCSharpV2 : IAutoCreateToolV2
     {
-        public string Name => "EvalCsharp";
-        public string Description => "Eval C# using CSharpScript.EvaluateAsync.";
+        public static string Name => "EvalCsharp";
+        public static string Description => "Eval C# using CSharpScript.EvaluateAsync.";
+        public static string CategoryPath => "代码";
+
+        public static IAutoCreateToolV2 Create(PersistentEnv env) => new InvokeCSharpV2();
 
         public Tool GetDefinition() => new()
         {

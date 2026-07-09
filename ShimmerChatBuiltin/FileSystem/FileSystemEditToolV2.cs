@@ -6,10 +6,23 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.FileSystem
 {
-    public class FileSystemEditToolV2 : IToolV2
+    public class FileSystemEditToolV2 : IAutoCreateToolV2
     {
-        public string Name => "edit_file";
-        public string Description => "Edit a plain text file by replacing a specific string.";
+        private readonly IKVDataService _kvData;
+
+        public static string Name => "edit_file";
+        public static string Description => "Edit a plain text file by replacing a specific string.";
+        public static string CategoryPath => "文件系统/读写";
+
+        public FileSystemEditToolV2() { }
+
+        private FileSystemEditToolV2(IKVDataService kvData)
+        {
+            _kvData = kvData;
+        }
+
+        public static IAutoCreateToolV2 Create(PersistentEnv env) =>
+            new FileSystemEditToolV2(env.KVData);
 
         public Tool GetDefinition() => new()
         {
@@ -40,9 +53,7 @@ namespace ShimmerChatBuiltin.FileSystem
             try
             {
                 path = Path.GetFullPath(path);
-                var config = ShimmerChatLib.Generation.ToolEnvironment.KVData != null
-                    ? FileSystemConfigManager.Load(ShimmerChatLib.Generation.ToolEnvironment.KVData)
-                    : new FileSystemConfig();
+                var config = FileSystemConfigManager.Load(_kvData);
 
                 if (!FileSystemConfigManager.IsPathAllowed(path, config))
                     return $"Access denied: path '{path}' is not allowed.";

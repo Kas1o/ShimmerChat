@@ -6,12 +6,15 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin.FileSystem
 {
     /// <summary>
-    /// 无依赖的 FileSystemOverviewTool V2 版本
+    /// IAutoCreateToolV2 版本。无外部依赖，Create 直接 new。
     /// </summary>
-    public class FileSystemOverviewToolV2 : IToolV2
+    public class FileSystemOverviewToolV2 : IAutoCreateToolV2
     {
-        public string Name => "file_system_overview";
-        public string Description => "Get an overview of the local file system.";
+        public static string Name => "file_system_overview";
+        public static string Description => "Get an overview of the local file system.";
+        public static string CategoryPath => "文件系统/浏览";
+
+        public static IAutoCreateToolV2 Create(PersistentEnv env) => new FileSystemOverviewToolV2();
 
         public Tool GetDefinition() => new()
         {

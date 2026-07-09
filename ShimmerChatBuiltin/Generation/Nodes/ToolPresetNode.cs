@@ -4,7 +4,7 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
     /// <summary>
-    /// 从 KVData 中按名称加载 ToolManager 预设，实例化工具加入 Tools 列表
+    /// 从 KVData 中按名称加载 ToolManager 预设，通过 IAutoCreateToolV2.Create 实例化工具加入 Tools 列表
     /// </summary>
     [NodeInfo("Tool Preset", Icon = "📦", Color = "#40c0a0", Category = "Tool/Preset", Description = "Load a tool preset from ToolManager")]
     public class ToolPresetNode : IGenerationNode
@@ -43,11 +43,17 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 var toolType = ResolveToolType(typeName);
                 if (toolType == null)
                     continue;
-                var ctor = toolType.GetConstructor(Type.EmptyTypes);
-                if (ctor == null)
-                    continue;
-                var tool = (IToolV2)Activator.CreateInstance(toolType)!;
-                context.Env.Transient.Tools.Add(tool);
+
+                try
+                {
+                    var createMethod = toolType.GetMethod("Create",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                    if (createMethod == null) continue;
+
+                    var tool = (IToolV2)createMethod.Invoke(null, [context.Env.Persistent])!;
+                    context.Env.Transient.Tools.Add(tool);
+                }
+                catch { }
             }
 
             return Task.FromResult(NodeResult.SuccessResult());
@@ -62,14 +68,16 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 {
                     foreach (var t in asm.GetExportedTypes())
                     {
-                        if (!typeof(IToolV2).IsAssignableFrom(t) || t.IsAbstract || t.IsInterface)
+                        if (!typeof(IAutoCreateToolV2).IsAssignableFrom(t) || t.IsAbstract || t.IsInterface)
                             continue;
-                        if (t.GetConstructor(Type.EmptyTypes) == null)
-                            continue;
+
                         try
                         {
-                            var instance = (IToolV2)Activator.CreateInstance(t)!;
-                            if (instance.Name == toolName)
+                            var nameProp = t.GetProperty("Name",
+                                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                            if (nameProp == null) continue;
+                            var name = (string)nameProp.GetValue(null)!;
+                            if (name == toolName)
                                 return t;
                         }
                         catch { }

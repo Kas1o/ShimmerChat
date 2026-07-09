@@ -6,10 +6,23 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.FileSystem
 {
-    public class FileSystemWriteToolV2 : IToolV2
+    public class FileSystemWriteToolV2 : IAutoCreateToolV2
     {
-        public string Name => "write_file";
-        public string Description => "Write plain text content to a file.";
+        private readonly IKVDataService _kvData;
+
+        public static string Name => "write_file";
+        public static string Description => "Write plain text content to a file.";
+        public static string CategoryPath => "文件系统/读写";
+
+        public FileSystemWriteToolV2() { }
+
+        private FileSystemWriteToolV2(IKVDataService kvData)
+        {
+            _kvData = kvData;
+        }
+
+        public static IAutoCreateToolV2 Create(PersistentEnv env) =>
+            new FileSystemWriteToolV2(env.KVData);
 
         public Tool GetDefinition() => new()
         {
@@ -37,9 +50,7 @@ namespace ShimmerChatBuiltin.FileSystem
             try
             {
                 path = Path.GetFullPath(path);
-                var config = ShimmerChatLib.Generation.ToolEnvironment.KVData != null
-                    ? FileSystemConfigManager.Load(ShimmerChatLib.Generation.ToolEnvironment.KVData)
-                    : new FileSystemConfig();
+                var config = FileSystemConfigManager.Load(_kvData);
 
                 if (!FileSystemConfigManager.IsPathAllowed(path, config))
                     return $"Access denied: path '{path}' is not allowed.";

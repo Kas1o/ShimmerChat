@@ -8,23 +8,29 @@ using ShimmerChatBuiltin.Variable;
 namespace ShimmerChatBuiltin.Variable
 {
     /// <summary>
-    /// IToolV2 版本的 VariableTool。由 VariableToolNode 构造并注入依赖。
+    /// IAutoCreateToolV2 版本的 VariableTool。
     /// </summary>
-    public class VariableToolV2 : IToolV2
+    public class VariableToolV2 : IAutoCreateToolV2
     {
         private readonly IKVDataService _kvData;
         private readonly Guid _chatGuid;
         private readonly Guid _agentGuid;
 
-        public string Name => "VariableTool";
-        public string Description => "Manage variables in conversations. Supports get, set, delete, list, search.";
+        public static string Name => "VariableTool";
+        public static string Description => "Manage variables in conversations. Supports get, set, delete, list, search.";
+        public static string CategoryPath => "变量";
 
-        public VariableToolV2(IKVDataService kvData, Guid chatGuid, Guid agentGuid)
+        public VariableToolV2() { }
+
+        private VariableToolV2(IKVDataService kvData, Guid chatGuid, Guid agentGuid)
         {
             _kvData = kvData;
             _chatGuid = chatGuid;
             _agentGuid = agentGuid;
         }
+
+        public static IAutoCreateToolV2 Create(PersistentEnv env) =>
+            new VariableToolV2(env.KVData, env.ChatGuid, env.AgentGuid);
 
         public Tool GetDefinition() => new()
         {

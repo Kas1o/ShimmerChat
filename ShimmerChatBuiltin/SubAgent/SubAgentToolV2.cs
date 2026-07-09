@@ -18,9 +18,6 @@ namespace ShimmerChatBuiltin.SubAgent
         private readonly ILLMAPI? _api;
         private readonly List<IToolV2> _tools;
 
-        public string Name => "subagent_call";
-        public string Description => "Invoke a sub-agent to handle complex tasks independently.";
-
         public SubAgentToolV2(IKVDataService kvData, ILLMAPI? api, List<IToolV2> tools)
         {
             _kvData = kvData;
@@ -79,7 +76,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 {
                     foreach (var tc in response.Body.toolCalls)
                     {
-                        var tool = _tools.FirstOrDefault(t => t.Name == tc.name);
+                        var tool = _tools.FirstOrDefault(t => t.GetDefinition().name == tc.name);
                         var result = tool != null
                             ? await tool.ExecuteAsync(tc.arguments ?? "{}")
                             : $"Tool '{tc.name}' not found.";

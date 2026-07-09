@@ -3,22 +3,13 @@ using SharperLLM.FunctionCalling;
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
-    /// ShimmerChat 2.0 Tool 抽象。
-    /// 依赖通过构造函数注入。无参构造的工具可被 ToolInstantiateNode 自动发现和批量开关；
-    /// 有参构造的工具通过专用节点手动实例化并提供依赖。
+    /// ShimmerChat 2.0 Tool 纯执行接口。
+    /// 只定义 LLM 可调用的工具能力，不暴露 Name/Description。
+    /// 需要自动发现和批量管理的工具请实现 <see cref="IAutoCreateToolV2"/>。
+    /// 有参构造的工具由专用节点手动实例化并提供依赖，只实现此接口即可。
     /// </summary>
     public interface IToolV2
     {
-        /// <summary>
-        /// 工具名称（唯一标识）
-        /// </summary>
-        string Name { get; }
-
-        /// <summary>
-        /// 工具描述（给 LLM 看）
-        /// </summary>
-        string Description { get; }
-
         /// <summary>
         /// 获取 Function Calling 工具定义
         /// </summary>

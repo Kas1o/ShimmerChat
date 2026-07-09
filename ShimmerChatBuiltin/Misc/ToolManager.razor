@@ -38,38 +38,45 @@ else
     <div class="shimmer-group" style="margin-top:16px;">
         <h5>Available Tools</h5>
         <p class="text-muted" style="font-size:0.85em;">Enable tools here, then use <strong>Tool Preset</strong> node in Generation Manager to load them.</p>
-        <div class="tm-table">
-            <div class="tm-header tm-row">
-                <div>Enabled</div>
-                <div>Name</div>
-                <div>Description</div>
-            </div>
-            @foreach (var toolInfo in _allTools)
-            {
-                <div class="tm-row">
-                    <div>
-                        <input type="checkbox" checked="@_enabledTools.Contains(toolInfo.Name)"
-                               @onchange="e => ToggleTool(toolInfo.Name, (bool)(e.Value ?? false))" />
-                    </div>
-                    <div class="tm-name">@toolInfo.Name</div>
-                    <div class="tm-desc">@toolInfo.Description</div>
+
+        @foreach (var group in _groupedTools)
+        {
+            <div class="tm-group">
+                <div class="tm-group-header">
+                    <span class="tm-group-icon">@(group.Key.Contains('/') ? "▸" : "▾")</span>
+                    <span class="tm-group-name">@group.Key</span>
+                    <span class="tm-group-count">@group.Value.Count</span>
                 </div>
-            }
-            @if (_allTools.Count == 0)
-            {
-                <div class="tm-row"><div colspan="3" style="color:#888;">No tools discovered.</div></div>
-            }
-        </div>
+                @foreach (var tool in group.Value)
+                {
+                    <div class="tm-row">
+                        <div>
+                            <input type="checkbox" checked="@_enabledTools.Contains(tool.Name)"
+                                   @onchange="e => ToggleTool(tool.Name, (bool)(e.Value ?? false))" />
+                        </div>
+                        <div class="tm-name">@tool.Name</div>
+                        <div class="tm-desc">@tool.Description</div>
+                    </div>
+                }
+            </div>
+        }
+        @if (_groupedTools.Count == 0)
+        {
+            <div class="tm-row"><div colspan="3" style="color:#888;">No tools discovered.</div></div>
+        }
     </div>
 }
 
 @code {
     private bool _loading = true;
-    private List<(string Name, string Description)> _allTools = new();
+    private List<ToolInfo> _allTools = new();
+    private Dictionary<string, List<ToolInfo>> _groupedTools = new();
     private HashSet<string> _enabledTools = new();
     private List<string> _presetNames = new();
     private string _selectedPresetName = "";
     private string _status = "";
+
+    private record ToolInfo(string Name, string Description, string Category);
 
     protected override void OnInitialized()
     {
@@ -88,12 +95,19 @@ else
             {
                 foreach (var type in asm.GetExportedTypes())
                 {
-                    if (typeof(IToolV2).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
+                    if (typeof(IAutoCreateToolV2).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
                     {
                         try
                         {
-                            var instance = (IToolV2)Activator.CreateInstance(type)!;
-                            _allTools.Add((instance.Name, instance.Description));
+                            var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
+                            var nameProp = type.GetProperty("Name", flags);
+                            var descProp = type.GetProperty("Description", flags);
+                            var catProp = type.GetProperty("CategoryPath", flags);
+                            if (nameProp == null || descProp == null) continue;
+                            var name = (string)nameProp.GetValue(null)!;
+                            var desc = (string)descProp.GetValue(null)!;
+                            var cat = catProp != null ? (string)catProp.GetValue(null)! : "";
+                            _allTools.Add(new ToolInfo(name, desc, cat));
                         }
                         catch { }
                     }
@@ -101,7 +115,10 @@ else
             }
             catch { }
         }
-        _allTools = _allTools.OrderBy(t => t.Name).ToList();
+        _allTools = _allTools.OrderBy(t => t.Category).ThenBy(t => t.Name).ToList();
+        _groupedTools = _allTools
+            .GroupBy(t => string.IsNullOrEmpty(t.Category) ? "其他" : t.Category)
+            .ToDictionary(g => g.Key, g => g.ToList());
     }
 
     private void LoadPresets()
@@ -163,9 +180,12 @@ else
 }
 
 <style>
-.tm-table { width: 100%; border-collapse: collapse; }
+.tm-group { margin-bottom: 12px; }
+.tm-group-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: rgba(255,255,255,0.03); border-radius: 4px 4px 0 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.tm-group-icon { font-size: 0.75em; color: #666; }
+.tm-group-name { font-weight: 600; font-size: 0.82em; color: #bbb; }
+.tm-group-count { font-size: 0.7em; color: #555; background: rgba(255,255,255,0.05); padding: 1px 6px; border-radius: 8px; }
 .tm-row { display: grid; grid-template-columns: 60px 1fr 2fr; gap: 8px; padding: 6px 8px; align-items: center; border-bottom: 1px solid var(--color-border, rgba(255,255,255,0.05)); }
-.tm-header { font-weight: 700; font-size: 0.85em; color: #aaa; border-bottom-width: 2px; }
 .tm-name { font-weight: 600; font-size: 0.85em; }
 .tm-desc { font-size: 0.78em; color: #888; }
 </style>

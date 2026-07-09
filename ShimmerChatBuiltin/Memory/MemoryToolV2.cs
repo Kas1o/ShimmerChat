@@ -10,23 +10,27 @@ using static Qdrant.Client.Grpc.Conditions;
 namespace ShimmerChatBuiltin.Memory
 {
     /// <summary>
-    /// IToolV2 版本的 MemoryTool。由 MemoryToolNode 构造并注入依赖。
+    /// IAutoCreateToolV2 版本的 MemoryTool。
     /// </summary>
-    public class MemoryToolV2 : IToolV2
+    public class MemoryToolV2 : IAutoCreateToolV2
     {
         private readonly IKVDataService _kvData;
-        private readonly Dictionary<string, object> _sharedState;
         private readonly Guid _agentGuid;
 
-        public string Name => "MemoryTool";
-        public string Description => "A tool for managing memory in conversations. Supports add, delete, and search (similarity/keyword).";
+        public static string Name => "MemoryTool";
+        public static string Description => "A tool for managing memory in conversations. Supports add, delete, and search (similarity/keyword).";
+        public static string CategoryPath => "记忆";
 
-        public MemoryToolV2(IKVDataService kvData, Dictionary<string, object> sharedState, Guid agentGuid)
+        public MemoryToolV2() { }
+
+        private MemoryToolV2(IKVDataService kvData, Guid agentGuid)
         {
             _kvData = kvData;
-            _sharedState = sharedState;
             _agentGuid = agentGuid;
         }
+
+        public static IAutoCreateToolV2 Create(PersistentEnv env) =>
+            new MemoryToolV2(env.KVData, env.AgentGuid);
 
         public Tool GetDefinition() => new()
         {

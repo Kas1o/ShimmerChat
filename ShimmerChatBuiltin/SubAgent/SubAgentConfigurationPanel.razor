@@ -338,12 +338,14 @@
             {
                 foreach (var type in asm.GetExportedTypes())
                 {
-                    if (typeof(IToolV2).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
+                    if (typeof(IAutoCreateToolV2).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
                     {
                         try
                         {
-                            var instance = (IToolV2)Activator.CreateInstance(type)!;
-                            names.Add(instance.Name);
+                            var nameProp = type.GetProperty("Name",
+                                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                            if (nameProp != null)
+                                names.Add((string)nameProp.GetValue(null)!);
                         }
                         catch { }
                     }

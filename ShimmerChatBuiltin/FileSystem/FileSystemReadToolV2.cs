@@ -6,13 +6,23 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.FileSystem
 {
-    /// <summary>
-    /// IToolV2 版本的 FileSystemReadTool。通过静态 KVData 提供者获取配置。
-    /// </summary>
-    public class FileSystemReadToolV2 : IToolV2
+    public class FileSystemReadToolV2 : IAutoCreateToolV2
     {
-        public string Name => "read_file";
-        public string Description => "Read a file's content from the local file system.";
+        private readonly IKVDataService _kvData;
+
+        public static string Name => "read_file";
+        public static string Description => "Read a file's content from the local file system.";
+        public static string CategoryPath => "文件系统/读写";
+
+        public FileSystemReadToolV2() { }
+
+        private FileSystemReadToolV2(IKVDataService kvData)
+        {
+            _kvData = kvData;
+        }
+
+        public static IAutoCreateToolV2 Create(PersistentEnv env) =>
+            new FileSystemReadToolV2(env.KVData);
 
         public Tool GetDefinition() => new()
         {
@@ -43,9 +53,7 @@ namespace ShimmerChatBuiltin.FileSystem
             try
             {
                 path = Path.GetFullPath(path);
-                var config = ShimmerChatLib.Generation.ToolEnvironment.KVData != null
-                    ? FileSystemConfigManager.Load(ShimmerChatLib.Generation.ToolEnvironment.KVData)
-                    : new FileSystemConfig();
+                var config = FileSystemConfigManager.Load(_kvData);
 
                 if (!FileSystemConfigManager.IsPathAllowed(path, config))
                     return $"Access denied: path '{path}' is not allowed.";

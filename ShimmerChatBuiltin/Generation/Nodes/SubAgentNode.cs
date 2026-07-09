@@ -99,7 +99,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     foreach (var tc in response.Body.toolCalls)
                     {
                         var tool = context.Env.Transient.Tools
-                            .FirstOrDefault(t => t.Name == tc.name);
+                            .FirstOrDefault(t => t.GetDefinition().name == tc.name);
                         string result = tool != null
                             ? await tool.ExecuteAsync(tc.arguments ?? "{}")
                             : $"Tool '{tc.name}' not found.";

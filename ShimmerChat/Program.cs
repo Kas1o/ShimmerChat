@@ -48,8 +48,8 @@ var app = builder.Build();
 // 执行自动迁移（如果需要）
 ExecuteAutoMigration(app);
 
-// ShimmerChat 2.0: 初始化 FileSystem V2 Tools 的静态依赖
-InitializeV2Tools(app);
+// ShimmerChat 2.0: 注册自定义节点编辑器
+InitializeV2NodeEditors(app);
 
 // ShimmerChat 2.0: 执行 Agent 数据迁移
 ExecuteAgentMigration(app);
@@ -95,18 +95,16 @@ app.Run();
 
 return;
 
-// ShimmerChat 2.0: 初始化 FileSystem V2 Tools 的静态依赖
-static void InitializeV2Tools(WebApplication app)
+// ShimmerChat 2.0: 注册自定义节点编辑器
+static void InitializeV2NodeEditors(WebApplication app)
 {
-    using var scope = app.Services.CreateScope();
-    ShimmerChatLib.Generation.ToolEnvironment.KVData =
-        scope.ServiceProvider.GetRequiredService<IKVDataService>();
-    Console.WriteLine("[ShimmerChat 2.0] ToolEnvironment initialized.");
-
     // Register custom node editors
     ShimmerChatLib.Generation.NodeEditorAttribute.RegisterEditor(
         "ShimmerChat.Components.SubComponents.APISelectNodeEditor",
         typeof(ShimmerChat.Components.SubComponents.APISelectNodeEditor));
+    ShimmerChatLib.Generation.NodeEditorAttribute.RegisterEditor(
+        "ShimmerChat.Components.SubComponents.ToolInstantiateNodeEditor",
+        typeof(ShimmerChat.Components.SubComponents.ToolInstantiateNodeEditor));
     Console.WriteLine("[ShimmerChat 2.0] Node editors registered.");
 }
 

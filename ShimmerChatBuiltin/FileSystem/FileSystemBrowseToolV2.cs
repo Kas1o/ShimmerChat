@@ -6,10 +6,23 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.FileSystem
 {
-    public class FileSystemBrowseToolV2 : IToolV2
+    public class FileSystemBrowseToolV2 : IAutoCreateToolV2
     {
-        public string Name => "browse_directory";
-        public string Description => "List contents of a directory.";
+        private readonly IKVDataService _kvData;
+
+        public static string Name => "browse_directory";
+        public static string Description => "List contents of a directory.";
+        public static string CategoryPath => "文件系统/浏览";
+
+        public FileSystemBrowseToolV2() { }
+
+        private FileSystemBrowseToolV2(IKVDataService kvData)
+        {
+            _kvData = kvData;
+        }
+
+        public static IAutoCreateToolV2 Create(PersistentEnv env) =>
+            new FileSystemBrowseToolV2(env.KVData);
 
         public Tool GetDefinition() => new()
         {
@@ -33,9 +46,7 @@ namespace ShimmerChatBuiltin.FileSystem
             try
             {
                 path = Path.GetFullPath(path);
-                var config = ShimmerChatLib.Generation.ToolEnvironment.KVData != null
-                    ? FileSystemConfigManager.Load(ShimmerChatLib.Generation.ToolEnvironment.KVData)
-                    : new FileSystemConfig();
+                var config = FileSystemConfigManager.Load(_kvData);
 
                 if (!FileSystemConfigManager.IsPathAllowed(path, config))
                     return $"Access denied: path '{path}' is not allowed.";

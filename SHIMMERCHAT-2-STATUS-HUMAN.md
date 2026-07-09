@@ -12,4 +12,6 @@
 
 DynPrompt 已经被删了，改成直接 Fragment 序列。 但目前还不支持递归搜寻， 需要结合 Fragment 给消息添加元信息（目前没有这个能力）加上 Sequence Repeat。
 
-目前工具执行环境手动设置的静态的KVData，显然不合理。
+本地化需要改，之前用的 IStringLocalizer + XML 资源，不太好用。
+
+Agent 基础设施匮乏，需要把项目总览和各个子模块的 SKILL 做出来。
