@@ -228,7 +228,18 @@
         NavigationManager.LocationChanged -= OnLocationChanged;
         if (dotNetRef != null)
         {
-            await JS.InvokeVoidAsync("unlistenOrientation");
+            try
+            {
+                await JS.InvokeVoidAsync("unlistenOrientation");
+            }
+            catch (JSDisconnectedException)
+            {
+                // 电路已断开，无法执行 JS interop，忽略
+            }
+            catch (ObjectDisposedException)
+            {
+                // JS 运行时已释放，忽略
+            }
             dotNetRef.Dispose();
         }
     }
