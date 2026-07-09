@@ -69,6 +69,11 @@ namespace ShimmerChat.Singletons
                 });
             }
 
+            root.Nodes.Add(new CallNode
+            {
+                PresetId = "__default__"
+            });
+
             // ShimmerChat 2.0: CustomToolNames has been removed. Tools are now configured
             // via ToolManager presets and loaded by ToolPresetNode in the tree.
             // The migration only converts the Description.
