@@ -12,7 +12,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Memory Tool";
 
-        public Task ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             var kvData = context.Env.Persistent.KVData;
             var sharedState = context.Env.Transient.SharedState;
@@ -21,7 +21,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             var tool = new MemoryToolV2(kvData, sharedState, agentGuid);
             context.Env.Transient.Tools.Add(tool);
 
-            return Task.CompletedTask;
+            return Task.FromResult(NodeResult.SuccessResult());
         }
     }
 }

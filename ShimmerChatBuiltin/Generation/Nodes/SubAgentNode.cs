@@ -37,20 +37,28 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("Max Iterations", Hint = "Maximum tool-call loop iterations")]
         public int MaxIterations { get; set; } = 50;
 
-        public async Task ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             if (string.IsNullOrWhiteSpace(ConfigName))
-                return;
+                return NodeResult.SuccessResult();
 
             var kvData = context.Env.Persistent.KVData;
             var agent = context.Env.Persistent.GetAgent();
 
             var config = LoadSubAgentConfig(kvData, ConfigName);
             if (config == null)
-                throw new InvalidOperationException($"SubAgent config '{ConfigName}' not found.");
+                return NodeResult.Failure(
+                    NodeErrorCodes.ConfigNotFound,
+                    $"SubAgent: Config '{ConfigName}' not found.",
+                    nodeId: Id, nodeName: Name);
 
-            var api = context.Env.Transient.API
-                ?? throw new InvalidOperationException("No API configured for SubAgent.");
+            if (context.Env.Transient.API == null)
+                return NodeResult.Failure(
+                    NodeErrorCodes.ApiUnavailable,
+                    "SubAgent: No API configured.",
+                    nodeId: Id, nodeName: Name);
+
+            var api = context.Env.Transient.API;
 
             var toolDefinitions = context.Env.Transient.Tools
                 .Select(t => t.GetDefinition())
@@ -105,11 +113,11 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             }
 
             if (OutputMode == "None")
-                return;
+                return NodeResult.SuccessResult();
 
             var outputMessages = allMessages.Skip(baseMessages.Length).ToList();
             if (outputMessages.Count == 0)
-                return;
+                return NodeResult.SuccessResult();
 
             var outputText = FormatOutput(outputMessages);
 
@@ -120,6 +128,8 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 From = PromptBuilder.From.assistant,
                 Metadata = new Dictionary<string, object> { ["subAgentName"] = ConfigName }
             });
+
+            return NodeResult.SuccessResult();
         }
 
         private static string FormatOutput(List<(ChatMessage, PromptBuilder.From)> messages)

@@ -36,7 +36,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("Overwrite First", Hint = "Replace first fragment of the same role")]
         public bool OverwriteFirst { get; set; } = false;
 
-        public Task ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             var segment = new ContextSegment
             {
@@ -53,7 +53,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 if (existing != null)
                 {
                     existing.Message.Content = Content;
-                    return Task.CompletedTask;
+                    return Task.FromResult(NodeResult.SuccessResult());
                 }
             }
 
@@ -62,7 +62,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             else
                 fragments.Insert(InsertAt, segment);
 
-            return Task.CompletedTask;
+            return Task.FromResult(NodeResult.SuccessResult());
         }
     }
 }

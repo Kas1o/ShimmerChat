@@ -43,12 +43,12 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// </summary>
         public static Func<IKVDataService, Tokenizers.HuggingFace.Tokenizer.Tokenizer>? TokenizerFactory { get; set; }
 
-        public Task ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             var fragments = context.Env.Transient.Fragments;
 
             if (fragments.Count == 0)
-                return Task.CompletedTask;
+                return Task.FromResult(NodeResult.SuccessResult());
 
             bool hasFirstSystem = false;
             ContextSegment? firstSystem = null;
@@ -68,7 +68,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 TrimByTokens(context, fragments, hasFirstSystem, firstSystem);
             }
 
-            return Task.CompletedTask;
+            return Task.FromResult(NodeResult.SuccessResult());
         }
 
         private static void TrimByCount(List<ContextSegment> fragments, int count,

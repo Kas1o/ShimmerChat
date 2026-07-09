@@ -12,7 +12,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Variable Tool";
 
-        public Task ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             var kvData = context.Env.Persistent.KVData;
             var chatGuid = context.Env.Persistent.ChatGuid;
@@ -21,7 +21,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             var tool = new VariableToolV2(kvData, chatGuid, agentGuid);
             context.Env.Transient.Tools.Add(tool);
 
-            return Task.CompletedTask;
+            return Task.FromResult(NodeResult.SuccessResult());
         }
     }
 }

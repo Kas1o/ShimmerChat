@@ -15,31 +15,42 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("Preset Name", Hint = "Name of the tool preset to load from ToolManager")]
         public string PresetName { get; set; } = "";
 
-        public Task ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             if (string.IsNullOrWhiteSpace(PresetName))
-                return Task.CompletedTask;
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.DataMissing,
+                    "ToolPreset: PresetName is empty.",
+                    nodeId: Id, nodeName: Name));
 
             var kvData = context.Env.Persistent.KVData;
             var json = kvData.Read("ToolPresets", PresetName);
             if (string.IsNullOrEmpty(json))
-                return Task.CompletedTask;
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.PresetNotFound,
+                    $"ToolPreset: Preset '{PresetName}' not found in KVData.",
+                    nodeId: Id, nodeName: Name));
 
             var preset = JsonConvert.DeserializeObject<ToolPresetData>(json);
             if (preset == null || preset.EnabledToolTypeNames.Count == 0)
-                return Task.CompletedTask;
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.PresetNotFound,
+                    $"ToolPreset: Preset '{PresetName}' is empty or invalid.",
+                    nodeId: Id, nodeName: Name));
 
             foreach (var typeName in preset.EnabledToolTypeNames)
             {
                 var toolType = ResolveToolType(typeName);
-                if (toolType == null) continue;
+                if (toolType == null)
+                    continue;
                 var ctor = toolType.GetConstructor(Type.EmptyTypes);
-                if (ctor == null) continue;
+                if (ctor == null)
+                    continue;
                 var tool = (IToolV2)Activator.CreateInstance(toolType)!;
                 context.Env.Transient.Tools.Add(tool);
             }
 
-            return Task.CompletedTask;
+            return Task.FromResult(NodeResult.SuccessResult());
         }
 
         private static Type? ResolveToolType(string toolName)

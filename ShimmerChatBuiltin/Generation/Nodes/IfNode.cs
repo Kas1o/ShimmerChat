@@ -21,14 +21,32 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         public IGenerationNode? Then { get; set; }
         public IGenerationNode? Else { get; set; }
 
-        public async Task ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             bool result = EvaluateCondition(context);
 
             if (result && Then != null)
-                await Then.ExecuteAsync(context);
+            {
+                var thenResult = await Then.ExecuteAsync(context);
+                if (!thenResult.Success)
+                {
+                    thenResult.NodeId ??= Id;
+                    thenResult.NodeName ??= Name;
+                }
+                return thenResult;
+            }
             else if (!result && Else != null)
-                await Else.ExecuteAsync(context);
+            {
+                var elseResult = await Else.ExecuteAsync(context);
+                if (!elseResult.Success)
+                {
+                    elseResult.NodeId ??= Id;
+                    elseResult.NodeName ??= Name;
+                }
+                return elseResult;
+            }
+
+            return NodeResult.SuccessResult();
         }
 
         private bool EvaluateCondition(NodeExecutionContext context)

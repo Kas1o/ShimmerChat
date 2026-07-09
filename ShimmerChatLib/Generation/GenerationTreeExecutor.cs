@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
@@ -13,6 +15,7 @@ namespace ShimmerChatLib.Generation
         /// <param name="env">持久化环境</param>
         /// <param name="ct">取消令牌</param>
         /// <returns>执行后的生成环境</returns>
+        /// <exception cref="InvalidOperationException">节点执行失败时抛出，异常信息包含失败节点和错误详情</exception>
         public async Task<GenerationEnv> ExecuteAsync(
             IGenerationNode rootNode,
             PersistentEnv env,
@@ -21,7 +24,23 @@ namespace ShimmerChatLib.Generation
             var generationEnv = new GenerationEnv(env);
             var context = new NodeExecutionContext(generationEnv, ct);
 
-            await rootNode.ExecuteAsync(context);
+            var result = await rootNode.ExecuteAsync(context);
+
+            if (!result.Success)
+            {
+                var sb = new StringBuilder();
+                sb.Append("Generation tree execution failed. ");
+                sb.Append($"Node: '{result.NodeName ?? "?"}' (ID: {result.NodeId ?? "?"}). ");
+                sb.Append($"Code: {result.Code ?? "?"}. ");
+                sb.Append($"Message: {result.Message ?? "?"}");
+                if (!string.IsNullOrEmpty(result.Details))
+                {
+                    sb.AppendLine();
+                    sb.Append("Details: ");
+                    sb.Append(result.Details);
+                }
+                throw new InvalidOperationException(sb.ToString());
+            }
 
             return generationEnv;
         }

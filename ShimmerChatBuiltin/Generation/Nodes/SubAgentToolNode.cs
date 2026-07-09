@@ -11,7 +11,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent Tool";
 
-        public Task ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             var kvData = context.Env.Persistent.KVData;
             var api = context.Env.Transient.API;
@@ -20,7 +20,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             var subAgentTool = new SubAgent.SubAgentToolV2(kvData, api, tools);
             context.Env.Transient.Tools.Add(subAgentTool);
 
-            return Task.CompletedTask;
+            return Task.FromResult(NodeResult.SuccessResult());
         }
     }
 }

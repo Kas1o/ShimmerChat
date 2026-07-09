@@ -21,20 +21,23 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// </summary>
         public int APIIndex { get; set; } = -1;
 
-        public Task ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             var kvData = context.Env.Persistent.KVData;
             var json = kvData.Read("ApiSettings", "apiSetting") ?? "[]";
             var settings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? [];
 
             if (settings.Count == 0)
-                throw new InvalidOperationException("No API settings configured.");
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.ApiUnavailable,
+                    "APISelect: No API settings configured.",
+                    nodeId: Id, nodeName: Name));
 
             int index = APIIndex;
             if (index == -1)
             {
                 var globalIndexStr = kvData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
-                index = int.Parse(globalIndexStr);
+                int.TryParse(globalIndexStr, out index);
             }
 
             if (index >= 0 && index < settings.Count)
@@ -42,7 +45,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             else
                 context.Env.Transient.API = settings[0].LLMApi;
 
-            return Task.CompletedTask;
+            return Task.FromResult(NodeResult.SuccessResult());
         }
     }
 }

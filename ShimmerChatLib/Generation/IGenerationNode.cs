@@ -16,9 +16,10 @@ namespace ShimmerChatLib.Generation
         string Name { get; set; }
 
         /// <summary>
-        /// 执行节点逻辑，修改 context.Env
+        /// 执行节点逻辑，修改 context.Env。
+        /// 返回 NodeResult，成功时 Success=true，失败时通过 Code/Message/Details 描述错误。
         /// </summary>
-        Task ExecuteAsync(NodeExecutionContext context);
+        Task<NodeResult> ExecuteAsync(NodeExecutionContext context);
     }
 
     /// <summary>

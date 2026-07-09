@@ -17,13 +17,21 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// </summary>
         public List<IGenerationNode> Nodes { get; set; } = new();
 
-        public async Task ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             foreach (var node in Nodes)
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
-                await node.ExecuteAsync(context);
+                var result = await node.ExecuteAsync(context);
+                if (!result.Success)
+                {
+                    // 传播子节点的失败结果，并附上当前节点的信息
+                    result.NodeId ??= Id;
+                    result.NodeName ??= Name;
+                    return result;
+                }
             }
+            return NodeResult.SuccessResult();
         }
     }
 }

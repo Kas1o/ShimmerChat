@@ -14,16 +14,23 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("Repeat", Hint = "Number of times to repeat the sequence")]
         public int Repeat { get; set; } = 1;
 
-        public async Task ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             for (int r = 0; r < Repeat; r++)
             {
                 foreach (var node in Nodes)
                 {
                     context.CancellationToken.ThrowIfCancellationRequested();
-                    await node.ExecuteAsync(context);
+                    var result = await node.ExecuteAsync(context);
+                    if (!result.Success)
+                    {
+                        result.NodeId ??= Id;
+                        result.NodeName ??= Name;
+                        return result;
+                    }
                 }
             }
+            return NodeResult.SuccessResult();
         }
     }
 }

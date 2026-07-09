@@ -15,24 +15,50 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("Preset ID", Hint = "ID of the generation preset to inline")]
         public string PresetId { get; set; } = "";
 
-        public async Task ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             if (string.IsNullOrWhiteSpace(PresetId))
-                return;
+                return NodeResult.Failure(
+                    NodeErrorCodes.DataMissing,
+                    "CallNode: PresetId is empty.",
+                    nodeId: Id, nodeName: Name);
 
             var kvData = context.Env.Persistent.KVData;
             var json = kvData.Read("GenerationManager", "generation_presets");
             if (string.IsNullOrEmpty(json))
-                return;
+                return NodeResult.Failure(
+                    NodeErrorCodes.DataMissing,
+                    "CallNode: No generation presets found in KVData.",
+                    nodeId: Id, nodeName: Name);
 
-            var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json ?? "[]") ?? new();
+            var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
             var preset = presets.FirstOrDefault(p => p.Id == PresetId);
-            if (preset == null || string.IsNullOrWhiteSpace(preset.RootNodeJson))
-                return;
+            if (preset == null)
+                return NodeResult.Failure(
+                    NodeErrorCodes.PresetNotFound,
+                    $"CallNode: Generation preset '{PresetId}' not found.",
+                    nodeId: Id, nodeName: Name);
+
+            if (string.IsNullOrWhiteSpace(preset.RootNodeJson))
+                return NodeResult.Failure(
+                    NodeErrorCodes.DataMissing,
+                    $"CallNode: Generation preset '{PresetId}' has empty RootNodeJson.",
+                    nodeId: Id, nodeName: Name);
 
             var node = GenerationNodeSerializer.Deserialize(preset.RootNodeJson);
-            if (node != null)
-                await node.ExecuteAsync(context);
+            if (node == null)
+                return NodeResult.Failure(
+                    NodeErrorCodes.DataMissing,
+                    $"CallNode: Failed to deserialize root node from preset '{PresetId}'.",
+                    nodeId: Id, nodeName: Name);
+
+            var childResult = await node.ExecuteAsync(context);
+            if (!childResult.Success)
+            {
+                childResult.NodeId ??= Id;
+                childResult.NodeName ??= Name;
+            }
+            return childResult;
         }
     }
 }

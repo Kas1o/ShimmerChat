@@ -17,24 +17,42 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// </summary>
         public string ToolTypeName { get; set; } = "";
 
-        public Task ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             if (string.IsNullOrWhiteSpace(ToolTypeName))
-                return Task.CompletedTask;
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.ToolNotFound,
+                    "ToolInstantiate: ToolTypeName is empty.",
+                    nodeId: Id, nodeName: Name));
 
             var toolType = Type.GetType(ToolTypeName);
             if (toolType == null || !typeof(IToolV2).IsAssignableFrom(toolType))
-                return Task.CompletedTask;
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.ToolNotFound,
+                    $"ToolInstantiate: Type '{ToolTypeName}' not found or is not an IToolV2.",
+                    nodeId: Id, nodeName: Name));
 
-            // 只支持无参构造
             var ctor = toolType.GetConstructor(Type.EmptyTypes);
             if (ctor == null)
-                return Task.CompletedTask;
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.ToolNotFound,
+                    $"ToolInstantiate: Type '{ToolTypeName}' has no parameterless constructor.",
+                    nodeId: Id, nodeName: Name));
 
-            var tool = (IToolV2)Activator.CreateInstance(toolType)!;
-            context.Env.Transient.Tools.Add(tool);
-
-            return Task.CompletedTask;
+            try
+            {
+                var tool = (IToolV2)Activator.CreateInstance(toolType)!;
+                context.Env.Transient.Tools.Add(tool);
+                return Task.FromResult(NodeResult.SuccessResult());
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.ToolNotFound,
+                    $"ToolInstantiate: Failed to create instance of '{ToolTypeName}'.",
+                    details: ex.ToString(),
+                    nodeId: Id, nodeName: Name));
+            }
         }
     }
 }
