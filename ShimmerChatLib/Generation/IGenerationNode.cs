@@ -11,7 +11,7 @@ namespace ShimmerChatLib.Generation
         string Id { get; }
 
         /// <summary>
-        /// 节点显示名称
+        /// 节点显示名称，通常由用户创建节点后自定义
         /// </summary>
         string Name { get; set; }
 
