@@ -7,7 +7,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 只处理实现了 IAutoCreateToolV2 的类型。
     /// </summary>
     [NodeInfo("Instantiate Tool", Icon = "⚙", Color = "#70c070", Category = "Tool")]
-    [NodeEditor("ShimmerChat.Components.SubComponents.ToolInstantiateNodeEditor")]
+    [NodeEditor(typeof(ToolInstantiateNodeEditor))]
     public class ToolInstantiateNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

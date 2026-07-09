@@ -5,9 +5,9 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChat.Components.SubComponents;
 
 /// <summary>
-/// Dynamically instantiates the correct editor for a node.
-/// If the node has a registered [NodeEditor], that custom component is used.
-/// Otherwise falls back to GenericNodeEditor&lt;T&gt;.
+/// Non-generic bridge that instantiates <see cref="GenericNodeEditor{TNode}"/>
+/// from an <see cref="IGenerationNode"/> parameter.
+/// Custom editor resolution is handled by <see cref="TreeEditor"/>.
 /// </summary>
 public class NodeBodyRenderer : ComponentBase
 {
@@ -18,20 +18,7 @@ public class NodeBodyRenderer : ComponentBase
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
-        var nodeType = Node.GetType();
-        var editorAttr = nodeType.GetCustomAttributes(false)
-            .OfType<NodeEditorAttribute>()
-            .FirstOrDefault();
-
-        Type componentType;
-        if (editorAttr != null)
-        {
-            componentType = NodeEditorAttribute.Resolve(editorAttr.EditorTypeName) ?? typeof(GenericNodeEditor<>).MakeGenericType(nodeType);
-        }
-        else
-        {
-            componentType = typeof(GenericNodeEditor<>).MakeGenericType(nodeType);
-        }
+        var componentType = typeof(GenericNodeEditor<>).MakeGenericType(Node.GetType());
 
         builder.OpenComponent(0, componentType);
         builder.AddAttribute(1, "Node", Node);

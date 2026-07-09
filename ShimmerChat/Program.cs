@@ -1,7 +1,6 @@
 using ShimmerChat.Components;
 using ShimmerChat.Singletons;
 using ShimmerChatLib.Generation;
-using ShimmerChatBuiltin.Generation.Nodes;
 using Microsoft.AspNetCore.Localization;
 using System.Globalization;
 using ShimmerChatLib.Interface;
@@ -48,9 +47,6 @@ var app = builder.Build();
 // 执行自动迁移（如果需要）
 ExecuteAutoMigration(app);
 
-// ShimmerChat 2.0: 注册自定义节点编辑器
-InitializeV2NodeEditors(app);
-
 // ShimmerChat 2.0: 执行 Agent 数据迁移
 ExecuteAgentMigration(app);
 
@@ -94,19 +90,6 @@ app.UseStaticFiles(new StaticFileOptions
 app.Run();
 
 return;
-
-// ShimmerChat 2.0: 注册自定义节点编辑器
-static void InitializeV2NodeEditors(WebApplication app)
-{
-    // Register custom node editors
-    ShimmerChatLib.Generation.NodeEditorAttribute.RegisterEditor(
-        "ShimmerChat.Components.SubComponents.APISelectNodeEditor",
-        typeof(ShimmerChat.Components.SubComponents.APISelectNodeEditor));
-    ShimmerChatLib.Generation.NodeEditorAttribute.RegisterEditor(
-        "ShimmerChat.Components.SubComponents.ToolInstantiateNodeEditor",
-        typeof(ShimmerChat.Components.SubComponents.ToolInstantiateNodeEditor));
-    Console.WriteLine("[ShimmerChat 2.0] Node editors registered.");
-}
 
 // ShimmerChat 2.0: 自动迁移 Agent 到 2.0
 static void ExecuteAgentMigration(WebApplication app)

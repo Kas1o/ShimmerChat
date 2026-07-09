@@ -10,7 +10,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// APIIndex: -1 表示使用全局选中 API；>=0 表示使用指定索引的 API 配置。
     /// </summary>
     [NodeInfo("API Select", Icon = "⚡", Color = "#e07070", Category = "Config", Description = "Choose which API configuration to use for generation")]
-    [NodeEditor("ShimmerChat.Components.SubComponents.APISelectNodeEditor")]
+    [NodeEditor(typeof(APISelectNodeEditor))]
     public class APISelectNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

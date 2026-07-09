@@ -1,6 +1,5 @@
 @using System.Reflection
 @using ShimmerChatLib.Generation
-@using ShimmerChatBuiltin.Generation.Nodes
 
 @if (_info == null)
 {
@@ -83,11 +82,7 @@ else
         var type = Node.GetType();
         _info = type.GetCustomAttribute<NodeInfoAttribute>();
 
-        var editorAttr = type.GetCustomAttribute<NodeEditorAttribute>();
-        if (editorAttr != null)
-        {
-            _customEditorType = NodeEditorAttribute.Resolve(editorAttr.EditorTypeName);
-        }
+        _customEditorType = type.GetCustomAttribute<NodeEditorAttribute>()?.EditorType;
 
         _editorParams = new Dictionary<string, object>
         {
