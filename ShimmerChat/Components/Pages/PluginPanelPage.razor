@@ -8,10 +8,6 @@
     {
         <div class="panel-header">
             <h1 class="panel-title">@PanelTitle</h1>
-            <button class="btn btn-secondary" @onclick="NavigateBack">
-                <span class="icon-back"></span>
-                返回列表
-            </button>
         </div>
         <div class="panel-content">
             <DynamicComponent Type="panelType" />
@@ -24,10 +20,6 @@
             <div class="panel-error-message">
                 <p>未找到名称为 "@PanelName" 的插件面板</p>
             </div>
-            <button class="btn btn-primary" @onclick="NavigateBack">
-                <span class="icon-back"></span>
-                返回面板列表
-            </button>
         </div>
     }
 </div>
@@ -82,25 +74,16 @@
         margin-bottom: var(--spacing-lg);
         border: 1px solid var(--color-error-border, rgba(239, 68, 68, 0.2));
     }
-
-    /* 图标样式 */
-    .icon-back::before {
-        content: "←";
-        margin-right: var(--spacing-xs);
-    }
 </style>
 
 @code {
     [Parameter]
     public string PanelName { get; set; } = string.Empty;
-    
-    [Inject]
-    public NavigationManager Navigation { get; set; } = null!;
 
     private Type? panelType;
     private string PanelTitle => panelType != null ? PanelName : "插件面板";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         // 确保插件面板服务已加载完成
         await Task.Delay(100); // 短暂延迟确保服务初始化
@@ -113,10 +96,5 @@
             PluginPanelService.RefreshPluginPanels();
             panelType = PluginPanelService.GetPluginPanelType(PanelName);
         }
-    }
-    
-    private void NavigateBack()
-    {
-        Navigation.NavigateTo("/pluginpanel");
     }
 }
