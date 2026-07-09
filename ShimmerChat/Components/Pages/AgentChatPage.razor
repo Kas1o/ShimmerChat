@@ -6,8 +6,7 @@
 @using ShimmerChat.Singletons
 @using Microsoft.JSInterop
 
-@inject ICompletionService completion
-@inject IAIGenerationService aiGenerationService
+@inject Singletons.GenerationManagerV2 generationManager
 @inject IPopupService popupService
 @inject IJSRuntime JS
 @inject IKVDataService KVData
@@ -422,10 +421,10 @@
 
 		try
 		{
-			await aiGenerationService.GenerateAIResponseStreamAsync(
+			await generationManager.GenerateStreamAsync(
 				agent, chat,
 				// 处理流式响应的函数
-				handleStreamResponses: async (responseStream) =>
+				handleStream: async (responseStream) =>
 				{
 					// 查找是否有正在重新生成的消息（Regenerating 状态）
 					var regeneratingMessage = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Regenerating);
@@ -585,11 +584,11 @@
 
 		try
 		{
-			await aiGenerationService.GenerateContinuationStreamAsync(
+			await generationManager.GenerateContinuationStreamAsync(
 				agent, chat,
 				continuationMessage,
 				// 处理流式响应的函数
-				handleStreamResponses: async (responseStream) =>
+				handleStream: async (responseStream) =>
 				{
 					// 使用现有的消息进行继续生成
 					continuationMessage.GenerationState = MessageGenerationState.Generating;

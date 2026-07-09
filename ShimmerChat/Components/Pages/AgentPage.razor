@@ -1,12 +1,13 @@
 @page "/agent/{agentguid}"
 @using ShimmerChatLib.Models
+@using ShimmerChatLib.Generation
+@using ShimmerChatBuiltin.Generation.Nodes
 @using System.Diagnostics
 @using System.Threading
 @inject NavigationManager navigation
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService
 @inject IJSRuntime JS
-@inject IToolService ToolService
 @inject IMessageStoreService messageStore
 
 @if(agent != null)
@@ -19,9 +20,9 @@
             <img class="agent-header-avatar" src="@AvatarPath" alt="avatar" />
             <div class="agent-header-info">
                 <h2>@agent.Name</h2>
-                @if(!string.IsNullOrWhiteSpace(agent.Description))
+                @if(!string.IsNullOrWhiteSpace(agent.UserIntro))
                 {
-                    <p class="agent-header-desc">@agent.Description</p>
+                    <p class="agent-header-desc">@agent.UserIntro</p>
                 }
             </div>
         </div>
@@ -159,12 +160,8 @@
                             <input class="shimmer-input" @bind="Name"/>
                         </div>
                         <div class="settings-field">
-                            <label>Description</label>
-                            <textarea class="shimmer-textarea" @bind="Description" rows="3" />
-                        </div>
-                        <div class="settings-field">
                             <label>User Introduction</label>
-                            <textarea class="shimmer-textarea" @bind="UserIntro" rows="2" />
+                            <textarea class="shimmer-textarea" @bind="UserIntro" rows="3" placeholder="A short description shown in the agent list and header" />
                         </div>
                     </div>
 
@@ -232,35 +229,45 @@
                     </div>
 
                     <div class="settings-group">
-                        <h4><i class="bi bi-tools"></i> Custom Tools</h4>
-                        <div class="tool-selector">
-                            <select class="shimmer-input" @bind="SelectedToolToAdd">
-                                <option value="">Select a tool...</option>
-                                @foreach(var tool in AvailableTools)
-                                {
-                                    <option value="@tool.GetToolDefinition().name">@tool.GetToolDefinition().name</option>
-                                }
-                            </select>
-                            <button class="btn btn-secondary" @onclick="AddToolToAgent" disabled="@(string.IsNullOrEmpty(SelectedToolToAdd))">
-                                <i class="bi bi-plus-lg"></i> Add
-                            </button>
-                        </div>
-                        <div class="tool-list">
-                            @if (agent?.CustomToolNames != null && agent.CustomToolNames.Any())
+                        <h4><i class="bi bi-diagram-3"></i> Generation Config</h4>
+                        <div class="settings-field">
+                            <label>Modifier Tree</label>
+                            @if (!string.IsNullOrEmpty(agent?.ModifierTreeJson))
                             {
-                                @foreach (var toolName in agent.CustomToolNames)
-                                {
-                                    <div class="tool-item">
-                                        <span class="tool-name"><i class="bi bi-wrench"></i> @toolName</span>
-                                        <button class="btn btn-danger btn-sm" @onclick="() => RemoveToolFromAgent(toolName)">
-                                            <i class="bi bi-x-lg"></i>
-                                        </button>
-                                    </div>
-                                }
+                                <div class="gen-config-status">
+                                    <span class="gen-config-badge private">Private Tree</span>
+                                    <span class="gen-config-hint">This agent has a custom modifier tree.</span>
+                                </div>
+                                <div style="margin-top:8px; display:flex; gap:8px;">
+                                    <button class="btn btn-primary btn-sm" @onclick="EditPrivateTree">
+                                        <i class="bi bi-pencil"></i> Edit Private Tree
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="RevertToPreset">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Revert to Preset
+                                    </button>
+                                </div>
                             }
                             else
                             {
-                                <p class="tool-empty">No custom tools added.</p>
+                                <div class="gen-config-status">
+                                    <span class="gen-config-badge preset">Using Preset</span>
+                                    <span class="gen-config-hint">Select a preset from Generation Manager.</span>
+                                </div>
+                                <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+                                    <select class="shimmer-input" style="flex:1;max-width:300px;" @bind="_selectedPresetId">
+                                        <option value="">-- No preset --</option>
+                                        @foreach (var p in _availablePresets)
+                                        {
+                                            <option value="@p.Id">@p.Name</option>
+                                        }
+                                    </select>
+                                    <button class="btn btn-primary btn-sm" @onclick="AssignPreset" disabled="@(string.IsNullOrEmpty(_selectedPresetId))">
+                                        Assign
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-sm" @onclick="CreatePrivateTree">
+                                        <i class="bi bi-pencil"></i> Create Private Tree
+                                    </button>
+                                </div>
                             }
                         </div>
                     </div>
@@ -789,6 +796,12 @@
             padding: 12px;
         }
 
+        .gen-config-status { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+        .gen-config-badge { padding: 2px 10px; border-radius: 12px; font-size: 0.78em; font-weight: 600; }
+        .gen-config-badge.private { background: rgba(100,200,100,0.15); color: #6c6; }
+        .gen-config-badge.preset { background: rgba(100,150,255,0.15); color: #8af; }
+        .gen-config-hint { font-size: 0.8em; color: #888; }
+
         /* Settings actions */
         .settings-actions {
             padding-top: 8px;
@@ -909,19 +922,7 @@
             if (agent != null)
             {
                 agent.Name = value;
-                agent.Save(kvDataService); // Save the specific agent after changing the name
-            }
-        }
-    }
-    string Description
-    {
-        get => agent?.Description ?? string.Empty;
-        set
-        {
-            if (agent != null)
-            {
-                agent.Description = value;
-                agent.Save(kvDataService); // Save the specific agent after changing the description
+                agent.Save(kvDataService);
             }
         }
     }
@@ -1218,11 +1219,8 @@
         swAgentLoad.Stop();
         PerfLog($"OnParametersSet Agent.Load done: found={(agent != null)}, elapsedMs={swAgentLoad.ElapsedMilliseconds}");
 
-        // Load available tools after agent is loaded
-        var swTools = Stopwatch.StartNew();
-        LoadAvailableTools();
-        swTools.Stop();
-        PerfLog($"OnParametersSet LoadAvailableTools done: toolCount={AvailableTools.Count}, elapsedMs={swTools.ElapsedMilliseconds}");
+        // ShimmerChat 2.0: tools are now managed via GenerationManager + ToolManager
+        LoadPresets();
 
         var swTags = Stopwatch.StartNew();
         LoadAllTags();
@@ -1628,55 +1626,55 @@
     }
 
     #endregion
-    
-    #region Tool Management
-    
-    string SelectedToolToAdd { get; set; } = string.Empty;
-    List<ShimmerChatLib.Tool.ITool> AvailableTools { get; set; } = new List<ShimmerChatLib.Tool.ITool>();
-    
 
-    
-    void LoadAvailableTools()
+    private List<GenerationPreset> _availablePresets = new();
+    private string _selectedPresetId = "";
+
+    private void LoadPresets()
     {
-        if (ToolService != null && agent != null)
-        {
-            // Show all loaded tools that are not already in the agent's custom tools list
-            AvailableTools = ToolService.LoadedTools.Where(t => !agent.CustomToolNames.Contains(t.GetToolDefinition().name)).ToList();
-        }
+        var json = kvDataService.Read("GenerationManager", "generation_presets");
+        if (!string.IsNullOrEmpty(json))
+            _availablePresets = Newtonsoft.Json.JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
         else
-        {
-            AvailableTools = new List<ShimmerChatLib.Tool.ITool>();
-        }
+            _availablePresets = new();
     }
-    
-    async Task AddToolToAgent()
+
+    private void AssignPreset()
     {
-        if (string.IsNullOrEmpty(SelectedToolToAdd) || agent == null)
-            return;
-            
-        if (!agent.CustomToolNames.Contains(SelectedToolToAdd))
+        if (agent == null || string.IsNullOrEmpty(_selectedPresetId)) return;
+        var preset = _availablePresets.FirstOrDefault(p => p.Id == _selectedPresetId);
+        if (preset != null)
         {
-            agent.CustomToolNames.Add(SelectedToolToAdd);
+            agent.ModifierTreeJson = preset.RootNodeJson;
             agent.Save(kvDataService);
-            
-            // Reset selection and reload available tools
-            SelectedToolToAdd = string.Empty;
-            LoadAvailableTools();
-            StateHasChanged();
         }
     }
-    
-    async Task RemoveToolFromAgent(string toolName)
+
+    private void CreatePrivateTree()
     {
-        if (agent == null)
-            return;
-            
-        agent.CustomToolNames.RemoveAll(t => t == toolName);
+        if (agent == null) return;
+        // Create private tree with a CallNode to Default preset, plus room for custom nodes
+        var root = new SequenceNode
+        {
+            Name = "Agent Private Tree",
+            Nodes = new List<IGenerationNode>
+            {
+                new CallNode { Name = "Default Pipeline", PresetId = "__default__" }
+            }
+        };
+        agent.ModifierTreeJson = GenerationNodeSerializer.Serialize(root);
         agent.Save(kvDataService);
-        
-        LoadAvailableTools();
-        StateHasChanged();
     }
-    
-    #endregion
+
+    private void EditPrivateTree()
+    {
+        navigation.NavigateTo($"/generationmanager?agent={agent?.Guid}");
+    }
+
+    private void RevertToPreset()
+    {
+        if (agent == null) return;
+        agent.ModifierTreeJson = null;
+        agent.Save(kvDataService);
+    }
 }

@@ -28,7 +28,6 @@ public class AgentTests
         agent.Greeting.Should().Be("Hello!");
         agent.AlternativeGreetings.Should().BeEquivalentTo(["Hi", "Hey"]);
         agent.ChatGuids.Should().BeEmpty();
-        agent.CustomToolNames.Should().BeEmpty();
     }
 
     [Fact]

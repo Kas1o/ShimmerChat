@@ -1,5 +1,4 @@
 using ShimmerChatLib.Panel;
-using ShimmerChatLib.Tool;
 
 namespace ShimmerChatLib.Interface
 {

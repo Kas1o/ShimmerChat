@@ -1,0 +1,307 @@
+@page "/generationmanager"
+@using ShimmerChatLib.Generation
+@using ShimmerChatBuiltin.Generation.Nodes
+@using ShimmerChat.Components.SubComponents
+@inject NavigationManager Navigation
+@inject IKVDataService KVData
+
+<h3>生成管理器</h3>
+
+@if (_isAgentMode)
+{
+    <div class="alert alert-warning" style="margin-top:16px;">
+        <strong>Editing private tree for agent: @_agentName</strong>
+        <button class="btn btn-sm btn-outline-secondary" style="margin-left:12px;" @onclick="BackToAgent">← Back to Agent</button>
+    </div>
+}
+
+@if (!_isAgentMode)
+{
+    <!-- Preset 管理 -->
+    <div class="shimmer-group" style="margin-top:16px;">
+        <h5>预设管理</h5>
+        <select @bind="_selectedPresetId" class="form-select" style="max-width: 400px;">
+            @foreach (var preset in _presets)
+            {
+                <option value="@preset.Id">@preset.Name @(preset.Id == DefaultPresetId ? "(默认)" : "")</option>
+            }
+        </select>
+        <div style="margin-top: 8px;">
+            <button class="btn btn-primary btn-sm" @onclick="CreateNewPreset">新建预设</button>
+            <button class="btn btn-secondary btn-sm" style="margin-left: 5px;" @onclick="StartRename"
+                    disabled="@(_activePreset?.Id == DefaultPresetId)">重命名</button>
+            <button class="btn btn-secondary btn-sm" style="margin-left: 5px;" @onclick="CloneCurrentPreset">克隆</button>
+            <button class="btn btn-danger btn-sm" style="margin-left: 5px;" @onclick="DeleteCurrentPreset"
+                    disabled="@(_presets.Count <= 1 || _activePreset?.Id == DefaultPresetId)">删除</button>
+        </div>
+    </div>
+}
+
+@if (_showNameDialog)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@_nameDialogTitle</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showNameDialog = false"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control" @bind="_nameInput" @bind:event="oninput"
+                           placeholder="预设名称" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => _showNameDialog = false">取消</button>
+                    <button type="button" class="btn btn-primary" @onclick="ConfirmName"
+                            disabled="@string.IsNullOrWhiteSpace(_nameInput)">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- 树编辑器 -->
+<div style="margin-top:16px;">
+    <h4>修改器树</h4>
+    @if (_isAgentMode)
+    {
+        <div class="card">
+            <div class="card-body">
+                <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+            </div>
+        </div>
+    }
+    else if (_activePreset != null)
+    {
+        <div class="card">
+            <div class="card-body">
+                @if (_activePreset.Id == DefaultPresetId)
+                {
+                    <div class="alert alert-warning" style="margin-bottom: 12px;">
+                        <strong>Default 预设为只读。</strong> 请克隆后编辑自定义预设。
+                    </div>
+                    <div style="pointer-events: none; opacity: 0.7;">
+                        <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+                    </div>
+                }
+                else
+                {
+                    <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <p>请先选择一个预设。</p>
+    }
+</div>
+
+<button class="btn btn-primary" style="margin:16px 5px;" @onclick="SaveAll"
+        disabled="@(!_isAgentMode && _activePreset?.Id == DefaultPresetId)">保存</button>
+
+@code {
+    [Parameter] [SupplyParameterFromQuery] public string? agent { get; set; }
+
+    private const string PresetStorageKey = "generation_presets";
+    private const string DefaultPresetId = "__default__";
+
+    private List<GenerationPreset> _presets = new();
+    private GenerationPreset? _activePreset;
+    private IGenerationNode _editingRoot = new SequenceNode { Name = "Root" };
+
+    private bool _isAgentMode;
+    private string _agentName = "";
+    private Guid _agentGuid;
+
+    private bool _showNameDialog;
+    private string _nameDialogTitle = "";
+    private string _nameInput = "";
+    private string? _renameTargetId;
+
+    private string _selectedPresetId
+    {
+        get => _activePreset?.Id ?? "";
+        set
+        {
+            var preset = _presets.FirstOrDefault(p => p.Id == value);
+            if (preset != null)
+            {
+                _activePreset = preset;
+                _editingRoot = GenerationNodeSerializer.Deserialize(preset.RootNodeJson)
+                    ?? new SequenceNode { Name = "Root" };
+            }
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(agent) && Guid.TryParse(agent, out _agentGuid))
+        {
+            _isAgentMode = true;
+            var ag = Agent.Load(_agentGuid, KVData);
+            _agentName = ag.Name;
+            _editingRoot = string.IsNullOrEmpty(ag.ModifierTreeJson)
+                ? new SequenceNode { Name = "Root" }
+                : GenerationNodeSerializer.Deserialize(ag.ModifierTreeJson)
+                    ?? new SequenceNode { Name = "Root" };
+            return;
+        }
+
+        LoadPresets();
+        if (_presets.Count == 0)
+        {
+            CreateDefaultPreset();
+        }
+        _activePreset = _presets[0];
+        _editingRoot = GenerationNodeSerializer.Deserialize(_activePreset.RootNodeJson)
+            ?? new SequenceNode { Name = "Root" };
+    }
+
+    private void LoadPresets()
+    {
+        var json = KVData.Read("GenerationManager", PresetStorageKey);
+        if (!string.IsNullOrEmpty(json))
+        {
+            _presets = Newtonsoft.Json.JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
+        }
+        // Ensure Default preset exists
+        if (!_presets.Any(p => p.Id == DefaultPresetId))
+        {
+            CreateDefaultPreset();
+        }
+    }
+
+    private void CreateDefaultPreset()
+    {
+        var defaultRoot = new SequenceNode
+        {
+            Name = "Default Pipeline",
+            Nodes = new List<IGenerationNode>
+            {
+                new APISelectNode { Name = "Select API", APIIndex = -1 },
+                new FragmentNode
+                {
+                    Name = "System Prompt",
+                    Content = "You are a helpful AI assistant.",
+                    From = SharperLLM.Util.PromptBuilder.From.system
+                },
+                new FragmentTrimNode { Name = "Trim Context", TokenBudget = 4096 }
+            }
+        };
+
+        var defaultPreset = new GenerationPreset
+        {
+            Id = DefaultPresetId,
+            Name = "Default",
+            RootNodeJson = GenerationNodeSerializer.Serialize(defaultRoot)
+        };
+        _presets.Insert(0, defaultPreset);
+    }
+
+    private void SavePresets()
+    {
+        KVData.Write("GenerationManager", PresetStorageKey,
+            Newtonsoft.Json.JsonConvert.SerializeObject(_presets));
+    }
+
+    private void CreateNewPreset()
+    {
+        _renameTargetId = null;
+        _nameInput = "";
+        _nameDialogTitle = "新建预设";
+        _showNameDialog = true;
+    }
+
+    private void StartRename()
+    {
+        if (_activePreset == null || _activePreset.Id == DefaultPresetId) return;
+        _renameTargetId = _activePreset.Id;
+        _nameInput = _activePreset.Name;
+        _nameDialogTitle = "重命名预设";
+        _showNameDialog = true;
+    }
+
+    private void CloneCurrentPreset()
+    {
+        if (_activePreset == null) return;
+        var newName = _activePreset.Name + " - Copy";
+        var counter = 2;
+        while (_presets.Any(p => p.Name == newName))
+        {
+            newName = $"{_activePreset.Name} - Copy ({counter})";
+            counter++;
+        }
+        var clone = new GenerationPreset
+        {
+            Name = newName,
+            RootNodeJson = _activePreset.RootNodeJson
+        };
+        _presets.Add(clone);
+        _activePreset = clone;
+        _editingRoot = GenerationNodeSerializer.Deserialize(clone.RootNodeJson)
+            ?? new SequenceNode { Name = "Root" };
+    }
+
+    private void DeleteCurrentPreset()
+    {
+        if (_presets.Count <= 1 || _activePreset == null || _activePreset.Id == DefaultPresetId)
+            return;
+        _presets.Remove(_activePreset);
+        _activePreset = _presets[0];
+        _editingRoot = GenerationNodeSerializer.Deserialize(_activePreset.RootNodeJson)
+            ?? new SequenceNode { Name = "Root" };
+        SavePresets();
+    }
+
+    private void ConfirmName()
+    {
+        if (string.IsNullOrWhiteSpace(_nameInput)) return;
+
+        if (_renameTargetId != null)
+        {
+            var target = _presets.FirstOrDefault(p => p.Id == _renameTargetId);
+            if (target != null) target.Name = _nameInput.Trim();
+        }
+        else
+        {
+            var newPreset = new GenerationPreset { Name = _nameInput.Trim() };
+            _presets.Add(newPreset);
+            _activePreset = newPreset;
+            _editingRoot = new SequenceNode { Name = "Root" };
+        }
+
+        _showNameDialog = false;
+        _renameTargetId = null;
+        SavePresets();
+    }
+
+    private async Task OnTreeChanged()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void SaveAll()
+    {
+        if (_editingRoot == null) return;
+
+        if (_isAgentMode)
+        {
+            var ag = Agent.Load(_agentGuid, KVData);
+            ag.ModifierTreeJson = GenerationNodeSerializer.Serialize(_editingRoot);
+            ag.Save(KVData);
+            return;
+        }
+
+        if (_activePreset != null && _activePreset.Id != DefaultPresetId)
+        {
+            _activePreset.RootNodeJson = GenerationNodeSerializer.Serialize(_editingRoot);
+            SavePresets();
+        }
+    }
+
+    private void BackToAgent()
+    {
+        Navigation.NavigateTo($"/agent/{_agentGuid}");
+    }
+}

@@ -1,0 +1,71 @@
+@using Newtonsoft.Json
+@using ShimmerChatLib
+@using ShimmerChatLib.Generation
+@using ShimmerChatBuiltin.Generation.Nodes
+@inject IKVDataService KVData
+
+<div class="api-select-editor">
+    <div class="ge-field">
+        <label class="ge-label" title="Select which API configuration to use for this generation">
+            API Config
+        </label>
+        <div class="ge-value">
+            <select class="ge-select" @bind="_selectedIndex" @bind:event="onchange"
+                    style="width: 100%; max-width: 400px;">
+                <option value="-2">Use global default API</option>
+                @for (int i = 0; i < _settings.Count; i++)
+                {
+                    <option value="@i">@_settings[i].Name (@_settings[i].Type)</option>
+                }
+            </select>
+            @if (_settings.Count == 0)
+            {
+                <div style="font-size: 0.75em; color: #e66; margin-top: 4px;">
+                    No API settings configured. Please add one in the API Settings panel.
+                </div>
+            }
+            else
+            {
+                <div style="font-size: 0.72em; color: #666; margin-top: 4px;">
+                    @(_selectedIndex == -2
+                        ? "Will use the globally selected API from API Settings."
+                        : _selectedIndex >= 0 && _selectedIndex < _settings.Count
+                            ? $"Using: {_settings[_selectedIndex].Name} ({_settings[_selectedIndex].Type}) — {(_settings[_selectedIndex].EnableStream ? "streaming" : "non-streaming")}"
+                            : "")
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public APISelectNode Node { get; set; } = default!;
+    [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
+
+    private List<ApiSetting> _settings = new();
+    private int _selectedIndex;
+
+    protected override void OnInitialized()
+    {
+        var json = KVData.Read("ApiSettings", "apiSetting") ?? "[]";
+        _settings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? new();
+
+        if (Node.APIIndex == -1)
+            _selectedIndex = -2;
+        else if (Node.APIIndex >= 0 && Node.APIIndex < _settings.Count)
+            _selectedIndex = Node.APIIndex;
+        else
+            _selectedIndex = -2;
+    }
+
+    private int SelectedIndex
+    {
+        get => _selectedIndex;
+        set
+        {
+            _selectedIndex = value;
+            Node.APIIndex = value == -2 ? -1 : value;
+            OnChanged.InvokeAsync(Node);
+        }
+    }
+}

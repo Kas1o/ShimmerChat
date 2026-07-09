@@ -1,5 +1,6 @@
 ﻿using ShimmerChatLib;
 using ShimmerChatLib.Context;
+using ShimmerChatLib.Generation;
 using System;
 using System.Collections.Generic;
 using System.Text;

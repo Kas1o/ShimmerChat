@@ -1,7 +1,9 @@
 @using Microsoft.AspNetCore.Components.Routing
 @using ShimmerChat.Components.SubComponents
+@using ShimmerChatLib.Interface
 @using System.Reflection
 @inject IStringLocalizer<NavMenu> l
+@inject IPluginPanelService PluginPanelService
 @implements IDisposable
 
 <div class="@(IsPortrait ? "shimmer-nav-portrait" : "shimmer-sidebar")">
@@ -29,28 +31,10 @@
             </div>
 
             <div>
-                <NavLink class="shimmer-nav-item" href="apisettings" Match="NavLinkMatch.All">
+                <NavLink class="shimmer-nav-item" href="generationmanager" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-gear"></i></span>
-                        <span class="nav-text">@l["API Settings"]</span>
-                    </div>
-                </NavLink>
-            </div>
-
-            <div>
-                <NavLink class="shimmer-nav-item" href="contextmanager" Match="NavLinkMatch.All">
-                    <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-folder"></i></span>
-                        <span class="nav-text">@l["Context Manager"]</span>
-                    </div>
-                </NavLink>
-            </div>
-
-            <div>
-                <NavLink class="shimmer-nav-item" href="toolmanager" Match="NavLinkMatch.All">
-                    <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-wrench"></i></span>
-                        <span class="nav-text">@l["Tool Manager"]</span>
+                        <span class="nav-icon"><i class="bi bi-diagram-3"></i></span>
+                        <span class="nav-text">生成管理器</span>
                     </div>
                 </NavLink>
             </div>
@@ -64,14 +48,15 @@
                 </NavLink>
             </div>
             <div>
-                <NavLink class="shimmer-nav-item" href="pluginpanel" Match="NavLinkMatch.All">
+                <NavLink class="shimmer-nav-item" href="misc" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-puzzle"></i></span>
-                        <span class="nav-text">@l["Plugin Settings"]</span>
+                        <span class="nav-icon"><i class="bi bi-ui-checks-grid"></i></span>
+                        <span class="nav-text">@l["Misc"]</span>
                     </div>
                 </NavLink>
             </div>
 
+            <div class="shimmer-nav-section-label">Representation</div>
             <div>
                 <NavLink class="shimmer-nav-item" href="messagerender" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
@@ -80,17 +65,6 @@
                     </div>
                 </NavLink>
             </div>
-
-
-            <div>
-                <NavLink class="shimmer-nav-item" href="misc" Match="NavLinkMatch.All">
-                    <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-ui-checks-grid"></i></span>
-                        <span class="nav-text">@l["Misc"]</span>
-                    </div>
-                </NavLink>
-            </div>
-            
             <div>
                 <NavLink class="shimmer-nav-item" href="thememanager" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
@@ -99,6 +73,19 @@
                     </div>
                 </NavLink>
             </div>
+
+            <div class="shimmer-nav-section-label">Plugin Panels</div>
+            @foreach (var panel in _pluginPanels)
+            {
+                <div>
+                    <NavLink class="shimmer-nav-item" href="@($"pluginpanel/{Uri.EscapeDataString(panel.Name)}")" Match="NavLinkMatch.All">
+                        <div class="nav-item-content">
+                            <span class="nav-icon"><i class="bi @(panel.Icon ?? "bi-puzzle")"></i></span>
+                            <span class="nav-text">@panel.Name</span>
+                        </div>
+                    </NavLink>
+                </div>
+            }
         </div>
     </nav>
 
@@ -228,6 +215,16 @@
         flex: 1;
     }
 
+    .shimmer-nav-section-label {
+        padding: 8px 16px 4px 16px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--color-text-tertiary);
+        margin-top: 8px;
+    }
+
     .nav-badge {
         background-color: var(--color-primary);
         color: white;
@@ -276,13 +273,18 @@
 
     public string Version { get; set; }
 
+    private List<PluginPanelInfo> _pluginPanels = new();
+
     protected override void OnInitialized()
     {
-        // 订阅主题变更事件
         ThemeService.OnThemeChanged += HandleThemeChanged;
         Version = typeof(Program).Assembly
             .GetCustomAttributes<AssemblyInformationalVersionAttribute>()
             ?.First()?.InformationalVersion ?? "Unknown";
+        _pluginPanels = PluginPanelService.GetPluginPanels()
+            .Where(p => p.PanelDisplayPlace == ShimmerChatLib.Panel.PanelDisplayPlace.Settings)
+            .OrderBy(p => p.Order)
+            .ToList();
     }
 
     private void HandleThemeChanged(ShimmerChatLib.Models.Theme theme)

@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using SharperLLM.Util;
 using ShimmerChatLib;
 using ShimmerChatLib.Context;
+using ShimmerChatLib.Generation;
 using System.Text;
 
 namespace ShimmerChatBuiltin.Misc

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Text;
 using System.Collections.Generic;
 using System.IO;
@@ -55,9 +55,10 @@ namespace ShimmerChatLib
         /// </summary>
         public Guid? BackgroundGuid { get; set; }
         /// <summary>
-        /// 此智能体所自定义的工具名，使用时和主配置求并集。
+        /// 2.0 修改器树 JSON（生成相关定义）
         /// </summary>
-        public List<string> CustomToolNames { get; set; } = new List<string>();
+        public string? ModifierTreeJson { get; set; }
+
         /// <summary>
         /// 仅用户可见的介绍文本
         /// </summary>
@@ -459,7 +460,6 @@ namespace ShimmerChatLib
 				Guid= Guid.NewGuid(),
 				Greeting = greeting,
 				AlternativeGreetings = alternativeGreetings ?? new List<string>(),
-				CustomToolNames = new List<string>(),
 				UserIntro = "",
 				Tags = new List<string>()
 			};

@@ -1,0 +1,131 @@
+@using System.Reflection
+@using ShimmerChatLib.Generation
+@using ShimmerChatBuiltin.Generation.Nodes
+
+@if (_info == null)
+{
+    <div class="tree-node-card" style="border-left-color: #888;">
+        <div class="tn-header">
+            <span class="tn-icon">●</span>
+            <span class="tn-label">@Node.GetType().Name</span>
+            <span class="tn-name">@Node.Name</span>
+            @if (RemoveMe != null && Depth > 0)
+            {
+                <div class="tn-actions">
+                    <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)" title="Remove">✕</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    var isContainer = typeof(IList<IGenerationNode>).IsAssignableFrom(
+        Node.GetType().GetProperties().FirstOrDefault(p =>
+            p.PropertyType.IsGenericType &&
+            p.PropertyType.GetGenericTypeDefinition() == typeof(List<>) &&
+            typeof(IGenerationNode).IsAssignableFrom(p.PropertyType.GenericTypeArguments[0])
+        )?.PropertyType ?? typeof(object));
+
+    <div class="tree-node-card" style="border-left-color: @_info.Color;">
+        <div class="tn-header" @onclick="ToggleExpand">
+            <span class="tn-icon">@_info.Icon</span>
+            <span class="tn-label">@_info.Label</span>
+            <input class="tn-name-input" @bind="Node.Name" @bind:event="oninput"
+                   @onkeydown="OnNameKeyDown" placeholder="Name" />
+            <div class="tn-actions">
+                @if (RemoveMe != null && Depth > 0)
+                {
+                    <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)" title="Remove">✕</button>
+                }
+                @if (isContainer)
+                {
+                    <button class="tn-btn tn-btn-exp" @onclick="ToggleExpand" title="@(_expanded ? "Collapse" : "Expand")">
+                        @(_expanded ? "▾" : "▸")
+                    </button>
+                }
+            </div>
+        </div>
+
+        @if (_expanded)
+        {
+            <div class="tn-body">
+                @* Custom editor via [NodeEditor] *@
+                @if (_customEditorType != null)
+                {
+                    <DynamicComponent Type="_customEditorType" Parameters="@_editorParams" />
+                }
+                else
+                {
+                    @* Auto-generated editor *@
+                    <NodeBodyRenderer Node="@Node" Depth="@Depth"
+                                      OnTreeChanged="OnTreeChanged"
+                                      RemoveMe="RemoveMe" />
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IGenerationNode Node { get; set; } = default!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public EventCallback OnTreeChanged { get; set; }
+    [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
+
+    private NodeInfoAttribute? _info;
+    private Type? _customEditorType;
+    private Dictionary<string, object> _editorParams = new();
+    private bool _expanded = true;
+
+    protected override void OnInitialized()
+    {
+        var type = Node.GetType();
+        _info = type.GetCustomAttribute<NodeInfoAttribute>();
+
+        var editorAttr = type.GetCustomAttribute<NodeEditorAttribute>();
+        if (editorAttr != null)
+        {
+            _customEditorType = NodeEditorAttribute.Resolve(editorAttr.EditorTypeName);
+        }
+
+        _editorParams = new Dictionary<string, object>
+        {
+            ["Node"] = Node,
+            ["OnChanged"] = EventCallback.Factory.Create<IGenerationNode>(this, _ => OnTreeChanged.InvokeAsync())
+        };
+    }
+
+    private void ToggleExpand() => _expanded = !_expanded;
+
+    private async Task OnNameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await OnTreeChanged.InvokeAsync();
+    }
+}
+
+<style>
+.tree-node-card {
+    border-left: 3px solid #888;
+    margin-bottom: 4px;
+    background: var(--color-card, #1e1e2e);
+    border-radius: 0 5px 5px 0;
+    overflow: hidden;
+}
+.tn-header {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    cursor: pointer; user-select: none;
+    background: rgba(255,255,255,0.015);
+}
+.tn-header:hover { background: rgba(255,255,255,0.04); }
+.tn-icon { font-size: 1em; width: 20px; text-align: center; flex-shrink: 0; }
+.tn-label { font-weight: 600; font-size: 0.82em; color: #bbb; min-width: 80px; }
+.tn-name-input { flex: 1; background: transparent; border: none; border-bottom: 1px solid transparent; color: #999; font-size: 0.78em; outline: none; padding: 1px 2px; }
+.tn-name-input:focus { border-bottom-color: rgba(255,255,255,0.2); color: #ddd; }
+.tn-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.tn-btn { width: 22px; height: 22px; border: none; border-radius: 4px; font-size: 0.8em; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.tn-btn-del { background: rgba(220,80,80,0.12); color: #e66; }
+.tn-btn-del:hover { background: rgba(220,80,80,0.28); }
+.tn-btn-exp { background: transparent; color: #666; font-size: 0.65em; }
+.tn-body { padding: 4px 10px 8px 28px; }
+</style>

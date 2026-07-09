@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reflection;
 using ShimmerChatBuiltin;
 using ShimmerChatLib.Panel;
-using ShimmerChatLib.Tool;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
@@ -60,6 +59,19 @@ namespace ShimmerChat.Singletons
                     {
                         Console.WriteLine($"加载内置面板时出错: {ex.Message}");
                         Console.WriteLine(ex.StackTrace);
+                    }
+
+                    // 1.5 加载 ShimmerChat 主程序集的插件面板 (ApiSettings, ToolManager等)
+                    try
+                    {
+                        var shimmerAssembly = typeof(Program).Assembly;
+                        var shimmerPanelTypes = _pluginLoaderService.GetTypesWithAttributeFromAssembly<PluginPanelAttribute>(shimmerAssembly);
+                        Console.WriteLine($"找到 {shimmerPanelTypes.Count} 个主程序集面板类型");
+                        AddPanelsFromTypes(shimmerPanelTypes);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"加载主程序集面板时出错: {ex.Message}");
                     }
                     
                     // 2. 加载外部插件面板

@@ -1,4 +1,5 @@
 ﻿using SharperLLM.Util;
+using ShimmerChatLib.Generation;
 
 namespace ShimmerChatLib.Context
 {

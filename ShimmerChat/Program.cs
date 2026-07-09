@@ -1,5 +1,7 @@
 using ShimmerChat.Components;
 using ShimmerChat.Singletons;
+using ShimmerChatLib.Generation;
+using ShimmerChatBuiltin.Generation.Nodes;
 using Microsoft.AspNetCore.Localization;
 using System.Globalization;
 using ShimmerChatLib.Interface;
@@ -31,22 +33,26 @@ builder.Services.AddLocalization(option => option.ResourcesPath = "Resources");
 // 配置 KV 数据存储
 ConfigureKVDataStorage(builder);
 
-builder.Services.AddSingleton<ICompletionService, CompletionServiceV1>();
-builder.Services.AddSingleton<ICompletionServiceV2, CompletionServiceV2>();
-builder.Services.AddSingleton<IContextBuilderService, ContextBuilderServiceV1>();
-builder.Services.AddSingleton<IAIGenerationService, AIGenerationServiceV1>();
+// ShimmerChat 2.0 服务
+builder.Services.AddSingleton<GenerationManagerV2>();
+builder.Services.AddSingleton<AgentMigrationService>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
-builder.Services.AddSingleton<IToolService, ToolServiceV1>();
 builder.Services.AddSingleton<IPopupService, PopupService>();
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
-builder.Services.AddSingleton<IContextModifierService, ContextModifierServiceV1>();
+builder.Services.AddSingleton<ICompletionServiceV2, CompletionServiceV2>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
 
 var app = builder.Build();
 
 // 执行自动迁移（如果需要）
 ExecuteAutoMigration(app);
+
+// ShimmerChat 2.0: 初始化 FileSystem V2 Tools 的静态依赖
+InitializeV2Tools(app);
+
+// ShimmerChat 2.0: 执行 Agent 数据迁移
+ExecuteAgentMigration(app);
 
 var supportedCultures = new[]
 {
@@ -88,6 +94,37 @@ app.UseStaticFiles(new StaticFileOptions
 app.Run();
 
 return;
+
+// ShimmerChat 2.0: 初始化 FileSystem V2 Tools 的静态依赖
+static void InitializeV2Tools(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    ShimmerChatLib.Generation.ToolEnvironment.KVData =
+        scope.ServiceProvider.GetRequiredService<IKVDataService>();
+    Console.WriteLine("[ShimmerChat 2.0] ToolEnvironment initialized.");
+
+    // Register custom node editors
+    ShimmerChatLib.Generation.NodeEditorAttribute.RegisterEditor(
+        "ShimmerChat.Components.SubComponents.APISelectNodeEditor",
+        typeof(ShimmerChat.Components.SubComponents.APISelectNodeEditor));
+    Console.WriteLine("[ShimmerChat 2.0] Node editors registered.");
+}
+
+// ShimmerChat 2.0: 自动迁移 Agent 到 2.0
+static void ExecuteAgentMigration(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var migrationService = scope.ServiceProvider.GetRequiredService<AgentMigrationService>();
+    try
+    {
+        int count = migrationService.MigrateAll();
+        Console.WriteLine($"[ShimmerChat 2.0] Agent migration completed. {count} agents migrated.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[ShimmerChat 2.0] Agent migration error: {ex.Message}");
+    }
+}
 
 // 配置 KV 数据存储服务
 static void ConfigureKVDataStorage(WebApplicationBuilder builder)

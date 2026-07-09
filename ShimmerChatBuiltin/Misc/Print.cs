@@ -1,6 +1,7 @@
 ﻿using SharperLLM.Util;
 using ShimmerChatLib;
 using ShimmerChatLib.Context;
+using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.Misc
 {

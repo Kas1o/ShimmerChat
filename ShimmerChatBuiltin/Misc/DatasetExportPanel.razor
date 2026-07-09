@@ -4,7 +4,6 @@
 @using ShimmerChatLib.Interface
 @inject IKVDataService KVData
 @inject IJSRuntime JS
-@inject IContextBuilderService ContextBuilderService
 
 @attribute [PluginPanelAttribute("数据集导出", "导出对话内容，支持应用上下文修改器和不应用", PanelDisplayPlace.Chat)]
 
@@ -41,18 +40,37 @@
 	{
 		var agent = Agent.Load(AgentGuid, KVData);
 		var chat = Chat.Load(ChatGuid, KVData);
-		var pb = ContextBuilderService.BuildPromptBuilderWithoutContextModify(chat,agent);
+		var pb = BuildRawPrompt(chat, agent);
 		var json = Newtonsoft.Json.JsonConvert.SerializeObject(SharperLLM.Util.Dataset.ShareGPTDatasetTerm.CreateFromPromptBuilder(pb));
 		SaveToFile(json);
 	}
 
 	void ApplyModifiersAndExport()
 	{
-		var agent = Agent.Load(AgentGuid, KVData);
-		var chat = Chat.Load(ChatGuid, KVData);
-		var pb = ContextBuilderService.BuildPromptBuilder(chat,agent);
-		var json = Newtonsoft.Json.JsonConvert.SerializeObject(SharperLLM.Util.Dataset.ShareGPTDatasetTerm.CreateFromPromptBuilder(pb));
-		SaveToFile(json);
+		// ShimmerChat 2.0: modifiers are now part of the generation pipeline.
+		// Exporting raw data for now.
+		Export();
+	}
+
+	private static SharperLLM.Util.PromptBuilder BuildRawPrompt(Chat chat, Agent agent)
+	{
+		var pb = new SharperLLM.Util.PromptBuilder();
+		var messages = chat.Messages
+			.Where(x => x.GenerationState != ShimmerChatLib.MessageGenerationState.Regenerating)
+			.Select(x => (
+				x.message,
+				x.sender.ToLower() switch
+				{
+					ShimmerChatLib.Sender.User => SharperLLM.Util.PromptBuilder.From.user,
+					ShimmerChatLib.Sender.AI => SharperLLM.Util.PromptBuilder.From.assistant,
+					ShimmerChatLib.Sender.System => SharperLLM.Util.PromptBuilder.From.system,
+					ShimmerChatLib.Sender.ToolResult => SharperLLM.Util.PromptBuilder.From.tool_result,
+					_ => SharperLLM.Util.PromptBuilder.From.user
+				}
+			)).ToList();
+		messages.Insert(0, (new SharperLLM.Util.ChatMessage { Content = agent.Description }, SharperLLM.Util.PromptBuilder.From.system));
+		pb.Messages = messages.ToArray();
+		return pb;
 	}
 
 	void SaveToFile(string content)

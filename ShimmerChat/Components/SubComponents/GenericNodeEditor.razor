@@ -1,0 +1,430 @@
+@using System.Reflection
+@using ShimmerChatLib.Generation
+@using ShimmerChatBuiltin.Generation.Nodes
+@typeparam TNode where TNode : IGenerationNode
+
+<div class="generic-editor">
+    @foreach (var prop in _properties.OrderBy(p => p.Order))
+    {
+        <div class="ge-field">
+            <label class="ge-label" title="@prop.Hint">@prop.Label</label>
+            <div class="ge-value">
+                @RenderProperty(prop)
+            </div>
+        </div>
+    }
+    @if (_childNodesProp != null)
+    {
+        <div class="ge-children">
+            <div class="ge-children-header">
+                <span class="ge-label">@_childNodesProp.Label</span>
+                <span class="tn-count">(@_childNodes.Count)</span>
+                <button class="tn-btn tn-btn-add" @onclick="ToggleAddMenu" title="Add child">+</button>
+            </div>
+
+            @if (_showAddMenu)
+            {
+                <div class="tn-add-menu">
+                    <input class="tn-add-search" placeholder="Filter..." @bind="_filter" @bind:event="oninput"
+                           @onkeydown="OnAddKeyDown" />
+
+                    @if (_navPath.Count == 0)
+                    {
+                        @* Root level: show top categories + any root-level items *@
+                        <div class="tn-add-categories">
+                            @foreach (var child in _categoryTree)
+                            {
+                                var count = CountLeafNodes(child, _filter);
+                                <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
+                                    <span class="tn-cat-name">@child.Name</span>
+                                    <span class="tn-cat-count">@count</span>
+                                </button>
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(_filter))
+                        {
+                            <div class="tn-add-flat">
+                                @foreach (var leaf in _flatNodes.Where(n =>
+                                    n.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    <div class="tn-add-item" @onclick="() => AddChild(leaf.Type)" @onclick:preventDefault>
+                                        <span class="tn-item-left">
+                                            <span style="color:@leaf.Color">@leaf.Icon</span>
+                                            <span class="tn-item-label">@leaf.Label</span>
+                                        </span>
+                                        <span class="tn-add-item-cat">@leaf.FullCategory</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @* Drilled into a category *@
+                        var current = _navPath[^1];
+                        <div class="tn-add-breadcrumb">
+                            <button class="tn-add-back" @onclick="NavigateUp" title="Back">←</button>
+                            @for (int i = 0; i < _navPath.Count; i++)
+                            {
+                                if (i > 0) { <span class="tn-bc-sep">›</span> }
+                                <button class="tn-bc-item @(i == _navPath.Count - 1 ? "current" : "")"
+                                        @onclick="() => NavigateTo(_navPath.Take(i + 1).ToList())">
+                                    @_navPath[i].Name
+                                </button>
+                            }
+                        </div>
+                        <div class="tn-add-categories">
+                            @foreach (var child in current.Children)
+                            {
+                                var count = CountLeafNodes(child, _filter);
+                                <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
+                                    <span class="tn-cat-name">@child.Name</span>
+                                    <span class="tn-cat-count">@count</span>
+                                </button>
+                            }
+                        </div>
+                        @if (current.LeafNodes.Count > 0)
+                        {
+                            <div class="tn-add-nodes">
+                                @foreach (var nt in current.LeafNodes.Where(n =>
+                                    string.IsNullOrEmpty(_filter) ||
+                                    n.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    <div class="tn-add-item" @onclick="() => AddChild(nt.Type)" @onclick:preventDefault>
+                                        <span class="tn-item-left">
+                                            <span style="color:@nt.Color">@nt.Icon</span>
+                                            <span class="tn-item-label">@nt.Label</span>
+                                        </span>
+                                        @if (nt.Description != null)
+                                        {
+                                            <span class="tn-item-desc">@nt.Description</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            }
+
+            @foreach (var child in _childNodes)
+            {
+                <TreeEditor Node="@child" Depth="@(Depth + 1)"
+                            OnTreeChanged="OnTreeChanged"
+                            RemoveMe="@(node => { _childNodes.Remove(node); OnTreeChanged.InvokeAsync(); })" />
+            }
+            @if (_childNodes.Count == 0)
+            {
+                <div class="tn-empty">empty — click + to add</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public TNode Node { get; set; } = default!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public EventCallback OnTreeChanged { get; set; }
+    [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
+
+    private List<PropInfo> _properties = new();
+    private PropInfo? _childNodesProp;
+    private IList<IGenerationNode> _childNodes = new List<IGenerationNode>();
+    private bool _showAddMenu;
+    private string _filter = "";
+
+    private List<CategoryTreeNode> _categoryTree = new();
+    private List<CategoryTreeNode> _navPath = new();
+    private List<(string Label, Type Type, string Icon, string Color, string? Description, string FullCategory)> _flatNodes = new();
+
+    private static List<(string Label, Type Type, string Icon, string Color, string? Description, string FullCategory)>? _cachedFlats;
+
+    protected override void OnInitialized()
+    {
+        BuildPropertyList();
+        BuildCategoryTree();
+    }
+
+    private void BuildCategoryTree()
+    {
+        var flatNodes = GetFlatNodes();
+        _flatNodes = flatNodes;
+
+        var root = new Dictionary<string, CategoryTreeNode>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var node in flatNodes)
+        {
+            var parts = node.FullCategory.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+            {
+                parts = new[] { "General" };
+            }
+
+            Dictionary<string, CategoryTreeNode> current = root;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var part = parts[i];
+                if (!current.TryGetValue(part, out var treeNode))
+                {
+                    treeNode = new CategoryTreeNode { Name = part };
+                    current[part] = treeNode;
+                }
+
+                if (i == parts.Length - 1)
+                {
+                    treeNode.LeafNodes.Add(node);
+                }
+
+                current = treeNode.ChildrenDict;
+            }
+        }
+
+        _categoryTree = root.Values.OrderBy(c => c.Name).ToList();
+    }
+
+    private static List<(string Label, Type Type, string Icon, string Color, string? Description, string FullCategory)> GetFlatNodes()
+    {
+        if (_cachedFlats != null) return _cachedFlats;
+
+        _cachedFlats = new();
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (asm.IsDynamic) continue;
+            try
+            {
+                foreach (var type in asm.GetExportedTypes())
+                {
+                    if (typeof(IGenerationNode).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
+                    {
+                        var info = type.GetCustomAttribute<NodeInfoAttribute>();
+                        _cachedFlats.Add((
+                            info?.Label ?? type.Name,
+                            type,
+                            info?.Icon ?? "●",
+                            info?.Color ?? "#888",
+                            info?.Description,
+                            info?.Category ?? "General"
+                        ));
+                    }
+                }
+            }
+            catch { }
+        }
+        return _cachedFlats;
+    }
+
+    private static int CountLeafNodes(CategoryTreeNode node, string filter)
+    {
+        int count = node.LeafNodes.Count(n =>
+            string.IsNullOrEmpty(filter) || n.Label.Contains(filter, StringComparison.OrdinalIgnoreCase));
+        foreach (var child in node.Children)
+            count += CountLeafNodes(child, filter);
+        return count;
+    }
+
+    private void NavigateInto(CategoryTreeNode node)
+    {
+        _navPath.Add(node);
+    }
+
+    private void NavigateUp()
+    {
+        if (_navPath.Count > 0)
+            _navPath.RemoveAt(_navPath.Count - 1);
+    }
+
+    private void NavigateTo(List<CategoryTreeNode> path)
+    {
+        _navPath = path;
+    }
+
+    private void BuildPropertyList()
+    {
+        var nodeType = Node.GetType();
+        var props = nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanRead && p.CanWrite)
+            .Where(p => p.Name is not "Id") // skip Id
+            .ToList();
+
+        foreach (var prop in props)
+        {
+            if (typeof(IList<IGenerationNode>).IsAssignableFrom(prop.PropertyType) ||
+                (prop.PropertyType.IsGenericType && prop.PropertyType.GetGenericTypeDefinition() == typeof(List<>)
+                 && typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType.GenericTypeArguments[0])))
+            {
+                _childNodesProp = new PropInfo(prop, nodeType);
+                _childNodes = (IList<IGenerationNode>)prop.GetValue(Node)! ?? new List<IGenerationNode>();
+                continue;
+            }
+            if (typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType) && prop.PropertyType != typeof(IGenerationNode))
+            {
+                continue; // single child node — skip for now, handled by TreeEditor
+            }
+            _properties.Add(new PropInfo(prop, nodeType));
+        }
+    }
+
+    private class CategoryTreeNode
+    {
+        public string Name { get; set; } = "";
+        public Dictionary<string, CategoryTreeNode> ChildrenDict { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<CategoryTreeNode> Children => ChildrenDict.Values.OrderBy(c => c.Name).ToList();
+        public List<(string Label, Type Type, string Icon, string Color, string? Description, string FullCategory)> LeafNodes { get; } = new();
+    }
+
+    private void ToggleAddMenu()
+    {
+        _showAddMenu = !_showAddMenu;
+        _navPath.Clear();
+        _filter = "";
+    }
+
+    private async Task OnAddKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") { _showAddMenu = false; }
+    }
+
+    private void AddChild(Type type)
+    {
+        _showAddMenu = false;
+        _filter = "";
+        var instance = (IGenerationNode)Activator.CreateInstance(type)!;
+        instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.Label ?? type.Name;
+        _childNodes.Add(instance);
+        OnTreeChanged.InvokeAsync();
+    }
+
+    private RenderFragment RenderProperty(PropInfo prop) => builder =>
+    {
+        var value = prop.GetValue(Node);
+
+        if (prop.PropertyType == typeof(string))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "class", "ge-input");
+            builder.AddAttribute(2, "value", value as string ?? "");
+            builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, value as string ?? ""));
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType == typeof(int))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "number");
+            builder.AddAttribute(2, "class", "ge-input ge-input-num");
+            builder.AddAttribute(3, "value", (int)(value ?? 0));
+            builder.AddAttribute(4, "onchange", EventCallback.Factory.CreateBinder<int>(this,
+                v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, (int)(value ?? 0)));
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType == typeof(bool))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "checkbox");
+            builder.AddAttribute(2, "class", "ge-check");
+            builder.AddAttribute(3, "checked", (bool)(value ?? false));
+            builder.AddAttribute(4, "onchange", EventCallback.Factory.CreateBinder<bool>(this,
+                v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, (bool)(value ?? false)));
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType.IsEnum)
+        {
+            builder.OpenElement(0, "select");
+            builder.AddAttribute(1, "class", "ge-select");
+            var current = value?.ToString() ?? "";
+            builder.AddAttribute(2, "value", current);
+            builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                v => { prop.SetValue(Node, Enum.Parse(prop.PropertyType, v)); OnTreeChanged.InvokeAsync(); }, current));
+            foreach (var name in Enum.GetNames(prop.PropertyType))
+            {
+                builder.OpenElement(4, "option");
+                builder.AddAttribute(5, "value", name);
+                builder.AddContent(6, name);
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType == typeof(float))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "number");
+            builder.AddAttribute(2, "step", "0.1");
+            builder.AddAttribute(3, "class", "ge-input ge-input-num");
+            builder.AddAttribute(4, "value", (float)(value ?? 0f));
+            builder.AddAttribute(5, "onchange", EventCallback.Factory.CreateBinder<float>(this,
+                v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, (float)(value ?? 0f)));
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.AddContent(0, value?.ToString() ?? "(null)");
+        }
+    };
+
+    private class PropInfo
+    {
+        public string Label { get; }
+        public string? Hint { get; }
+        public int Order { get; }
+        public PropertyInfo Prop { get; }
+        public Type PropertyType { get; }
+
+        public PropInfo(PropertyInfo prop, Type nodeType)
+        {
+            Prop = prop;
+            PropertyType = prop.PropertyType;
+            var attr = prop.GetCustomAttribute<NodePropertyAttribute>();
+            Label = attr?.Label ?? prop.Name;
+            Hint = attr?.Hint;
+            Order = attr?.Order ?? 0;
+        }
+
+        public object? GetValue(object obj) => Prop.GetValue(obj);
+        public void SetValue(object obj, object? value) => Prop.SetValue(obj, value);
+    }
+}
+
+
+<style>
+.ge-field { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; }
+.ge-label { font-size: 0.75em; color: #777; min-width: 80px; padding-top: 5px; flex-shrink: 0; text-align: right; }
+.ge-value { flex: 1; }
+.ge-input { width: 100%; padding: 4px 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; color: #ccc; font-size: 0.8em; outline: none; }
+.ge-input:focus { border-color: rgba(100,150,255,0.4); }
+.ge-input-num { width: 100px; }
+.ge-check { width: 16px; height: 16px; accent-color: #4a9eff; }
+.ge-select { padding: 4px 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; color: #ccc; font-size: 0.8em; outline: none; min-width: 120px; }
+.ge-children { margin-top: 6px; }
+.ge-children-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.tn-count { font-size: 0.7em; color: #666; }
+.tn-btn { width: 22px; height: 22px; border: none; border-radius: 4px; font-size: 0.8em; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.tn-btn-add { background: rgba(100,200,100,0.12); color: #6c6; }
+.tn-btn-add:hover { background: rgba(100,200,100,0.28); }
+.tn-add-menu { margin: 4px 0 8px; background: var(--color-surface, #252540); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; }
+.tn-add-search { width: 100%; padding: 6px 10px; border: none; border-bottom: 1px solid rgba(255,255,255,0.06); background: transparent; color: #ccc; font-size: 0.78em; outline: none; }
+.tn-add-search::placeholder { color: #555; }
+.tn-add-categories { padding: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.tn-add-cat { padding: 5px 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; background: transparent; color: #aaa; font-size: 0.75em; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+.tn-add-cat:hover { border-color: rgba(100,150,255,0.4); color: #ddd; }
+.tn-add-cat.active { background: rgba(100,150,255,0.15); border-color: #4a9eff; color: #fff; }
+.tn-cat-name { font-weight: 500; }
+.tn-cat-count { font-size: 0.8em; color: #555; background: rgba(255,255,255,0.05); padding: 1px 6px; border-radius: 8px; }
+.tn-add-cat-header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.tn-add-back { padding: 2px 8px; border: none; background: rgba(255,255,255,0.05); color: #888; font-size: 0.75em; border-radius: 3px; cursor: pointer; }
+.tn-add-back:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+.tn-add-breadcrumb { display: flex; align-items: center; gap: 4px; padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.75em; flex-wrap: wrap; }
+.tn-bc-sep { color: #444; }
+.tn-bc-item { padding: 1px 4px; border: none; background: transparent; color: #888; cursor: pointer; border-radius: 2px; }
+.tn-bc-item:hover { color: #ccc; background: rgba(255,255,255,0.05); }
+.tn-bc-item.current { color: #bbb; font-weight: 600; }
+.tn-add-cat-title { font-size: 0.8em; font-weight: 600; color: #aaa; }
+.tn-add-nodes { padding: 4px 0; max-height: 160px; overflow-y: auto; }
+.tn-add-flat { border-top: 1px solid rgba(255,255,255,0.06); padding-top: 4px; margin-top: 4px; max-height: 140px; overflow-y: auto; }
+.tn-add-item { padding: 6px 10px; font-size: 0.78em; cursor: pointer; color: #aaa; display: flex; align-items: center; justify-content: space-between; transition: background 0.1s; }
+.tn-add-item:hover { background: rgba(100,150,255,0.12); color: #fff; }
+.tn-item-left { display: flex; align-items: center; gap: 6px; }
+.tn-item-label { font-weight: 500; }
+.tn-item-desc { font-size: 0.7em; color: #555; max-width: 140px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tn-add-item-cat { font-size: 0.65em; color: #555; margin-left: auto; }
+.tn-empty { padding: 6px 0; font-size: 0.72em; color: #555; font-style: italic; }
+</style>

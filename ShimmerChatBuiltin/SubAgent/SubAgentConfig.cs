@@ -1,4 +1,4 @@
-using ShimmerChatLib.Interface;
+using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.SubAgent
 {
