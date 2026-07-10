@@ -19,6 +19,10 @@
                 <span class="ge-label">@_childNodesProp.Label</span>
                 <span class="tn-count">(@_childNodes.Count)</span>
                 <button class="tn-btn tn-btn-add" @onclick="ToggleAddMenu" title="Add child">+</button>
+                @if (NodeClipboard.HasContent)
+                {
+                    <button class="tn-btn tn-btn-paste" @onclick="PasteNode" title="Paste copied node">📋</button>
+                }
             </div>
 
             @if (_showAddMenu)
@@ -106,11 +110,28 @@
                 </div>
             }
 
-            @foreach (var child in _childNodes)
+            @for (int i = 0; i < _childNodes.Count; i++)
             {
-                <TreeEditor Node="@child" Depth="@(Depth + 1)"
-                            OnTreeChanged="OnTreeChanged"
-                            RemoveMe="@(node => { _childNodes.Remove(node); OnTreeChanged.InvokeAsync(); })" />
+                var index = i;
+                var child = _childNodes[i];
+                <div class="tn-child-row" @key="child.Id">
+                    <div class="tn-child-actions">
+                        <button class="tn-btn tn-btn-move"
+                                @onclick="() => MoveChildUp(index)"
+                                @onclick:stopPropagation="true"
+                                disabled="@(index == 0)" title="Move up">⇧</button>
+                        <button class="tn-btn tn-btn-move"
+                                @onclick="() => MoveChildDown(index)"
+                                @onclick:stopPropagation="true"
+                                disabled="@(index == _childNodes.Count - 1)" title="Move down">⇩</button>
+                    </div>
+                    <div class="tn-child-tree">
+                        <TreeEditor Node="@child" Depth="@(Depth + 1)"
+                                    OnTreeChanged="OnTreeChanged"
+                                    RemoveMe="@(node => { _childNodes.Remove(node); OnTreeChanged.InvokeAsync(); })"
+                                    CopyMe="CopyNode" />
+                    </div>
+                </div>
             }
             @if (_childNodes.Count == 0)
             {
@@ -125,6 +146,7 @@
     [Parameter] public int Depth { get; set; }
     [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
+    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     private List<PropInfo> _properties = new();
     private PropInfo? _childNodesProp;
@@ -293,6 +315,39 @@
         OnTreeChanged.InvokeAsync();
     }
 
+    private void CopyNode(IGenerationNode node)
+    {
+        NodeClipboard.Copy(node);
+        // Re-render to show paste button
+        OnTreeChanged.InvokeAsync();
+    }
+
+    private void PasteNode()
+    {
+        var node = NodeClipboard.Paste();
+        if (node != null)
+        {
+            _childNodes.Add(node);
+            OnTreeChanged.InvokeAsync();
+        }
+    }
+
+    private void MoveChildUp(int index)
+    {
+        if (index <= 0 || index >= _childNodes.Count) return;
+        (_childNodes[index], _childNodes[index - 1]) = (_childNodes[index - 1], _childNodes[index]);
+        OnTreeChanged.InvokeAsync();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void MoveChildDown(int index)
+    {
+        if (index < 0 || index >= _childNodes.Count - 1) return;
+        (_childNodes[index], _childNodes[index + 1]) = (_childNodes[index + 1], _childNodes[index]);
+        OnTreeChanged.InvokeAsync();
+        InvokeAsync(StateHasChanged);
+    }
+
     private RenderFragment RenderProperty(PropInfo prop) => builder =>
     {
         var value = prop.GetValue(Node);
@@ -399,6 +454,14 @@
 .tn-btn { width: 22px; height: 22px; border: none; border-radius: 4px; font-size: 0.8em; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .tn-btn-add { background: rgba(100,200,100,0.12); color: #6c6; }
 .tn-btn-add:hover { background: rgba(100,200,100,0.28); }
+.tn-btn-paste { background: rgba(100,150,220,0.12); color: #8af; font-size: 0.7em; }
+.tn-btn-paste:hover { background: rgba(100,150,220,0.28); }
+.tn-btn-move { width: 20px; height: 20px; border: none; border-radius: 3px; font-size: 0.65em; cursor: pointer; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.04); color: #666; }
+.tn-btn-move:hover:not(:disabled) { background: rgba(255,255,255,0.1); color: #aaa; }
+.tn-btn-move:disabled { opacity: 0.25; cursor: default; }
+.tn-child-row { display: flex; align-items: flex-start; gap: 2px; }
+.tn-child-tree { flex: 1; min-width: 0; }
+.tn-child-actions { display: flex; flex-direction: column; gap: 1px; padding-top: 7px; flex-shrink: 0; }
 .tn-add-menu { margin: 4px 0 8px; background: var(--color-surface, #252540); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; }
 .tn-add-search { width: 100%; padding: 6px 10px; border: none; border-bottom: 1px solid rgba(255,255,255,0.06); background: transparent; color: #ccc; font-size: 0.78em; outline: none; }
 .tn-add-search::placeholder { color: #555; }

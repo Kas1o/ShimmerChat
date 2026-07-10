@@ -15,6 +15,7 @@ public class NodeBodyRenderer : ComponentBase
     [Parameter] public int Depth { get; set; }
     [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
+    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
@@ -25,6 +26,7 @@ public class NodeBodyRenderer : ComponentBase
         builder.AddAttribute(2, "Depth", Depth);
         builder.AddAttribute(3, "OnTreeChanged", OnTreeChanged);
         builder.AddAttribute(4, "RemoveMe", RemoveMe);
+        builder.AddAttribute(5, "CopyMe", CopyMe);
         builder.CloseComponent();
     }
 }

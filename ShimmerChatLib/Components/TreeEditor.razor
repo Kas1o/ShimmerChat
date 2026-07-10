@@ -8,12 +8,18 @@
             <span class="tn-icon">●</span>
             <span class="tn-label">@Node.GetType().Name</span>
             <span class="tn-name">@Node.Name</span>
-            @if (RemoveMe != null && Depth > 0)
-            {
-                <div class="tn-actions">
-                    <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)" title="Remove">✕</button>
-                </div>
-            }
+            <div class="tn-actions">
+                @if (CopyMe != null)
+                {
+                    <button class="tn-btn tn-btn-copy" @onclick="() => CopyMe?.Invoke(Node)"
+                            @onclick:stopPropagation="true" title="Copy">📋</button>
+                }
+                @if (RemoveMe != null && Depth > 0)
+                {
+                    <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)"
+                            @onclick:stopPropagation="true" title="Remove">✕</button>
+                }
+            </div>
         </div>
     </div>
 }
@@ -33,9 +39,15 @@ else
             <input class="tn-name-input" @bind="Node.Name" @bind:event="oninput"
                    @onkeydown="OnNameKeyDown" placeholder="Name" />
             <div class="tn-actions">
+                @if (CopyMe != null)
+                {
+                    <button class="tn-btn tn-btn-copy" @onclick="() => CopyMe?.Invoke(Node)"
+                            @onclick:stopPropagation="true" title="Copy">📋</button>
+                }
                 @if (RemoveMe != null && Depth > 0)
                 {
-                    <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)" title="Remove">✕</button>
+                    <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)"
+                            @onclick:stopPropagation="true" title="Remove">✕</button>
                 }
                 @if (isContainer)
                 {
@@ -59,7 +71,8 @@ else
                     @* Auto-generated editor *@
                     <NodeBodyRenderer Node="@Node" Depth="@Depth"
                                       OnTreeChanged="OnTreeChanged"
-                                      RemoveMe="RemoveMe" />
+                                      RemoveMe="RemoveMe"
+                                      CopyMe="CopyMe" />
                 }
             </div>
         }
@@ -71,6 +84,7 @@ else
     [Parameter] public int Depth { get; set; }
     [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
+    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     private NodeInfoAttribute? _info;
     private Type? _customEditorType;
@@ -121,6 +135,8 @@ else
 .tn-btn { width: 22px; height: 22px; border: none; border-radius: 4px; font-size: 0.8em; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .tn-btn-del { background: rgba(220,80,80,0.12); color: #e66; }
 .tn-btn-del:hover { background: rgba(220,80,80,0.28); }
+.tn-btn-copy { background: rgba(100,150,220,0.12); color: #8af; font-size: 0.7em; }
+.tn-btn-copy:hover { background: rgba(100,150,220,0.28); }
 .tn-btn-exp { background: transparent; color: #666; font-size: 0.65em; }
 .tn-body { padding: 4px 10px 8px 28px; }
 </style>
