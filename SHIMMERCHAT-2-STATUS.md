@@ -10,11 +10,17 @@
 - [x] `NodePropertyAttribute` — per-property metadata (label, hint, order)
 - [x] `NodeEditorAttribute` — string-based editor registration (avoids circular dependency)
 - [x] `ToolEnvironment` — static KVData access for no-arg tools
+- [x] `NodeResult` — unified error structure (Success / Code / Message / Details / NodeId / NodeName)
+- [x] `NodeErrorCodes` — predefined error codes (PRESET_NOT_FOUND, TOOL_NOT_FOUND, API_UNAVAILABLE, etc.)
+- [x] `NodeClipboard` — static Copy/Paste for node trees (JSON serialization with ID regeneration)
 
-### Nodes (15)
-- [x] SequenceNode, IfNode, CallNode, FragmentNode, AgentRootNode
-- [x] ToolInstantiateNode, MemoryToolNode, VariableToolNode, SetChatNameNode, SubAgentToolNode, ToolPresetNode
+### Nodes (18+)
+- [x] SequenceNode, IfNode, CallNode, FragmentNode
+- [x] ToolInstantiateNode, ToolPresetNode, SubAgentToolNode
 - [x] APISelectNode, FragmentTrimNode, MemoryRetrieveNode, SubAgentNode
+- [x] AppendChatMessagesNode, DynPromptNode, MergeFragmentsNode
+- [x] MessagePrintNode, MessagePrintLatestNode, MessagePrintV2Node, PrintNode
+- [x] STStyleMacroNode, TransientProbeNode
 
 ### Tool V2 Implementations (10)
 - [x] FileSystemReadToolV2, WriteToolV2, EditToolV2, BrowseToolV2, OverviewToolV2 (no-arg, via ToolEnvironment)
@@ -26,7 +32,20 @@
 - [x] `GenerateContinuationStreamAsync` — prefix continuation support
 - [x] `ForwardAccumulated` — single-pass stream accumulation + tool call detection
 - [x] CallNode reads presets from KVData directly (no external delegates)
-- [x] ToolPresetNode reads tool presets from KVData + auto-scans assemblies
+- [x] ToolPresetNode reads tool presets from KVData + delegates to ToolRegistry (which has Lazy caching)
+- [x] `ToolRegistry` — unified tool scanning with `Lazy<IReadOnlyList<ToolMetadata>>` cache
+
+### Error Handling (P0-1)
+- [x] `NodeResult` with Success/Code/Message/Details/NodeId/NodeName
+- [x] `NodeErrorCodes` — 8 predefined error codes
+- [x] Nodes use `NodeResult.Failure(...)` instead of throwing / silent-fail (SubAgentNode, ToolPresetNode, etc.)
+- [x] UI displays errors via PopupService in AgentChatPage catch block
+
+### SubAgent (P1-2)
+- [x] SubAgentNode — all three output modes: `LastMessage`, `FullJson`, `None`
+- [x] `SubAgentFormatter.Format()` — switch on mode: LastMessage returns text, FullJson returns JSON array, None returns ""
+- [x] SubAgentConfigurationPanel — functional UI with create/select/edit/delete, output mode dropdown, preset/private tree toggle, inline TreeEditor
+- [x] SubAgentToolV2 — sub-agent callable as LLM tool
 
 ### UI
 - [x] `GenerationManagerPage.razor` — tree editor with data-driven nodes
@@ -34,9 +53,12 @@
 - [x] `GenericNodeEditor.razor` — auto-generated property forms via [NodeProperty]
 - [x] `NodeBodyRenderer.cs` — non-generic bridge for DynamicComponent
 - [x] `APISelectNodeEditor.razor` — custom editor example (API dropdown)
+- [x] `ToolInstantiateNodeEditor.razor`, `SubAgentToolNodeEditor.razor` — custom editors
 - [x] NavMenu restructured: Home → Generation Manager → Agents → Misc → Representation → Plugin Panels
 - [x] PluginPanelSelectPage deleted; panels listed directly in NavMenu
 - [x] ContextManagerPage → redirects to GenerationManagerPage
+- [x] `NodeClipboard` — cross-tree copy/paste via JSON serialization
+- [x] `GenericNodeEditor` — move up / move down buttons for child node reordering
 
 ### Agent Changes
 - [x] `Agent.ModifierTreeJson` — private modifier tree, replaces Description-as-system-prompt
@@ -47,7 +69,8 @@
 
 ### Panel System
 - [x] ApiSettingsPage, ToolManager — attributed as PluginPanel, scanned by PluginPanelServiceV1
-- [x] ToolManager — rewritten to IToolV2 dispaly + preset save/load
+- [x] ToolManager — rewritten to IToolV2 display + preset save/load
+- [x] ToolManager `_default_` preset — rebuilt each startup with all available tools, non-deletable (P2-2)
 
 ### Cleanup
 - [x] Removed ~37 old files (V1 services, interfaces, Tool implementations, ContextModifiers, etc.)
@@ -58,19 +81,11 @@
 
 ## Incomplete / Known Issues
 
-### ToolPresetNode startup cost
-`ToolPresetNode.ResolveToolType` iterates all assemblies and creates an instance for each candidate. This is O(n × m) per lookup. Should cache results in a static dictionary.
-
-### SubAgentConfigurationPanel
-Old panel was partially migrated. Independent modifier editing removed (placeholder message). Full redesign pending.
-
-### SubAgentNode output modes
-Currently only returns `LastMessage`. `FullJson` and `None` modes from old system not implemented.
-
-### GenerationManagerPage — tree editor UX
-- Node deletion only works at top-level via TreeEditor. No "remove" button on leaf nodes shown at Depth 0.
-- No drag-and-drop reorder.
-- No copy/paste between trees.
+### GenerationManagerPage — tree editor UX (P2-1 基本完成)
+- [x] Cross-tree copy/paste via `NodeClipboard` (Copy/Paste/Clear/HasContent) + paste button in GenericNodeEditor
+- [x] Move up / move down buttons (⇧⇩) on child nodes in GenericNodeEditor
+- [ ] No drag-and-drop reorder.
+- [ ] Delete button only appears when `Depth > 0` in TreeEditor — depth-0 nodes can't be deleted directly.
 
 ### Streaming UX
 `ForwardAccumulated` mutates `ResponseEx` in-place. Tool call arguments are accumulated correctly, but thinking content deduplication is naive (string concat).
@@ -79,19 +94,22 @@ Currently only returns `LastMessage`. `FullJson` and `None` modes from old syste
 `GenerateContinuationStreamAsync` sets `prefix:true` on the last assistant fragment. May not work correctly with all API backends.
 
 ### FragmentTrimNode token counting
-Relies on static `TokenizerFactory` delegate — currently unset, so token-based trimming is disabled by default. Falls back to message-count trimming.
+Relies on static `TokenizerFactory` delegate — currently unset, so token-based trimming is disabled by default. Falls back to message-count trimming. Delegate is never assigned anywhere in the codebase.
 
 ### APISelectNode
 When `APIIndex = -1` (global default), reads from KVData at execution time. If global API settings change mid-generation, the tree reflects them immediately — arguably correct but may surprise.
 
 ### IfNode conditions
-Only supports `SharedState['key'] == "value"` comparison. No expression parser (deferred to Stage B).
+Supports `SharedState['key'] == "value"` and `SharedState['key'] != "value"` literal string comparison (case-insensitive). No expression parser (deferred to Stage B).
 
 ### FileSystem tools
 ToolEnvironment.KVData is set at startup. If KVData becomes unavailable at runtime (e.g., after storage migration), tools will fail silently.
 
+### GenerationTreeExecutor dead code
+`GenerationTreeExecutor.ExecuteAsync()` has detailed error formatting (StringBuilder with Code/Message/Details) but is never called. `GenerationManagerV2.BuildEnvironment()` calls `rootNode.ExecuteAsync(context)` directly, bypassing the executor. The `_executor` field is unused.
+
 ### Missing Stage B features
-- ProbeNode (dump/breakpoint/timing)
+- Enhanced ProbeNode (breakpoint/timing) — basic dump probe exists as `TransientProbeNode` (Console.WriteLine of Fragments/SharedState/Tools/API)
 - Expression engine (full condition evaluator)
 - Simulation preview (virtual execution, no API call)
 - Preset import/export
@@ -99,7 +117,25 @@ ToolEnvironment.KVData is set at startup. If KVData becomes unavailable at runti
 ### Tests
 - `ShimmerChatLib.Tests/AgentTests.cs` — updated (CustomToolNames removed)
 - `ShimmerChat.Tests/ContextBuilderServiceV1Tests.cs` — deleted (service no longer exists)
-- No new tests written for GenerationManagerV2, nodes, or serialization
+- No tests for: GenerationManagerV2, GenerationTreeExecutor, GenerationNodeSerializer, any nodes, SubAgentNode output modes, error paths, ToolPresetNode, IfNode
+
+---
+
+## Human-Reported Issues (from SHIMMERCHAT-2-STATUS-HUMAN.md)
+
+### Static CSS not extracted
+Large inline `<style>` blocks remain in components. Notable: `AgentChatPage.razor` has ~167 lines of inline CSS (`.shimmer-content`, `#container`, `#chat-main`, `#input-box`, `.shimmer-typing-indicator`, `.shimmer-message`, `.shimmer-toolcall`, etc.). No `.razor.css` files exist for 20 of 22 razor components.
+
+### Documentation gaps
+- No documentation on how to create a custom GenerationNode
+- Overall code comment rate is low
+- No SKILL.md files for agent infrastructure or module overview
+
+### Localization analyzer needed
+Localization key names need an analyzer to detect mismatches between keys used in code and keys defined in `Locales/*.json`.
+
+### Preset export/import not implemented
+No UI or service to export/import `GenerationPreset` or `ToolPreset` as standalone files (though `GenerationNodeSerializer.Serialize/Deserialize` provides the technical foundation).
 
 ---
 
@@ -118,9 +154,9 @@ ShimmerChat → ShimmerChatBuiltin → ShimmerChatLib → SharperLLM
 GenerateStreamAsync
   → BuildEnvironment
     → Agent.ModifierTreeJson ?? CreateFallbackRoot
-    → GenerationTreeExecutor.ExecuteAsync(root, persistent)
+    → rootNode.ExecuteAsync(context)  [direct call, NOT via GenerationTreeExecutor]
       → APISelectNode → sets TransientEnv.API
-      → ToolPresetNode → loads Tools from ToolManager preset
+      → ToolPresetNode → loads Tools from ToolRegistry (Lazy-cached)
       → FragmentNode → injects system prompt
       → MemoryRetrieveNode → Qdrant memory search
       → FragmentTrimNode → token/message trimming
@@ -138,6 +174,20 @@ ToolManager.razor → save enabled tools → KVData("ToolPresets", name)
 GenerationManager → user adds ToolPresetNode(presetName: "xxx")
                                               ↓
 ToolPresetNode.ExecuteAsync → KVData.Read("ToolPresets", "xxx")
-  → ResolveToolType → scan assemblies → Activator.CreateInstance
-  → TransientEnv.Tools.Add(...)
+  → ToolRegistry.FindByName(typeName) → CreateInstance → TransientEnv.Tools.Add(...)
+```
+
+### SubAgent execution flow
+```
+SubAgentNode.ExecuteAsync
+  → Load SubAgentConfig from KVData
+  → ResolveTree: private ModifierTreeJson ?? shared preset from GenerationManager
+  → Create isolated PersistentEnv + TransientEnv
+  → Execute modifier tree (API select, tool preset, fragments, etc.)
+  → Run ToolCallLoopRunner with sub-agent tools
+  → SubAgentFormatter.Format(mode, promptCtx):
+      LastMessage → ctx.LastAssistantContent
+      FullJson → JSON array [{role, content, tool_calls}, ...]
+      None → ""
+  → Inject result into parent TransientEnv.Fragments
 ```
