@@ -28,7 +28,7 @@ else
             </select>
             <button class="btn btn-primary btn-sm" @onclick="CreatePreset">Save As</button>
             <button class="btn btn-outline-danger btn-sm" @onclick="DeletePreset"
-                    disabled="@(string.IsNullOrEmpty(_selectedPresetName))">Delete</button>
+                    disabled="@(string.IsNullOrEmpty(_selectedPresetName) || _selectedPresetName == DefaultPresetName)">Delete</button>
         </div>
         @if (!string.IsNullOrEmpty(_status))
         {
@@ -69,6 +69,8 @@ else
 }
 
 @code {
+    private const string DefaultPresetName = "_default_";
+
     private bool _loading = true;
     private Dictionary<string, List<ToolMetadata>> _groupedTools = new();
     private HashSet<string> _enabledTools = new();
@@ -83,21 +85,36 @@ else
             .GroupBy(t => string.IsNullOrEmpty(t.CategoryPath) ? "其他" : t.CategoryPath)
             .ToDictionary(g => g.Key, g => g.ToList());
         LoadPresets();
+        EnsureDefaultPreset();
         _loading = false;
     }
 
     private void LoadPresets()
     {
         var json = KVData.Read("ToolPresets", "__presets__");
-        _presetNames = string.IsNullOrEmpty(json)
-            ? new()
+        var persistedNames = string.IsNullOrEmpty(json)
+            ? new List<string>()
             : Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json) ?? new();
+        // 移除旧版可能持久化的默认预设名，改为每次启动从代码重建
+        _presetNames = persistedNames.Where(n => n != DefaultPresetName).ToList();
 
         if (string.IsNullOrEmpty(_selectedPresetName) && _presetNames.Count > 0)
         {
             _selectedPresetName = _presetNames[0];
             LoadPreset(_selectedPresetName);
         }
+    }
+
+    /// <summary>每次启动重建默认预设，包含所有可用工具</summary>
+    private void EnsureDefaultPreset()
+    {
+        var allToolNames = ToolRegistry.AllTools.Select(t => t.Name).ToList();
+        var defaultPreset = new ToolPreset { Name = DefaultPresetName, EnabledToolTypeNames = allToolNames };
+        // 写入 KVData 供 ToolPresetNode 读取
+        KVData.Write("ToolPresets", DefaultPresetName,
+            Newtonsoft.Json.JsonConvert.SerializeObject(defaultPreset));
+
+        _presetNames.Insert(0, DefaultPresetName);
     }
 
     private void LoadPreset(string name)
@@ -119,8 +136,7 @@ else
 
         if (!_presetNames.Contains(name))
             _presetNames.Add(name);
-        KVData.Write("ToolPresets", "__presets__",
-            Newtonsoft.Json.JsonConvert.SerializeObject(_presetNames));
+        SavePresetNames();
 
         _selectedPresetName = name;
         _status = $"Saved: {name} ({_enabledTools.Count} tools)";
@@ -129,12 +145,24 @@ else
     private void DeletePreset()
     {
         if (string.IsNullOrEmpty(_selectedPresetName)) return;
+        if (_selectedPresetName == DefaultPresetName)
+        {
+            _status = "Cannot delete the default preset.";
+            return;
+        }
         _presetNames.Remove(_selectedPresetName);
-        KVData.Write("ToolPresets", "__presets__",
-            Newtonsoft.Json.JsonConvert.SerializeObject(_presetNames));
+        SavePresetNames();
         _selectedPresetName = "";
         _enabledTools.Clear();
         _status = "Preset deleted.";
+    }
+
+    /// <summary>持久化预设名称列表，排除每次启动重建的默认预设</summary>
+    private void SavePresetNames()
+    {
+        KVData.Write("ToolPresets", "__presets__",
+            Newtonsoft.Json.JsonConvert.SerializeObject(
+                _presetNames.Where(n => n != DefaultPresetName).ToList()));
     }
 
     private void ToggleTool(string name, bool enabled)

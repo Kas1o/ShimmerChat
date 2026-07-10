@@ -148,10 +148,6 @@
         }
 
         LoadPresets();
-        if (_presets.Count == 0)
-        {
-            CreateDefaultPreset();
-        }
         _activePreset = _presets[0];
         _editingRoot = GenerationNodeSerializer.Deserialize(_activePreset.RootNodeJson)
             ?? new SequenceNode { Name = "Root" };
@@ -160,15 +156,13 @@
     private void LoadPresets()
     {
         var json = KVData.Read("GenerationManager", PresetStorageKey);
-        if (!string.IsNullOrEmpty(json))
-        {
-            _presets = Newtonsoft.Json.JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
-        }
-        // Ensure Default preset exists
-        if (!_presets.Any(p => p.Id == DefaultPresetId))
-        {
-            CreateDefaultPreset();
-        }
+        _presets = string.IsNullOrEmpty(json)
+            ? new()
+            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
+
+        // 移除旧版持久化的默认预设，改为每次启动从代码重建
+        _presets.RemoveAll(p => p.Id == DefaultPresetId);
+        CreateDefaultPreset();
     }
 
     private void CreateDefaultPreset()
@@ -179,6 +173,7 @@
             Nodes = new List<IGenerationNode>
             {
                 new APISelectNode { Name = "Select API", APIIndex = -1 },
+                new ToolPresetNode { Name = "Load Tools", PresetName = "_default_" },
                 new FragmentNode
                 {
                     Name = "System Prompt",
@@ -200,8 +195,10 @@
 
     private void SavePresets()
     {
+        // 默认预设不持久化，每次启动从代码重建
         KVData.Write("GenerationManager", PresetStorageKey,
-            Newtonsoft.Json.JsonConvert.SerializeObject(_presets));
+            Newtonsoft.Json.JsonConvert.SerializeObject(
+                _presets.Where(p => p.Id != DefaultPresetId).ToList()));
     }
 
     private void CreateNewPreset()
