@@ -317,11 +317,20 @@
         var root = new SequenceNode
         {
             Name = $"{selectedConfig.Name} Private Tree",
-            Nodes = new List<IGenerationNode>
-            {
-                new CallNode { Name = "Default Pipeline", PresetId = "__default__" }
-            }
+            Nodes = new List<IGenerationNode>()
         };
+
+        if (!string.IsNullOrEmpty(selectedConfig.ModifierPresetId))
+        {
+            var presets = GetPresets();
+            var preset = presets.FirstOrDefault(p => p.Id == selectedConfig.ModifierPresetId);
+            root.Nodes.Add(new CallNode
+            {
+                Name = preset?.Name ?? "Preset",
+                PresetId = selectedConfig.ModifierPresetId
+            });
+        }
+
         selectedConfig.ModifierTreeJson = GenerationNodeSerializer.Serialize(root);
         selectedConfig.UseSharedPreset = false;
         _editingTree = root;

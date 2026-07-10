@@ -261,9 +261,6 @@
                                             <option value="@p.Id">@p.Name</option>
                                         }
                                     </select>
-                                    <button class="btn btn-primary btn-sm" @onclick="AssignPreset" disabled="@(string.IsNullOrEmpty(_selectedPresetId))">
-                                        Assign
-                                    </button>
                                     <button class="btn btn-outline-primary btn-sm" @onclick="CreatePrivateTree">
                                         <i class="bi bi-pencil"></i> Create Private Tree
                                     </button>
@@ -1639,29 +1636,25 @@
             _availablePresets = new();
     }
 
-    private void AssignPreset()
-    {
-        if (agent == null || string.IsNullOrEmpty(_selectedPresetId)) return;
-        var preset = _availablePresets.FirstOrDefault(p => p.Id == _selectedPresetId);
-        if (preset != null)
-        {
-            agent.ModifierTreeJson = preset.RootNodeJson;
-            agent.Save(kvDataService);
-        }
-    }
-
     private void CreatePrivateTree()
     {
         if (agent == null) return;
-        // Create private tree with a CallNode to Default preset, plus room for custom nodes
         var root = new SequenceNode
         {
             Name = "Agent Private Tree",
-            Nodes = new List<IGenerationNode>
-            {
-                new CallNode { Name = "Default Pipeline", PresetId = "__default__" }
-            }
+            Nodes = new List<IGenerationNode>()
         };
+
+        if (!string.IsNullOrEmpty(_selectedPresetId))
+        {
+            var preset = _availablePresets.FirstOrDefault(p => p.Id == _selectedPresetId);
+            root.Nodes.Add(new CallNode
+            {
+                Name = preset?.Name ?? "Preset",
+                PresetId = _selectedPresetId
+            });
+        }
+
         agent.ModifierTreeJson = GenerationNodeSerializer.Serialize(root);
         agent.Save(kvDataService);
     }

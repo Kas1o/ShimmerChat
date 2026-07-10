@@ -294,7 +294,7 @@ namespace ShimmerChat.Singletons
 
         private static IGenerationNode CreateFallbackRoot(Agent agent)
         {
-            var root = new AgentRootNode { Name = agent.Name };
+            var root = new SequenceNode { Name = agent.Name };
 
             if (!string.IsNullOrWhiteSpace(agent.Description))
             {
@@ -305,6 +305,8 @@ namespace ShimmerChat.Singletons
                     From = PromptBuilder.From.system
                 });
             }
+
+            root.Nodes.Add(new CallNode { PresetId = "__default__" });
 
             return root;
         }

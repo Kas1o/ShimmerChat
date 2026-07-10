@@ -130,7 +130,7 @@ namespace ShimmerChatBuiltin.SubAgent
         {
             if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
                 return GenerationNodeSerializer.Deserialize(config.ModifierTreeJson)
-                    ?? new AgentRootNode { Name = config.Name };
+                    ?? new SequenceNode { Name = config.Name };
 
             if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
             {
@@ -139,10 +139,10 @@ namespace ShimmerChatBuiltin.SubAgent
                 var preset = presets.FirstOrDefault(p => p.Id == config.ModifierPresetId);
                 if (preset != null)
                     return GenerationNodeSerializer.Deserialize(preset.RootNodeJson)
-                        ?? new AgentRootNode { Name = config.Name };
+                        ?? new SequenceNode { Name = config.Name };
             }
 
-            return new AgentRootNode { Name = config.Name };
+            return new SequenceNode { Name = config.Name };
         }
 
         private class SubAgentEntry

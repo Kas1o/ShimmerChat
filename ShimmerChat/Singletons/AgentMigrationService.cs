@@ -52,7 +52,7 @@ namespace ShimmerChat.Singletons
             if (!string.IsNullOrEmpty(agent.ModifierTreeJson))
                 return false;
 
-            var root = new AgentRootNode
+            var root = new SequenceNode
             {
                 Name = agent.Name,
                 Nodes = new List<IGenerationNode>()
