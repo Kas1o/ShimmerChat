@@ -4,7 +4,7 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
     /// <summary>
-    /// 向 TransientEnv.Fragments 注入 ContextSegment
+    /// 向 TransientEnv.Fragments 末尾追加 ContextSegment
     /// </summary>
     [NodeInfo("Fragment", Icon = "▤", Color = "#60b0e0", Category = "Content/Fragment")]
     public class FragmentNode : IGenerationNode
@@ -24,43 +24,14 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("Role", Hint = "system / user / assistant")]
         public PromptBuilder.From From { get; set; } = PromptBuilder.From.system;
 
-        /// <summary>
-        /// 插入位置（默认 -1 表示末尾）
-        /// </summary>
-        [NodeProperty("Insert At", Hint = "Insert position (-1 = end)")]
-        public int InsertAt { get; set; } = -1;
-
-        /// <summary>
-        /// 是否覆盖同角色的首个片段
-        /// </summary>
-        [NodeProperty("Overwrite First", Hint = "Replace first fragment of the same role")]
-        public bool OverwriteFirst { get; set; } = false;
-
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
-            var segment = new ContextSegment
+            context.Env.Transient.Fragments.Add(new ContextSegment
             {
                 SourceType = typeof(FragmentNode),
                 Message = new ChatMessage { Content = Content },
                 From = From
-            };
-
-            var fragments = context.Env.Transient.Fragments;
-
-            if (OverwriteFirst)
-            {
-                var existing = fragments.FirstOrDefault(f => f.From == From);
-                if (existing != null)
-                {
-                    existing.Message.Content = Content;
-                    return Task.FromResult(NodeResult.SuccessResult());
-                }
-            }
-
-            if (InsertAt < 0 || InsertAt >= fragments.Count)
-                fragments.Add(segment);
-            else
-                fragments.Insert(InsertAt, segment);
+            });
 
             return Task.FromResult(NodeResult.SuccessResult());
         }

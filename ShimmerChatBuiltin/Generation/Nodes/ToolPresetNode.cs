@@ -32,10 +32,10 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     nodeId: Id, nodeName: Name));
 
             var preset = JsonConvert.DeserializeObject<ToolPresetData>(json);
-            if (preset == null || preset.EnabledToolTypeNames.Count == 0)
+            if (preset == null)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    $"ToolPreset: Preset '{PresetName}' is empty or invalid.",
+                    $"ToolPreset: Preset '{PresetName}' is invalid.",
                     nodeId: Id, nodeName: Name));
 
             foreach (var typeName in preset.EnabledToolTypeNames)

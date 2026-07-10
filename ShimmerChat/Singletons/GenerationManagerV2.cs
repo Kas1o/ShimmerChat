@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using SharperLLM.Util;
@@ -22,6 +23,42 @@ namespace ShimmerChat.Singletons
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
+            EnsureDefaultPreset();
+        }
+
+        private void EnsureDefaultPreset()
+        {
+            var json = _kvData.Read("GenerationManager", "generation_presets");
+            var presets = string.IsNullOrEmpty(json)
+                ? new List<GenerationPreset>()
+                : (JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new List<GenerationPreset>());
+
+            presets.RemoveAll(p => p.Id == "__default__");
+
+            presets.Add(new GenerationPreset
+            {
+                Id = "__default__",
+                Name = "Default",
+                RootNodeJson = GenerationNodeSerializer.Serialize(new SequenceNode
+                {
+                    Name = "Default",
+                    Nodes = new List<IGenerationNode>
+                    {
+                        new FragmentNode
+                        {
+                            Name = "System Prompt",
+                            Content = "You are a helpful AI assistant.",
+                            From = PromptBuilder.From.system
+                        },
+                        new AppendChatMessagesNode { Name = "Append Chat Messages" },
+                        new APISelectNode { Name = "Select API", APIIndex = -1 },
+                        new ToolPresetNode { Name = "Load Tools", PresetName = "_default_" }
+                    }
+                })
+            });
+
+            _kvData.Write("GenerationManager", "generation_presets",
+                JsonConvert.SerializeObject(presets, Formatting.Indented));
         }
 
         /// <summary>
@@ -117,9 +154,9 @@ namespace ShimmerChat.Singletons
                 rootNode = CreateFallbackRoot(agent);
             }
 
-            // 先构建空 env，追加聊天历史，再执行修改器树（历史在前，树产物在后）
+            // 先构建空 env，将聊天历史放入 SharedState（由 AppendChatMessages 节点负责注入）
             var env = new GenerationEnv(persistent);
-            AppendChatHistory(env, chat);
+            env.Transient.SharedState["ChatMessages"] = chat.Messages.ToList();
 
             var context = new NodeExecutionContext(env, ct);
             var result = await rootNode.ExecuteAsync(context);
@@ -258,37 +295,6 @@ namespace ShimmerChat.Singletons
                     }
                 }
                 yield return acc;
-            }
-        }
-
-        private void AppendChatHistory(GenerationEnv env, Chat chat)
-        {
-            var fragments = env.Transient.Fragments;
-
-            foreach (var msg in chat.Messages)
-            {
-                if (msg.GenerationState == MessageGenerationState.Regenerating)
-                    continue;
-
-                var from = msg.sender.ToLower() switch
-                {
-                    Sender.User => PromptBuilder.From.user,
-                    Sender.System => PromptBuilder.From.system,
-                    Sender.AI => PromptBuilder.From.assistant,
-                    Sender.ToolResult => PromptBuilder.From.tool_result,
-                    _ => PromptBuilder.From.system
-                };
-
-                fragments.Add(new ContextSegment
-                {
-                    Message = msg.message,
-                    From = from,
-                    Metadata = new Dictionary<string, object>
-                    {
-                        ["timestamp"] = msg.timestamp,
-                        ["sender"] = msg.sender
-                    }
-                });
             }
         }
 

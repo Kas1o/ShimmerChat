@@ -52,18 +52,10 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 ToolRegistry = context.Env.Persistent.ToolRegistry
             };
 
-            // 1. 创建隔离 env，先追加父级 fragments（历史在前）
+            // 1. 创建隔离 env，将对话历史放入 SharedState（由树中的 AppendChatMessages 节点负责注入）
             var subEnv = new GenerationEnv(persistent);
-            foreach (var seg in context.Env.Transient.Fragments)
-            {
-                subEnv.Transient.Fragments.Add(new ContextSegment
-                {
-                    Message = CloneChatMessage(seg.Message),
-                    From = seg.From,
-                    SourceType = seg.SourceType,
-                    Metadata = new Dictionary<string, object>(seg.Metadata)
-                });
-            }
+            var chat = context.Env.Persistent.GetChat();
+            subEnv.Transient.SharedState["ChatMessages"] = chat.Messages.ToList();
 
             // 2. 执行 SubAgent 修饰器树（树产物追加在历史之后）
             try
@@ -168,24 +160,6 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             var json = kvData.Read("SubAgent", "configs");
             var configs = JsonConvert.DeserializeObject<List<SubAgent.SubAgentConfig>>(json ?? "[]") ?? [];
             return configs.FirstOrDefault(c => c.Name == name);
-        }
-
-        private static ChatMessage CloneChatMessage(ChatMessage original)
-        {
-            return new ChatMessage
-            {
-                Content = original.Content,
-                ImageBase64 = original.ImageBase64,
-                thinking = original.thinking,
-                id = original.id,
-                toolCalls = original.toolCalls?.Select(tc => new SharperLLM.API.ToolCall
-                {
-                    name = tc.name, id = tc.id,
-                    arguments = tc.arguments, index = tc.index
-                }).ToList(),
-                CustomProperties = original.CustomProperties != null
-                    ? new Dictionary<string, object>(original.CustomProperties) : null
-            };
         }
     }
 }
