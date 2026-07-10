@@ -7,12 +7,15 @@ namespace ShimmerChat.Singletons
     /// <summary>
     /// 轻量级本地化服务。从嵌入资源和文件系统加载 JSON 翻译文件，
     /// 提供 Key → 显示字符串的查找，找不到时回退到 Key 本身。
-    /// 语言切换即时生效并持久化到 localesettings.json。
+    /// 语言设置通过 IKVDataService 持久化，切换即时生效。
     /// </summary>
     public class LocService : ILocService
     {
         private readonly Dictionary<string, string> _entries = new(StringComparer.OrdinalIgnoreCase);
         private readonly string _fallbackCulture = "en-US";
+        private readonly IKVDataService _kvData;
+        private const string KVSpace = "_locale";
+        private const string KVKey = "culture";
 
         /// <inheritdoc/>
         public string CurrentCulture { get; private set; }
@@ -23,10 +26,9 @@ namespace ShimmerChat.Singletons
         /// <inheritdoc/>
         IReadOnlyList<string> ILocService.SupportedCultures => SupportedCultures;
 
-        private static readonly string _configPath = Path.Combine(AppContext.BaseDirectory, "localesettings.json");
-
-        public LocService(string? overrideDirectory = null)
+        public LocService(IKVDataService kvData, string? overrideDirectory = null)
         {
+            _kvData = kvData;
             CurrentCulture = LoadSavedCulture();
             LoadFromEmbeddedResources(CurrentCulture);
             if (!string.IsNullOrEmpty(overrideDirectory))
@@ -40,28 +42,19 @@ namespace ShimmerChat.Singletons
             CurrentCulture = culture;
             _entries.Clear();
             LoadFromEmbeddedResources(culture);
-
-            var data = new CultureConfig(culture);
-            File.WriteAllText(_configPath, JsonSerializer.Serialize(data));
+            _kvData.Write(KVSpace, KVKey, culture);
         }
 
-        private static string LoadSavedCulture()
+        private string LoadSavedCulture()
         {
-            try
-            {
-                if (File.Exists(_configPath))
-                {
-                    var json = File.ReadAllText(_configPath);
-                    var data = JsonSerializer.Deserialize<CultureConfig>(json);
-                    if (data != null && SupportedCultures.Contains(data.culture))
-                        return data.culture;
-                }
-            }
-            catch { }
-            return "zh-CN";
-        }
+            var saved = _kvData.Read(KVSpace, KVKey);
+            if (saved != null && SupportedCultures.Contains(saved))
+                return saved;
 
-        private record class CultureConfig(string culture);
+            var fallback = SupportedCultures[0]; // zh-CN
+            _kvData.Write(KVSpace, KVKey, fallback);
+            return fallback;
+        }
 
         /// <inheritdoc/>
         public string this[string key] => _entries.TryGetValue(key, out var value) ? value : key;
