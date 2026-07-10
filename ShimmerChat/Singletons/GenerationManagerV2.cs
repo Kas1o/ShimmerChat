@@ -15,11 +15,13 @@ namespace ShimmerChat.Singletons
     public class GenerationManagerV2
     {
         private readonly IKVDataService _kvData;
+        private readonly IToolRegistry _toolRegistry;
         private readonly GenerationTreeExecutor _executor = new();
 
-        public GenerationManagerV2(IKVDataService kvData)
+        public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry)
         {
             _kvData = kvData;
+            _toolRegistry = toolRegistry;
         }
 
         /// <summary>
@@ -99,7 +101,8 @@ namespace ShimmerChat.Singletons
             {
                 KVData = _kvData,
                 ChatGuid = chat.Guid,
-                AgentGuid = agent.Guid
+                AgentGuid = agent.Guid,
+                ToolRegistry = _toolRegistry
             };
 
             // 解析 Agent 的修改器树

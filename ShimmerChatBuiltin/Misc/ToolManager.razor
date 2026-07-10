@@ -6,6 +6,7 @@
 
 @inject IKVDataService KVData
 @inject IStringLocalizer<ToolManager> l
+@inject IToolRegistry ToolRegistry
 
 <h3>Tool Manager</h3>
 
@@ -69,56 +70,20 @@ else
 
 @code {
     private bool _loading = true;
-    private List<ToolInfo> _allTools = new();
-    private Dictionary<string, List<ToolInfo>> _groupedTools = new();
+    private Dictionary<string, List<ToolMetadata>> _groupedTools = new();
     private HashSet<string> _enabledTools = new();
     private List<string> _presetNames = new();
     private string _selectedPresetName = "";
     private string _status = "";
 
-    private record ToolInfo(string Name, string Description, string Category);
-
     protected override void OnInitialized()
     {
-        DiscoverTools();
+        _groupedTools = ToolRegistry.AllTools
+            .OrderBy(t => t.CategoryPath).ThenBy(t => t.Name)
+            .GroupBy(t => string.IsNullOrEmpty(t.CategoryPath) ? "其他" : t.CategoryPath)
+            .ToDictionary(g => g.Key, g => g.ToList());
         LoadPresets();
         _loading = false;
-    }
-
-    private void DiscoverTools()
-    {
-        _allTools.Clear();
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            if (asm.IsDynamic) continue;
-            try
-            {
-                foreach (var type in asm.GetExportedTypes())
-                {
-                    if (typeof(IAutoCreateToolV2).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
-                    {
-                        try
-                        {
-                            var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
-                            var nameProp = type.GetProperty("Name", flags);
-                            var descProp = type.GetProperty("Description", flags);
-                            var catProp = type.GetProperty("CategoryPath", flags);
-                            if (nameProp == null || descProp == null) continue;
-                            var name = (string)nameProp.GetValue(null)!;
-                            var desc = (string)descProp.GetValue(null)!;
-                            var cat = catProp != null ? (string)catProp.GetValue(null)! : "";
-                            _allTools.Add(new ToolInfo(name, desc, cat));
-                        }
-                        catch { }
-                    }
-                }
-            }
-            catch { }
-        }
-        _allTools = _allTools.OrderBy(t => t.Category).ThenBy(t => t.Name).ToList();
-        _groupedTools = _allTools
-            .GroupBy(t => string.IsNullOrEmpty(t.Category) ? "其他" : t.Category)
-            .ToDictionary(g => g.Key, g => g.ToList());
     }
 
     private void LoadPresets()

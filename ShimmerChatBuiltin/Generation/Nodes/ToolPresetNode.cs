@@ -40,52 +40,15 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
             foreach (var typeName in preset.EnabledToolTypeNames)
             {
-                var toolType = ResolveToolType(typeName);
-                if (toolType == null)
-                    continue;
+                var meta = context.Env.Persistent.ToolRegistry.FindByName(typeName);
+                if (meta == null) continue;
 
-                try
-                {
-                    var createMethod = toolType.GetMethod("Create",
-                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                    if (createMethod == null) continue;
-
-                    var tool = (IToolV2)createMethod.Invoke(null, [context.Env.Persistent])!;
+                var tool = context.Env.Persistent.ToolRegistry.CreateInstance(meta.Type, context.Env.Persistent);
+                if (tool != null)
                     context.Env.Transient.Tools.Add(tool);
-                }
-                catch { }
             }
 
             return Task.FromResult(NodeResult.SuccessResult());
-        }
-
-        private static Type? ResolveToolType(string toolName)
-        {
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (asm.IsDynamic) continue;
-                try
-                {
-                    foreach (var t in asm.GetExportedTypes())
-                    {
-                        if (!typeof(IAutoCreateToolV2).IsAssignableFrom(t) || t.IsAbstract || t.IsInterface)
-                            continue;
-
-                        try
-                        {
-                            var nameProp = t.GetProperty("Name",
-                                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                            if (nameProp == null) continue;
-                            var name = (string)nameProp.GetValue(null)!;
-                            if (name == toolName)
-                                return t;
-                        }
-                        catch { }
-                    }
-                }
-                catch { }
-            }
-            return null;
         }
 
         /// <summary>工具预设数据（与 ToolManager 共用结构）</summary>

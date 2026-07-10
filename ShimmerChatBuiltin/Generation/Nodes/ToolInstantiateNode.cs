@@ -26,24 +26,15 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     "ToolInstantiate: ToolTypeName is empty.",
                     nodeId: Id, nodeName: Name));
 
-            var toolType = Type.GetType(ToolTypeName);
-            if (toolType == null || !typeof(IAutoCreateToolV2).IsAssignableFrom(toolType))
-                return Task.FromResult(NodeResult.Failure(
-                    NodeErrorCodes.ToolNotFound,
-                    $"ToolInstantiate: Type '{ToolTypeName}' not found or does not implement IAutoCreateToolV2.",
-                    nodeId: Id, nodeName: Name));
-
             try
             {
-                var createMethod = toolType.GetMethod("Create",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                if (createMethod == null)
+                var tool = context.Env.Persistent.ToolRegistry.CreateInstance(ToolTypeName, context.Env.Persistent);
+                if (tool == null)
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ToolNotFound,
-                        $"ToolInstantiate: Type '{ToolTypeName}' has no static Create method.",
+                        $"ToolInstantiate: Type '{ToolTypeName}' not found or does not implement IAutoCreateToolV2.",
                         nodeId: Id, nodeName: Name));
 
-                var tool = (IToolV2)createMethod.Invoke(null, [context.Env.Persistent])!;
                 context.Env.Transient.Tools.Add(tool);
                 return Task.FromResult(NodeResult.SuccessResult());
             }

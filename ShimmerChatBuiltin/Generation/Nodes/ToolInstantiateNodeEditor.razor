@@ -1,5 +1,7 @@
 @using ShimmerChatLib.Generation
 
+@inject IToolRegistry ToolRegistry
+
 <div class="ti-editor">
     <div class="ti-label">Select Tool</div>
     @if (_selectedToolName != null)
@@ -49,9 +51,7 @@
     private ToolInstantiateNode? _typedNode;
     private bool _showPicker = true;
     private string? _selectedToolName;
-    private Dictionary<string, List<ToolEntry>> _groupedTools = new();
-
-    private record ToolEntry(string Name, string Description, string Category, string TypeName);
+    private Dictionary<string, List<ToolMetadata>> _groupedTools = new();
 
     protected override void OnInitialized()
     {
@@ -59,7 +59,10 @@
         if (_typedNode == null)
             return;
 
-        DiscoverTools();
+        _groupedTools = ToolRegistry.AllTools
+            .OrderBy(t => t.CategoryPath).ThenBy(t => t.Name)
+            .GroupBy(t => string.IsNullOrEmpty(t.CategoryPath) ? "其他" : t.CategoryPath)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         if (!string.IsNullOrEmpty(_typedNode.ToolTypeName))
         {
@@ -74,44 +77,7 @@
         }
     }
 
-    private void DiscoverTools()
-    {
-        var all = new List<ToolEntry>();
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            if (asm.IsDynamic) continue;
-            try
-            {
-                foreach (var type in asm.GetExportedTypes())
-                {
-                    if (typeof(IAutoCreateToolV2).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
-                    {
-                        try
-                        {
-                            var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
-                            var nameProp = type.GetProperty("Name", flags);
-                            var descProp = type.GetProperty("Description", flags);
-                            var catProp = type.GetProperty("CategoryPath", flags);
-                            if (nameProp == null) continue;
-                            var name = (string)nameProp.GetValue(null)!;
-                            var desc = descProp != null ? (string)descProp.GetValue(null)! : "";
-                            var cat = catProp != null ? (string)catProp.GetValue(null)! : "";
-                            all.Add(new ToolEntry(name, desc, cat, type.FullName!));
-                        }
-                        catch { }
-                    }
-                }
-            }
-            catch { }
-        }
-
-        _groupedTools = all
-            .OrderBy(t => t.Category).ThenBy(t => t.Name)
-            .GroupBy(t => string.IsNullOrEmpty(t.Category) ? "其他" : t.Category)
-            .ToDictionary(g => g.Key, g => g.ToList());
-    }
-
-    private void SelectTool(ToolEntry tool)
+    private void SelectTool(ToolMetadata tool)
     {
         if (_typedNode == null) return;
         _typedNode.ToolTypeName = tool.TypeName;

@@ -42,5 +42,12 @@ namespace ShimmerChatLib.Interface
         /// <param name="pluginsFolder">插件目录路径</param>
         /// <returns>标记了指定Attribute的所有类型</returns>
         List<Type> GetTypesWithAttributeFromPlugins<TAttribute>(string pluginsFolder) where TAttribute : Attribute;
+
+        /// <summary>
+        /// 获取所有已加载程序集中实现了指定接口的具体类型（不实例化）
+        /// </summary>
+        /// <param name="interfaceType">接口类型</param>
+        /// <returns>所有实现了该接口的具体类型</returns>
+        List<Type> GetImplementingTypes(Type interfaceType);
     }
 }

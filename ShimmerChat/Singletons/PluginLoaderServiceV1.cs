@@ -154,5 +154,26 @@ namespace ShimmerChat.Singletons
             
             return types;
         }
+
+        public List<Type> GetImplementingTypes(Type interfaceType)
+        {
+            var types = new List<Type>();
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (assembly.IsDynamic) continue;
+                try
+                {
+                    foreach (var t in assembly.GetExportedTypes())
+                    {
+                        if (interfaceType.IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface)
+                            types.Add(t);
+                    }
+                }
+                catch { }
+            }
+
+            return types;
+        }
     }
 }

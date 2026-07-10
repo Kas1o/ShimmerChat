@@ -7,6 +7,7 @@
 @using Newtonsoft.Json
 
 @inject IKVDataService pluginData
+@inject IToolRegistry ToolRegistry
 
 
 
@@ -327,33 +328,9 @@
         selectedConfig.IndependentModifiers = new();
     }
 
-    // ShimmerChat 2.0: direct scan for IToolV2 implementations
-    private static List<string> GetAvailableToolNames()
+    private List<string> GetAvailableToolNames()
     {
-        var names = new List<string>();
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            if (asm.IsDynamic) continue;
-            try
-            {
-                foreach (var type in asm.GetExportedTypes())
-                {
-                    if (typeof(IAutoCreateToolV2).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
-                    {
-                        try
-                        {
-                            var nameProp = type.GetProperty("Name",
-                                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                            if (nameProp != null)
-                                names.Add((string)nameProp.GetValue(null)!);
-                        }
-                        catch { }
-                    }
-                }
-            }
-            catch { }
-        }
-        return names.OrderBy(n => n).ToList();
+        return ToolRegistry.AllTools.Select(t => t.Name).OrderBy(n => n).ToList();
     }
 
     private List<GenerationPreset> GetPresets()
