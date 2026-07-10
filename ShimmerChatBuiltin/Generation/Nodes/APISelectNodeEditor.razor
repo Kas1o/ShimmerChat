@@ -9,7 +9,7 @@
             API Config
         </label>
         <div class="ge-value">
-            <select class="ge-select" @bind="_selectedIndex" @bind:event="onchange"
+            <select class="ge-select" @bind="SelectedIndex" @bind:event="onchange"
                     style="width: 100%; max-width: 400px;">
                 <option value="-2">Use global default API</option>
                 @for (int i = 0; i < _settings.Count; i++)
@@ -26,10 +26,10 @@
             else
             {
                 <div style="font-size: 0.72em; color: #666; margin-top: 4px;">
-                    @(_selectedIndex == -2
+                    @(SelectedIndex == -2
                         ? "Will use the globally selected API from API Settings."
-                        : _selectedIndex >= 0 && _selectedIndex < _settings.Count
-                            ? $"Using: {_settings[_selectedIndex].Name} ({_settings[_selectedIndex].Type}) — {(_settings[_selectedIndex].EnableStream ? "streaming" : "non-streaming")}"
+                        : SelectedIndex >= 0 && SelectedIndex < _settings.Count
+                            ? $"Using: {_settings[SelectedIndex].Name} ({_settings[SelectedIndex].Type}) — {(_settings[SelectedIndex].EnableStream ? "streaming" : "non-streaming")}"
                             : "")
                 </div>
             }
@@ -41,30 +41,29 @@
     [Parameter] public APISelectNode Node { get; set; } = default!;
     [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
 
-    private List<ApiSetting> _settings = new();
-    private int _selectedIndex;
+    private List<ApiSetting> _settings = [];
+
+    private int SelectedIndex
+    {
+        get => field;
+        set
+        {
+            field = value;
+            Node.APIIndex = value == -2 ? -1 : value;
+            OnChanged.InvokeAsync(Node);
+        }
+    } = -2;
 
     protected override void OnInitialized()
     {
         var json = KVData.Read("ApiSettings", "apiSetting") ?? "[]";
-        _settings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? new();
+        _settings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? [];
 
         if (Node.APIIndex == -1)
-            _selectedIndex = -2;
+            SelectedIndex = -2;
         else if (Node.APIIndex >= 0 && Node.APIIndex < _settings.Count)
-            _selectedIndex = Node.APIIndex;
+            SelectedIndex = Node.APIIndex;
         else
-            _selectedIndex = -2;
-    }
-
-    private int SelectedIndex
-    {
-        get => _selectedIndex;
-        set
-        {
-            _selectedIndex = value;
-            Node.APIIndex = value == -2 ? -1 : value;
-            OnChanged.InvokeAsync(Node);
-        }
+            SelectedIndex = -2;
     }
 }

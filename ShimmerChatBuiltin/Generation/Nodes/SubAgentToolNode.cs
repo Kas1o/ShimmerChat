@@ -1,26 +1,57 @@
+using Newtonsoft.Json;
 using ShimmerChatLib.Generation;
+using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
     /// <summary>
-    /// 构造 SubAgentToolV2 并加入 Tools 列表
+    /// 将指定的 SubAgent 配置注册到共享的 SubAgentToolV2 实例中。
+    /// 多个 SubAgentToolNode 共享同一个工具，每个添加一个 SubAgent。
     /// </summary>
     [NodeInfo("SubAgent Tool", Icon = "🔧", Color = "#e060a0", Category = "Tool/SubAgent")]
+    [NodeEditor(typeof(SubAgentToolNodeEditor))]
     public class SubAgentToolNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent Tool";
 
+        [NodeProperty("Config Name", Hint = "SubAgent configuration name (selected from dropdown)")]
+        public string ConfigName { get; set; } = "";
+
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            if (string.IsNullOrWhiteSpace(ConfigName))
+                return Task.FromResult(NodeResult.SuccessResult());
+
             var kvData = context.Env.Persistent.KVData;
-            var api = context.Env.Transient.API;
-            var tools = context.Env.Transient.Tools;
 
-            var subAgentTool = new SubAgent.SubAgentToolV2(kvData, api, tools);
-            context.Env.Transient.Tools.Add(subAgentTool);
+            var config = LoadConfig(kvData, ConfigName);
+            if (config == null)
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.ConfigNotFound,
+                    $"SubAgentTool: Config '{ConfigName}' not found.",
+                    nodeId: Id, nodeName: Name));
 
+            // 查找或创建 SubAgentToolV2 单例
+            var tool = context.Env.Transient.Tools.OfType<SubAgent.SubAgentToolV2>().FirstOrDefault();
+            if (tool == null)
+            {
+                var p = context.Env.Persistent;
+                tool = new SubAgent.SubAgentToolV2(
+                    kvData, context.Env.Transient.API,
+                    p.ToolRegistry, p.ChatGuid, p.AgentGuid);
+                context.Env.Transient.Tools.Add(tool);
+            }
+
+            tool.AddSubAgent(ConfigName, config);
             return Task.FromResult(NodeResult.SuccessResult());
+        }
+
+        private static SubAgent.SubAgentConfig? LoadConfig(IKVDataService kvData, string name)
+        {
+            var json = kvData.Read("SubAgent", "configs");
+            var configs = JsonConvert.DeserializeObject<List<SubAgent.SubAgentConfig>>(json ?? "[]") ?? [];
+            return configs.FirstOrDefault(c => c.Name == name);
         }
     }
 }

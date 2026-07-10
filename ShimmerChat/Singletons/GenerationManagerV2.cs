@@ -117,11 +117,15 @@ namespace ShimmerChat.Singletons
                 rootNode = CreateFallbackRoot(agent);
             }
 
-            // 加载历史消息到 Fragments
-            var env = await _executor.ExecuteAsync(rootNode, persistent, ct);
-
-            // 将聊天历史追加到 Fragments 后面
+            // 先构建空 env，追加聊天历史，再执行修改器树（历史在前，树产物在后）
+            var env = new GenerationEnv(persistent);
             AppendChatHistory(env, chat);
+
+            var context = new NodeExecutionContext(env, ct);
+            var result = await rootNode.ExecuteAsync(context);
+            if (!result.Success)
+                throw new InvalidOperationException(
+                    $"Generation tree execution failed. Node: '{result.NodeName}' ({result.NodeId}). {result.Message}");
 
             return env;
         }

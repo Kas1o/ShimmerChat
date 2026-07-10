@@ -3,11 +3,10 @@
 @using ShimmerChatLib.Generation
 @using ShimmerChatLib.Interface
 @using ShimmerChatBuiltin.SubAgent
-@using ShimmerChatLib
+@using ShimmerChatBuiltin.Generation.Nodes
 @using Newtonsoft.Json
 
 @inject IKVDataService pluginData
-@inject IToolRegistry ToolRegistry
 
 
 
@@ -46,10 +45,7 @@
                             </button>
                         </div>
                         <div class="text-sm text-muted mt-1">
-                            API: @(GetApiName(cfg.SelectedApiIndex))
-                        </div>
-                        <div class="text-sm text-muted">
-                            Tools: @cfg.EnabledToolNames.Count | Preset: @GetPresetName(cfg) | Output: @cfg.OutputMode
+                            Preset: @GetPresetName(cfg) | Output: @cfg.OutputMode
                         </div>
                     </div>
                 }
@@ -68,17 +64,6 @@
             </div>
 
             <div class="mt-3">
-                <label><strong>API Setting</strong></label>
-                <select class="form-select" @bind="selectedConfig.SelectedApiIndex">
-                    <option value="-1">Inherit Global</option>
-                    @for (int i = 0; i < apiSettings.Count; i++)
-                    {
-                        <option value="@i">@apiSettings[i].Name (@apiSettings[i].Type)</option>
-                    }
-                </select>
-            </div>
-
-            <div class="mt-3">
                 <label><strong>Output Mode</strong></label>
                 <select class="form-select" @bind="selectedConfig.OutputMode">
                     <option value="LastMessage">Last Message (text only)</option>
@@ -91,55 +76,61 @@
             </div>
 
             <div class="mt-4">
-                <h5>Tools</h5>
-                <p class="text-sm text-muted">Select tools available to this sub-agent.</p>
-                <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                    @foreach (var toolName in GetAvailableToolNames())
-                    {
-                        var isChecked = selectedConfig.EnabledToolNames.Contains(toolName);
-                        <label class="d-flex align-items-center gap-1" style="cursor:pointer;">
-                            <input type="checkbox" checked="@isChecked"
-                                   @onchange="e => ToggleTool(toolName, (bool)(e.Value ?? false))" />
-                            @toolName
-                        </label>
-                    }
-                </div>
-                @if (GetAvailableToolNames().Count == 0)
-                {
-                    <p class="text-muted">No tools available.</p>
-                }
-            </div>
-
-            <div class="mt-4">
-                <h5>Context Modifiers</h5>
-
-                <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" role="switch"
-                           id="useSharedPresetSwitch"
-                           checked="@selectedConfig.UseSharedPreset"
-                           @onchange="e => TogglePresetMode((bool)(e.Value ?? false))" />
-                    <label class="form-check-label" for="useSharedPresetSwitch">
-                        <strong>Use Shared Preset</strong>
-                    </label>
-                </div>
+                <h5>Modifier Tree</h5>
 
                 @if (selectedConfig.UseSharedPreset)
                 {
-                    <p class="text-sm text-muted">Select a shared context modifier preset.</p>
-                    <select class="form-select mt-2" @bind="selectedConfig.ModifierPresetId" style="max-width: 400px;">
-                        <option value="">— None —</option>
-                        @foreach (var preset in GetPresets())
-                        {
-                            <option value="@preset.Id">@preset.Name</option>
-                        }
-                    </select>
+                    <div class="gen-config-status mb-2">
+                        <span class="gen-config-badge preset">Using Preset</span>
+                        <span class="gen-config-hint">Select a preset from Generation Manager.</span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <select class="form-select" style="max-width:300px;" @bind="selectedConfig.ModifierPresetId">
+                            <option value="">— None —</option>
+                            @foreach (var preset in GetPresets())
+                            {
+                                <option value="@preset.Id">@preset.Name</option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-primary btn-sm" @onclick="CreatePrivateTree">
+                            <i class="bi bi-pencil"></i> Create Private Tree
+                        </button>
+                    </div>
                 }
                 else
                 {
-                    <p class="text-sm text-muted">
-                        ShimmerChat 2.0: Independent modifiers are being redesigned.
-                        Use the Generation Manager to configure presets.
-                    </p>
+                    @if (!string.IsNullOrEmpty(selectedConfig.ModifierTreeJson))
+                    {
+                        <div class="gen-config-status mb-2">
+                            <span class="gen-config-badge private">Private Tree</span>
+                            <span class="gen-config-hint">This sub-agent has a custom modifier tree.</span>
+                        </div>
+                        <div style="display:flex; gap:8px; margin-bottom: 12px;">
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="RevertToPreset">
+                                <i class="bi bi-arrow-counterclockwise"></i> Revert to Preset
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="ClearPrivateTree">
+                                Clear Private Tree
+                            </button>
+                        </div>
+                        @if (_editingTree != null)
+                        {
+                            <div class="tree-editor-container">
+                                <TreeEditor Node="@_editingTree"
+                                    OnTreeChanged="OnPrivateTreeChanged" />
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="gen-config-status mb-2">
+                            <span class="gen-config-badge private">Minimal</span>
+                            <span class="gen-config-hint">Runs with no system prompt or modifiers — just the task and tools.</span>
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm" @onclick="CreatePrivateTree">
+                            <i class="bi bi-pencil"></i> Create Private Tree
+                        </button>
+                    }
                 }
             </div>
 
@@ -165,6 +156,15 @@
     }
 </div>
 
+<style>
+    .gen-config-status { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .gen-config-badge { padding: 2px 10px; border-radius: 12px; font-size: 0.78em; font-weight: 600; }
+    .gen-config-badge.private { background: rgba(100,200,100,0.15); color: #6c6; }
+    .gen-config-badge.preset { background: rgba(100,150,255,0.15); color: #8af; }
+    .gen-config-hint { font-size: 0.8em; color: #888; }
+    .tree-editor-container { margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.15); border-radius: 6px; }
+</style>
+
 @code {
     List<SubAgentConfig> configs = [];
     SubAgentConfig? selectedConfig;
@@ -172,13 +172,11 @@
     bool isLoading;
     string statusMessage = "";
     string statusType = "success";
-
-    List<ApiSetting> apiSettings = [];
+    IGenerationNode? _editingTree;
 
     protected override void OnInitialized()
     {
         LoadConfigs();
-        LoadApiSettings();
     }
 
     static readonly JsonSerializerSettings _configSerializerSettings = new()
@@ -208,29 +206,14 @@
         }
     }
 
-    void LoadApiSettings()
-    {
-        var json = pluginData.Read("ApiSettings", "apiSetting") ?? "[]";
-        apiSettings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? [];
-    }
-
     string GetPresetName(SubAgentConfig cfg)
     {
         if (!cfg.UseSharedPreset)
-            return $"Independent ({cfg.IndependentModifiers.Count})";
+            return !string.IsNullOrEmpty(cfg.ModifierTreeJson) ? "Private Tree" : "Minimal";
         if (string.IsNullOrEmpty(cfg.ModifierPresetId))
             return "None";
         var preset = GetPresets().FirstOrDefault(p => p.Id == cfg.ModifierPresetId);
         return preset?.Name ?? "—";
-    }
-
-    string GetApiName(int index)
-    {
-        if (index == -1)
-            return "Inherit Global";
-        if (index >= 0 && index < apiSettings.Count)
-            return apiSettings[index].Name;
-        return "Default";
     }
 
     void CreateNewConfig()
@@ -247,6 +230,30 @@
     void SelectConfig(SubAgentConfig config)
     {
         selectedConfig = config;
+        LoadEditingTree();
+    }
+
+    void LoadEditingTree()
+    {
+        if (selectedConfig != null && !selectedConfig.UseSharedPreset
+            && !string.IsNullOrEmpty(selectedConfig.ModifierTreeJson))
+        {
+            _editingTree = GenerationNodeSerializer.Deserialize(selectedConfig.ModifierTreeJson)
+                ?? new SequenceNode { Name = selectedConfig.Name };
+        }
+        else
+        {
+            _editingTree = null;
+        }
+    }
+
+    void OnPrivateTreeChanged()
+    {
+        if (_editingTree != null && selectedConfig != null)
+        {
+            selectedConfig.ModifierTreeJson = GenerationNodeSerializer.Serialize(_editingTree);
+        }
+        StateHasChanged();
     }
 
     async Task DeleteConfig(SubAgentConfig config)
@@ -255,15 +262,6 @@
         if (selectedConfig == config)
             selectedConfig = null;
         await SaveConfigsAsync();
-    }
-
-    void ToggleTool(string toolName, bool isChecked)
-    {
-        if (selectedConfig == null) return;
-        if (isChecked && !selectedConfig.EnabledToolNames.Contains(toolName))
-            selectedConfig.EnabledToolNames.Add(toolName);
-        else if (!isChecked)
-            selectedConfig.EnabledToolNames.Remove(toolName);
     }
 
     async Task SaveConfigsAsync()
@@ -307,30 +305,41 @@
         StateHasChanged();
     }
 
-    bool _showIndependentEditor;
-
     private Dictionary<string, object> SubAgentPluginParameters => new()
     {
         ["AgentGuid"] = selectedConfig?.Guid ?? Guid.Empty,
         ["EventHandlerReg"] = (Action<IChatPanelEventHandler>)(handler => { })
     };
 
-    void TogglePresetMode(bool useShared)
+    void CreatePrivateTree()
     {
         if (selectedConfig == null) return;
-        selectedConfig.UseSharedPreset = useShared;
+        var root = new SequenceNode
+        {
+            Name = $"{selectedConfig.Name} Private Tree",
+            Nodes = new List<IGenerationNode>
+            {
+                new CallNode { Name = "Default Pipeline", PresetId = "__default__" }
+            }
+        };
+        selectedConfig.ModifierTreeJson = GenerationNodeSerializer.Serialize(root);
+        selectedConfig.UseSharedPreset = false;
+        _editingTree = root;
     }
 
-    void OnIndependentPresetChanged(GenerationPreset changed)
+    void RevertToPreset()
     {
         if (selectedConfig == null) return;
-        // ShimmerChat 2.0: independent modifiers are stored as a list of modifier names
-        selectedConfig.IndependentModifiers = new();
+        selectedConfig.UseSharedPreset = true;
+        selectedConfig.ModifierTreeJson = null;
+        _editingTree = null;
     }
 
-    private List<string> GetAvailableToolNames()
+    void ClearPrivateTree()
     {
-        return ToolRegistry.AllTools.Select(t => t.Name).OrderBy(n => n).ToList();
+        if (selectedConfig == null) return;
+        selectedConfig.ModifierTreeJson = null;
+        _editingTree = null;
     }
 
     private List<GenerationPreset> GetPresets()

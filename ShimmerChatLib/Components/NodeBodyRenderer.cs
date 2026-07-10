@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using ShimmerChatLib.Generation;
 
-namespace ShimmerChat.Components.SubComponents;
+namespace ShimmerChatLib.Components;
 
 /// <summary>
 /// Non-generic bridge that instantiates <see cref="GenericNodeEditor{TNode}"/>

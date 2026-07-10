@@ -1,41 +1,30 @@
 using Newtonsoft.Json;
-using SharperLLM.API;
-using SharperLLM.FunctionCalling;
+using SharperLLM.Agents;
 using SharperLLM.Util;
-using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
-using ShimmerChatBuiltin.SubAgent;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    /// <summary>
-    /// SubAgent 节点。在修改器阶段调用 SubAgent 运行独立生成，
-    /// 结果注入到上下文片段中。
-    /// </summary>
     [NodeInfo("SubAgent", Icon = "🤖", Color = "#e06090", Category = "Flow/SubAgent")]
     public class SubAgentNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent";
 
-        /// <summary>
-        /// SubAgent 配置名称
-        /// </summary>
         [NodeProperty("Config Name", Hint = "Name of the SubAgent configuration")]
         public string ConfigName { get; set; } = "";
 
-        /// <summary>
-        /// 输出模式：LastMessage / FullJson / None
-        /// </summary>
-        [NodeProperty("Output Mode", Hint = "LastMessage, FullJson, or None")]
-        public string OutputMode { get; set; } = "LastMessage";
+        [NodeProperty("Task", Hint = "Optional task message appended before generation. Leave empty to continue parent conversation.")]
+        public string Task { get; set; } = "";
 
-        /// <summary>
-        /// 最大迭代次数
-        /// </summary>
+        [NodeProperty("Output Mode", Hint = "LastMessage, FullJson, or None. Overrides config if set.")]
+        public string OutputMode { get; set; } = "";
+
         [NodeProperty("Max Iterations", Hint = "Maximum tool-call loop iterations")]
         public int MaxIterations { get; set; } = 50;
+
+        private static readonly GenerationTreeExecutor _treeExecutor = new();
 
         public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
@@ -43,107 +32,160 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 return NodeResult.SuccessResult();
 
             var kvData = context.Env.Persistent.KVData;
-            var agent = context.Env.Persistent.GetAgent();
-
-            var config = LoadSubAgentConfig(kvData, ConfigName);
+            var config = LoadConfig(kvData, ConfigName);
             if (config == null)
-                return NodeResult.Failure(
-                    NodeErrorCodes.ConfigNotFound,
-                    $"SubAgent: Config '{ConfigName}' not found.",
+                return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
+                    $"SubAgent: Config '{ConfigName}' not found.", nodeId: Id, nodeName: Name);
+
+            var rootNode = ResolveTree(config, kvData);
+            if (rootNode == null)
+                return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
+                    $"SubAgent: No modifier tree configured for '{ConfigName}'. Assign a preset or create a private tree.",
                     nodeId: Id, nodeName: Name);
 
-            if (context.Env.Transient.API == null)
-                return NodeResult.Failure(
-                    NodeErrorCodes.ApiUnavailable,
-                    "SubAgent: No API configured.",
-                    nodeId: Id, nodeName: Name);
-
-            var api = context.Env.Transient.API;
-
-            var toolDefinitions = context.Env.Transient.Tools
-                .Select(t => t.GetDefinition())
-                .ToList();
-
-            var baseMessages = context.Env.Transient.Fragments
-                .Select(s => (s.Message, s.From))
-                .ToArray();
-
-            var allMessages = new List<(ChatMessage, PromptBuilder.From)>(baseMessages);
-
-            for (int iteration = 0; iteration < MaxIterations; iteration++)
+            // 1. 创建隔离的 GenerationEnv，执行 SubAgent 修饰器树
+            var persistent = new PersistentEnv
             {
-                var pb = new PromptBuilder
-                {
-                    Messages = allMessages.ToArray(),
-                    AvailableTools = toolDefinitions.Count > 0 ? toolDefinitions : null,
-                    AvailableToolsFormatter = toolDefinitions.Count > 0 ? ToolPromptParser.Parse : null
-                };
+                KVData = kvData,
+                ChatGuid = context.Env.Persistent.ChatGuid,
+                AgentGuid = context.Env.Persistent.AgentGuid,
+                ToolRegistry = context.Env.Persistent.ToolRegistry
+            };
 
-                ResponseEx response;
-                try
+            // 1. 创建隔离 env，先追加父级 fragments（历史在前）
+            var subEnv = new GenerationEnv(persistent);
+            foreach (var seg in context.Env.Transient.Fragments)
+            {
+                subEnv.Transient.Fragments.Add(new ContextSegment
                 {
-                    response = await api.GenerateChatEx(pb);
-                }
-                catch (Exception ex)
-                {
-                    allMessages.Add((new ChatMessage { Content = $"[SubAgent Error: {ex.Message}]" }, PromptBuilder.From.assistant));
-                    break;
-                }
-
-                allMessages.Add((response.Body, PromptBuilder.From.assistant));
-
-                if (response.FinishReason == FinishReason.FunctionCall
-                    && response.Body.toolCalls != null
-                    && response.Body.toolCalls.Count > 0)
-                {
-                    foreach (var tc in response.Body.toolCalls)
-                    {
-                        var tool = context.Env.Transient.Tools
-                            .FirstOrDefault(t => t.GetDefinition().name == tc.name);
-                        string result = tool != null
-                            ? await tool.ExecuteAsync(tc.arguments ?? "{}")
-                            : $"Tool '{tc.name}' not found.";
-                        allMessages.Add((new ChatMessage { Content = result, id = tc.id }, PromptBuilder.From.tool_result));
-                    }
-                }
-                else
-                {
-                    break; // 没有 tool call，结束
-                }
+                    Message = CloneChatMessage(seg.Message),
+                    From = seg.From,
+                    SourceType = seg.SourceType,
+                    Metadata = new Dictionary<string, object>(seg.Metadata)
+                });
             }
 
-            if (OutputMode == "None")
-                return NodeResult.SuccessResult();
-
-            var outputMessages = allMessages.Skip(baseMessages.Length).ToList();
-            if (outputMessages.Count == 0)
-                return NodeResult.SuccessResult();
-
-            var outputText = FormatOutput(outputMessages);
-
-            context.Env.Transient.Fragments.Add(new ContextSegment
+            // 2. 执行 SubAgent 修饰器树（树产物追加在历史之后）
+            try
             {
-                SourceType = typeof(SubAgentNode),
-                Message = new ChatMessage { Content = outputText },
-                From = PromptBuilder.From.assistant,
-                Metadata = new Dictionary<string, object> { ["subAgentName"] = ConfigName }
-            });
+                var ctx = new NodeExecutionContext(subEnv, context.CancellationToken);
+                var result = await rootNode.ExecuteAsync(ctx);
+                if (!result.Success)
+                    return NodeResult.Failure(NodeErrorCodes.ServiceError,
+                        $"SubAgent: Tree execution failed: {result.Message}", nodeId: Id, nodeName: Name);
+            }
+            catch (Exception ex)
+            {
+                return NodeResult.Failure(NodeErrorCodes.ServiceError,
+                    $"SubAgent: Tree execution failed: {ex.Message}", nodeId: Id, nodeName: Name);
+            }
+
+            // 3. API：父级优先，树未设置则继承父级
+            subEnv.Transient.API ??= context.Env.Transient.API;
+            if (subEnv.Transient.API == null)
+                return NodeResult.Failure(NodeErrorCodes.ApiUnavailable,
+                    "SubAgent: No API configured.", nodeId: Id, nodeName: Name);
+
+            // 3. 若节点显式设置了 Task，追加为 user 消息
+            if (!string.IsNullOrWhiteSpace(Task))
+            {
+                subEnv.Transient.Fragments.Add(new ContextSegment
+                {
+                    Message = new ChatMessage { Content = Task },
+                    From = PromptBuilder.From.user
+                });
+            }
+
+            // 4. Tool Call 循环（隔离 env 内独立运行）
+            var tools = subEnv.Transient.Tools;
+            var toolDefs = tools.Select(t => t.GetDefinition()).ToList();
+            var toolExecutor = new SubAgent.ToolV2Executor(tools);
+            var promptCtx = new SubAgent.SubAgentPromptContext(
+                subEnv.Transient.Fragments.Select(s => (s.Message, s.From)));
+
+            var runner = new ToolCallLoopRunner();
+            var options = new ToolCallLoopOptions
+            {
+                MaxRounds = MaxIterations,
+                ContinueOnToolError = true,
+                ThrowOnRoundLimitReached = false
+            };
+
+            try
+            {
+                await runner.RunAsync(subEnv.Transient.API, promptCtx, toolDefs, toolExecutor, options,
+                    cancellationToken: context.CancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return NodeResult.Failure(NodeErrorCodes.ServiceError,
+                    $"[SubAgent Error: {ex.Message}]", nodeId: Id, nodeName: Name);
+            }
+
+            // 5. 输出格式化，注入父级上下文
+            var mode = !string.IsNullOrWhiteSpace(OutputMode) ? OutputMode : config.OutputMode;
+            if (mode == "None")
+                return NodeResult.SuccessResult();
+
+            var outputText = SubAgent.SubAgentFormatter.Format(mode, promptCtx);
+            if (!string.IsNullOrEmpty(outputText))
+            {
+                context.Env.Transient.Fragments.Add(new ContextSegment
+                {
+                    SourceType = typeof(SubAgentNode),
+                    Message = new ChatMessage { Content = outputText },
+                    From = PromptBuilder.From.assistant,
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["subAgentName"] = ConfigName,
+                        ["outputMode"] = mode
+                    }
+                });
+            }
 
             return NodeResult.SuccessResult();
         }
 
-        private static string FormatOutput(List<(ChatMessage, PromptBuilder.From)> messages)
+        private static IGenerationNode? ResolveTree(SubAgent.SubAgentConfig config, IKVDataService kvData)
         {
-            if (messages.Count == 0) return "";
-            return messages[^1].Item1.Content;
+            if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
+                return GenerationNodeSerializer.Deserialize(config.ModifierTreeJson);
+
+            if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
+            {
+                var json = kvData.Read("GenerationManager", "generation_presets");
+                var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json ?? "[]") ?? [];
+                var preset = presets.FirstOrDefault(p => p.Id == config.ModifierPresetId);
+                if (preset != null)
+                    return GenerationNodeSerializer.Deserialize(preset.RootNodeJson);
+            }
+
+            return null;
         }
 
-        private static SubAgentConfig? LoadSubAgentConfig(IKVDataService kvData, string name)
+        private static SubAgent.SubAgentConfig? LoadConfig(IKVDataService kvData, string name)
         {
             var json = kvData.Read("SubAgent", "configs");
-            var configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]")
-                ?? [];
+            var configs = JsonConvert.DeserializeObject<List<SubAgent.SubAgentConfig>>(json ?? "[]") ?? [];
             return configs.FirstOrDefault(c => c.Name == name);
+        }
+
+        private static ChatMessage CloneChatMessage(ChatMessage original)
+        {
+            return new ChatMessage
+            {
+                Content = original.Content,
+                ImageBase64 = original.ImageBase64,
+                thinking = original.thinking,
+                id = original.id,
+                toolCalls = original.toolCalls?.Select(tc => new SharperLLM.API.ToolCall
+                {
+                    name = tc.name, id = tc.id,
+                    arguments = tc.arguments, index = tc.index
+                }).ToList(),
+                CustomProperties = original.CustomProperties != null
+                    ? new Dictionary<string, object>(original.CustomProperties) : null
+            };
         }
     }
 }

@@ -1,0 +1,80 @@
+@using Newtonsoft.Json
+@using ShimmerChatBuiltin.SubAgent
+@inject ShimmerChatLib.Interface.IKVDataService KVData
+
+@if (_typedNode != null)
+{
+    <div class="subagent-editor">
+        <div class="ge-field">
+            <label class="ge-label" title="Select a SubAgent configuration from the list">
+                SubAgent
+            </label>
+            <div class="ge-value">
+                <select class="ge-select" @bind="SelectedName" @bind:event="onchange"
+                        style="width: 100%; max-width: 400px;">
+                    <option value="">— Select SubAgent —</option>
+                    @foreach (var cfg in _configs)
+                    {
+                        <option value="@cfg.Name">@cfg.Name</option>
+                    }
+                </select>
+                @if (_configs.Count == 0)
+                {
+                    <div style="font-size: 0.75em; color: #e66; margin-top: 4px;">
+                        No SubAgent configurations found. Create one in the SubAgent Configuration panel.
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(SelectedName))
+                {
+                    var selected = _configs.FirstOrDefault(c => c.Name == SelectedName);
+                    if (selected != null)
+                    {
+                        <div style="font-size: 0.72em; color: #666; margin-top: 4px;">
+                            Output: @selected.OutputMode
+                            @if (selected.UseSharedPreset)
+                            {
+                                <span> | Preset: @(string.IsNullOrEmpty(selected.ModifierPresetId) ? "None" : selected.ModifierPresetId)</span>
+                            }
+                            else
+                            {
+                                <span> | Private Tree</span>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public ShimmerChatLib.Generation.IGenerationNode Node { get; set; } = default!;
+    [Parameter] public EventCallback<ShimmerChatLib.Generation.IGenerationNode> OnChanged { get; set; }
+
+    private SubAgentToolNode? _typedNode;
+    private List<SubAgentConfig> _configs = [];
+
+    private string SelectedName
+    {
+        get => field;
+        set
+        {
+            field = value;
+            if (_typedNode != null)
+            {
+                _typedNode.ConfigName = value;
+                OnChanged.InvokeAsync(Node);
+            }
+        }
+    } = "";
+
+    protected override void OnInitialized()
+    {
+        _typedNode = Node as SubAgentToolNode;
+        if (_typedNode == null) return;
+
+        var json = KVData.Read("SubAgent", "configs");
+        _configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
+        SelectedName = _typedNode.ConfigName ?? "";
+    }
+}

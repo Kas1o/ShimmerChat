@@ -1,105 +1,159 @@
 using Newtonsoft.Json;
+using SharperLLM.Agents;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using SharperLLM.Util;
-using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
+using ShimmerChatBuiltin.Generation.Nodes;
 
 namespace ShimmerChatBuiltin.SubAgent
 {
     /// <summary>
-    /// IToolV2 版本的 SubAgent 工具，允许 LLM 通过 Tool Call 主动唤起 SubAgent。
-    /// 依赖由 SubAgentToolNode 通过构造函数注入。
+    /// IToolV2 版本的 SubAgent 工具。
+    /// 内部维护 SubAgent 注册列表，GetDefinition 动态返回可用枚举。
     /// </summary>
     public class SubAgentToolV2 : IToolV2
     {
         private readonly IKVDataService _kvData;
         private readonly ILLMAPI? _api;
-        private readonly List<IToolV2> _tools;
+        private readonly IToolRegistry _toolRegistry;
+        private readonly Guid _chatGuid;
+        private readonly Guid _agentGuid;
 
-        public SubAgentToolV2(IKVDataService kvData, ILLMAPI? api, List<IToolV2> tools)
+        private readonly List<SubAgentEntry> _entries = new();
+
+        public SubAgentToolV2(IKVDataService kvData, ILLMAPI? api,
+            IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid)
         {
             _kvData = kvData;
             _api = api;
-            _tools = tools;
+            _toolRegistry = toolRegistry;
+            _chatGuid = chatGuid;
+            _agentGuid = agentGuid;
         }
 
-        public Tool GetDefinition() => new()
+        /// <summary>注册一个 SubAgent 配置。</summary>
+        public void AddSubAgent(string configName, SubAgentConfig config)
         {
-            name = "subagent_call",
-            description = "Invoke a sub-agent with a specific config name to handle complex subtasks. The sub-agent will run independently with its own context and return results.",
-            parameters =
-            [
-                (new ToolParameter { name = "config_name", type = ParameterType.String, description = "The name of the SubAgent configuration to invoke." }, true),
-                (new ToolParameter { name = "task", type = ParameterType.String, description = "The task description for the sub-agent." }, true)
-            ]
-        };
+            if (!_entries.Any(e => e.ConfigName == configName))
+                _entries.Add(new SubAgentEntry { ConfigName = configName, Config = config });
+        }
+
+        public Tool GetDefinition()
+        {
+            var names = _entries.Select(e => e.ConfigName).ToList();
+            return new Tool
+            {
+                name = "subagent_call",
+                description = names.Count > 0
+                    ? $"Invoke a registered sub-agent. Available: {string.Join(", ", names)}"
+                    : "Invoke a registered sub-agent. (None registered yet.)",
+                parameters =
+                [
+                    (new ToolParameter
+                    {
+                        name = "subagent",
+                        type = ParameterType.String,
+                        description = $"Name of the sub-agent to invoke. Available: {string.Join(", ", names)}",
+                        @enum = names
+                    }, true),
+                    (new ToolParameter
+                    {
+                        name = "task",
+                        type = ParameterType.String,
+                        description = "The task description for the sub-agent."
+                    }, true)
+                ]
+            };
+        }
+
+        private static readonly GenerationTreeExecutor _treeExecutor = new();
 
         public async Task<string> ExecuteAsync(string input)
         {
             var args = JsonConvert.DeserializeObject<SubAgentCallArgs>(input);
-            if (args == null || string.IsNullOrWhiteSpace(args.config_name))
-                return "Error: config_name is required.";
+            if (args == null || string.IsNullOrWhiteSpace(args.subagent))
+                return "Error: subagent is required.";
+
+            var entry = _entries.FirstOrDefault(e => e.ConfigName == args.subagent);
+            if (entry == null)
+                return $"Error: SubAgent '{args.subagent}' is not registered. Available: {string.Join(", ", _entries.Select(e => e.ConfigName))}";
 
             if (_api == null)
                 return "Error: No API available for SubAgent.";
 
-            var config = LoadConfig(_kvData, args.config_name);
-            if (config == null)
-                return $"SubAgent config '{args.config_name}' not found.";
+            var config = entry.Config;
 
-            var toolDefs = _tools.Select(t => t.GetDefinition()).ToList();
-
-            var messages = new List<(ChatMessage, PromptBuilder.From)>
+            var rootNode = ResolveTree(config, _kvData);
+            var persistent = new PersistentEnv
             {
-                (new ChatMessage { Content = args.task ?? "Execute the configured task." }, PromptBuilder.From.user)
+                KVData = _kvData,
+                ChatGuid = _chatGuid,
+                AgentGuid = _agentGuid,
+                ToolRegistry = _toolRegistry
             };
 
-            for (int i = 0; i < 50; i++)
+            GenerationEnv subEnv;
+            try { subEnv = await _treeExecutor.ExecuteAsync(rootNode, persistent); }
+            catch (Exception ex) { return $"[SubAgent Tree Error: {ex.Message}]"; }
+
+            var api = subEnv.Transient.API ?? _api;
+            var tools = subEnv.Transient.Tools;
+            var toolDefs = tools.Select(t => t.GetDefinition()).ToList();
+            var toolExecutor = new ToolV2Executor(tools);
+
+            subEnv.Transient.Fragments.Add(new ContextSegment
             {
-                var pb = new PromptBuilder
-                {
-                    Messages = messages.ToArray(),
-                    AvailableTools = toolDefs.Count > 0 ? toolDefs : null,
-                    AvailableToolsFormatter = toolDefs.Count > 0 ? ToolPromptParser.Parse : null
-                };
+                Message = new ChatMessage { Content = args.task ?? "Execute the configured task." },
+                From = PromptBuilder.From.user
+            });
 
-                ResponseEx response;
-                try { response = await _api.GenerateChatEx(pb); }
-                catch (Exception ex) { return $"[SubAgent Error: {ex.Message}]"; }
+            var promptCtx = new SubAgentPromptContext(
+                subEnv.Transient.Fragments.Select(s => (s.Message, s.From)));
 
-                messages.Add((response.Body, PromptBuilder.From.assistant));
+            var runner = new ToolCallLoopRunner();
+            var options = new ToolCallLoopOptions
+            {
+                MaxRounds = 50,
+                ContinueOnToolError = true,
+                ThrowOnRoundLimitReached = false
+            };
 
-                if (response.FinishReason == FinishReason.FunctionCall
-                    && response.Body.toolCalls?.Count > 0)
-                {
-                    foreach (var tc in response.Body.toolCalls)
-                    {
-                        var tool = _tools.FirstOrDefault(t => t.GetDefinition().name == tc.name);
-                        var result = tool != null
-                            ? await tool.ExecuteAsync(tc.arguments ?? "{}")
-                            : $"Tool '{tc.name}' not found.";
-                        messages.Add((new ChatMessage { Content = result, id = tc.id }, PromptBuilder.From.tool_result));
-                    }
-                }
-                else break;
-            }
+            try { await runner.RunAsync(api, promptCtx, toolDefs, toolExecutor, options); }
+            catch (Exception ex) { return $"[SubAgent Error: {ex.Message}]"; }
 
-            return messages.LastOrDefault(m => m.Item2 == PromptBuilder.From.assistant).Item1?.Content
-                ?? "No response from sub-agent.";
+            return SubAgentFormatter.Format(config.OutputMode, promptCtx);
         }
 
-        private static SubAgentConfig? LoadConfig(IKVDataService kvData, string name)
+        private static IGenerationNode ResolveTree(SubAgentConfig config, IKVDataService kvData)
         {
-            var json = kvData.Read("SubAgent", "configs");
-            var configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
-            return configs.FirstOrDefault(c => c.Name == name);
+            if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
+                return GenerationNodeSerializer.Deserialize(config.ModifierTreeJson)
+                    ?? new AgentRootNode { Name = config.Name };
+
+            if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
+            {
+                var json = kvData.Read("GenerationManager", "generation_presets");
+                var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json ?? "[]") ?? [];
+                var preset = presets.FirstOrDefault(p => p.Id == config.ModifierPresetId);
+                if (preset != null)
+                    return GenerationNodeSerializer.Deserialize(preset.RootNodeJson)
+                        ?? new AgentRootNode { Name = config.Name };
+            }
+
+            return new AgentRootNode { Name = config.Name };
+        }
+
+        private class SubAgentEntry
+        {
+            public string ConfigName { get; set; } = "";
+            public SubAgentConfig Config { get; set; } = null!;
         }
 
         private class SubAgentCallArgs
         {
-            [JsonProperty("config_name")] public string? config_name { get; set; }
+            [JsonProperty("subagent")] public string? subagent { get; set; }
             [JsonProperty("task")] public string? task { get; set; }
         }
     }
