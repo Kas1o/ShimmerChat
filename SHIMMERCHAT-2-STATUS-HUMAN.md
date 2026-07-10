@@ -12,8 +12,6 @@
 
 Agent 基础设施匮乏，需要把项目总览和各个子模块的 SKILL 做出来。
 
-ContextModifier 没删完， ShimmerChatLib\Components\ConfigEditor.razor 之类的周边也没删完
-
-SubAgent 没做 GenerationConfig 适配。
-
 IfNode 根本没做
+
+预设导出功能需要
