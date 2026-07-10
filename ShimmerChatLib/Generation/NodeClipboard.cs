@@ -8,18 +8,22 @@ namespace ShimmerChatLib.Generation
     public static class NodeClipboard
     {
         private static string? _json;
+        private static IGenerationNodeSerializer _serializer = null!;
+
+        /// <summary>由宿主在启动时注入。</summary>
+        public static void Initialize(IGenerationNodeSerializer serializer) => _serializer = serializer;
 
         public static bool HasContent => _json != null;
 
         public static void Copy(IGenerationNode node)
         {
-            _json = GenerationNodeSerializer.Serialize(node);
+            _json = _serializer.Serialize(node);
         }
 
         public static IGenerationNode? Paste()
         {
             if (_json == null) return null;
-            var node = GenerationNodeSerializer.Deserialize(_json);
+            var node = _serializer.Deserialize(_json);
             if (node != null) RegenerateIds(node);
             return node;
         }

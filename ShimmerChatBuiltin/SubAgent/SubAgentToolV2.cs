@@ -20,17 +20,20 @@ namespace ShimmerChatBuiltin.SubAgent
         private readonly IToolRegistry _toolRegistry;
         private readonly Guid _chatGuid;
         private readonly Guid _agentGuid;
+        private readonly IGenerationNodeSerializer _serializer;
 
         private readonly List<SubAgentEntry> _entries = new();
 
         public SubAgentToolV2(IKVDataService kvData, ILLMAPI? api,
-            IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid)
+            IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid,
+            IGenerationNodeSerializer serializer)
         {
             _kvData = kvData;
             _api = api;
             _toolRegistry = toolRegistry;
             _chatGuid = chatGuid;
             _agentGuid = agentGuid;
+            _serializer = serializer;
         }
 
         /// <summary>注册一个 SubAgent 配置。</summary>
@@ -91,7 +94,8 @@ namespace ShimmerChatBuiltin.SubAgent
                 KVData = _kvData,
                 ChatGuid = _chatGuid,
                 AgentGuid = _agentGuid,
-                ToolRegistry = _toolRegistry
+                ToolRegistry = _toolRegistry,
+                Serializer = _serializer
             };
 
             GenerationEnv subEnv;
@@ -126,10 +130,10 @@ namespace ShimmerChatBuiltin.SubAgent
             return SubAgentFormatter.Format(config.OutputMode, promptCtx);
         }
 
-        private static IGenerationNode ResolveTree(SubAgentConfig config, IKVDataService kvData)
+        private IGenerationNode ResolveTree(SubAgentConfig config, IKVDataService kvData)
         {
             if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
-                return GenerationNodeSerializer.Deserialize(config.ModifierTreeJson)
+                return _serializer.Deserialize(config.ModifierTreeJson)
                     ?? new SequenceNode { Name = config.Name };
 
             if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
@@ -138,7 +142,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json ?? "[]") ?? [];
                 var preset = presets.FirstOrDefault(p => p.Id == config.ModifierPresetId);
                 if (preset != null)
-                    return GenerationNodeSerializer.Deserialize(preset.RootNodeJson)
+                    return _serializer.Deserialize(preset.RootNodeJson)
                         ?? new SequenceNode { Name = config.Name };
             }
 

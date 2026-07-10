@@ -37,7 +37,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
                     $"SubAgent: Config '{ConfigName}' not found.", nodeId: Id, nodeName: Name);
 
-            var rootNode = ResolveTree(config, kvData);
+            var rootNode = ResolveTree(config, kvData, context.Env.Persistent.Serializer);
             if (rootNode == null)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
                     $"SubAgent: No modifier tree configured for '{ConfigName}'. Assign a preset or create a private tree.",
@@ -49,7 +49,8 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 KVData = kvData,
                 ChatGuid = context.Env.Persistent.ChatGuid,
                 AgentGuid = context.Env.Persistent.AgentGuid,
-                ToolRegistry = context.Env.Persistent.ToolRegistry
+                ToolRegistry = context.Env.Persistent.ToolRegistry,
+                Serializer = context.Env.Persistent.Serializer
             };
 
             // 1. 创建隔离 env，将对话历史放入 SharedState（由树中的 AppendChatMessages 节点负责注入）
@@ -138,10 +139,10 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             return NodeResult.SuccessResult();
         }
 
-        private static IGenerationNode? ResolveTree(SubAgent.SubAgentConfig config, IKVDataService kvData)
+        private static IGenerationNode? ResolveTree(SubAgent.SubAgentConfig config, IKVDataService kvData, IGenerationNodeSerializer serializer)
         {
             if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
-                return GenerationNodeSerializer.Deserialize(config.ModifierTreeJson);
+                return serializer.Deserialize(config.ModifierTreeJson);
 
             if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
             {
@@ -149,7 +150,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json ?? "[]") ?? [];
                 var preset = presets.FirstOrDefault(p => p.Id == config.ModifierPresetId);
                 if (preset != null)
-                    return GenerationNodeSerializer.Deserialize(preset.RootNodeJson);
+                    return serializer.Deserialize(preset.RootNodeJson);
             }
 
             return null;

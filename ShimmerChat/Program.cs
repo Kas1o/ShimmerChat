@@ -31,6 +31,7 @@ ConfigureKVDataStorage(builder);
 
 // ShimmerChat 2.0 服务
 builder.Services.AddSingleton<IToolRegistry, ToolRegistry>();
+builder.Services.AddSingleton<IGenerationNodeSerializer, GenerationNodeSerializer>();
 builder.Services.AddSingleton<GenerationManagerV2>();
 builder.Services.AddSingleton<AgentMigrationService>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();

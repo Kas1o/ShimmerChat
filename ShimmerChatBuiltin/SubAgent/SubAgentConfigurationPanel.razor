@@ -7,6 +7,7 @@
 @using Newtonsoft.Json
 
 @inject IKVDataService pluginData
+@inject IGenerationNodeSerializer Serializer
 
 
 
@@ -238,7 +239,7 @@
         if (selectedConfig != null && !selectedConfig.UseSharedPreset
             && !string.IsNullOrEmpty(selectedConfig.ModifierTreeJson))
         {
-            _editingTree = GenerationNodeSerializer.Deserialize(selectedConfig.ModifierTreeJson)
+            _editingTree = Serializer.Deserialize(selectedConfig.ModifierTreeJson)
                 ?? new SequenceNode { Name = selectedConfig.Name };
         }
         else
@@ -251,7 +252,7 @@
     {
         if (_editingTree != null && selectedConfig != null)
         {
-            selectedConfig.ModifierTreeJson = GenerationNodeSerializer.Serialize(_editingTree);
+            selectedConfig.ModifierTreeJson = Serializer.Serialize(_editingTree);
         }
         StateHasChanged();
     }
@@ -331,7 +332,7 @@
             });
         }
 
-        selectedConfig.ModifierTreeJson = GenerationNodeSerializer.Serialize(root);
+        selectedConfig.ModifierTreeJson = Serializer.Serialize(root);
         selectedConfig.UseSharedPreset = false;
         _editingTree = root;
     }

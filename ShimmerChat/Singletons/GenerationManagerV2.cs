@@ -17,12 +17,15 @@ namespace ShimmerChat.Singletons
     {
         private readonly IKVDataService _kvData;
         private readonly IToolRegistry _toolRegistry;
+        private readonly IGenerationNodeSerializer _serializer;
         private readonly GenerationTreeExecutor _executor = new();
 
-        public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry)
+        public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry,
+            IGenerationNodeSerializer serializer)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
+            _serializer = serializer;
             EnsureDefaultPreset();
         }
 
@@ -39,7 +42,7 @@ namespace ShimmerChat.Singletons
             {
                 Id = "__default__",
                 Name = "Default",
-                RootNodeJson = GenerationNodeSerializer.Serialize(new SequenceNode
+                RootNodeJson = _serializer.Serialize(new SequenceNode
                 {
                     Name = "Default",
                     Nodes = new List<IGenerationNode>
@@ -139,14 +142,15 @@ namespace ShimmerChat.Singletons
                 KVData = _kvData,
                 ChatGuid = chat.Guid,
                 AgentGuid = agent.Guid,
-                ToolRegistry = _toolRegistry
+                ToolRegistry = _toolRegistry,
+                Serializer = _serializer
             };
 
             // 解析 Agent 的修改器树
             IGenerationNode rootNode;
             if (!string.IsNullOrEmpty(agent.ModifierTreeJson))
             {
-                rootNode = GenerationNodeSerializer.Deserialize(agent.ModifierTreeJson)
+                rootNode = _serializer.Deserialize(agent.ModifierTreeJson)
                     ?? CreateFallbackRoot(agent);
             }
             else

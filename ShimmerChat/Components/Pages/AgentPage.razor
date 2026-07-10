@@ -9,6 +9,7 @@
 @inject IPopupService PopupService
 @inject IJSRuntime JS
 @inject IMessageStoreService messageStore
+@inject IGenerationNodeSerializer Serializer
 
 @if(agent != null)
 {
@@ -1655,7 +1656,7 @@
             });
         }
 
-        agent.ModifierTreeJson = GenerationNodeSerializer.Serialize(root);
+        agent.ModifierTreeJson = Serializer.Serialize(root);
         agent.Save(kvDataService);
     }
 

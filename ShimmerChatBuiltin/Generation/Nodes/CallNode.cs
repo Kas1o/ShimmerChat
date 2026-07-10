@@ -45,7 +45,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     $"CallNode: Generation preset '{PresetId}' has empty RootNodeJson.",
                     nodeId: Id, nodeName: Name);
 
-            var node = GenerationNodeSerializer.Deserialize(preset.RootNodeJson);
+            var node = context.Env.Persistent.Serializer.Deserialize(preset.RootNodeJson);
             if (node == null)
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,

@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject IKVDataService KVData
 @inject GenerationManagerV2 GenManager
+@inject IGenerationNodeSerializer Serializer
 
 <h3>生成管理器</h3>
 
@@ -129,7 +130,7 @@
             if (preset != null)
             {
                 _activePreset = preset;
-                _editingRoot = GenerationNodeSerializer.Deserialize(preset.RootNodeJson)
+                _editingRoot = Serializer.Deserialize(preset.RootNodeJson)
                     ?? new SequenceNode { Name = "Root" };
             }
         }
@@ -144,7 +145,7 @@
             _agentName = ag.Name;
             _editingRoot = string.IsNullOrEmpty(ag.ModifierTreeJson)
                 ? new SequenceNode { Name = "Root" }
-                : GenerationNodeSerializer.Deserialize(ag.ModifierTreeJson)
+                : Serializer.Deserialize(ag.ModifierTreeJson)
                     ?? new SequenceNode { Name = "Root" };
             return;
         }
@@ -153,10 +154,10 @@
         if (_presets.Count == 0)
         {
             // 极端情况：若 KVData 中没有任何预设，给一个空序列兜底
-            _presets.Add(new GenerationPreset { Id = DefaultPresetId, Name = "Default", RootNodeJson = GenerationNodeSerializer.Serialize(new SequenceNode { Name = "Root" }) });
+            _presets.Add(new GenerationPreset { Id = DefaultPresetId, Name = "Default", RootNodeJson = Serializer.Serialize(new SequenceNode { Name = "Root" }) });
         }
         _activePreset = _presets[0];
-        _editingRoot = GenerationNodeSerializer.Deserialize(_activePreset.RootNodeJson)
+        _editingRoot = Serializer.Deserialize(_activePreset.RootNodeJson)
             ?? new SequenceNode { Name = "Root" };
     }
 
@@ -208,7 +209,7 @@
         };
         _presets.Add(clone);
         _activePreset = clone;
-        _editingRoot = GenerationNodeSerializer.Deserialize(clone.RootNodeJson)
+        _editingRoot = Serializer.Deserialize(clone.RootNodeJson)
             ?? new SequenceNode { Name = "Root" };
     }
 
@@ -218,7 +219,7 @@
             return;
         _presets.Remove(_activePreset);
         _activePreset = _presets[0];
-        _editingRoot = GenerationNodeSerializer.Deserialize(_activePreset.RootNodeJson)
+        _editingRoot = Serializer.Deserialize(_activePreset.RootNodeJson)
             ?? new SequenceNode { Name = "Root" };
         SavePresets();
     }
@@ -257,14 +258,14 @@
         if (_isAgentMode)
         {
             var ag = Agent.Load(_agentGuid, KVData);
-            ag.ModifierTreeJson = GenerationNodeSerializer.Serialize(_editingRoot);
+            ag.ModifierTreeJson = Serializer.Serialize(_editingRoot);
             ag.Save(KVData);
             return;
         }
 
         if (_activePreset != null && _activePreset.Id != DefaultPresetId)
         {
-            _activePreset.RootNodeJson = GenerationNodeSerializer.Serialize(_editingRoot);
+            _activePreset.RootNodeJson = Serializer.Serialize(_editingRoot);
             SavePresets();
         }
     }

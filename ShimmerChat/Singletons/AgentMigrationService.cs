@@ -13,10 +13,12 @@ namespace ShimmerChat.Singletons
     public class AgentMigrationService
     {
         private readonly IKVDataService _kvData;
+        private readonly IGenerationNodeSerializer _serializer;
 
-        public AgentMigrationService(IKVDataService kvData)
+        public AgentMigrationService(IKVDataService kvData, IGenerationNodeSerializer serializer)
         {
             _kvData = kvData;
+            _serializer = serializer;
         }
 
         /// <summary>
@@ -78,7 +80,7 @@ namespace ShimmerChat.Singletons
             // via ToolManager presets and loaded by ToolPresetNode in the tree.
             // The migration only converts the Description.
 
-            agent.ModifierTreeJson = GenerationNodeSerializer.Serialize(root);
+            agent.ModifierTreeJson = _serializer.Serialize(root);
             agent.Save(_kvData);
             return true;
         }
