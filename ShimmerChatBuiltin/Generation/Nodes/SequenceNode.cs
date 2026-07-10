@@ -5,13 +5,13 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// <summary>
     /// 顺序执行子节点，Repeat=N 表示重复执行 N 次（默认 1 次）
     /// </summary>
-    [NodeInfo("Sequence", Icon = "▦", Color = "#4a9eff", Category = "Flow")]
+    [NodeInfo("node.sequence", Icon = "▦", Color = "#4a9eff", CategoryKeys = ["category.flow"])]
     public class SequenceNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Sequence";
         public List<IGenerationNode> Nodes { get; set; } = new();
-        [NodeProperty("Repeat", Hint = "Number of times to repeat the sequence")]
+        [NodeProperty("prop.sequence.repeat", HintKey = "prop.sequence.repeat.hint")]
         public int Repeat { get; set; } = 1;
 
         public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)

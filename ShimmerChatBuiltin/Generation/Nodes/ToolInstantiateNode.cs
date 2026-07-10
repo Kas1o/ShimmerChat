@@ -6,7 +6,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 通过 IAutoCreateToolV2.Create(PersistentEnv) 实例化工具并加入 Tools 列表。
     /// 只处理实现了 IAutoCreateToolV2 的类型。
     /// </summary>
-    [NodeInfo("Instantiate Tool", Icon = "⚙", Color = "#70c070", Category = "Tool")]
+    [NodeInfo("node.instantiate_tool", Icon = "⚙", Color = "#70c070", CategoryKeys = ["category.tool"])]
     [NodeEditor(typeof(ToolInstantiateNodeEditor))]
     public class ToolInstantiateNode : IGenerationNode
     {

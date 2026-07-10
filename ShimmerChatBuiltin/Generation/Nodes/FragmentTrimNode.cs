@@ -8,7 +8,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// Token 裁剪节点：超过 TokenBudget 时从最早的消息开始裁剪。
     /// 合并了旧的 TokenLimit 和 LatestN 功能。
     /// </summary>
-    [NodeInfo("Fragment Trim", Icon = "✂", Color = "#c080e0", Category = "Content/Filter")]
+    [NodeInfo("node.fragment_trim", Icon = "✂", Color = "#c080e0", CategoryKeys = ["category.content", "category.filter"])]
     public class FragmentTrimNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
@@ -17,25 +17,25 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// <summary>
         /// Token 预算，超过则从头部裁剪
         /// </summary>
-        [NodeProperty("Token Budget", Hint = "Max tokens before trimming from head")]
+        [NodeProperty("prop.fragment_trim.token_budget", HintKey = "prop.fragment_trim.token_budget.hint")]
         public int TokenBudget { get; set; } = 4096;
 
         /// <summary>
         /// 裁剪模式：TokenBudget（按 token 裁剪）或 LatestN（只保留最新 N 条）
         /// </summary>
-        [NodeProperty("Trim Mode", Hint = "TokenBudget or LatestN")]
+        [NodeProperty("prop.fragment_trim.trim_mode", HintKey = "prop.fragment_trim.trim_mode.hint")]
         public TrimMode Mode { get; set; } = TrimMode.TokenBudget;
 
         /// <summary>
         /// LatestN 模式下保留的消息数
         /// </summary>
-        [NodeProperty("Count", Hint = "Messages to keep in LatestN mode")]
+        [NodeProperty("prop.fragment_trim.count", HintKey = "prop.fragment_trim.count.hint")]
         public int Count { get; set; } = 10;
 
         /// <summary>
         /// 是否保留第一条 system 消息
         /// </summary>
-        [NodeProperty("Keep First System", Hint = "Preserve the first system message")]
+        [NodeProperty("prop.fragment_trim.keep_first_system", HintKey = "prop.fragment_trim.keep_first_system.hint")]
         public bool KeepFirstSystem { get; set; } = true;
 
         /// <summary>

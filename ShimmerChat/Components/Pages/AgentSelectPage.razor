@@ -1,21 +1,21 @@
 @page "/agentselect"
 @using System.Collections.ObjectModel;
 @inject NavigationManager navigation
-@inject IStringLocalizer<AgentSelectPage> l
+@inject ILocService Loc
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService
 
-<h3>@l["AgentSelectPage"]</h3>
+<h3>@Loc["AgentSelectPage"]</h3>
 <div class="agent-toolbar">
 	<div class="toolbar-left">
-		<button class="btn btn-primary" @onclick="OpenCreateAgentMenu">@l["Create New Agent"]</button>
+		<button class="btn btn-primary" @onclick="OpenCreateAgentMenu">@Loc["Create New Agent"]</button>
 		<div class="import-group">
 			<InputFile OnChange="InputFileChanged" />
 			<button class="btn btn-primary" @onclick="Import">Import</button>
 		</div>
 	</div>
 	<div class="toolbar-right">
-		<button class="btn btn-secondary view-toggle-btn" @onclick="ToggleViewMode" title="@(IsDetailMode ? l["Switch to Grid View"] : l["Switch to Detail View"])">
+		<button class="btn btn-secondary view-toggle-btn" @onclick="ToggleViewMode" title="@(IsDetailMode ? Loc["Switch to Grid View"] : Loc["Switch to Detail View"])">
 			<i class="bi @(IsDetailMode ? "bi-grid-3x3-gap-fill" : "bi-list-ul")"></i>
 		</button>
 	</div>
@@ -23,11 +23,11 @@
 
 <div class="search-filter-bar">
 	<div class="search-input-wrapper">
-		<input class="shimmer-input search-input" type="text" @bind="SearchQuery" @bind:event="oninput" placeholder="@l["Search agents..."]" />
+		<input class="shimmer-input search-input" type="text" @bind="SearchQuery" @bind:event="oninput" placeholder="@Loc["Search agents..."]" />
 	</div>
 	<div class="filter-input-wrapper">
 		<input class="shimmer-input filter-input" type="text" @bind="FilterTag" @bind:event="oninput"
-			@onfocus="OnFilterFocus" @onfocusout="OnFilterFocusOut" placeholder="@l["Filter by tag..."]" />
+			@onfocus="OnFilterFocus" @onfocusout="OnFilterFocusOut" placeholder="@Loc["Filter by tag..."]" />
 		@if (ShowTagSuggestions && TagSuggestions.Count > 0)
 		{
 			<div class="tag-suggestions-dropdown">
@@ -76,7 +76,7 @@
 			}
 			@if (!FilteredAgents.Any())
 			{
-				<div class="agent-empty">@l["No agents found"]</div>
+				<div class="agent-empty">@Loc["No agents found"]</div>
 			}
 		</div>
 	</div>
@@ -100,7 +100,7 @@ else
 			}
 			@if (!FilteredAgents.Any())
 			{
-				<div class="agent-empty" style="grid-column: 1 / -1; text-align: center; padding: 40px;">@l["No agents found"]</div>
+				<div class="agent-empty" style="grid-column: 1 / -1; text-align: center; padding: 40px;">@Loc["No agents found"]</div>
 			}
 		</div>
 	</div>
@@ -110,14 +110,14 @@ else
 {
 	<div class="shimmer-popup-overlay" @onclick="() => CreatePopupVisible=false">
 		<div class="shimmer-popup-content" @onclick:stopPropagation>
-			<h5>@l["Create new Agent popup title"]</h5>
-			<label>@l["Name:"]</label>
+			<h5>@Loc["Create new Agent popup title"]</h5>
+			<label>@Loc["Name:"]</label>
 			<input class="shimmer-input" @bind=popupNewAgentName/>
-			<label>@l["Description:"]</label>
+			<label>@Loc["Description:"]</label>
 			<textarea class="shimmer-textarea" @bind=popupNewAgentDescription/>
-			<label>@l["Greeting:"]</label>
+			<label>@Loc["Greeting:"]</label>
 			<textarea class="shimmer-textarea" @bind=popupNewAgentGreeting/>
-			<button class="btn btn-dark" @onclick="CreateNewAgent">@l["Create"]</button>
+			<button class="btn btn-dark" @onclick="CreateNewAgent">@Loc["Create"]</button>
 		</div>
 	</div>
 }
@@ -126,11 +126,11 @@ else
 {
 	<div class="shimmer-popup-overlay" @onclick="() => DeletePopupVisible=false">
 		<div class="shimmer-popup-content" @onclick:stopPropagation>
-			<h5>@l["Delete Agent popup title"]</h5>
-			<p>@string.Format(l["Delete Agent confirmation message"], AgentToDelete?.Name)</p>
+			<h5>@Loc["Delete Agent popup title"]</h5>
+			<p>@string.Format(Loc["Delete Agent confirmation message"], AgentToDelete?.Name)</p>
 			<div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-				<button class="btn btn-secondary" @onclick="() => DeletePopupVisible=false">@l["Cancel"]</button>
-				<button class="btn btn-danger" @onclick="DeleteAgentConfirmed">@l["Delete"]</button>
+				<button class="btn btn-secondary" @onclick="() => DeletePopupVisible=false">@Loc["Cancel"]</button>
+				<button class="btn btn-danger" @onclick="DeleteAgentConfirmed">@Loc["Delete"]</button>
 			</div>
 		</div>
 	</div>

@@ -2,13 +2,13 @@ using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    [NodeInfo("Print", Icon = "🖨️", Color = "#888", Category = "Debug", Description = "Print a template to console with {time} and {total_len} macro support")]
+    [NodeInfo("node.print", Icon = "🖨️", Color = "#888", CategoryKeys = ["category.debug"], DescriptionKey = "node.print.desc")]
     public class PrintNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Print";
 
-        [NodeProperty("Template", Hint = "Template string. Supports {time} and {total_len} macros")]
+        [NodeProperty("prop.print.template", HintKey = "prop.print.template.hint")]
         public string Template { get; set; } = "";
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)

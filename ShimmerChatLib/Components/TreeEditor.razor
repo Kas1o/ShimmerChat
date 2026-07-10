@@ -1,5 +1,6 @@
 @using System.Reflection
 @using ShimmerChatLib.Generation
+@inject ILocService Loc
 
 @if (_info == null)
 {
@@ -35,7 +36,7 @@ else
     <div class="tree-node-card" style="border-left-color: @_info.Color;">
         <div class="tn-header" @onclick="ToggleExpand">
             <span class="tn-icon">@_info.Icon</span>
-            <span class="tn-label">@_info.Label</span>
+            <span class="tn-label">@Loc[_info.LabelKey]</span>
             <input class="tn-name-input" @bind="Node.Name" @bind:event="oninput"
                    @onkeydown="OnNameKeyDown" placeholder="Name" />
             <div class="tn-actions">

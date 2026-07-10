@@ -1,6 +1,7 @@
 @using ShimmerChatLib.Generation
 
 @inject IToolRegistry ToolRegistry
+@inject ILocService Loc
 
 <div class="ti-editor">
     <div class="ti-label">Select Tool</div>
@@ -18,13 +19,13 @@
             @foreach (var group in _groupedTools)
             {
                 <div class="ti-group">
-                    <div class="ti-group-header">@group.Key</div>
+                    <div class="ti-group-header">@string.Join(" / ", group.Key.Split('/').Select(k => Loc[k.Trim()]))</div>
                     @foreach (var tool in group.Value)
                     {
-                        <div class="ti-item @(tool.Name == _selectedToolName ? "ti-item-active" : "")"
+                        <div class="ti-item @(tool.NameKey == _selectedToolName ? "ti-item-active" : "")"
                              @onclick="() => SelectTool(tool)">
-                            <span class="ti-item-name">@tool.Name</span>
-                            <span class="ti-item-desc">@tool.Description</span>
+                            <span class="ti-item-name">@Loc[tool.NameKey]</span>
+                            <span class="ti-item-desc">@Loc[tool.DescriptionKey]</span>
                         </div>
                     }
                 </div>
@@ -60,8 +61,8 @@
             return;
 
         _groupedTools = ToolRegistry.AllTools
-            .OrderBy(t => t.CategoryPath).ThenBy(t => t.Name)
-            .GroupBy(t => string.IsNullOrEmpty(t.CategoryPath) ? "其他" : t.CategoryPath)
+            .OrderBy(t => string.Join("/", t.CategoryKeys)).ThenBy(t => t.NameKey)
+            .GroupBy(t => t.CategoryKeys is { Length: > 0 } ? string.Join("/", t.CategoryKeys) : "category.other")
             .ToDictionary(g => g.Key, g => g.ToList());
 
         if (!string.IsNullOrEmpty(_typedNode.ToolTypeName))
@@ -71,7 +72,7 @@
                 .FirstOrDefault(t => t.TypeName == _typedNode.ToolTypeName);
             if (match != null)
             {
-                _selectedToolName = match.Name;
+                _selectedToolName = match.NameKey;
                 _showPicker = false;
             }
         }
@@ -81,7 +82,7 @@
     {
         if (_typedNode == null) return;
         _typedNode.ToolTypeName = tool.TypeName;
-        _selectedToolName = tool.Name;
+        _selectedToolName = tool.NameKey;
         _showPicker = false;
         OnChanged.InvokeAsync(Node);
     }

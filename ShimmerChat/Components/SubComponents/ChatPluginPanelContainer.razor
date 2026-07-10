@@ -1,4 +1,5 @@
 ﻿@inject IPluginPanelService PluginPanelService
+@inject ILocService Loc
 
 <div class="plugin-sidebar @(_isExpanded ? "sidebar-expanded" : "sidebar-collapsed")">
 	<button class="sidebar-toggle" @onclick="ToggleSidebar" title="@(_isExpanded ? "收起" : "展开")">
@@ -12,12 +13,12 @@
 		{
 			<details class="plugin-item">
 				<summary class="plugin-summary">
-					<span class="plugin-name">@item.Name</span>
+					<span class="plugin-name">@Loc[item.NameKey]</span>
 					<span class="plugin-arrow bi bi-chevron-down"></span>
 				</summary>
-				@if (!string.IsNullOrEmpty(item.Description))
+				@if (!string.IsNullOrEmpty(item.DescriptionKey))
 				{
-					<p class="plugin-description">@item.Description</p>
+					<p class="plugin-description">@Loc[item.DescriptionKey]</p>
 				}
 				<div class="plugin-content">
 					<DynamicComponent Type="item.PanelType" Parameters="Parameters"/>

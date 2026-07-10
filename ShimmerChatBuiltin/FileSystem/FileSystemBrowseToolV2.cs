@@ -10,9 +10,9 @@ namespace ShimmerChatBuiltin.FileSystem
     {
         private readonly IKVDataService _kvData;
 
-        public static string Name => "browse_directory";
-        public static string Description => "List contents of a directory.";
-        public static string CategoryPath => "文件系统/浏览";
+        public static string NameKey => "tool.browse_directory";
+        public static string DescriptionKey => "tool.browse_directory.desc";
+        public static string[] CategoryKeys => ["category.file_system", "category.browse"];
 
         public FileSystemBrowseToolV2() { }
 

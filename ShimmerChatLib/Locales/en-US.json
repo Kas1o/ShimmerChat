@@ -1,0 +1,23 @@
+{
+  "category.file_system": "File System",
+  "category.read_write": "Read & Write",
+  "category.browse": "Browse",
+  "category.memory": "Memory",
+  "category.chat": "Chat",
+  "category.code": "Code",
+  "category.variable": "Variable",
+  "category.config": "Config",
+  "category.content": "Content",
+  "category.fragment": "Fragment",
+  "category.filter": "Filter",
+  "category.memory_node": "Memory",
+  "category.flow": "Flow",
+  "category.link": "Link",
+  "category.branching": "Branching",
+  "category.debug": "Debug",
+  "category.tool": "Tool",
+  "category.preset": "Preset",
+  "category.sub_agent": "SubAgent",
+  "category.general": "General",
+  "category.other": "Other"
+}

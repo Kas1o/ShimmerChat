@@ -10,9 +10,9 @@ namespace ShimmerChatBuiltin
     /// </summary>
     public class InvokeCSharpV2 : IAutoCreateToolV2
     {
-        public static string Name => "EvalCsharp";
-        public static string Description => "Eval C# using CSharpScript.EvaluateAsync.";
-        public static string CategoryPath => "代码";
+        public static string NameKey => "tool.eval_csharp";
+        public static string DescriptionKey => "tool.eval_csharp.desc";
+        public static string[] CategoryKeys => ["category.code"];
 
         public static IAutoCreateToolV2 Create(PersistentEnv env) => new InvokeCSharpV2();
 

@@ -14,9 +14,9 @@ namespace ShimmerChatBuiltin
         private readonly IKVDataService _kvData;
         private readonly Guid _chatGuid;
 
-        public static string Name => "set_chat_name";
-        public static string Description => "Set name for current chat. Invoke when topic updates or on first user input.";
-        public static string CategoryPath => "对话";
+        public static string NameKey => "tool.set_chat_name";
+        public static string DescriptionKey => "tool.set_chat_name.desc";
+        public static string[] CategoryKeys => ["category.chat"];
 
         public SetChatNameToolV2() { }
 

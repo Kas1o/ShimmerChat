@@ -6,22 +6,22 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    [NodeInfo("SubAgent", Icon = "🤖", Color = "#e06090", Category = "Flow/SubAgent")]
+    [NodeInfo("node.sub_agent", Icon = "🤖", Color = "#e06090", CategoryKeys = ["category.flow", "category.sub_agent"])]
     public class SubAgentNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent";
 
-        [NodeProperty("Config Name", Hint = "Name of the SubAgent configuration")]
+        [NodeProperty("prop.sub_agent.config_name", HintKey = "prop.sub_agent.config_name.hint")]
         public string ConfigName { get; set; } = "";
 
-        [NodeProperty("Task", Hint = "Optional task message appended before generation. Leave empty to continue parent conversation.")]
+        [NodeProperty("prop.sub_agent.task", HintKey = "prop.sub_agent.task.hint")]
         public string Task { get; set; } = "";
 
-        [NodeProperty("Output Mode", Hint = "LastMessage, FullJson, or None. Overrides config if set.")]
+        [NodeProperty("prop.sub_agent.output_mode", HintKey = "prop.sub_agent.output_mode.hint")]
         public string OutputMode { get; set; } = "";
 
-        [NodeProperty("Max Iterations", Hint = "Maximum tool-call loop iterations")]
+        [NodeProperty("prop.sub_agent.max_iterations", HintKey = "prop.sub_agent.max_iterations.hint")]
         public int MaxIterations { get; set; } = 50;
 
         private static readonly GenerationTreeExecutor _treeExecutor = new();

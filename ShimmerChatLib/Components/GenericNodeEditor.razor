@@ -1,12 +1,13 @@
 @using System.Reflection
 @using ShimmerChatLib.Generation
 @typeparam TNode where TNode : IGenerationNode
+@inject ILocService Loc
 
 <div class="generic-editor">
     @foreach (var prop in _properties.OrderBy(p => p.Order))
     {
         <div class="ge-field">
-            <label class="ge-label" title="@prop.Hint">@prop.Label</label>
+            <label class="ge-label" title="@(prop.HintKey != null ? Loc[prop.HintKey] : null)">@Loc[prop.LabelKey]</label>
             <div class="ge-value">
                 @RenderProperty(prop)
             </div>
@@ -16,7 +17,7 @@
     {
         <div class="ge-children">
             <div class="ge-children-header">
-                <span class="ge-label">@_childNodesProp.Label</span>
+                <span class="ge-label">@Loc[_childNodesProp.LabelKey]</span>
                 <span class="tn-count">(@_childNodes.Count)</span>
                 <button class="tn-btn tn-btn-add" @onclick="ToggleAddMenu" title="Add child">+</button>
                 @if (NodeClipboard.HasContent)
@@ -39,7 +40,7 @@
                             {
                                 var count = CountLeafNodes(child, _filter);
                                 <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
-                                    <span class="tn-cat-name">@child.Name</span>
+                                    <span class="tn-cat-name">@Loc[child.Name]</span>
                                     <span class="tn-cat-count">@count</span>
                                 </button>
                             }
@@ -48,14 +49,14 @@
                         {
                             <div class="tn-add-flat">
                                 @foreach (var leaf in _flatNodes.Where(n =>
-                                    n.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+                                    n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     <div class="tn-add-item" @onclick="() => AddChild(leaf.Type)" @onclick:preventDefault>
                                         <span class="tn-item-left">
                                             <span style="color:@leaf.Color">@leaf.Icon</span>
-                                            <span class="tn-item-label">@leaf.Label</span>
+                                            <span class="tn-item-label">@Loc[leaf.LabelKey]</span>
                                         </span>
-                                        <span class="tn-add-item-cat">@leaf.FullCategory</span>
+                                        <span class="tn-add-item-cat">@string.Join(" / ", leaf.FullCategory.Split('/').Select(k => Loc[k.Trim()]))</span>
                                     </div>
                                 }
                             </div>
@@ -72,7 +73,7 @@
                                 if (i > 0) { <span class="tn-bc-sep">›</span> }
                                 <button class="tn-bc-item @(i == _navPath.Count - 1 ? "current" : "")"
                                         @onclick="() => NavigateTo(_navPath.Take(i + 1).ToList())">
-                                    @_navPath[i].Name
+                                    @Loc[_navPath[i].Name]
                                 </button>
                             }
                         </div>
@@ -81,7 +82,7 @@
                             {
                                 var count = CountLeafNodes(child, _filter);
                                 <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
-                                    <span class="tn-cat-name">@child.Name</span>
+                                    <span class="tn-cat-name">@Loc[child.Name]</span>
                                     <span class="tn-cat-count">@count</span>
                                 </button>
                             }
@@ -91,16 +92,16 @@
                             <div class="tn-add-nodes">
                                 @foreach (var nt in current.LeafNodes.Where(n =>
                                     string.IsNullOrEmpty(_filter) ||
-                                    n.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+                                    n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     <div class="tn-add-item" @onclick="() => AddChild(nt.Type)" @onclick:preventDefault>
                                         <span class="tn-item-left">
                                             <span style="color:@nt.Color">@nt.Icon</span>
-                                            <span class="tn-item-label">@nt.Label</span>
+                                            <span class="tn-item-label">@Loc[nt.LabelKey]</span>
                                         </span>
-                                        @if (nt.Description != null)
+                                        @if (nt.DescriptionKey != null)
                                         {
-                                            <span class="tn-item-desc">@nt.Description</span>
+                                            <span class="tn-item-desc">@Loc[nt.DescriptionKey]</span>
                                         }
                                     </div>
                                 }
@@ -156,9 +157,9 @@
 
     private List<CategoryTreeNode> _categoryTree = new();
     private List<CategoryTreeNode> _navPath = new();
-    private List<(string Label, Type Type, string Icon, string Color, string? Description, string FullCategory)> _flatNodes = new();
+    private List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey, string FullCategory)> _flatNodes = new();
 
-    private static List<(string Label, Type Type, string Icon, string Color, string? Description, string FullCategory)>? _cachedFlats;
+    private static List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey, string FullCategory)>? _cachedFlats;
 
     protected override void OnInitialized()
     {
@@ -178,7 +179,7 @@
             var parts = node.FullCategory.Split('/', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0)
             {
-                parts = new[] { "General" };
+                parts = new[] { "category.general" };
             }
 
             Dictionary<string, CategoryTreeNode> current = root;
@@ -203,7 +204,7 @@
         _categoryTree = root.Values.OrderBy(c => c.Name).ToList();
     }
 
-    private static List<(string Label, Type Type, string Icon, string Color, string? Description, string FullCategory)> GetFlatNodes()
+    private static List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey, string FullCategory)> GetFlatNodes()
     {
         if (_cachedFlats != null) return _cachedFlats;
 
@@ -219,12 +220,12 @@
                     {
                         var info = type.GetCustomAttribute<NodeInfoAttribute>();
                         _cachedFlats.Add((
-                            info?.Label ?? type.Name,
+                            info?.LabelKey ?? type.Name,
                             type,
                             info?.Icon ?? "●",
                             info?.Color ?? "#888",
-                            info?.Description,
-                            info?.Category ?? "General"
+                            info?.DescriptionKey,
+                            info?.CategoryKeys is { Length: > 0 } cats ? string.Join("/", cats) : "category.general"
                         ));
                     }
                 }
@@ -237,7 +238,7 @@
     private static int CountLeafNodes(CategoryTreeNode node, string filter)
     {
         int count = node.LeafNodes.Count(n =>
-            string.IsNullOrEmpty(filter) || n.Label.Contains(filter, StringComparison.OrdinalIgnoreCase));
+            string.IsNullOrEmpty(filter) || n.LabelKey.Contains(filter, StringComparison.OrdinalIgnoreCase));
         foreach (var child in node.Children)
             count += CountLeafNodes(child, filter);
         return count;
@@ -290,7 +291,7 @@
         public string Name { get; set; } = "";
         public Dictionary<string, CategoryTreeNode> ChildrenDict { get; } = new(StringComparer.OrdinalIgnoreCase);
         public List<CategoryTreeNode> Children => ChildrenDict.Values.OrderBy(c => c.Name).ToList();
-        public List<(string Label, Type Type, string Icon, string Color, string? Description, string FullCategory)> LeafNodes { get; } = new();
+        public List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey, string FullCategory)> LeafNodes { get; } = new();
     }
 
     private void ToggleAddMenu()
@@ -310,7 +311,7 @@
         _showAddMenu = false;
         _filter = "";
         var instance = (IGenerationNode)Activator.CreateInstance(type)!;
-        instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.Label ?? type.Name;
+        instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
         _childNodes.Add(instance);
         OnTreeChanged.InvokeAsync();
     }
@@ -417,8 +418,8 @@
 
     private class PropInfo
     {
-        public string Label { get; }
-        public string? Hint { get; }
+        public string LabelKey { get; }
+        public string? HintKey { get; }
         public int Order { get; }
         public PropertyInfo Prop { get; }
         public Type PropertyType { get; }
@@ -428,8 +429,8 @@
             Prop = prop;
             PropertyType = prop.PropertyType;
             var attr = prop.GetCustomAttribute<NodePropertyAttribute>();
-            Label = attr?.Label ?? prop.Name;
-            Hint = attr?.Hint;
+            LabelKey = attr?.LabelKey ?? prop.Name;
+            HintKey = attr?.HintKey;
             Order = attr?.Order ?? 0;
         }
 

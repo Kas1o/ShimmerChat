@@ -3,7 +3,7 @@
 @using ShimmerChatLib
 @using SharperLLM.Util
 
-@inject IStringLocalizer<Message> l
+@inject ILocService Loc
 @inject IJSRuntime JS
 @inject IMessageDisplayService MessageDisplayService
 @inject IKVDataService KVData
@@ -35,23 +35,23 @@
 			@if (message.sender == ShimmerChatLib.Sender.AI)
 			{
 				<div @onclick="RegenerateFromThisMessage" style="display: @(message.IsStreaming ? "none" : "block")">
-					@l["BUTTON_REGENERATE"]
+					@Loc["BUTTON_REGENERATE"]
 				</div>
 				@if (IsContinuationEnabled())
 				{
 					<div @onclick="ContinueFromThisMessage" style="display: @(message.IsStreaming ? "none" : "block")">
-						@l["BUTTON_CONTINUE"]
+						@Loc["BUTTON_CONTINUE"]
 					</div>
 				}
 			}
 			<div @onclick="e => DeleteThisMessage()">
-				@l["BUTTON_DELETE"]
+				@Loc["BUTTON_DELETE"]
 			</div>
 			<div @onclick="CopyContentToClipboard">
-				@l["BUTTON_COPY"]
+				@Loc["BUTTON_COPY"]
 			</div>
 			<div @onclick="EnterEditMode" style="display: @(message.IsStreaming ? "none" : "block")">
-				@l["BUTTON_EDIT"]
+				@Loc["BUTTON_EDIT"]
 			</div>
 		</div>
 	</div>
@@ -68,8 +68,8 @@
 			<label>消息内容:</label>
 			<textarea @bind="editContent" rows="4" style="width:100%"></textarea>
 			<!-- 这里有个长文本输入问题，Blazor SignalR 消息不允许过长的文本输入-->
-			<button class="btn btn-success" @onclick="SaveEdit">@l["BUTTON_SAVE"]</button>
-			<button class="btn" @onclick="CancelEdit">@l["BUTTON_CANCEL"]</button>
+			<button class="btn btn-success" @onclick="SaveEdit">@Loc["BUTTON_SAVE"]</button>
+			<button class="btn" @onclick="CancelEdit">@Loc["BUTTON_CANCEL"]</button>
 		</div>
 	}
 	else
@@ -152,7 +152,7 @@
 	{
 		ShimmerChatLib.Sender.User => KVData.Read("User", "username") ?? "User",
 		ShimmerChatLib.Sender.AI => AgentName,
-		ShimmerChatLib.Sender.ToolResult => l["ToolResult"],
+		ShimmerChatLib.Sender.ToolResult => Loc["ToolResult"],
 		var other => other
 	};
 

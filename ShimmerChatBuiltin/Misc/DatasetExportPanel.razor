@@ -5,7 +5,7 @@
 @inject IKVDataService KVData
 @inject IJSRuntime JS
 
-@attribute [PluginPanelAttribute("数据集导出", "导出对话内容，支持应用上下文修改器和不应用", PanelDisplayPlace.Chat)]
+@attribute [PluginPanelAttribute("panel.dataset_export", "panel.dataset_export.desc", PanelDisplayPlace.Chat)]
 
 <button class="btn btn-primary" @onclick="Export">Export</button>
 <button class="btn btn-primary" @onclick="ApplyModifiersAndExport">Apply Modifiers And Export</button>

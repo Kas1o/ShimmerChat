@@ -1,8 +1,7 @@
 using ShimmerChat.Components;
 using ShimmerChat.Singletons;
 using ShimmerChatLib.Generation;
-using Microsoft.AspNetCore.Localization;
-using System.Globalization;
+using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 using Microsoft.Extensions.FileProviders;
 using System.Reflection;
@@ -27,8 +26,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddLocalization(option => option.ResourcesPath = "Resources");
-
 // 配置 KV 数据存储
 ConfigureKVDataStorage(builder);
 
@@ -42,6 +39,7 @@ builder.Services.AddSingleton<IPopupService, PopupService>();
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
 builder.Services.AddSingleton<ICompletionServiceV2, CompletionServiceV2>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
+builder.Services.AddSingleton<ILocService, LocService>();
 
 var app = builder.Build();
 
@@ -50,20 +48,6 @@ ExecuteAutoMigration(app);
 
 // ShimmerChat 2.0: 执行 Agent 数据迁移
 ExecuteAgentMigration(app);
-
-var supportedCultures = new[]
-{
-    new CultureInfo("en-US"),
-    new CultureInfo("zh-CN")
-};
-
-app.UseRequestLocalization(new RequestLocalizationOptions
-{
-	DefaultRequestCulture = new RequestCulture("zh-CN"),
-	SupportedCultures = supportedCultures,
-	SupportedUICultures = supportedCultures
-});
-
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

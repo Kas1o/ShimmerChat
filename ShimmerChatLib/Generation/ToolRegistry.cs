@@ -3,7 +3,7 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatLib.Generation
 {
-    public record ToolMetadata(string Name, string Description, string CategoryPath, Type Type)
+    public record ToolMetadata(string NameKey, string DescriptionKey, string[] CategoryKeys, Type Type)
     {
         public string TypeName => Type.FullName!;
     }
@@ -23,7 +23,7 @@ namespace ShimmerChatLib.Generation
         public IReadOnlyList<ToolMetadata> AllTools => _tools.Value;
 
         public ToolMetadata? FindByName(string name) =>
-            _tools.Value.FirstOrDefault(t => t.Name == name);
+            _tools.Value.FirstOrDefault(t => t.NameKey == name);
 
         public ToolMetadata? FindByTypeName(string typeName) =>
             _tools.Value.FirstOrDefault(t => t.TypeName == typeName);
@@ -53,15 +53,15 @@ namespace ShimmerChatLib.Generation
             {
                 try
                 {
-                    var nameProp = type.GetProperty("Name", flags);
+                    var nameProp = type.GetProperty("NameKey", flags);
                     if (nameProp == null) continue;
                     var name = (string)nameProp.GetValue(null)!;
 
-                    var descProp = type.GetProperty("Description", flags);
+                    var descProp = type.GetProperty("DescriptionKey", flags);
                     var desc = descProp != null ? (string)descProp.GetValue(null)! : "";
 
-                    var catProp = type.GetProperty("CategoryPath", flags);
-                    var cat = catProp != null ? (string)catProp.GetValue(null)! : "";
+                    var catProp = type.GetProperty("CategoryKeys", flags);
+                    var cat = catProp != null ? (string[])catProp.GetValue(null)! : [];
 
                     result.Add(new ToolMetadata(name, desc, cat, type));
                 }

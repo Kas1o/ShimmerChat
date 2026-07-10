@@ -16,9 +16,9 @@ namespace ShimmerChatBuiltin.Variable
         private readonly Guid _chatGuid;
         private readonly Guid _agentGuid;
 
-        public static string Name => "VariableTool";
-        public static string Description => "Manage variables in conversations. Supports get, set, delete, list, search.";
-        public static string CategoryPath => "变量";
+        public static string NameKey => "tool.variable";
+        public static string DescriptionKey => "tool.variable.desc";
+        public static string[] CategoryKeys => ["category.variable"];
 
         public VariableToolV2() { }
 

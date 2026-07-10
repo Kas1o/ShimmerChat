@@ -10,9 +10,9 @@ namespace ShimmerChatBuiltin.FileSystem
     {
         private readonly IKVDataService _kvData;
 
-        public static string Name => "write_file";
-        public static string Description => "Write plain text content to a file.";
-        public static string CategoryPath => "文件系统/读写";
+        public static string NameKey => "tool.write_file";
+        public static string DescriptionKey => "tool.write_file.desc";
+        public static string[] CategoryKeys => ["category.file_system", "category.read_write"];
 
         public FileSystemWriteToolV2() { }
 

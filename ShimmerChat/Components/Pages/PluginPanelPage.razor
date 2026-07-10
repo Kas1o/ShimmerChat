@@ -1,13 +1,14 @@
 @page "/pluginpanel/{PanelName}"
 @inject IPluginPanelService PluginPanelService
+@inject ILocService Loc
 
-<PageTitle>插件面板 - @PanelTitle</PageTitle>
+<PageTitle>@(panelType != null ? Loc[PanelName] : "插件面板")</PageTitle>
 
 <div class="plugin-panel-container">
     @if (panelType != null)
     {
         <div class="panel-header">
-            <h1 class="panel-title">@PanelTitle</h1>
+            <h1 class="panel-title">@Loc[PanelName]</h1>
         </div>
         <div class="panel-content">
             <DynamicComponent Type="panelType" />
@@ -18,7 +19,7 @@
         <div class="panel-not-found">
             <h1 class="panel-error-title">面板不存在</h1>
             <div class="panel-error-message">
-                <p>未找到名称为 "@PanelName" 的插件面板</p>
+                <p>未找到名称为 "@Loc[PanelName]" 的插件面板</p>
             </div>
         </div>
     }
@@ -81,7 +82,6 @@
     public string PanelName { get; set; } = string.Empty;
 
     private Type? panelType;
-    private string PanelTitle => panelType != null ? PanelName : "插件面板";
 
     protected override async Task OnParametersSetAsync()
     {

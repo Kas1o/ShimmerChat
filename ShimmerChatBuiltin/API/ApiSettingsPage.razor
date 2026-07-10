@@ -1,27 +1,27 @@
 @using ShimmerChatLib;
 @using ShimmerChatLib.Panel
-@attribute [PluginPanelAttribute("API 设置", "配置 LLM API 连接参数和模型选择", PanelDisplayPlace.Settings, Order = 1)]
+@attribute [PluginPanelAttribute("panel.api_settings", "panel.api_settings.desc", PanelDisplayPlace.Settings, Order = 1)]
 @inject NavigationManager Navigation
-@inject IStringLocalizer<ApiSettingsPage> l
+@inject ILocService Loc
 
-<h3>@l["Api Settings"]</h3>
-<h4>@l["ApiSettings Profile:"]</h4>
+<h3>@Loc["Api Settings"]</h3>
+<h4>@Loc["ApiSettings Profile:"]</h4>
 <select @bind="_selectedIndex" class="form-select">
     @for (int i = 0; i < apiSettings.Count; i++)
     {
         <option value="@i">@apiSettings[i].Name</option>
     }
 </select>
-<button class="btn btn-primary" style="margin:5px" @onclick="CreateNewApiSetting">@l["Create New Api Setting Profile"]</button>
-<button class="btn btn-secondary" style="margin:5px" @onclick="CloneCurrentApiSetting">@l["Clone Current Api Setting Profile"]</button>
+<button class="btn btn-primary" style="margin:5px" @onclick="CreateNewApiSetting">@Loc["Create New Api Setting Profile"]</button>
+<button class="btn btn-secondary" style="margin:5px" @onclick="CloneCurrentApiSetting">@Loc["Clone Current Api Setting Profile"]</button>
 
 @if (topAPISetting != null)
 {
-    <h4>@l["Profile Settings:"]</h4>
+    <h4>@Loc["Profile Settings:"]</h4>
     <div class="shimmer-group">
-        <h5>@l["Profile Name:"]</h5>
+        <h5>@Loc["Profile Name:"]</h5>
         <input @bind="topAPISetting.Name" class="shimmer-input" />
-        <h5>@l["Api Type:"]</h5>
+        <h5>@Loc["Api Type:"]</h5>
         <select @bind="topAPISetting.Type" class="form-select">
             <option value="@ApiSettingType.Kobold">kobold</option>
             <option value="@ApiSettingType.OpenAI">openai</option>
@@ -33,174 +33,174 @@
         @if (topAPISetting.Type == ApiSettingType.Pseudo)
         {
             <div class="alert alert-info" style="margin-top: 12px; padding: 12px; background-color: #e8f4fd; border: 1px solid #b6d4fe; border-radius: 4px;">
-                <strong>@l["PseudoAPI Info Title"]</strong><br/>
-                @l["PseudoAPI Info Description"]
+                <strong>@Loc["PseudoAPI Info Title"]</strong><br/>
+                @Loc["PseudoAPI Info Description"]
             </div>
         }
         
         <!-- Completion Type Selection -->
-        <h5>@l["Completion Type:"]</h5>
+        <h5>@Loc["Completion Type:"]</h5>
         <select @bind="topAPISetting.CompletionType" class="form-select">
-            <option value="@ShimmerChatLib.CompletionType.ChatCompletion">@l["Chat Completion"]</option>
-            <option value="@ShimmerChatLib.CompletionType.TextCompletion">@l["Text Completion"]</option>
+            <option value="@ShimmerChatLib.CompletionType.ChatCompletion">@Loc["Chat Completion"]</option>
+            <option value="@ShimmerChatLib.CompletionType.TextCompletion">@Loc["Text Completion"]</option>
         </select>
         
         <!-- Text Completion Settings (shown only when Text Completion is selected) -->
         @if (topAPISetting.CompletionType == ShimmerChatLib.CompletionType.TextCompletion)
         {
-            <h5>@l["Text Completion Settings:"]</h5>
+            <h5>@Loc["Text Completion Settings:"]</h5>
             <select @bind="topAPISetting.SelectedTextCompletionSettingIndex" class="form-select">
                 @for (int i = 0; i < (topAPISetting.TextCompletionSettings?.Count ?? 0); i++)
                 {
                     <option value="@i">@(topAPISetting.TextCompletionSettings?[i]?.name ?? "Unnamed")</option>
                 }
             </select>
-            <button class="btn btn-primary" style="margin:5px" @onclick="CreateNewTextCompletionSetting">@l["Create New Text Completion Setting Profile"]</button>
+            <button class="btn btn-primary" style="margin:5px" @onclick="CreateNewTextCompletionSetting">@Loc["Create New Text Completion Setting Profile"]</button>
             
             @if (topAPISetting.TextCompletionSettings != null && topAPISetting.SelectedTextCompletionSettingIndex >= 0 && topAPISetting.SelectedTextCompletionSettingIndex < topAPISetting.TextCompletionSettings.Count)
             {
                 var currentTextSetting = topAPISetting.TextCompletionSettings[topAPISetting.SelectedTextCompletionSettingIndex];
                 <div class="shimmer-group" style="margin-top:16px;">
-                    <h5>@l["NAME:"]</h5>
+                    <h5>@Loc["NAME:"]</h5>
                     <textarea class="form-control" rows="2" @bind="currentTextSetting.name"></textarea>
-                    <h5>@l["SYSTEM_MESSAGE_TEMPLATE"]</h5>
-                    <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.SystemMessageTemplate"></textarea>
-                    <h5>@l["USER_MESSAGE_TEMPLATE"]</h5>
-                    <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.UserMessageTemplate"></textarea>
-                    <h5>@l["AGENT_MESSAGE_TEMPLATE"]</h5>
-                    <textarea placeholder="@l["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.CharMessageTemplate"></textarea>
+                    <h5>@Loc["SYSTEM_MESSAGE_TEMPLATE"]</h5>
+                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.SystemMessageTemplate"></textarea>
+                    <h5>@Loc["USER_MESSAGE_TEMPLATE"]</h5>
+                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.UserMessageTemplate"></textarea>
+                    <h5>@Loc["AGENT_MESSAGE_TEMPLATE"]</h5>
+                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.CharMessageTemplate"></textarea>
                 </div>
             }
         }
         
-        <h5>@l["Configs:"]</h5>
+        <h5>@Loc["Configs:"]</h5>
         <div class="shimmer-group">
             @if (topAPISetting.Type == ApiSettingType.Kobold)
             {
                 <div class="shimmer-group">
-                    <h5>@l["Basic Settings"]</h5>
-                    <label>@l["API URL"]</label>
+                    <h5>@Loc["Basic Settings"]</h5>
+                    <label>@Loc["API URL"]</label>
                     <input class="shimmer-input" @bind="topAPISetting.KoboldUrl" />
-                    <label>@l["Temperature"]</label>
+                    <label>@Loc["Temperature"]</label>
                     <input type="number" step="0.01" min="0" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.temperature" />
                 </div>
 
                 <div class="shimmer-group">
-                    <h5>@l["Context & Length"]</h5>
-                    <label>@l["Max Context Length"]</label>
+                    <h5>@Loc["Context & Length"]</h5>
+                    <label>@Loc["Max Context Length"]</label>
                     <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.max_context_length" />
-                    <label>@l["Max Length"]</label>
+                    <label>@Loc["Max Length"]</label>
                     <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.max_length" />
                 </div>
 
                 <div class="shimmer-group">
-                    <h5>@l["Repetition Penalty"]</h5>
-                    <label>@l["Repetition Penalty"]</label>
+                    <h5>@Loc["Repetition Penalty"]</h5>
+                    <label>@Loc["Repetition Penalty"]</label>
                     <input type="number" step="0.01" min="1" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.rep_pen" />
-                    <label>@l["Repetition Penalty Range"]</label>
+                    <label>@Loc["Repetition Penalty Range"]</label>
                     <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.rep_pen_range" />
                 </div>
 
                 <div class="shimmer-group">
-                    <h5>@l["Sampling Settings"]</h5>
-                    <label>@l["Sampler Seed"]</label>
+                    <h5>@Loc["Sampling Settings"]</h5>
+                    <label>@Loc["Sampler Seed"]</label>
                     <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.sampler_seed" />
-                    <label>@l["Top K"]</label>
+                    <label>@Loc["Top K"]</label>
                     <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.top_k" />
-                    <label>@l["Top P"]</label>
+                    <label>@Loc["Top P"]</label>
                     <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.top_p" />
-                    <label>@l["Top A"]</label>
+                    <label>@Loc["Top A"]</label>
                     <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.top_a" />
-                    <label>@l["Min P"]</label>
+                    <label>@Loc["Min P"]</label>
                     <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.min_p" />
-                    <label>@l["Typical"]</label>
+                    <label>@Loc["Typical"]</label>
                     <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.typical" />
-                    <label>@l["TFS (Tail Free Sampling)"]</label>
+                    <label>@Loc["TFS (Tail Free Sampling)"]</label>
                     <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.tfs" />
                 </div>
 
                 <div class="shimmer-group">
-                    <h5>@l["Dynamic Temperature"]</h5>
-                    <label>@l["Dynatemp Range"]</label>
+                    <h5>@Loc["Dynamic Temperature"]</h5>
+                    <label>@Loc["Dynatemp Range"]</label>
                     <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.dynatemp_range" />
-                    <label>@l["Dynatemp Exponent"]</label>
+                    <label>@Loc["Dynatemp Exponent"]</label>
                     <input type="number" step="0.01" min="0" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.dynatemp_exponent" />
-                    <label>@l["Smoothing Factor"]</label>
+                    <label>@Loc["Smoothing Factor"]</label>
                     <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.smoothing_factor" />
                 </div>
 
                 <div class="shimmer-group">
-                    <h5>@l["Mirostat"]</h5>
-                    <label>@l["Mirostat (0=disabled, 1=v1, 2=v2)"]</label>
+                    <h5>@Loc["Mirostat"]</h5>
+                    <label>@Loc["Mirostat (0=disabled, 1=v1, 2=v2)"]</label>
                     <input type="number" min="0" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.mirostat" />
-                    <label>@l["Mirostat Tau"]</label>
+                    <label>@Loc["Mirostat Tau"]</label>
                     <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.mirostat_tau" />
-                    <label>@l["Mirostat Eta"]</label>
+                    <label>@Loc["Mirostat Eta"]</label>
                     <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.mirostat_eta" />
                 </div>
 
                 <div class="shimmer-group">
-                    <h5>@l["Advanced"]</h5>
-                    <label>@l["Stop Sequence (comma separated)"]</label>
+                    <h5>@Loc["Advanced"]</h5>
+                    <label>@Loc["Stop Sequence (comma separated)"]</label>
                     <input class="shimmer-input" 
                            @bind:get="string.Join(',', topAPISetting.KoboldConf.stop_sequence ?? new string[0])" 
                            @bind:set="value => topAPISetting.KoboldConf.stop_sequence = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()" />
-                    <label>@l["Banned Tokens (comma separated)"]</label>
+                    <label>@Loc["Banned Tokens (comma separated)"]</label>
                     <input class="shimmer-input" 
                            @bind:get="string.Join(',', topAPISetting.KoboldConf.banned_tokens ?? new string[0])" 
                            @bind:set="value => topAPISetting.KoboldConf.banned_tokens = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()" />
-                    <label>@l["Genkey"]</label>
+                    <label>@Loc["Genkey"]</label>
                     <input class="shimmer-input" @bind="topAPISetting.KoboldConf.genkey" />
-                    <label>@l["Grammar"]</label>
+                    <label>@Loc["Grammar"]</label>
                     <textarea class="shimmer-input" rows="3" @bind="topAPISetting.KoboldConf.grammar"></textarea>
-                    <label>@l["Trim Stop"]</label>
+                    <label>@Loc["Trim Stop"]</label>
                     <input type="checkbox" @bind="topAPISetting.KoboldConf.trim_stop" />
-                    <label>@l["Bypass EOS"]</label>
+                    <label>@Loc["Bypass EOS"]</label>
                     <input type="checkbox" @bind="topAPISetting.KoboldConf.bypass_eos" />
                 </div>
                 <div class="shimmer-group">
-                    <p style="font-style: italic; color: #666;">@l["Note: Logit bias settings are available in the API but not configurable through this interface."]</p>
+                    <p style="font-style: italic; color: #666;">@Loc["Note: Logit bias settings are available in the API but not configurable through this interface."]</p>
                 </div>
             }
 
             @if (topAPISetting.Type == ApiSettingType.OpenAI)
             {
-                <label>@l["API URL"]</label>
+                <label>@Loc["API URL"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.OpenAIUrl" />
-                <label>@l["API KEY"]</label>
+                <label>@Loc["API KEY"]</label>
                 <input type="password" class="shimmer-input" @bind="topAPISetting.OpenAIApiKey" />
-                <label>@l["API MODEL"]</label>
+                <label>@Loc["API MODEL"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.OpenAIModel" />
-                <label>@l["API GENERATION LENGTH"]</label>
+                <label>@Loc["API GENERATION LENGTH"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.OpenAICtx" />
-                <label>@l["API ENABLE STREAM"]</label>
+                <label>@Loc["API ENABLE STREAM"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIStream" />
-                <label>@l["API ENABLE CONTINUE"]</label>
+                <label>@Loc["API ENABLE CONTINUE"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIEnableContinuation" />
-                <label>@l["API ASIS"]</label>
+                <label>@Loc["API ASIS"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIAsIs" />
             }
 
             @if (topAPISetting.Type == ApiSettingType.DeepSeek)
             {
-                <label>@l["API URL"]</label>
+                <label>@Loc["API URL"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.DeepSeekUrl" />
-                <label>@l["API KEY"]</label>
+                <label>@Loc["API KEY"]</label>
                 <input type="password" class="shimmer-input" @bind="topAPISetting.DeepSeekApiKey" />
-                <label>@l["API MODEL"]</label>
+                <label>@Loc["API MODEL"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.DeepSeekModel" />
-                <label>@l["API GENERATION LENGTH"]</label>
+                <label>@Loc["API GENERATION LENGTH"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.DeepSeekCtx" />
-                <label>@l["API ENABLE STREAM"]</label>
+                <label>@Loc["API ENABLE STREAM"]</label>
                 <input type="checkbox" @bind="topAPISetting.DeepSeekStream" />
-                <label>@l["API ENABLE CONTINUE"]</label>
+                <label>@Loc["API ENABLE CONTINUE"]</label>
                 <input type="checkbox" @bind="topAPISetting.DeepSeekEnableContinuation" />
-                <label>@l["API ASIS"]</label>
+                <label>@Loc["API ASIS"]</label>
                 <input type="checkbox" @bind="topAPISetting.DeepSeekAsIs" />
                 <div>
-                    <label>@l["API REASONING EFFORT"]</label>
+                    <label>@Loc["API REASONING EFFORT"]</label>
                     <select class="shimmer-input" @bind="topAPISetting.DeepSeekReasoningEffort">
-                        <option value="">@l["API REASONING EFFORT OFF"]</option>
+                        <option value="">@Loc["API REASONING EFFORT OFF"]</option>
                         <option value="high">High</option>
                         <option value="max">Max</option>
                     </select>
@@ -210,7 +210,7 @@
     </div>
 }
 <br />
-<button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">@l["Save"]</button>
+<button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">@Loc["Save"]</button>
 
 @code {
     [Inject]

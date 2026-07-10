@@ -1,16 +1,17 @@
 @inject IPluginPanelService PluginPanelService
+@inject ILocService Loc
 
 <div class="plugin-panel-container">
     @foreach (var item in PluginPanelInfos)
     {
         <details class="plugin-item">
             <summary class="plugin-summary">
-                <span class="plugin-name">@item.Name</span>
+                <span class="plugin-name">@Loc[item.NameKey]</span>
                 <span class="plugin-arrow bi bi-chevron-down"></span>
             </summary>
-            @if (!string.IsNullOrEmpty(item.Description))
+            @if (!string.IsNullOrEmpty(item.DescriptionKey))
             {
-                <p class="plugin-description">@item.Description</p>
+                <p class="plugin-description">@Loc[item.DescriptionKey]</p>
             }
             <div class="plugin-content">
                 <DynamicComponent Type="item.PanelType" Parameters="Parameters"/>

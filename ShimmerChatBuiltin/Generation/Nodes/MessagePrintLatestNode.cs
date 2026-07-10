@@ -2,7 +2,7 @@ using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    [NodeInfo("Message Print Latest", Icon = "📄", Color = "#888", Category = "Debug", Description = "Print the latest fragment's message content to console")]
+    [NodeInfo("node.message_print_latest", Icon = "📄", Color = "#888", CategoryKeys = ["category.debug"], DescriptionKey = "node.message_print_latest.desc")]
     public class MessagePrintLatestNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

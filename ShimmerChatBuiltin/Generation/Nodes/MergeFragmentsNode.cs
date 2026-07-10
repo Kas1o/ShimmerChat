@@ -11,13 +11,13 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         Assistant
     }
 
-    [NodeInfo("Merge Fragments", Icon = "🔗", Color = "#c080e0", Category = "Content/Fragment", Description = "Merge all context fragments into a single fragment with the selected role")]
+    [NodeInfo("node.merge_fragments", Icon = "🔗", Color = "#c080e0", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.merge_fragments.desc")]
     public class MergeFragmentsNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Merge Fragments";
 
-        [NodeProperty("Target Role", Hint = "Role assigned to the merged fragment")]
+        [NodeProperty("prop.merge_fragments.target_role", HintKey = "prop.merge_fragments.target_role.hint")]
         public MergeTargetRole TargetRole { get; set; } = MergeTargetRole.System;
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)

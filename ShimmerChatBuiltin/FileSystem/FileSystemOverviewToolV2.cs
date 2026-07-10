@@ -10,9 +10,9 @@ namespace ShimmerChatBuiltin.FileSystem
     /// </summary>
     public class FileSystemOverviewToolV2 : IAutoCreateToolV2
     {
-        public static string Name => "file_system_overview";
-        public static string Description => "Get an overview of the local file system.";
-        public static string CategoryPath => "文件系统/浏览";
+        public static string NameKey => "tool.file_system_overview";
+        public static string DescriptionKey => "tool.file_system_overview.desc";
+        public static string[] CategoryKeys => ["category.file_system", "category.browse"];
 
         public static IAutoCreateToolV2 Create(PersistentEnv env) => new FileSystemOverviewToolV2();
 

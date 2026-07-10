@@ -2,8 +2,8 @@
 @using ShimmerChat.Components.SubComponents
 @using ShimmerChatLib.Interface
 @using System.Reflection
-@inject IStringLocalizer<NavMenu> l
 @inject IPluginPanelService PluginPanelService
+@inject ILocService Loc
 @implements IDisposable
 
 <div class="@(IsPortrait ? "shimmer-nav-portrait" : "shimmer-sidebar")">
@@ -12,7 +12,7 @@
         <div class="shimmer-nav-header">
             <div class="shimmer-nav-brand">
                 <img src="@(ThemeService.CurrentTheme?.IsDarkMode == true ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="ShimmerChat Logo" class="shimmer-nav-logo" />
-                <h1 class="shimmer-nav-title">@l["ShimmerChat"]</h1>
+                <h1 class="shimmer-nav-title">@Loc["ShimmerChat"]</h1>
             </div>
         </div>
 
@@ -25,7 +25,7 @@
                 <NavLink class="shimmer-nav-item" href="" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
                         <span class="nav-icon"><i class="bi bi-house-door"></i></span>
-                        <span class="nav-text">@l["Home"]</span>
+                        <span class="nav-text">@Loc["Home"]</span>
                     </div>
                 </NavLink>
             </div>
@@ -43,7 +43,7 @@
                 <NavLink class="shimmer-nav-item" href="agentselect" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
                         <span class="nav-icon"><i class="bi bi-person"></i></span>
-                        <span class="nav-text">@l["Agents"]</span>
+                        <span class="nav-text">@Loc["Agents"]</span>
                     </div>
                 </NavLink>
             </div>
@@ -51,7 +51,7 @@
                 <NavLink class="shimmer-nav-item" href="misc" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
                         <span class="nav-icon"><i class="bi bi-ui-checks-grid"></i></span>
-                        <span class="nav-text">@l["Misc"]</span>
+                        <span class="nav-text">@Loc["Misc"]</span>
                     </div>
                 </NavLink>
             </div>
@@ -78,10 +78,10 @@
             @foreach (var panel in _pluginPanels)
             {
                 <div>
-                    <NavLink class="shimmer-nav-item" href="@($"pluginpanel/{Uri.EscapeDataString(panel.Name)}")" Match="NavLinkMatch.All">
+                    <NavLink class="shimmer-nav-item" href="@($"pluginpanel/{Uri.EscapeDataString(panel.NameKey)}")" Match="NavLinkMatch.All">
                         <div class="nav-item-content">
                             <span class="nav-icon"><i class="bi @(panel.Icon ?? "bi-puzzle")"></i></span>
-                            <span class="nav-text">@panel.Name</span>
+                            <span class="nav-text">@Loc[panel.NameKey]</span>
                         </div>
                     </NavLink>
                 </div>
@@ -92,6 +92,14 @@
     @if (!IsPortrait)
     {
     <div class="shimmer-nav-footer">
+        <div class="shimmer-nav-locale">
+            <select class="locale-select" @bind="_selectedCulture" @bind:after="OnCultureChanged">
+                @foreach (var c in Loc.SupportedCultures)
+                {
+                    <option value="@c">@c</option>
+                }
+            </select>
+        </div>
         <div class="shimmer-nav-version">
             <span>版本 @Version</span>
         </div>
@@ -240,6 +248,25 @@
     .shimmer-nav-footer {
         padding: 16px;
         border-top: 1px solid var(--color-border);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .shimmer-nav-locale {
+        display: flex;
+        justify-content: center;
+    }
+
+    .locale-select {
+        padding: 4px 8px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 4px;
+        color: var(--color-text);
+        font-size: 0.78em;
+        outline: none;
+        cursor: pointer;
     }
 
     .shimmer-mobile-theme-toggle {
@@ -274,6 +301,7 @@
     public string Version { get; set; }
 
     private List<PluginPanelInfo> _pluginPanels = new();
+    private string _selectedCulture = "zh-CN";
 
     protected override void OnInitialized()
     {
@@ -281,6 +309,7 @@
         Version = typeof(Program).Assembly
             .GetCustomAttributes<AssemblyInformationalVersionAttribute>()
             ?.First()?.InformationalVersion ?? "Unknown";
+        _selectedCulture = Loc.CurrentCulture;
         _pluginPanels = PluginPanelService.GetPluginPanels()
             .Where(p => p.PanelDisplayPlace == ShimmerChatLib.Panel.PanelDisplayPlace.Settings)
             .OrderBy(p => p.Order)
@@ -297,6 +326,15 @@
     {
         // 取消订阅，避免内存泄漏
         ThemeService.OnThemeChanged -= HandleThemeChanged;
+    }
+
+    private async Task OnCultureChanged()
+    {
+        if (_selectedCulture != Loc.CurrentCulture)
+        {
+            Loc.SetCulture(_selectedCulture);
+            StateHasChanged();
+        }
     }
 }
 

@@ -6,13 +6,13 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// <summary>
     /// 根据 PresetId 从 KVData 加载预设并内联执行其根节点
     /// </summary>
-    [NodeInfo("Call Preset", Icon = "↗", Color = "#40c0a0", Category = "Flow/Link", Description = "Load and execute a preset from Generation Manager")]
+    [NodeInfo("node.call_preset", Icon = "↗", Color = "#40c0a0", CategoryKeys = ["category.flow", "category.link"], DescriptionKey = "node.call_preset.desc")]
     public class CallNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Call Preset";
 
-        [NodeProperty("Preset ID", Hint = "ID of the generation preset to inline")]
+        [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint")]
         public string PresetId { get; set; } = "";
 
         public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)

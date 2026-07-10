@@ -23,6 +23,15 @@
     <ProjectReference Include="..\ShimmerChatLib\ShimmerChatLib.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="Locales\*.json" />
+    <None Remove="Locales\*.json" />
+    <EmbeddedResource Include="Locales\*.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
 
 
 </Project>

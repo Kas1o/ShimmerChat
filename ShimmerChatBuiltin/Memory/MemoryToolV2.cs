@@ -17,9 +17,9 @@ namespace ShimmerChatBuiltin.Memory
         private readonly IKVDataService _kvData;
         private readonly Guid _agentGuid;
 
-        public static string Name => "MemoryTool";
-        public static string Description => "A tool for managing memory in conversations. Supports add, delete, and search (similarity/keyword).";
-        public static string CategoryPath => "记忆";
+        public static string NameKey => "tool.memory";
+        public static string DescriptionKey => "tool.memory.desc";
+        public static string[] CategoryKeys => ["category.memory"];
 
         public MemoryToolV2() { }
 

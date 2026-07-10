@@ -10,7 +10,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// DynPrompt 动态提示词注入节点。
     /// 从 KVData 中读取 DynPromptSet，评估触发规则，将匹配的提示词注入到 TransientEnv.Fragments。
     /// </summary>
-    [NodeInfo("DynPrompt", Icon = "📝", Color = "#b080d0", Category = "Content/Fragment", Description = "Evaluate DynPrompt trigger rules and inject matching prompts")]
+    [NodeInfo("node.dyn_prompt", Icon = "📝", Color = "#b080d0", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.dyn_prompt.desc")]
     public class DynPromptNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
@@ -19,13 +19,13 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// <summary>
         /// 指定要使用的 DynPromptSet 名称。留空则使用所有集合。
         /// </summary>
-        [NodeProperty("Set Name", Hint = "Name of the DynPromptSet to use. Leave empty to use all sets.")]
+        [NodeProperty("prop.dyn_prompt.set_name", HintKey = "prop.dyn_prompt.set_name.hint", Order = 1)]
         public string SetName { get; set; } = "";
 
         /// <summary>
         /// 注入片段的角色
         /// </summary>
-        [NodeProperty("Role", Hint = "Role for injected fragments (system / user / assistant)")]
+        [NodeProperty("prop.dyn_prompt.role", HintKey = "prop.dyn_prompt.role.hint", Order = 2)]
         public PromptBuilder.From From { get; set; } = PromptBuilder.From.system;
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)

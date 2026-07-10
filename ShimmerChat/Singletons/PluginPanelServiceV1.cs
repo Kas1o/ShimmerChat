@@ -96,7 +96,7 @@ namespace ShimmerChat.Singletons
                 Console.WriteLine($"成功加载了 {_pluginPanels.Count} 个插件面板");
                 foreach (var panel in _pluginPanels)
                 {
-                    Console.WriteLine($"  - {panel.Name}: {panel.PanelType.FullName}");
+                    Console.WriteLine($"  - {panel.NameKey}: {panel.PanelType.FullName}");
                 }
             }
             catch (Exception ex)
@@ -133,13 +133,13 @@ namespace ShimmerChat.Singletons
                     var attribute = panelType.GetCustomAttributes(typeof(PluginPanelAttribute), false).FirstOrDefault() as PluginPanelAttribute;
                     if (attribute != null)
                     {
-                        Console.WriteLine($"  找到属性: Name='{attribute.Name}', Description='{attribute.Description}'");
+                        Console.WriteLine($"  找到属性: NameKey='{attribute.NameKey}', DescriptionKey='{attribute.DescriptionKey}'");
                         if (IsValidComponent(panelType))
                         {
                             Console.WriteLine($"  有效组件，添加到列表");
                             _pluginPanels.Add(new PluginPanelInfo(
-                                attribute.Name,
-                                attribute.Description,
+                                attribute.NameKey,
+                                attribute.DescriptionKey,
                                 attribute.Icon,
                                 attribute.Order,
                                 panelType,
@@ -193,7 +193,7 @@ namespace ShimmerChat.Singletons
         public Type? GetPluginPanelType(string panelName)
         {
             EnsurePanelsLoaded();
-            return _pluginPanels.FirstOrDefault(p => p.Name.Equals(panelName, StringComparison.OrdinalIgnoreCase))?.PanelType;
+            return _pluginPanels.FirstOrDefault(p => p.NameKey.Equals(panelName, StringComparison.OrdinalIgnoreCase))?.PanelType;
         }
 
         /// <summary>

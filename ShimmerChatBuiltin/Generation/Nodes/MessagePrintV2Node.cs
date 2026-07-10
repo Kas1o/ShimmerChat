@@ -6,7 +6,7 @@ using System.Text;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    [NodeInfo("Message Print V2", Icon = "🌈", Color = "#e08040", Category = "Debug", Description = "Print context fragments with ANSI role-based coloring to console")]
+    [NodeInfo("node.message_print_v2", Icon = "🌈", Color = "#e08040", CategoryKeys = ["category.debug"], DescriptionKey = "node.message_print_v2.desc")]
     public class MessagePrintV2Node : IGenerationNode
     {
         private const string Reset = "\x1b[0m";
@@ -25,19 +25,19 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Message Print V2";
 
-        [NodeProperty("Colorize", Hint = "Enable ANSI color output")]
+        [NodeProperty("prop.message_print_v2.colorize", HintKey = "prop.message_print_v2.colorize.hint")]
         public bool Colorize { get; set; } = true;
 
-        [NodeProperty("Ignore Null Properties", Hint = "Skip properties whose value is null or empty")]
+        [NodeProperty("prop.message_print_v2.ignore_null_properties", HintKey = "prop.message_print_v2.ignore_null_properties.hint")]
         public bool IgnoreNullProperties { get; set; } = true;
 
-        [NodeProperty("Colorize Tool Args", Hint = "Apply JSON syntax coloring to tool call arguments")]
+        [NodeProperty("prop.message_print_v2.colorize_tool_args", HintKey = "prop.message_print_v2.colorize_tool_args.hint")]
         public bool ColorizeToolArgs { get; set; } = true;
 
-        [NodeProperty("Sixel", Hint = "[Not implemented] Enable Sixel image output")]
+        [NodeProperty("prop.message_print_v2.sixel", HintKey = "prop.message_print_v2.sixel.hint")]
         public bool Sixel { get; set; }
 
-        [NodeProperty("Kitty", Hint = "[Not implemented] Enable Kitty graphics protocol")]
+        [NodeProperty("prop.message_print_v2.kitty", HintKey = "prop.message_print_v2.kitty.hint")]
         public bool Kitty { get; set; }
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)

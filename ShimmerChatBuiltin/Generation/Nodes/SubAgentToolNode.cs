@@ -8,14 +8,14 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 将指定的 SubAgent 配置注册到共享的 SubAgentToolV2 实例中。
     /// 多个 SubAgentToolNode 共享同一个工具，每个添加一个 SubAgent。
     /// </summary>
-    [NodeInfo("SubAgent Tool", Icon = "🔧", Color = "#e060a0", Category = "Tool/SubAgent")]
+    [NodeInfo("node.sub_agent_tool", Icon = "🔧", Color = "#e060a0", CategoryKeys = ["category.tool", "category.sub_agent"])]
     [NodeEditor(typeof(SubAgentToolNodeEditor))]
     public class SubAgentToolNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent Tool";
 
-        [NodeProperty("Config Name", Hint = "SubAgent configuration name (selected from dropdown)")]
+        [NodeProperty("prop.sub_agent_tool.config_name", HintKey = "prop.sub_agent_tool.config_name.hint")]
         public string ConfigName { get; set; } = "";
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)

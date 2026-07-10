@@ -1,0 +1,23 @@
+{
+  "category.file_system": "文件系统",
+  "category.read_write": "读写",
+  "category.browse": "浏览",
+  "category.memory": "记忆",
+  "category.chat": "对话",
+  "category.code": "代码",
+  "category.variable": "变量",
+  "category.config": "配置",
+  "category.content": "内容",
+  "category.fragment": "片段",
+  "category.filter": "过滤",
+  "category.memory_node": "记忆",
+  "category.flow": "流程",
+  "category.link": "链接",
+  "category.branching": "分支",
+  "category.debug": "调试",
+  "category.tool": "工具",
+  "category.preset": "预设",
+  "category.sub_agent": "子智能体",
+  "category.general": "通用",
+  "category.other": "其他"
+}

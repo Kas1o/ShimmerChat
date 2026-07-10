@@ -2,11 +2,12 @@
 @using ShimmerChatLib.Panel
 @using ShimmerChatLib.Generation
 @using ShimmerChatBuiltin.Generation.Nodes
-@attribute [PluginPanelAttribute("Tool Manager", "Manage tools and tool presets", PanelDisplayPlace.Settings, Order = 2)]
+@attribute [PluginPanelAttribute("panel.tool_manager", "panel.tool_manager.desc", PanelDisplayPlace.Settings, Order = 2)]
 
 @inject IKVDataService KVData
 @inject IStringLocalizer<ToolManager> l
 @inject IToolRegistry ToolRegistry
+@inject ILocService Loc
 
 <h3>Tool Manager</h3>
 
@@ -45,18 +46,18 @@ else
             <div class="tm-group">
                 <div class="tm-group-header">
                     <span class="tm-group-icon">@(group.Key.Contains('/') ? "▸" : "▾")</span>
-                    <span class="tm-group-name">@group.Key</span>
+                    <span class="tm-group-name">@string.Join(" / ", group.Key.Split('/').Select(k => Loc[k.Trim()]))</span>
                     <span class="tm-group-count">@group.Value.Count</span>
                 </div>
                 @foreach (var tool in group.Value)
                 {
                     <div class="tm-row">
                         <div>
-                            <input type="checkbox" checked="@_enabledTools.Contains(tool.Name)"
-                                   @onchange="e => ToggleTool(tool.Name, (bool)(e.Value ?? false))" />
+                            <input type="checkbox" checked="@_enabledTools.Contains(tool.NameKey)"
+                                   @onchange="e => ToggleTool(tool.NameKey, (bool)(e.Value ?? false))" />
                         </div>
-                        <div class="tm-name">@tool.Name</div>
-                        <div class="tm-desc">@tool.Description</div>
+                        <div class="tm-name">@Loc[tool.NameKey]</div>
+                        <div class="tm-desc">@Loc[tool.DescriptionKey]</div>
                     </div>
                 }
             </div>
@@ -81,8 +82,8 @@ else
     protected override void OnInitialized()
     {
         _groupedTools = ToolRegistry.AllTools
-            .OrderBy(t => t.CategoryPath).ThenBy(t => t.Name)
-            .GroupBy(t => string.IsNullOrEmpty(t.CategoryPath) ? "其他" : t.CategoryPath)
+            .OrderBy(t => string.Join("/", t.CategoryKeys)).ThenBy(t => t.NameKey)
+            .GroupBy(t => t.CategoryKeys is { Length: > 0 } ? string.Join("/", t.CategoryKeys) : "category.other")
             .ToDictionary(g => g.Key, g => g.ToList());
         LoadPresets();
         EnsureDefaultPreset();
@@ -108,7 +109,7 @@ else
     /// <summary>每次启动重建默认预设，包含所有可用工具</summary>
     private void EnsureDefaultPreset()
     {
-        var allToolNames = ToolRegistry.AllTools.Select(t => t.Name).ToList();
+        var allToolNames = ToolRegistry.AllTools.Select(t => t.NameKey).ToList();
         var defaultPreset = new ToolPreset { Name = DefaultPresetName, EnabledToolTypeNames = allToolNames };
         // 写入 KVData 供 ToolPresetNode 读取
         KVData.Write("ToolPresets", DefaultPresetName,

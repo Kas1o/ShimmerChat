@@ -10,7 +10,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// <summary>
     /// Qdrant 记忆检索注入节点：基于最近的 N 条消息检索相关记忆并注入到上下文
     /// </summary>
-    [NodeInfo("Memory Retrieve", Icon = "🔍", Color = "#e0c060", Category = "Content/Memory")]
+    [NodeInfo("node.memory_retrieve", Icon = "🔍", Color = "#e0c060", CategoryKeys = ["category.content", "category.memory_node"])]
     public class MemoryRetrieveNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
@@ -19,19 +19,19 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// <summary>
         /// 用于检索的最近消息数量
         /// </summary>
-        [NodeProperty("Recent Messages", Hint = "Number of recent messages used for memory search")]
+        [NodeProperty("prop.memory_retrieve.recent_messages", HintKey = "prop.memory_retrieve.recent_messages.hint")]
         public int RecentMessageCount { get; set; } = 3;
 
         /// <summary>
         /// 相似度阈值 (0.0 ~ 1.0)
         /// </summary>
-        [NodeProperty("Similarity Threshold", Hint = "Minimum similarity score (0.0 - 1.0)")]
+        [NodeProperty("prop.memory_retrieve.similarity_threshold", HintKey = "prop.memory_retrieve.similarity_threshold.hint")]
         public float SimilarityThreshold { get; set; } = 0.5f;
 
         /// <summary>
         /// 注入位置（-1 为开头，-2 为末尾）
         /// </summary>
-        [NodeProperty("Insert Position", Hint = "Where to insert memories (0 = start)")]
+        [NodeProperty("prop.memory_retrieve.insert_position", HintKey = "prop.memory_retrieve.insert_position.hint")]
         public int InsertPosition { get; set; } = 0;
 
         private static Dictionary<string, List<float>>? _vectorCache;
