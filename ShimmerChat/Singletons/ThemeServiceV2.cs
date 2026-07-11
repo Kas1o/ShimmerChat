@@ -23,7 +23,16 @@ namespace ShimmerChat.Singletons
             } 
         }
         
-        public List<Theme> AvailableThemes { get; private set; } = new();
+        private List<Theme> _availableThemes = new();
+        
+        public List<Theme> AvailableThemes 
+        { 
+            get 
+            {
+                EnsureInitialized();
+                return _availableThemes; 
+            } 
+        }
         
         public event Action<Theme>? OnThemeChanged;
         
@@ -59,14 +68,14 @@ namespace ShimmerChat.Singletons
                 // 获取当前主题ID - 使用KVDataService
                 var currentThemeId = _kvDataService.Read(THEME_STORAGE_KEY, THEME_STORAGE_KEY);
                 
-                if (!string.IsNullOrEmpty(currentThemeId) && AvailableThemes.Any(t => t.Id == currentThemeId))
+                if (!string.IsNullOrEmpty(currentThemeId) && _availableThemes.Any(t => t.Id == currentThemeId))
                 {
-                    _currentTheme = AvailableThemes.First(t => t.Id == currentThemeId);
+                    _currentTheme = _availableThemes.First(t => t.Id == currentThemeId);
                 }
                 else
                 {
                     // 如果没有找到当前主题或当前主题不存在，则使用默认主题
-                    _currentTheme = AvailableThemes.FirstOrDefault(t => t.IsDefault) ?? AvailableThemes.FirstOrDefault() ?? GetBuiltInThemes().First();
+                    _currentTheme = _availableThemes.FirstOrDefault(t => t.IsDefault) ?? _availableThemes.FirstOrDefault() ?? GetBuiltInThemes().First();
                 }
                 
                 // 应用当前主题
@@ -77,7 +86,7 @@ namespace ShimmerChat.Singletons
                 // 如果初始化失败，使用默认主题
                 var builtInThemes = GetBuiltInThemes();
                 _currentTheme = builtInThemes.First();
-                AvailableThemes = builtInThemes;
+                _availableThemes = builtInThemes;
                 ApplyTheme(_currentTheme);
             }
         }
@@ -161,12 +170,12 @@ namespace ShimmerChat.Singletons
         
         public List<Theme> GetUserThemes()
         {
-            return AvailableThemes.Where(t => !t.IsBuiltIn).ToList();
+            return _availableThemes.Where(t => !t.IsBuiltIn).ToList();
         }
         
         public void SetTheme(string themeId)
         {
-            var theme = AvailableThemes.FirstOrDefault(t => t.Id == themeId);
+            var theme = _availableThemes.FirstOrDefault(t => t.Id == themeId);
             if (theme != null)
             {
                 _currentTheme = theme;
@@ -273,7 +282,7 @@ namespace ShimmerChat.Singletons
         
         public void CreateTheme(Theme theme)
         {
-            if (AvailableThemes.Any(t => t.Id == theme.Id))
+            if (_availableThemes.Any(t => t.Id == theme.Id))
             {
                 throw new InvalidOperationException($"Theme with ID '{theme.Id}' already exists.");
             }
@@ -281,17 +290,17 @@ namespace ShimmerChat.Singletons
             theme.CreatedAt = DateTime.Now;
             theme.UpdatedAt = DateTime.Now;
             
-            AvailableThemes.Add(theme);
+            _availableThemes.Add(theme);
             SaveAllThemes();
         }
         
         public void UpdateTheme(Theme theme)
         {
-            var existingIndex = AvailableThemes.FindIndex(t => t.Id == theme.Id);
+            var existingIndex = _availableThemes.FindIndex(t => t.Id == theme.Id);
             if (existingIndex >= 0)
             {
                 theme.UpdatedAt = DateTime.Now;
-                AvailableThemes[existingIndex] = theme;
+                _availableThemes[existingIndex] = theme;
                 
                 _currentTheme = theme;
                 ApplyTheme(theme);
@@ -302,15 +311,15 @@ namespace ShimmerChat.Singletons
         
         public void DeleteTheme(string themeId)
         {
-            var theme = AvailableThemes.FirstOrDefault(t => t.Id == themeId);
+            var theme = _availableThemes.FirstOrDefault(t => t.Id == themeId);
             if (theme != null && !theme.IsBuiltIn)
             {
-                AvailableThemes.Remove(theme);
+                _availableThemes.Remove(theme);
                 
                 // 如果删除的是当前主题，则切换到默认主题
                 if (_currentTheme.Id == themeId)
                 {
-                    var newTheme = AvailableThemes.FirstOrDefault(t => t.IsDefault) ?? AvailableThemes.FirstOrDefault() ?? GetBuiltInThemes().First();
+                    var newTheme = _availableThemes.FirstOrDefault(t => t.IsDefault) ?? _availableThemes.FirstOrDefault() ?? GetBuiltInThemes().First();
                     SetTheme(newTheme.Id);
                 }
                 
@@ -320,7 +329,7 @@ namespace ShimmerChat.Singletons
         
         public string ExportTheme(string themeId)
         {
-            var theme = AvailableThemes.FirstOrDefault(t => t.Id == themeId);
+            var theme = _availableThemes.FirstOrDefault(t => t.Id == themeId);
             if (theme == null)
             {
                 throw new ArgumentException($"Theme with ID '{themeId}' not found.");
@@ -346,7 +355,7 @@ namespace ShimmerChat.Singletons
                     theme.CreatedAt = DateTime.Now;
                     theme.UpdatedAt = DateTime.Now;
                     
-                    AvailableThemes.Add(theme);
+                    _availableThemes.Add(theme);
                     SaveAllThemes();
                 }
             }
@@ -366,20 +375,20 @@ namespace ShimmerChat.Singletons
                     var savedThemes = System.Text.Json.JsonSerializer.Deserialize<List<Theme>>(themesJson, new System.Text.Json.JsonSerializerOptions());
                     if (savedThemes != null)
                     {
-                        AvailableThemes = savedThemes;
+                        _availableThemes = savedThemes;
                     }
                 }
             }
             catch (Exception ex)
             {
                 // 如果加载失败，使用内置主题
-                AvailableThemes = GetBuiltInThemes();
+                _availableThemes = GetBuiltInThemes();
             }
             
             // 确保至少有一个内置主题
-            if (!AvailableThemes.Any())
+            if (!_availableThemes.Any())
             {
-                AvailableThemes = GetBuiltInThemes();
+                _availableThemes = GetBuiltInThemes();
             }
         }
         
@@ -387,7 +396,7 @@ namespace ShimmerChat.Singletons
         {
             try
             {
-                var themesJson = System.Text.Json.JsonSerializer.Serialize(AvailableThemes, new System.Text.Json.JsonSerializerOptions());
+                var themesJson = System.Text.Json.JsonSerializer.Serialize(_availableThemes, new System.Text.Json.JsonSerializerOptions());
                 _kvDataService.Write(THEMES_STORAGE_KEY, THEMES_STORAGE_KEY, themesJson);
             }
             catch (Exception ex)
