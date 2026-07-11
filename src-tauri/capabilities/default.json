@@ -1,0 +1,9 @@
+{
+  "identifier": "default",
+  "description": "Default capability set for ShimmerChat",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:default"
+  ]
+}

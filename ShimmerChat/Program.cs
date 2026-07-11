@@ -42,6 +42,10 @@ builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>()
 builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
 builder.Services.AddSingleton<ILocService, LocService>();
 
+// 默认动态端口：让 OS 分配空闲端口，避免端口冲突
+// dev 模式下 dotnet run --urls 参数优先级更高，不受影响
+builder.WebHost.UseUrls("http://127.0.0.1:0");
+
 var app = builder.Build();
 
 // 执行自动迁移（如果需要）
@@ -76,8 +80,17 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/userimages"
 });
 
-app.Run();
+// Tauri sidecar mode: start async and emit ready signal on stdout
+await app.StartAsync();
 
+var urls = app.Urls;
+var targetUrl = urls.FirstOrDefault(u => u.StartsWith("http://127.0.0.1:"))
+                ?? urls.FirstOrDefault(u => u.StartsWith("http://localhost:"))
+                ?? urls.FirstOrDefault()
+                ?? "http://127.0.0.1:5000";
+Console.WriteLine($"SHIMMER_READY:{targetUrl}");
+
+await app.WaitForShutdownAsync();
 return;
 
 // ShimmerChat 2.0: 自动迁移 Agent 到 2.0
