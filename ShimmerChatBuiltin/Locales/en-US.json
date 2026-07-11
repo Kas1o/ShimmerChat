@@ -140,5 +140,13 @@
   "prop.transient_probe.print_api": "Print API",
   "prop.transient_probe.print_api.hint": "Show API status",
 
-  "category.other": "Other"
+  "category.other": "Other",
+
+  "editor.call_node.label": "Preset",
+  "editor.call_node.search_placeholder": "Search name or ID...",
+  "editor.call_node.no_presets": "No presets found. Create one in the Generation Manager.",
+  "editor.call_node.no_match": "No presets match your search",
+  "editor.call_node.selected_id": "Preset ID:",
+  "editor.call_node.copy": "Copy",
+  "editor.call_node.change": "Change"
 }

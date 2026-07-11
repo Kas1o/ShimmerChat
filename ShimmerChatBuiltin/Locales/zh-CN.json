@@ -140,5 +140,13 @@
   "prop.transient_probe.print_api": "打印 API",
   "prop.transient_probe.print_api.hint": "显示 API 状态",
 
-  "category.other": "其他"
+  "category.other": "其他",
+
+  "editor.call_node.label": "预设",
+  "editor.call_node.search_placeholder": "搜索名称或 ID...",
+  "editor.call_node.no_presets": "没有预设，请在生成管理器中创建",
+  "editor.call_node.no_match": "没有匹配的预设",
+  "editor.call_node.selected_id": "预设 ID:",
+  "editor.call_node.copy": "复制",
+  "editor.call_node.change": "更换"
 }

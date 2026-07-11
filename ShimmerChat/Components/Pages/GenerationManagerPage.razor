@@ -6,6 +6,7 @@
 @inject IKVDataService KVData
 @inject GenerationManagerV2 GenManager
 @inject IGenerationNodeSerializer Serializer
+@inject IJSRuntime JS
 
 <h3>生成管理器</h3>
 
@@ -28,6 +29,20 @@
                 <option value="@preset.Id">@preset.Name @(preset.Id == DefaultPresetId ? "(默认)" : "")</option>
             }
         </select>
+        @if (_activePreset != null)
+        {
+            <div class="preset-id-row" style="margin-top: 6px; display: flex; align-items: center; gap: 6px; max-width: 400px;">
+                <span style="font-size: 0.72em; color: #777; white-space: nowrap;">ID:</span>
+                <code class="preset-id-text"
+                      @oncontextmenu="CopyPresetId"
+                      @oncontextmenu:preventDefault
+                      title="Right-click to copy"
+                      style="font-size: 0.72em; color: #999; font-family: monospace; overflow: hidden; text-overflow: ellipsis; flex: 1; cursor: pointer; user-select: all; padding: 2px 4px; background: rgba(255,255,255,0.03); border-radius: 3px;">
+                    @_activePreset.Id
+                </code>
+                <button class="btn btn-sm btn-outline-secondary" style="font-size: 0.65em; padding: 1px 6px;" @onclick="CopyPresetId" title="Copy ID">Copy</button>
+            </div>
+        }
         <div style="margin-top: 8px;">
             <button class="btn btn-primary btn-sm" @onclick="CreateNewPreset">新建预设</button>
             <button class="btn btn-secondary btn-sm" style="margin-left: 5px;" @onclick="StartRename"
@@ -273,5 +288,13 @@
     private void BackToAgent()
     {
         Navigation.NavigateTo($"/agent/{_agentGuid}");
+    }
+
+    private async Task CopyPresetId()
+    {
+        if (_activePreset != null)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _activePreset.Id);
+        }
     }
 }
