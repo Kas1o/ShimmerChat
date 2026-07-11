@@ -369,3 +369,7 @@ FodyWeavers.xsd
 
 .idea/
 .bitfun/
+
+# Build artifact directories (may appear from any branch)
+src-tauri/target/
+src-tauri/binaries/
