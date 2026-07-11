@@ -3,12 +3,7 @@ using Markdig.Extensions.Tables;
 using Microsoft.AspNetCore.Components;
 using ShimmerChatLib.Interface;
 using Newtonsoft.Json;
-using System.Collections.Generic;
-using System.Linq;
-using System.IO;
-using System;
 using System.Text;
-using ShimmerChatBuiltin;
 using ShimmerChatLib;
 
 namespace ShimmerChat.Singletons
@@ -45,7 +40,6 @@ namespace ShimmerChat.Singletons
         // 共享的MarkdownPipeline实例，只需创建一次
         private readonly MarkdownPipeline _markdownPipeline;
 
-        private readonly string PluginsFolder = Path.Combine(AppContext.BaseDirectory, "./Plugins");
         private const string PluginId = "MessageDisplayService";
         private const string ActivatedModifiersKey = "activated_modifiers";
         private const string DebugModeKey = "debug_mode_enabled";
@@ -86,43 +80,21 @@ namespace ShimmerChat.Singletons
         {
             var modifierDict = new Dictionary<string, IMessageRenderModifier>(StringComparer.OrdinalIgnoreCase);
 
-            // 1. 加载 ShimmerChatBuiltin 项目的 RenderModifier
             try
             {
-                var builtinAssembly = typeof(Target).Assembly;
-                var builtinModifiers = _pluginLoaderService.LoadImplementationsFromAssembly<IMessageRenderModifier>(builtinAssembly);
-                
-                foreach (var modifier in builtinModifiers)
+                var allModifiers = _pluginLoaderService.LoadImplementations<IMessageRenderModifier>();
+                foreach (var modifier in allModifiers)
                 {
                     var name = modifier.Info.Name;
                     if (modifierDict.ContainsKey(name))
-                        // 简单的日志或忽略重复
-                        Console.WriteLine($"MessageRenderModifier名称冲突(Builtin): {name}");
+                        Console.WriteLine($"MessageRenderModifier名称冲突: {name}");
                     else
                         modifierDict[name] = modifier;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"加载内置MessageRenderModifier失败: {ex.Message}");
-            }
-
-            // 2. 加载插件中的 RenderModifier
-            try
-            {
-                var pluginModifiers = _pluginLoaderService.LoadImplementationsFromPlugins<IMessageRenderModifier>(PluginsFolder);
-                foreach (var modifier in pluginModifiers)
-                {
-                    var name = modifier.Info.Name;
-                    if (modifierDict.ContainsKey(name))
-                         Console.WriteLine($"MessageRenderModifier名称冲突(Plugin): {name}");
-                    else
-                        modifierDict[name] = modifier;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"加载插件MessageRenderModifier失败: {ex.Message}");
+                Console.WriteLine($"加载MessageRenderModifier失败: {ex.Message}");
             }
 
             LoadedModifiers = modifierDict.Values.ToList();

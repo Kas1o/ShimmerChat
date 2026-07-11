@@ -65,7 +65,10 @@ namespace ShimmerChatLib.Generation
 
                     result.Add(new ToolMetadata(name, desc, cat, type));
                 }
-                catch { }
+                catch(Exception ex)
+                {
+                    Console.WriteLine($"AutoCreateTool Error({type.FullName}): {ex}");
+                }
             }
             return result;
         }

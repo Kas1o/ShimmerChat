@@ -9,7 +9,7 @@ namespace ShimmerChat.Singletons
     /// </summary>
     public class PluginLoadContext : AssemblyLoadContext
     {
-        private readonly AssemblyDependencyResolver _resolver;
+        private AssemblyDependencyResolver? _resolver;
 
         private static readonly HashSet<string> SharedPrefixes = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -24,7 +24,6 @@ namespace ShimmerChat.Singletons
         public PluginLoadContext(string pluginDir)
             : base(name: $"PluginContext_{Path.GetFileName(pluginDir)}", isCollectible: true)
         {
-            _resolver = new AssemblyDependencyResolver(pluginDir);
         }
 
         /// <summary>从 plugin.json manifest 加载入口程序集。</summary>
@@ -41,17 +40,15 @@ namespace ShimmerChat.Singletons
                 return false;
             }
 
-            if (manifest?.Assemblies == null || manifest.Assemblies.Count == 0) return false;
+            if (manifest?.Assembly == null) return false;
 
-            foreach (var asm in manifest.Assemblies)
-            {
-                var path = Path.Combine(pluginDir, asm);
-                if (File.Exists(path))
-                {
-                    try { LoadFromAssemblyPath(path); }
-                    catch (Exception ex) { Console.WriteLine($"[ALC] Failed to load {path}: {ex.Message}"); }
-                }
-            }
+            var asmPath = Path.Combine(pluginDir, manifest.Assembly);
+            if (!File.Exists(asmPath)) return false;
+
+            _resolver = new AssemblyDependencyResolver(asmPath);
+
+            try { LoadFromAssemblyPath(asmPath); }
+            catch (Exception ex) { Console.WriteLine($"[ALC] Failed to load {asmPath}: {ex.Message}"); return false; }
 
             return true;
         }
@@ -62,7 +59,7 @@ namespace ShimmerChat.Singletons
             if (SharedPrefixes.Any(p => name.Name?.StartsWith(p, StringComparison.OrdinalIgnoreCase) == true))
                 return null;
 
-            var path = _resolver.ResolveAssemblyToPath(name);
+            var path = _resolver?.ResolveAssemblyToPath(name);
             if (path != null)
                 return LoadFromAssemblyPath(path);
 
@@ -71,7 +68,7 @@ namespace ShimmerChat.Singletons
 
         protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
         {
-            var path = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
+            var path = _resolver?.ResolveUnmanagedDllToPath(unmanagedDllName);
             return path != null ? LoadUnmanagedDllFromPath(path) : IntPtr.Zero;
         }
 
@@ -80,7 +77,7 @@ namespace ShimmerChat.Singletons
             [JsonProperty("name")] public string? Name { get; set; }
             [JsonProperty("version")] public string? Version { get; set; }
             [JsonProperty("description")] public string? Description { get; set; }
-            [JsonProperty("assemblies")] public List<string> Assemblies { get; set; } = new();
+            [JsonProperty("assembly")] public string? Assembly { get; set; }
         }
     }
 }

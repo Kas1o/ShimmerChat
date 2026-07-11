@@ -14,6 +14,7 @@ namespace ShimmerChat.Singletons
         private readonly Dictionary<string, string> _entries = new(StringComparer.OrdinalIgnoreCase);
         private readonly string _fallbackCulture = "en-US";
         private readonly IKVDataService _kvData;
+        private readonly IPluginLoaderService _pluginLoader;
         private const string KVSpace = "_locale";
         private const string KVKey = "culture";
 
@@ -26,9 +27,10 @@ namespace ShimmerChat.Singletons
         /// <inheritdoc/>
         IReadOnlyList<string> ILocService.SupportedCultures => SupportedCultures;
 
-        public LocService(IKVDataService kvData, string? overrideDirectory = null)
+        public LocService(IKVDataService kvData, IPluginLoaderService pluginLoader, string? overrideDirectory = null)
         {
             _kvData = kvData;
+            _pluginLoader = pluginLoader;
             CurrentCulture = LoadSavedCulture();
             LoadFromEmbeddedResources(CurrentCulture);
             if (!string.IsNullOrEmpty(overrideDirectory))
@@ -86,7 +88,7 @@ namespace ShimmerChat.Singletons
 
         private void LoadCultureFromAssemblies(string culture)
         {
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            foreach (var asm in _pluginLoader.GetAssemblies())
             {
                 if (asm.IsDynamic) continue;
                 try

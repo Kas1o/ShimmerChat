@@ -9,6 +9,8 @@ namespace ShimmerChat.Singletons
     public class PluginLoaderServiceV1 : IPluginLoaderService
     {
         private static readonly Assembly BuiltinAssembly = typeof(Target).Assembly;
+        private static readonly Assembly HostAssembly = typeof(Program).Assembly;
+        private static readonly Assembly LibAssembly = typeof(IPluginInitializer).Assembly;
         private readonly IServiceProvider _serviceProvider;
         private readonly List<AssemblyLoadContext> _pluginContexts = new();
 
@@ -34,10 +36,74 @@ namespace ShimmerChat.Singletons
 
         public List<T> LoadImplementations<T>()
         {
-            return GetAllAssemblies().SelectMany(a => LoadImplementationsFromAssembly<T>(a)).ToList();
+            return GetAssemblies().SelectMany(a => LoadFromAssembly<T>(a)).ToList();
         }
 
-        public List<T> LoadImplementationsFromAssembly<T>(Assembly assembly)
+        public List<Type> GetTypesWithAttribute<TAttribute>() where TAttribute : Attribute
+        {
+            return GetAssemblies().SelectMany(a => GetAttrTypesFromAssembly<TAttribute>(a)).ToList();
+        }
+
+        public async Task InitializePluginsAsync()
+        {
+            var types = GetImplementingTypes(typeof(IPluginInitializer));
+            foreach (var type in types)
+            {
+                try
+                {
+                    var initializer = (IPluginInitializer)ActivatorUtilities.CreateInstance(_serviceProvider, type);
+                    await initializer.InitializeAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Plugin initializer {type.FullName} failed: {ex.Message}");
+                }
+            }
+        }
+
+        public List<Type> GetImplementingTypes(Type interfaceType)
+        {
+            var types = new List<Type>();
+
+            foreach (var assembly in GetAssemblies())
+            {
+                try
+                {
+                    foreach (var t in assembly.GetTypes())
+                    {
+                        if (interfaceType.IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface)
+                            types.Add(t);
+                    }
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    Console.WriteLine($"从程序集 {assembly.FullName} 加载类型时出错: {ex.Message}");
+                    foreach (var loaderException in ex.LoaderExceptions)
+                        Console.WriteLine($"加载异常: {loaderException.Message}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"处理程序集 {assembly.FullName} 时出错: {ex.Message}");
+                }
+            }
+
+            return types;
+        }
+
+        public IEnumerable<Assembly> GetAssemblies()
+        {
+            yield return LibAssembly;
+            yield return BuiltinAssembly;
+            yield return HostAssembly;
+
+            foreach (var ctx in _pluginContexts)
+                foreach (var asm in ctx.Assemblies)
+                    yield return asm;
+        }
+
+        // ---- private helpers ----
+
+        private List<T> LoadFromAssembly<T>(Assembly assembly)
         {
             var implementations = new List<T>();
 
@@ -75,12 +141,7 @@ namespace ShimmerChat.Singletons
             return implementations;
         }
 
-        public List<T> LoadImplementationsFromPlugins<T>(string pluginsFolder)
-        {
-            return GetPluginAssemblies().SelectMany(a => LoadImplementationsFromAssembly<T>(a)).ToList();
-        }
-
-        public List<Type> GetTypesWithAttributeFromAssembly<TAttribute>(Assembly assembly) where TAttribute : Attribute
+        private List<Type> GetAttrTypesFromAssembly<TAttribute>(Assembly assembly) where TAttribute : Attribute
         {
             var types = new List<Type>();
 
@@ -101,70 +162,6 @@ namespace ShimmerChat.Singletons
             }
 
             return types;
-        }
-
-        public List<Type> GetTypesWithAttributeFromPlugins<TAttribute>(string pluginsFolder) where TAttribute : Attribute
-        {
-            return GetPluginAssemblies().SelectMany(a => GetTypesWithAttributeFromAssembly<TAttribute>(a)).ToList();
-        }
-
-        public async Task InitializePluginsAsync()
-        {
-            var types = GetImplementingTypes(typeof(IPluginInitializer));
-            foreach (var type in types)
-            {
-                try
-                {
-                    var initializer = (IPluginInitializer)ActivatorUtilities.CreateInstance(_serviceProvider, type);
-                    await initializer.InitializeAsync();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Plugin initializer {type.FullName} failed: {ex.Message}");
-                }
-            }
-        }
-
-        public List<Type> GetImplementingTypes(Type interfaceType)
-        {
-            var types = new List<Type>();
-
-            foreach (var assembly in GetAllAssemblies())
-            {
-                try
-                {
-                    foreach (var t in assembly.GetExportedTypes())
-                    {
-                        if (interfaceType.IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface)
-                            types.Add(t);
-                    }
-                }
-                catch { }
-            }
-
-            return types;
-        }
-
-        /// <summary>所有扫描范围：默认 ALC + 插件 ALC + Builtin 特例。</summary>
-        private IEnumerable<Assembly> GetAllAssemblies()
-        {
-            var seen = new HashSet<Assembly>();
-
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-                if (!asm.IsDynamic) seen.Add(asm);
-
-            foreach (var ctx in _pluginContexts)
-                foreach (var asm in ctx.Assemblies)
-                    seen.Add(asm);
-
-            seen.Add(BuiltinAssembly);
-            return seen;
-        }
-
-        /// <summary>仅插件 ALC 中的程序集。</summary>
-        private IEnumerable<Assembly> GetPluginAssemblies()
-        {
-            return _pluginContexts.SelectMany(ctx => ctx.Assemblies);
         }
     }
 }

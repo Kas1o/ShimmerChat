@@ -111,14 +111,14 @@ git clone https://github.com/Kas1o/ShimmerChat.git
   "name": "MyCoolPlugin",
   "version": "1.0.0",
   "description": "一个示例插件",
-  "assemblies": ["MyCoolPlugin.dll"]
+  "assembly": "MyCoolPlugin.dll"
 }
 ```
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
 | `name` | 是 | 插件名称 |
-| `assemblies` | 是 | 入口程序集列表，相对于插件目录 |
+| `assembly` | 是 | 入口程序集文件名，相对于插件目录 |
 | `version` | 否 | 版本号 |
 | `description` | 否 | 描述 |
 

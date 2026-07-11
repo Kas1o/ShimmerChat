@@ -39,7 +39,12 @@ namespace ShimmerChat.Singletons
             if (string.IsNullOrWhiteSpace(json) || json.Trim() == "{}")
                 return null;
             try { return JsonConvert.DeserializeObject<IGenerationNode>(json, _settings); }
-            catch { return null; }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GenerationNodeSerializer] 反序列化失败: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+                return null;
+            }
         }
 
         public IReadOnlyDictionary<string, Type> GetKnownTypes() => _typeMap;
