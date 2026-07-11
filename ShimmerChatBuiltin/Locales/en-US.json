@@ -130,7 +130,7 @@
   "prop.sub_agent_tool.config_name": "Config Name",
   "prop.sub_agent_tool.config_name.hint": "SubAgent configuration name (selected from dropdown)",
   "prop.tool_preset.preset_name": "Preset Name",
-  "prop.tool_preset.preset_name.hint": "Name of the tool preset to load from ToolManager",
+  "prop.tool_preset.preset_name.hint": "Leave empty to use the default preset, or enter a preset name to match",
   "prop.transient_probe.print_fragments": "Print Fragments",
   "prop.transient_probe.print_fragments.hint": "Show context fragments",
   "prop.transient_probe.print_shared_state": "Print SharedState",

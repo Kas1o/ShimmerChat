@@ -5,6 +5,7 @@
 ShimmerChat 支持通过外部 DLL 扩展功能。插件放在 `Plugins/` 目录下，启动时自动发现和加载。
 
 插件可以添加：
+- **插件初始化器**（PluginInitializer）— 启动时自动初始化
 - **自定义工具**（Function Calling Tool）
 - **自定义生成节点**（GenerationNode）
 - **消息渲染修改器**（MessageRenderModifier）
@@ -159,7 +160,86 @@ ShimmerChat/
 
 ---
 
-## 3. 自定义工具
+## 3. 插件初始化 (IPluginInitializer)
+
+### 概述
+
+插件可以实现 `IPluginInitializer` 接口，在应用启动时自动执行初始化逻辑。宿主通过 `IPluginLoaderService.InitializePluginsAsync()` 扫描所有实现并依次调用。
+
+```csharp
+using ShimmerChatLib.Interface;
+
+public class MyPluginInitializer : IPluginInitializer
+{
+    private readonly IKVDataService _kvData;
+
+    public MyPluginInitializer(IKVDataService kvData)
+    {
+        _kvData = kvData;
+    }
+
+    public Task InitializeAsync()
+    {
+        // 确保默认配置存在
+        if (string.IsNullOrEmpty(_kvData.Read("MyPlugin", "config")))
+        {
+            _kvData.Write("MyPlugin", "config", "{}");
+        }
+        return Task.CompletedTask;
+    }
+}
+```
+
+### 初始化时机
+
+初始化在 `app.Build()` 之后、`app.Run()` 之前执行：
+
+```
+启动 → 程序集加载 → DI 容器构建 → 迁移 → 插件初始化 → 中间件配置 → 开始监听请求
+```
+
+此时所有单例服务（`IKVDataService`、`IToolRegistry` 等）已可用，但尚未处理任何 HTTP 请求。
+
+### 适合做什么
+
+| 场景 | 示例 |
+|------|------|
+| 写入默认 KVData | 确保默认工具预设存在（`IsDefault = true`） |
+| 创建必需的目录/文件 | 插件的工作目录、默认配置文件 |
+| 注册初始数据 | 首次启动才需要写入的默认值 |
+
+### 不适合做什么
+
+| 场景 | 原因 |
+|------|------|
+| 耗时操作（网络请求、大文件 I/O） | 会阻塞启动，延长启动时间 |
+| 依赖用户输入的操作 | 此时还没有用户会话 |
+| 依赖 Scoped / Transient 服务 | DI 根容器中只有 Singleton 可用 |
+| 修改其他插件的数据 | 违反插件隔离原则 |
+
+### 默认预设的推荐做法
+
+对于需要在启动时创建的默认预设（如工具预设、配置预设等）：
+
+- **首次创建，后续由用户编辑**：初始化器仅在预设不存在时创建默认值，不会覆盖用户的后续修改。
+- **使用 GUID + IsDefault 标记**：预设通过 GUID 标识，`IsDefault` 标记唯一默认预设。生成节点通过 `IsDefault` 查找，与名称解耦。
+- **统一列表存储**：所有预设序列化为一个 `List<T>` 存入 KVData，避免以名称为键的散落存储。
+
+参考 `ShimmerChatBuiltin/Misc/DefaultToolPresetInitializer.cs`：检查预设列表中是否已有 `IsDefault = true` 的项，没有则创建一个空的默认预设。
+
+### 依赖注入
+
+初始化器通过 `ActivatorUtilities.CreateInstance` 创建，支持构造函数注入。可用的服务：
+
+- `IKVDataService` — 读写插件数据
+- `IToolRegistry` — 查询可用工具
+- 其他已注册的 Singleton 服务
+
+> 不要在初始化器中注入 Scoped 或 Transient 服务，会导致生命周期异常。
+
+---
+
+## 4. 自定义工具
 
 ### 方式 A：自动创建工具（IAutoCreateToolV2）
 
@@ -262,7 +342,7 @@ if (string.IsNullOrEmpty(config))
 
 ---
 
-## 4. 自定义生成节点
+## 5. 自定义生成节点
 
 ### 基本节点
 
@@ -372,7 +452,7 @@ SharedState   // Dictionary<string, object>  跨节点共享状态
 
 ---
 
-## 5. 自定义消息渲染修改器
+## 6. 自定义消息渲染修改器
 
 修改器在消息发送到 UI 渲染前对内容做后处理。所有插件中的修改器由 `MessageDisplayServiceV1` 自动发现。
 
@@ -403,7 +483,7 @@ public class MyModifier : IMessageRenderModifier
 
 ---
 
-## 6. UI 面板
+## 7. UI 面板
 
 ### 基本面板（Settings 位置）
 
@@ -455,7 +535,7 @@ public class MyModifier : IMessageRenderModifier
 
 ---
 
-## 7. 本地化
+## 8. 本地化
 
 ### 文件结构
 
@@ -513,7 +593,7 @@ Locales/
 
 ---
 
-## 8. 调试技巧
+## 9. 调试技巧
 
 1. 将插件 DLL 和依赖放入 `Plugins/{PluginName}/`，启动宿主
 2. 检查控制台日志：`[ALC] Failed to load ...` 表示加载问题

@@ -18,23 +18,60 @@ else
 {
     <div class="shimmer-group" style="margin-top:16px;">
         <h5>Tool Preset</h5>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-            <select class="form-select" style="max-width:300px;" @bind="_selectedPresetName">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+            <select class="form-select" style="max-width:240px;"
+                    @bind="_selectedPresetId" @bind:after="OnPresetChanged">
                 <option value="">-- New preset --</option>
-                @foreach (var name in _presetNames)
+                @foreach (var p in _presets)
                 {
-                    <option value="@name">@name</option>
+                    <option value="@p.Id">@p.Name@(p.IsDefault ? " (default)" : "")</option>
                 }
             </select>
-            <button class="btn btn-primary btn-sm" @onclick="CreatePreset">Save As</button>
+            <input class="form-control" style="max-width:180px;" placeholder="Preset name"
+                   @bind="_editName" @bind:event="oninput"
+                   disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
+            <label style="display:flex;align-items:center;gap:4px;font-size:0.85em;white-space:nowrap;cursor:pointer;">
+                <input type="checkbox" checked="@_isDefault"
+                       @onchange="e => _isDefault = (bool)(e.Value ?? false)"
+                       disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
+                Default
+            </label>
+            <button class="btn btn-primary btn-sm" @onclick="SavePreset"
+                    disabled="@(string.IsNullOrEmpty(_editName) || string.IsNullOrEmpty(_selectedPresetId))">
+                Save
+            </button>
+            <button class="btn btn-outline-primary btn-sm" @onclick="OpenSaveAsDialog">
+                Save As
+            </button>
             <button class="btn btn-outline-danger btn-sm" @onclick="DeletePreset"
-                    disabled="@(string.IsNullOrEmpty(_selectedPresetName) || _selectedPresetName == DefaultPresetName)">Delete</button>
+                    disabled="@(string.IsNullOrEmpty(_selectedPresetId))">
+                Delete
+            </button>
         </div>
         @if (!string.IsNullOrEmpty(_status))
         {
             <div class="alert @(_status.Contains("Error") ? "alert-danger" : "alert-success")" style="padding:4px 8px;font-size:0.85em;">@_status</div>
         }
     </div>
+
+    @* Save As dialog *@
+    @if (_showSaveAsDialog)
+    {
+        <div class="tm-overlay" @onclick="CancelSaveAsDialog">
+            <div class="tm-dialog" @onclick:stopPropagation="true">
+                <div class="tm-dialog-title">Save As New Preset</div>
+                <input class="form-control" style="width:100%;" placeholder="Preset name"
+                       @bind="_saveAsName" @bind:event="oninput" />
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="CancelSaveAsDialog">Cancel</button>
+                    <button class="btn btn-primary btn-sm" @onclick="ConfirmSaveAs"
+                            disabled="@(string.IsNullOrEmpty(_saveAsName))">
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="shimmer-group" style="margin-top:16px;">
         <h5>Available Tools</h5>
@@ -69,13 +106,15 @@ else
 }
 
 @code {
-    private const string DefaultPresetName = "_default_";
-
     private bool _loading = true;
     private Dictionary<string, List<ToolMetadata>> _groupedTools = new();
     private HashSet<string> _enabledTools = new();
-    private List<string> _presetNames = new();
-    private string _selectedPresetName = "";
+    private List<ToolPreset> _presets = new();
+    private string _selectedPresetId = "";
+    private string _editName = "";
+    private bool _isDefault = false;
+    private bool _showSaveAsDialog = false;
+    private string _saveAsName = "";
     private string _status = "";
 
     protected override void OnInitialized()
@@ -85,84 +124,178 @@ else
             .GroupBy(t => t.CategoryKeys is { Length: > 0 } ? string.Join("/", t.CategoryKeys) : "category.other")
             .ToDictionary(g => g.Key, g => g.ToList());
         LoadPresets();
-        EnsureDefaultPreset();
+        EnsureDefaultExists();
+        var def = _presets.FirstOrDefault(p => p.IsDefault);
+        SelectPreset(def?.Id ?? "");
         _loading = false;
     }
 
     private void LoadPresets()
     {
         var json = KVData.Read("ToolPresets", "__presets__");
-        var persistedNames = string.IsNullOrEmpty(json)
-            ? new List<string>()
-            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json) ?? new();
-        // 移除旧版可能持久化的默认预设名，改为每次启动从代码重建
-        _presetNames = persistedNames.Where(n => n != DefaultPresetName).ToList();
-
-        if (string.IsNullOrEmpty(_selectedPresetName) && _presetNames.Count > 0)
+        if (string.IsNullOrEmpty(json))
         {
-            _selectedPresetName = _presetNames[0];
-            LoadPreset(_selectedPresetName);
+            _presets = new();
+            return;
+        }
+
+        // 尝试新格式 List<ToolPreset>
+        try
+        {
+            _presets = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ToolPreset>>(json) ?? new();
+            return;
+        }
+        catch (Newtonsoft.Json.JsonException) { }
+
+        // 旧格式 List<string> → 迁移
+        var oldNames = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json) ?? new();
+        _presets = new();
+        bool hasDefault = false;
+        foreach (var name in oldNames)
+        {
+            var data = KVData.Read("ToolPresets", name);
+            if (string.IsNullOrEmpty(data)) continue;
+            try
+            {
+                var old = Newtonsoft.Json.JsonConvert.DeserializeObject<ToolPreset>(data);
+                if (old != null)
+                {
+                    old.Id = Guid.NewGuid().ToString();
+                    _presets.Add(old);
+                }
+            }
+            catch { }
+        }
+        // 也检查 _default_（旧格式不在 __presets__ 列表中）
+        var defData = KVData.Read("ToolPresets", "_default_");
+        if (!string.IsNullOrEmpty(defData))
+        {
+            try
+            {
+                var def = Newtonsoft.Json.JsonConvert.DeserializeObject<ToolPreset>(defData);
+                if (def != null)
+                {
+                    def.Id = Guid.NewGuid().ToString();
+                    def.IsDefault = true;
+                    hasDefault = true;
+                    _presets.Insert(0, def);
+                }
+            }
+            catch { }
+        }
+        if (!hasDefault && _presets.Count > 0)
+            _presets[0].IsDefault = true;
+        Persist();
+    }
+
+    private void EnsureDefaultExists()
+    {
+        if (!_presets.Any(p => p.IsDefault))
+        {
+            _presets.Insert(0, new ToolPreset
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = "Default",
+                IsDefault = true,
+                EnabledToolTypeNames = new()
+            });
+            Persist();
         }
     }
 
-    /// <summary>每次启动重建默认预设，包含所有可用工具</summary>
-    private void EnsureDefaultPreset()
+    private void OnPresetChanged()
     {
-        var allToolNames = ToolRegistry.AllTools.Select(t => t.NameKey).ToList();
-        var defaultPreset = new ToolPreset { Name = DefaultPresetName, EnabledToolTypeNames = allToolNames };
-        // 写入 KVData 供 ToolPresetNode 读取
-        KVData.Write("ToolPresets", DefaultPresetName,
-            Newtonsoft.Json.JsonConvert.SerializeObject(defaultPreset));
-
-        _presetNames.Insert(0, DefaultPresetName);
+        SelectPreset(_selectedPresetId);
     }
 
-    private void LoadPreset(string name)
+    private void SelectPreset(string id)
     {
-        var json = KVData.Read("ToolPresets", name);
-        if (!string.IsNullOrEmpty(json))
+        _selectedPresetId = id;
+        var preset = _presets.FirstOrDefault(p => p.Id == id);
+        if (preset == null)
         {
-            var preset = Newtonsoft.Json.JsonConvert.DeserializeObject<ToolPreset>(json);
-            _enabledTools = preset?.EnabledToolTypeNames?.ToHashSet() ?? new();
+            _editName = "";
+            _isDefault = false;
+            _enabledTools.Clear();
+        }
+        else
+        {
+            _editName = preset.Name;
+            _isDefault = preset.IsDefault;
+            _enabledTools = preset.EnabledToolTypeNames.ToHashSet();
         }
     }
 
-    private void CreatePreset()
+    private void SavePreset()
     {
-        var name = string.IsNullOrEmpty(_selectedPresetName) ? "Default" : _selectedPresetName;
-        var preset = new ToolPreset { Name = name, EnabledToolTypeNames = _enabledTools.ToList() };
-        KVData.Write("ToolPresets", name,
-            Newtonsoft.Json.JsonConvert.SerializeObject(preset));
+        if (string.IsNullOrEmpty(_selectedPresetId) || string.IsNullOrEmpty(_editName))
+            return;
 
-        if (!_presetNames.Contains(name))
-            _presetNames.Add(name);
-        SavePresetNames();
+        var preset = _presets.FirstOrDefault(p => p.Id == _selectedPresetId);
+        if (preset == null) return;
 
-        _selectedPresetName = name;
-        _status = $"Saved: {name} ({_enabledTools.Count} tools)";
+        if (_isDefault && !preset.IsDefault)
+        {
+            foreach (var p in _presets) p.IsDefault = false;
+        }
+
+        preset.Name = _editName;
+        preset.IsDefault = _isDefault;
+        preset.EnabledToolTypeNames = _enabledTools.ToList();
+        Persist();
+        _status = $"Saved: {_editName} ({_enabledTools.Count} tools)";
+    }
+
+    private void OpenSaveAsDialog()
+    {
+        _saveAsName = "";
+        _showSaveAsDialog = true;
+    }
+
+    private void CancelSaveAsDialog()
+    {
+        _showSaveAsDialog = false;
+    }
+
+    private void ConfirmSaveAs()
+    {
+        _showSaveAsDialog = false;
+        if (string.IsNullOrEmpty(_saveAsName))
+            return;
+
+        if (_isDefault)
+        {
+            foreach (var p in _presets) p.IsDefault = false;
+        }
+
+        var preset = new ToolPreset
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = _saveAsName,
+            IsDefault = _isDefault,
+            EnabledToolTypeNames = _enabledTools.ToList()
+        };
+        _presets.Add(preset);
+        Persist();
+        _selectedPresetId = preset.Id;
+        _status = $"Saved: {_saveAsName} ({_enabledTools.Count} tools)";
     }
 
     private void DeletePreset()
     {
-        if (string.IsNullOrEmpty(_selectedPresetName)) return;
-        if (_selectedPresetName == DefaultPresetName)
-        {
-            _status = "Cannot delete the default preset.";
+        if (string.IsNullOrEmpty(_selectedPresetId))
             return;
-        }
-        _presetNames.Remove(_selectedPresetName);
-        SavePresetNames();
-        _selectedPresetName = "";
-        _enabledTools.Clear();
+        _presets.RemoveAll(p => p.Id == _selectedPresetId);
+        Persist();
+        var def = _presets.FirstOrDefault(p => p.IsDefault);
+        SelectPreset(def?.Id ?? "");
         _status = "Preset deleted.";
     }
 
-    /// <summary>持久化预设名称列表，排除每次启动重建的默认预设</summary>
-    private void SavePresetNames()
+    private void Persist()
     {
         KVData.Write("ToolPresets", "__presets__",
-            Newtonsoft.Json.JsonConvert.SerializeObject(
-                _presetNames.Where(n => n != DefaultPresetName).ToList()));
+            Newtonsoft.Json.JsonConvert.SerializeObject(_presets));
     }
 
     private void ToggleTool(string name, bool enabled)
@@ -173,6 +306,9 @@ else
 }
 
 <style>
+.tm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.tm-dialog { background: var(--bg-primary, #1e1e1e); border: 1px solid var(--color-border, rgba(255,255,255,0.1)); border-radius: 8px; padding: 20px; min-width: 320px; max-width: 400px; }
+.tm-dialog-title { font-size: 1.05em; font-weight: 600; margin-bottom: 12px; }
 .tm-group { margin-bottom: 12px; }
 .tm-group-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: rgba(255,255,255,0.03); border-radius: 4px 4px 0 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
 .tm-group-icon { font-size: 0.75em; color: #666; }

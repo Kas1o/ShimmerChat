@@ -55,7 +55,7 @@ namespace ShimmerChat.Singletons
                         },
                         new AppendChatMessagesNode { Name = "Append Chat Messages" },
                         new APISelectNode { Name = "Select API", APIIndex = -1 },
-                        new ToolPresetNode { Name = "Load Tools", PresetName = "_default_" }
+                        new ToolPresetNode { Name = "Load Tools", PresetName = "" }
                     }
                 })
             });

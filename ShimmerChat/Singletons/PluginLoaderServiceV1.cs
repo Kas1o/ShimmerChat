@@ -108,6 +108,23 @@ namespace ShimmerChat.Singletons
             return GetPluginAssemblies().SelectMany(a => GetTypesWithAttributeFromAssembly<TAttribute>(a)).ToList();
         }
 
+        public async Task InitializePluginsAsync()
+        {
+            var types = GetImplementingTypes(typeof(IPluginInitializer));
+            foreach (var type in types)
+            {
+                try
+                {
+                    var initializer = (IPluginInitializer)ActivatorUtilities.CreateInstance(_serviceProvider, type);
+                    await initializer.InitializeAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Plugin initializer {type.FullName} failed: {ex.Message}");
+                }
+            }
+        }
+
         public List<Type> GetImplementingTypes(Type interfaceType)
         {
             var types = new List<Type>();

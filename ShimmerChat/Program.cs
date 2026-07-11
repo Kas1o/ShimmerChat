@@ -50,6 +50,9 @@ ExecuteAutoMigration(app);
 // ShimmerChat 2.0: 执行 Agent 数据迁移
 ExecuteAgentMigration(app);
 
+// 执行插件初始化
+ExecutePluginInitializers(app);
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -90,6 +93,21 @@ static void ExecuteAgentMigration(WebApplication app)
     catch (Exception ex)
     {
         Console.WriteLine($"[ShimmerChat 2.0] Agent migration error: {ex.Message}");
+    }
+}
+
+// 执行所有插件的初始化器
+static void ExecutePluginInitializers(WebApplication app)
+{
+    try
+    {
+        var pluginLoader = app.Services.GetRequiredService<IPluginLoaderService>();
+        pluginLoader.InitializePluginsAsync().GetAwaiter().GetResult();
+        Console.WriteLine("[ShimmerChat] Plugin initializers completed.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[ShimmerChat] Plugin initialization error: {ex.Message}");
     }
 }
 

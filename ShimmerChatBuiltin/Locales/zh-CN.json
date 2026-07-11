@@ -130,7 +130,7 @@
   "prop.sub_agent_tool.config_name": "配置名称",
   "prop.sub_agent_tool.config_name.hint": "子智能体配置名称（从下拉菜单选择）",
   "prop.tool_preset.preset_name": "预设名称",
-  "prop.tool_preset.preset_name.hint": "从 ToolManager 加载的工具预设名称",
+  "prop.tool_preset.preset_name.hint": "留空则使用默认预设，填写则按名称匹配",
   "prop.transient_probe.print_fragments": "打印片段",
   "prop.transient_probe.print_fragments.hint": "显示上下文片段",
   "prop.transient_probe.print_shared_state": "打印 SharedState",

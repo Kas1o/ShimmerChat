@@ -4,7 +4,7 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
     /// <summary>
-    /// 从 KVData 中按名称加载 ToolManager 预设，通过 IAutoCreateToolV2.Create 实例化工具加入 Tools 列表
+    /// 从 KVData 中加载工具预设。PresetName 为空时使用 IsDefault 预设，否则按名称匹配。
     /// </summary>
     [NodeInfo("node.tool_preset", Icon = "📦", Color = "#40c0a0", CategoryKeys = ["category.tool", "category.preset"], DescriptionKey = "node.tool_preset.desc")]
     public class ToolPresetNode : IGenerationNode
@@ -17,25 +17,31 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
-            if (string.IsNullOrWhiteSpace(PresetName))
-                return Task.FromResult(NodeResult.Failure(
-                    NodeErrorCodes.DataMissing,
-                    "ToolPreset: PresetName is empty.",
-                    nodeId: Id, nodeName: Name));
-
             var kvData = context.Env.Persistent.KVData;
-            var json = kvData.Read("ToolPresets", PresetName);
+            var json = kvData.Read("ToolPresets", "__presets__");
             if (string.IsNullOrEmpty(json))
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    $"ToolPreset: Preset '{PresetName}' not found in KVData.",
+                    "ToolPreset: No presets found.",
                     nodeId: Id, nodeName: Name));
 
-            var preset = JsonConvert.DeserializeObject<ToolPresetData>(json);
+            var presets = JsonConvert.DeserializeObject<List<ToolPreset>>(json);
+            if (presets == null || presets.Count == 0)
+                return Task.FromResult(NodeResult.Failure(
+                    NodeErrorCodes.PresetNotFound,
+                    "ToolPreset: Preset list is empty.",
+                    nodeId: Id, nodeName: Name));
+
+            ToolPreset? preset;
+            if (string.IsNullOrWhiteSpace(PresetName))
+                preset = presets.FirstOrDefault(p => p.IsDefault);
+            else
+                preset = presets.FirstOrDefault(p => p.Name == PresetName);
+
             if (preset == null)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    $"ToolPreset: Preset '{PresetName}' is invalid.",
+                    $"ToolPreset: Preset '{(string.IsNullOrWhiteSpace(PresetName) ? "(default)" : PresetName)}' not found.",
                     nodeId: Id, nodeName: Name));
 
             foreach (var typeName in preset.EnabledToolTypeNames)
@@ -50,19 +56,14 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
             return Task.FromResult(NodeResult.SuccessResult());
         }
-
-        /// <summary>工具预设数据（与 ToolManager 共用结构）</summary>
-        public class ToolPresetData
-        {
-            public string Name { get; set; } = "";
-            public List<string> EnabledToolTypeNames { get; set; } = new();
-        }
     }
 
-    /// <summary>工具预设（供 ToolManager 等使用）</summary>
+    /// <summary>工具预设</summary>
     public class ToolPreset
     {
+        public string Id { get; set; } = "";
         public string Name { get; set; } = "";
+        public bool IsDefault { get; set; } = false;
         public List<string> EnabledToolTypeNames { get; set; } = new();
     }
 }

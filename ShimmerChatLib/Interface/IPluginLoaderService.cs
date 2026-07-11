@@ -49,5 +49,10 @@ namespace ShimmerChatLib.Interface
         /// <param name="interfaceType">接口类型</param>
         /// <returns>所有实现了该接口的具体类型</returns>
         List<Type> GetImplementingTypes(Type interfaceType);
+
+        /// <summary>
+        /// 发现并执行所有 <see cref="IPluginInitializer"/> 实现，确保插件在首次使用前完成初始化。
+        /// </summary>
+        Task InitializePluginsAsync();
     }
 }
