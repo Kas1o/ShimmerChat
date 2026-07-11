@@ -423,16 +423,14 @@
 		{
 			await generationManager.GenerateStreamAsync(
 				agent, chat,
-				// 处理流式响应的函数
-				handleStream: async (responseStream) =>
+				onStreamDelta: async (accumulated) =>
 				{
-					// 查找是否有正在重新生成的消息（Regenerating 状态）
+					// 在第一个 delta 时创建消息
 					var regeneratingMessage = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Regenerating);
 					Message generatingMessage;
 
 					if (regeneratingMessage != null)
 					{
-						// 重新生成场景：清空内容后转为 Generating 状态
 						generatingMessage = regeneratingMessage;
 						if (generatingMessage.CurrentVersion != null)
 						{
@@ -445,62 +443,66 @@
 					}
 					else
 					{
-						// 创建新的AI消息
-						generatingMessage = new Message
+						var existingGenerating = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Generating);
+						if (existingGenerating != null)
 						{
-							message = new SharperLLM.Util.ChatMessage{ Content = "", thinking = string.Empty},
-							timestamp = DateTime.Now,
-							sender = ShimmerChatLib.Sender.AI,
-							GenerationState = MessageGenerationState.Generating
-						};
-						messages.Add(generatingMessage);
-						chat.SaveMessage(messageStore, generatingMessage);
+							generatingMessage = existingGenerating;
+						}
+						else
+						{
+							generatingMessage = new Message
+							{
+								message = new SharperLLM.Util.ChatMessage{ Content = "", thinking = string.Empty},
+								timestamp = DateTime.Now,
+								sender = ShimmerChatLib.Sender.AI,
+								GenerationState = MessageGenerationState.Generating
+							};
+							messages.Add(generatingMessage);
+							chat.SaveMessage(messageStore, generatingMessage);
+						}
+					}
+
+					// 更新消息内容
+					if (!string.IsNullOrEmpty(accumulated.Body.Content))
+					{
+						if (generatingMessage.CurrentVersion != null)
+							generatingMessage.CurrentVersion.Content = accumulated.Body.Content;
+						else
+							generatingMessage.message = new SharperLLM.Util.ChatMessage { Content = accumulated.Body.Content };
+					}
+
+					if (accumulated.Body.thinking != null)
+					{
+						if (generatingMessage.CurrentVersion != null)
+							generatingMessage.CurrentVersion.thinking = accumulated.Body.thinking;
+						else if (generatingMessage.message != null)
+							generatingMessage.message.thinking = accumulated.Body.thinking;
+					}
+
+					if (accumulated.Body.toolCalls != null)
+					{
+						if (generatingMessage.CurrentVersion != null)
+							generatingMessage.CurrentVersion.toolCalls = accumulated.Body.toolCalls;
+						else if (generatingMessage.message != null)
+							generatingMessage.message.toolCalls = accumulated.Body.toolCalls;
+					}
+
+					if (autoScrollDown && isUserAtBottom)
+					{
+						await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
 					}
 
 					await InvokeAsync(StateHasChanged);
-
-					await foreach (var rsp in responseStream.WithCancellation(cancellationToken))
+				},
+				onAssistantComplete: async (accumulated) =>
+				{
+					var generatingMessage = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Generating);
+					if (generatingMessage != null)
 					{
-						// 流式响应更新
-						// 更新消息内容
-						if (!string.IsNullOrEmpty(rsp.Body.Content))
-						{
-							if (generatingMessage.CurrentVersion != null)
-								generatingMessage.CurrentVersion.Content = rsp.Body.Content;
-							else
-								generatingMessage.message = new SharperLLM.Util.ChatMessage { Content = rsp.Body.Content };
-						}
-
-						// 如果有思考内容，更新思考内容
-						if (rsp.Body.thinking != null)
-						{
-							if (generatingMessage.CurrentVersion != null)
-								generatingMessage.CurrentVersion.thinking = rsp.Body.thinking;
-							else if (generatingMessage.message != null)
-								generatingMessage.message.thinking = rsp.Body.thinking;
-						}
-
-						if (rsp.Body.toolCalls != null)
-						{
-							if (generatingMessage.CurrentVersion != null)
-								generatingMessage.CurrentVersion.toolCalls = rsp.Body.toolCalls;
-							else if (generatingMessage.message != null)
-								generatingMessage.message.toolCalls = rsp.Body.toolCalls;
-						}
-
-						if (autoScrollDown && isUserAtBottom)
-						{
-							await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
-						}
-
-						// 立即触发UI刷新，确保流式内容实时显示
-						await InvokeAsync(StateHasChanged);
+						generatingMessage.GenerationState = MessageGenerationState.Completed;
+						chat.SaveMessage(messageStore, generatingMessage);
+						ChatPluginPanelContainer?.OnAgentMessage(generatingMessage);
 					}
-
-					// 流式响应结束，标记为完成状态
-					generatingMessage.GenerationState = MessageGenerationState.Completed;
-					chat.SaveMessage(messageStore, generatingMessage);
-					ChatPluginPanelContainer?.OnAgentMessage(generatingMessage);
 					await InvokeAsync(StateHasChanged);
 				},
 				// 处理工具调用的回调
@@ -584,46 +586,36 @@
 
 		try
 		{
+			continuationMessage.GenerationState = MessageGenerationState.Generating;
+			string originalContent = continuationMessage.CurrentVersion?.Content ?? "";
+
 			await generationManager.GenerateContinuationStreamAsync(
 				agent, chat,
 				continuationMessage,
-				// 处理流式响应的函数
-				handleStream: async (responseStream) =>
+				onStreamDelta: async (accumulated) =>
 				{
-					// 使用现有的消息进行继续生成
-					continuationMessage.GenerationState = MessageGenerationState.Generating;
-
-					// 保存原始内容
-					string originalContent = continuationMessage.CurrentVersion?.Content ?? "";
-
-					await InvokeAsync(StateHasChanged);
-
-					await foreach (var rsp in responseStream.WithCancellation(cancellationToken))
+					// 将新内容追加到原始内容后面
+					if (!string.IsNullOrEmpty(accumulated.Body.Content))
 					{
-						// 流式响应更新 - 将新内容追加到原始内容后面
-						if (!string.IsNullOrEmpty(rsp.Body.Content))
-						{
-							if (continuationMessage.CurrentVersion != null)
-								continuationMessage.CurrentVersion.Content = originalContent + rsp.Body.Content;
-						}
-
-						// 如果有思考内容，更新思考内容
-						if (rsp.Body.thinking != null)
-						{
-							if (continuationMessage.CurrentVersion != null)
-								continuationMessage.CurrentVersion.thinking = rsp.Body.thinking;
-						}
-
-						if (autoScrollDown && isUserAtBottom)
-						{
-							await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
-						}
-
-						// 立即触发UI刷新，确保流式内容实时显示
-						await InvokeAsync(StateHasChanged);
+						if (continuationMessage.CurrentVersion != null)
+							continuationMessage.CurrentVersion.Content = originalContent + accumulated.Body.Content;
 					}
 
-					// 流式响应结束，标记为完成状态
+					if (accumulated.Body.thinking != null)
+					{
+						if (continuationMessage.CurrentVersion != null)
+							continuationMessage.CurrentVersion.thinking = accumulated.Body.thinking;
+					}
+
+					if (autoScrollDown && isUserAtBottom)
+					{
+						await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+					}
+
+					await InvokeAsync(StateHasChanged);
+				},
+				onAssistantComplete: async (accumulated) =>
+				{
 					continuationMessage.GenerationState = MessageGenerationState.Completed;
 					continuationMessage.IsContinuation = false;
 					chat.SaveMessage(messageStore, continuationMessage);

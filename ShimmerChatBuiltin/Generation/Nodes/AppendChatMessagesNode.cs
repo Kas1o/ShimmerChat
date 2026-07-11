@@ -29,10 +29,10 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
                 var from = msg.sender.ToLower() switch
                 {
-                    "user" => PromptBuilder.From.user,
-                    "system" => PromptBuilder.From.system,
-                    "ai" => PromptBuilder.From.assistant,
-                    "toolresult" => PromptBuilder.From.tool_result,
+                    ShimmerChatLib.Sender.User => PromptBuilder.From.user,
+                    ShimmerChatLib.Sender.System => PromptBuilder.From.system,
+                    ShimmerChatLib.Sender.AI => PromptBuilder.From.assistant,
+                    ShimmerChatLib.Sender.ToolResult => PromptBuilder.From.tool_result,
                     _ => PromptBuilder.From.system
                 };
 

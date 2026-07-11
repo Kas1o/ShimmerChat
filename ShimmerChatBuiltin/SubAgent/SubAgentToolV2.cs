@@ -1,5 +1,4 @@
 using Newtonsoft.Json;
-using SharperLLM.Agents;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using SharperLLM.Util;
@@ -116,15 +115,10 @@ namespace ShimmerChatBuiltin.SubAgent
             var promptCtx = new SubAgentPromptContext(
                 subEnv.Transient.Fragments.Select(s => (s.Message, s.From)));
 
-            var runner = new ToolCallLoopRunner();
-            var options = new ToolCallLoopOptions
-            {
-                MaxRounds = 50,
-                ContinueOnToolError = true,
-                ThrowOnRoundLimitReached = false
-            };
+            var host = new SubAgentLoopHost(promptCtx, toolExecutor);
+            var loop = new ToolCallLoop();
 
-            try { await runner.RunAsync(api, promptCtx, toolDefs, toolExecutor, options); }
+            try { await loop.RunAsync(api, toolDefs, host); }
             catch (Exception ex) { return $"[SubAgent Error: {ex.Message}]"; }
 
             return SubAgentFormatter.Format(config.OutputMode, promptCtx);

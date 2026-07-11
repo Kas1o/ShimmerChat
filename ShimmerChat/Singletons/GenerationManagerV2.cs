@@ -11,7 +11,8 @@ namespace ShimmerChat.Singletons
 {
     /// <summary>
     /// ShimmerChat 2.0 生成管道管理器。
-    /// 替代 AIGenerationServiceV1：执行修改器树 → 构建 Prompt → 调用 API → Tool Call 循环。
+    /// 执行修改器树 → 构建 Prompt → 调用 API → Tool Call 循环。
+    /// Tool Call 循环委托给 ToolCallLoop，自身通过 MainLoopHost 适配。
     /// </summary>
     public class GenerationManagerV2
     {
@@ -19,6 +20,7 @@ namespace ShimmerChat.Singletons
         private readonly IToolRegistry _toolRegistry;
         private readonly IGenerationNodeSerializer _serializer;
         private readonly GenerationTreeExecutor _executor = new();
+        private readonly ToolCallLoop _loop = new();
 
         public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry,
             IGenerationNodeSerializer serializer)
@@ -70,16 +72,26 @@ namespace ShimmerChat.Singletons
         public async Task GenerateStreamAsync(
             Agent agent,
             Chat chat,
-            Func<IAsyncEnumerable<ResponseEx>, Task> handleStream,
+            Func<ResponseEx, Task> onStreamDelta,
+            Func<ResponseEx, Task> onAssistantComplete,
             Action<List<ToolCall>> onToolCall,
             Action<(string name, string resp, string id)> onToolResult,
             CancellationToken cancellationToken)
         {
-            // 1. 解析并执行修改器树
             var env = await BuildEnvironment(agent, chat, cancellationToken);
 
-            // 2. 构建初始 PromptBuilder
-            var result = await RunToolCallLoop(env, handleStream, onToolCall, onToolResult, cancellationToken);
+            var host = new MainLoopHost(this, agent, chat, env,
+                onStreamDelta, onAssistantComplete, onToolCall, onToolResult,
+                cancellationToken);
+
+            var api = env.Transient.API
+                ?? throw new InvalidOperationException("No API configured.");
+
+            await _loop.RunAsync(
+                api,
+                env.Transient.Tools.Select(t => t.GetDefinition()).ToList(),
+                host,
+                ct: cancellationToken);
         }
 
         /// <summary>
@@ -87,20 +99,27 @@ namespace ShimmerChat.Singletons
         /// </summary>
         public async Task GenerateContinuationStreamAsync(
             Agent agent, Chat chat, Message continuationMessage,
-            Func<IAsyncEnumerable<ResponseEx>, Task> handleStream,
+            Func<ResponseEx, Task> onStreamDelta,
+            Func<ResponseEx, Task> onAssistantComplete,
             CancellationToken cancellationToken)
         {
+            continuationMessage.message.CustomProperties ??= new Dictionary<string, object>();
+            continuationMessage.message.CustomProperties["prefix"] = true;
+
             var env = await BuildEnvironment(agent, chat, cancellationToken);
 
-            // Set prefix flag on the last assistant fragment
-            var lastAssistant = env.Transient.Fragments.LastOrDefault(f => f.From == SharperLLM.Util.PromptBuilder.From.assistant);
-            if (lastAssistant != null)
-            {
-                lastAssistant.Message.CustomProperties ??= new Dictionary<string, object>();
-                lastAssistant.Message.CustomProperties["prefix"] = true;
-            }
+            var host = new MainLoopHost(this, agent, chat, env,
+                onStreamDelta, onAssistantComplete, null, null,
+                cancellationToken);
 
-            await RunToolCallLoop(env, handleStream, null!, null!, cancellationToken);
+            var api = env.Transient.API
+                ?? throw new InvalidOperationException("No API configured.");
+
+            await _loop.RunAsync(
+                api,
+                env.Transient.Tools.Select(t => t.GetDefinition()).ToList(),
+                host,
+                ct: cancellationToken);
         }
 
         /// <summary>
@@ -115,20 +134,11 @@ namespace ShimmerChat.Singletons
             var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
             await GenerateStreamAsync(
                 agent, chat,
-                async stream =>
-                {
-                    ResponseEx accumulated = new ResponseEx
-                    {
-                        Body = new ChatMessage { Content = "" },
-                        FinishReason = FinishReason.None
-                    };
-                    await foreach (var chunk in stream)
-                    {
-                        accumulated += chunk;
-                        onResponse(accumulated);
-                    }
-                },
-                null!, onToolResult, cts.Token);
+                onStreamDelta: rsp => { onResponse(rsp); return Task.CompletedTask; },
+                onAssistantComplete: _ => Task.CompletedTask,
+                onToolCall: null!,
+                onToolResult: onToolResult,
+                cancellationToken: cts.Token);
         }
 
         /// <summary>
@@ -146,7 +156,6 @@ namespace ShimmerChat.Singletons
                 Serializer = _serializer
             };
 
-            // 解析 Agent 的修改器树
             IGenerationNode rootNode;
             if (!string.IsNullOrEmpty(agent.ModifierTreeJson))
             {
@@ -158,7 +167,6 @@ namespace ShimmerChat.Singletons
                 rootNode = CreateFallbackRoot(agent);
             }
 
-            // 先构建空 env，将聊天历史放入 SharedState（由 AppendChatMessages 节点负责注入）
             var env = new GenerationEnv(persistent);
             env.Transient.SharedState["ChatMessages"] = chat.Messages.ToList();
 
@@ -172,133 +180,84 @@ namespace ShimmerChat.Singletons
         }
 
         /// <summary>
-        /// 执行 Tool Call 循环
+        /// IToolCallLoopHost 实现：桥接 ToolCallLoop 和 ShimmerChat 主循环。
         /// </summary>
-        private async Task<ResponseEx> RunToolCallLoop(
-            GenerationEnv env,
-            Func<IAsyncEnumerable<ResponseEx>, Task> handleStream,
-            Action<List<ToolCall>> onToolCall,
-            Action<(string, string, string)> onToolResult,
-            CancellationToken ct)
+        private class MainLoopHost : IToolCallLoopHost
         {
-            var api = env.Transient.API
-                ?? throw new InvalidOperationException("No API configured.");
-            var tools = env.Transient.Tools;
-            var fragments = env.Transient.Fragments;
+            private readonly GenerationManagerV2 _manager;
+            private readonly Agent _agent;
+            private readonly Chat _chat;
+            private GenerationEnv _env;
+            private readonly Func<ResponseEx, Task> _onStreamDelta;
+            private readonly Func<ResponseEx, Task> _onAssistantComplete;
+            private readonly Action<List<ToolCall>>? _onToolCall;
+            private readonly Action<(string, string, string)>? _onToolResult;
+            private readonly CancellationToken _ct;
 
-            const int maxIterations = 50;
-
-            for (int iteration = 0; iteration < maxIterations; iteration++)
+            public MainLoopHost(
+                GenerationManagerV2 manager,
+                Agent agent,
+                Chat chat,
+                GenerationEnv env,
+                Func<ResponseEx, Task> onStreamDelta,
+                Func<ResponseEx, Task> onAssistantComplete,
+                Action<List<ToolCall>>? onToolCall,
+                Action<(string, string, string)>? onToolResult,
+                CancellationToken ct)
             {
-                ct.ThrowIfCancellationRequested();
+                _manager = manager;
+                _agent = agent;
+                _chat = chat;
+                _env = env;
+                _onStreamDelta = onStreamDelta;
+                _onAssistantComplete = onAssistantComplete;
+                _onToolCall = onToolCall;
+                _onToolResult = onToolResult;
+                _ct = ct;
+            }
 
-                var pb = BuildPromptBuilder(fragments, tools);
-
-                // Accumulate stream into a single ResponseEx for tool detection,
-                // while forwarding each accumulated step to the UI handler.
-                var accumulated = new ResponseEx
+            public PromptBuilder BuildPromptBuilder(IReadOnlyList<Tool> toolDefinitions)
+            {
+                var pb = new PromptBuilder
                 {
-                    Body = new ChatMessage { Content = "" },
-                    FinishReason = FinishReason.None
+                    Messages = _env.Transient.Fragments.Select(s => (s.Message, s.From)).ToArray()
                 };
-                var raw = api.GenerateChatExStream(pb, ct);
 
-                await handleStream(ForwardAccumulated(raw, accumulated));
-
-                // ForwardAccumulated mutates accumulated in-place via the reference,
-                // so accumulated now contains the final full response.
-                
-                fragments.Add(new ContextSegment
+                if (toolDefinitions.Count > 0)
                 {
-                    Message = accumulated.Body,
-                    From = PromptBuilder.From.assistant
-                });
-
-                // Tool Call 处理
-                if (accumulated.FinishReason == FinishReason.FunctionCall
-                    && accumulated.Body.toolCalls != null
-                    && accumulated.Body.toolCalls.Count > 0)
-                {
-                    onToolCall?.Invoke(accumulated.Body.toolCalls);
-
-                    foreach (var tc in accumulated.Body.toolCalls)
-                    {
-                        var tool = tools.FirstOrDefault(t => t.GetDefinition().name == tc.name);
-                        string result;
-                        if (tool != null)
-                        {
-                            result = await tool.ExecuteAsync(tc.arguments ?? "{}");
-                        }
-                        else
-                        {
-                            result = $"Error: Tool '{tc.name}' not found.";
-                        }
-
-                        fragments.Add(new ContextSegment
-                        {
-                            Message = new ChatMessage { Content = result, id = tc.id },
-                            From = PromptBuilder.From.tool_result
-                        });
-
-                        onToolResult?.Invoke((tc.name, result, tc.id ?? ""));
-                    }
+                    pb.AvailableTools = toolDefinitions.ToList();
+                    pb.AvailableToolsFormatter = ToolPromptParser.Parse;
                 }
-                else
-                {
-                    return accumulated;
-                }
+
+                return pb;
             }
 
-            throw new InvalidOperationException("Tool call loop exceeded maximum iterations.");
-        }
-
-        private static PromptBuilder BuildPromptBuilder(
-            List<ContextSegment> fragments, List<IToolV2> tools)
-        {
-            var pb = new PromptBuilder
+            public Task<string> ExecuteToolAsync(ToolCall toolCall, CancellationToken ct)
             {
-                Messages = fragments.Select(s => (s.Message, s.From)).ToArray()
-            };
+                var tool = _env.Transient.Tools.FirstOrDefault(t => t.GetDefinition().name == toolCall.name);
+                if (tool != null)
+                    return tool.ExecuteAsync(toolCall.arguments ?? "{}");
 
-            if (tools.Count > 0)
-            {
-                pb.AvailableTools = tools.Select(t => t.GetDefinition()).ToList();
-                pb.AvailableToolsFormatter = ToolPromptParser.Parse;
+                return Task.FromResult($"Error: Tool '{toolCall.name}' not found.");
             }
 
-            return pb;
-        }
-
-        private static async IAsyncEnumerable<ResponseEx> ForwardAccumulated(
-            IAsyncEnumerable<ResponseEx> source, ResponseEx acc)
-        {
-            await foreach (var chunk in source)
+            public async Task OnStreamDeltaAsync(ResponseEx accumulated, CancellationToken ct)
             {
-                // Mutate acc in-place so the caller sees the final result
-                acc.Body.Content += chunk.Body.Content;
-                acc.FinishReason = chunk.FinishReason;
-                if (chunk.Body.thinking != null)
-                    acc.Body.thinking = (acc.Body.thinking ?? "") + chunk.Body.thinking;
-                if (chunk.Body.id != null)
-                    acc.Body.id = chunk.Body.id;
+                await _onStreamDelta(accumulated);
+            }
 
-                if (chunk.Body.toolCalls != null)
-                {
-                    acc.Body.toolCalls ??= new List<ToolCall>();
-                    foreach (var tc in chunk.Body.toolCalls)
-                    {
-                        var existing = acc.Body.toolCalls.FirstOrDefault(t => t.index == tc.index);
-                        if (existing != null)
-                            existing.arguments = (existing.arguments ?? "") + (tc.arguments ?? "");
-                        else
-                            acc.Body.toolCalls.Add(new ToolCall
-                            {
-                                name = tc.name, id = tc.id,
-                                arguments = tc.arguments ?? "", index = tc.index
-                            });
-                    }
-                }
-                yield return acc;
+            public async Task<bool> OnAssistantCompleteAsync(ResponseEx fullResponse, CancellationToken ct)
+            {
+                await _onAssistantComplete(fullResponse);
+                return true;
+            }
+
+            public async Task OnToolCompleteAsync(ToolCall toolCall, string result, CancellationToken ct)
+            {
+                _onToolResult?.Invoke((toolCall.name, result, toolCall.id ?? ""));
+
+                // 重建 env，让 AppendChatMessagesNode 从 Chat 统一加载（handleStream 和 onToolResult 已持久化）
+                _env = await _manager.BuildEnvironment(_agent, _chat, ct);
             }
         }
 

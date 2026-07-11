@@ -30,7 +30,7 @@
 ### Generation Pipeline
 - [x] `GenerationManagerV2` — replaces AIGenerationServiceV1, wired into AgentChatPage
 - [x] `GenerateContinuationStreamAsync` — prefix continuation support
-- [x] `ForwardAccumulated` — single-pass stream accumulation + tool call detection
+- [x] `ToolCallLoop.Accumulate` — single-pass stream accumulation + tool call detection
 - [x] CallNode reads presets from KVData directly (no external delegates)
 - [x] ToolPresetNode reads tool presets from KVData + delegates to ToolRegistry (which has Lazy caching)
 - [x] `ToolRegistry` — unified tool scanning with `Lazy<IReadOnlyList<ToolMetadata>>` cache
@@ -88,10 +88,10 @@
 - [ ] Delete button only appears when `Depth > 0` in TreeEditor — depth-0 nodes can't be deleted directly.
 
 ### Streaming UX
-`ForwardAccumulated` mutates `ResponseEx` in-place. Tool call arguments are accumulated correctly, but thinking content deduplication is naive (string concat).
+`ToolCallLoop.Accumulate` mutates `ResponseEx` in-place. Tool call arguments are accumulated correctly, but thinking content deduplication is naive (string concat).
 
 ### Continuation
-`GenerateContinuationStreamAsync` sets `prefix:true` on the last assistant fragment. May not work correctly with all API backends.
+`GenerateContinuationStreamAsync` sets `prefix:true` on the continuation message's `ChatMessage.CustomProperties`. May not work correctly with all API backends.
 
 ### FragmentTrimNode token counting
 Relies on static `TokenizerFactory` delegate — currently unset, so token-based trimming is disabled by default. Falls back to message-count trimming. Delegate is never assigned anywhere in the codebase.
@@ -161,9 +161,9 @@ GenerateStreamAsync
       → MemoryRetrieveNode → Qdrant memory search
       → FragmentTrimNode → token/message trimming
     → AppendChatHistory
-  → RunToolCallLoop
-    → BuildPromptBuilder → PromptBuilder + available tools
-    → ForwardAccumulated → single-pass stream + accumulation
+  → ToolCallLoop.RunAsync (via MainLoopHost)
+    → MainLoopHost.BuildPromptBuilder → PromptBuilder + available tools
+    → Accumulate → single-pass stream + accumulation
     → Tool call detection + execution loop
 ```
 
@@ -184,7 +184,7 @@ SubAgentNode.ExecuteAsync
   → ResolveTree: private ModifierTreeJson ?? shared preset from GenerationManager
   → Create isolated PersistentEnv + TransientEnv
   → Execute modifier tree (API select, tool preset, fragments, etc.)
-  → Run ToolCallLoopRunner with sub-agent tools
+  → ToolCallLoop.RunAsync (via SubAgentLoopHost) with sub-agent tools
   → SubAgentFormatter.Format(mode, promptCtx):
       LastMessage → ctx.LastAssistantContent
       FullJson → JSON array [{role, content, tool_calls}, ...]
