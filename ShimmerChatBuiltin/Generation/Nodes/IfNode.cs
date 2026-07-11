@@ -18,7 +18,9 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.if_node.condition", HintKey = "prop.if_node.condition.hint")]
         public string Condition { get; set; } = "";
 
+        [NodeProperty("prop.if_node.then")]
         public IGenerationNode? Then { get; set; }
+        [NodeProperty("prop.if_node.else")]
         public IGenerationNode? Else { get; set; }
 
         public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)

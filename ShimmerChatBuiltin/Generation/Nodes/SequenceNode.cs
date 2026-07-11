@@ -10,6 +10,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Sequence";
+        [NodeProperty("prop.sequence.nodes")]
         public List<IGenerationNode> Nodes { get; set; } = new();
         [NodeProperty("prop.sequence.repeat", HintKey = "prop.sequence.repeat.hint")]
         public int Repeat { get; set; } = 1;

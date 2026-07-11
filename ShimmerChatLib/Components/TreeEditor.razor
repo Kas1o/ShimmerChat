@@ -38,7 +38,7 @@ else
             <span class="tn-icon">@_info.Icon</span>
             <span class="tn-label">@Loc[_info.LabelKey]</span>
             <input class="tn-name-input" @bind="Node.Name" @bind:event="oninput"
-                   @onkeydown="OnNameKeyDown" placeholder="Name" />
+                   @onkeydown="OnNameKeyDown" @onclick:stopPropagation="true" placeholder="Name" />
             <div class="tn-actions">
                 @if (CopyMe != null)
                 {

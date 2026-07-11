@@ -3,6 +3,90 @@
 @typeparam TNode where TNode : IGenerationNode
 @inject ILocService Loc
 
+@{
+    RenderFragment AddNodePicker = @<text>
+        <div class="tn-add-menu">
+            <input class="tn-add-search" placeholder="Filter..." @bind="_filter" @bind:event="oninput"
+                   @onkeydown="OnAddKeyDown" />
+
+            @if (_navPath.Count == 0)
+            {
+                <div class="tn-add-categories">
+                    @foreach (var child in _categoryTree)
+                    {
+                        var count = CountLeafNodes(child, _filter);
+                        <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
+                            <span class="tn-cat-name">@Loc[child.Name]</span>
+                            <span class="tn-cat-count">@count</span>
+                        </button>
+                    }
+                </div>
+                @if (!string.IsNullOrEmpty(_filter))
+                {
+                    <div class="tn-add-flat">
+                        @foreach (var leaf in _flatNodes.Where(n =>
+                            n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            <div class="tn-add-item" @onclick="() => AddChild(leaf.Type)" @onclick:preventDefault>
+                                <span class="tn-item-left">
+                                    <span style="color:@leaf.Color">@leaf.Icon</span>
+                                    <span class="tn-item-label">@Loc[leaf.LabelKey]</span>
+                                </span>
+                                <span class="tn-add-item-cat">@string.Join(" / ", leaf.FullCategory.Split('/').Select(k => Loc[k.Trim()]))</span>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                var current = _navPath[^1];
+                <div class="tn-add-breadcrumb">
+                    <button class="tn-add-back" @onclick="NavigateUp" title="Back">←</button>
+                    @for (int i = 0; i < _navPath.Count; i++)
+                    {
+                        if (i > 0) { <span class="tn-bc-sep">›</span> }
+                        <button class="tn-bc-item @(i == _navPath.Count - 1 ? "current" : "")"
+                                @onclick="() => NavigateTo(_navPath.Take(i + 1).ToList())">
+                            @Loc[_navPath[i].Name]
+                        </button>
+                    }
+                </div>
+                <div class="tn-add-categories">
+                    @foreach (var child in current.Children)
+                    {
+                        var count = CountLeafNodes(child, _filter);
+                        <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
+                            <span class="tn-cat-name">@Loc[child.Name]</span>
+                            <span class="tn-cat-count">@count</span>
+                        </button>
+                    }
+                </div>
+                @if (current.LeafNodes.Count > 0)
+                {
+                    <div class="tn-add-nodes">
+                        @foreach (var nt in current.LeafNodes.Where(n =>
+                            string.IsNullOrEmpty(_filter) ||
+                            n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            <div class="tn-add-item" @onclick="() => AddChild(nt.Type)" @onclick:preventDefault>
+                                <span class="tn-item-left">
+                                    <span style="color:@nt.Color">@nt.Icon</span>
+                                    <span class="tn-item-label">@Loc[nt.LabelKey]</span>
+                                </span>
+                                @if (nt.DescriptionKey != null)
+                                {
+                                    <span class="tn-item-desc">@Loc[nt.DescriptionKey]</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </text>;
+}
+
 <div class="generic-editor">
     @foreach (var prop in _properties.OrderBy(p => p.Order))
     {
@@ -28,87 +112,7 @@
 
             @if (_showAddMenu)
             {
-                <div class="tn-add-menu">
-                    <input class="tn-add-search" placeholder="Filter..." @bind="_filter" @bind:event="oninput"
-                           @onkeydown="OnAddKeyDown" />
-
-                    @if (_navPath.Count == 0)
-                    {
-                        @* Root level: show top categories + any root-level items *@
-                        <div class="tn-add-categories">
-                            @foreach (var child in _categoryTree)
-                            {
-                                var count = CountLeafNodes(child, _filter);
-                                <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
-                                    <span class="tn-cat-name">@Loc[child.Name]</span>
-                                    <span class="tn-cat-count">@count</span>
-                                </button>
-                            }
-                        </div>
-                        @if (!string.IsNullOrEmpty(_filter))
-                        {
-                            <div class="tn-add-flat">
-                                @foreach (var leaf in _flatNodes.Where(n =>
-                                    n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    <div class="tn-add-item" @onclick="() => AddChild(leaf.Type)" @onclick:preventDefault>
-                                        <span class="tn-item-left">
-                                            <span style="color:@leaf.Color">@leaf.Icon</span>
-                                            <span class="tn-item-label">@Loc[leaf.LabelKey]</span>
-                                        </span>
-                                        <span class="tn-add-item-cat">@string.Join(" / ", leaf.FullCategory.Split('/').Select(k => Loc[k.Trim()]))</span>
-                                    </div>
-                                }
-                            </div>
-                        }
-                    }
-                    else
-                    {
-                        @* Drilled into a category *@
-                        var current = _navPath[^1];
-                        <div class="tn-add-breadcrumb">
-                            <button class="tn-add-back" @onclick="NavigateUp" title="Back">←</button>
-                            @for (int i = 0; i < _navPath.Count; i++)
-                            {
-                                if (i > 0) { <span class="tn-bc-sep">›</span> }
-                                <button class="tn-bc-item @(i == _navPath.Count - 1 ? "current" : "")"
-                                        @onclick="() => NavigateTo(_navPath.Take(i + 1).ToList())">
-                                    @Loc[_navPath[i].Name]
-                                </button>
-                            }
-                        </div>
-                        <div class="tn-add-categories">
-                            @foreach (var child in current.Children)
-                            {
-                                var count = CountLeafNodes(child, _filter);
-                                <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
-                                    <span class="tn-cat-name">@Loc[child.Name]</span>
-                                    <span class="tn-cat-count">@count</span>
-                                </button>
-                            }
-                        </div>
-                        @if (current.LeafNodes.Count > 0)
-                        {
-                            <div class="tn-add-nodes">
-                                @foreach (var nt in current.LeafNodes.Where(n =>
-                                    string.IsNullOrEmpty(_filter) ||
-                                    n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    <div class="tn-add-item" @onclick="() => AddChild(nt.Type)" @onclick:preventDefault>
-                                        <span class="tn-item-left">
-                                            <span style="color:@nt.Color">@nt.Icon</span>
-                                            <span class="tn-item-label">@Loc[nt.LabelKey]</span>
-                                        </span>
-                                        @if (nt.DescriptionKey != null)
-                                        {
-                                            <span class="tn-item-desc">@Loc[nt.DescriptionKey]</span>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        }
-                    }
-                </div>
+                @AddNodePicker
             }
 
             @for (int i = 0; i < _childNodes.Count; i++)
@@ -140,6 +144,44 @@
             }
         </div>
     }
+    @foreach (var sp in _singleNodeProps)
+    {
+        var slotNode = sp.GetValue(Node) as IGenerationNode;
+        <div class="ge-children">
+            <div class="ge-children-header">
+                <span class="ge-label">@Loc[sp.LabelKey]</span>
+                @if (slotNode == null)
+                {
+                    <button class="tn-btn tn-btn-add" @onclick="() => ToggleSlotAdd(sp)" title="Add node">+</button>
+                    @if (NodeClipboard.HasContent)
+                    {
+                        <button class="tn-btn tn-btn-paste" @onclick="() => PasteToSlot(sp)" title="Paste">📋</button>
+                    }
+                }
+            </div>
+            @if (_showAddMenu && _activeSlotProp == sp)
+            {
+                @AddNodePicker
+            }
+            @if (slotNode != null)
+            {
+                <div class="tn-child-row">
+                    <div class="tn-child-actions">
+                        <button class="tn-btn tn-btn-del" @onclick="() => { sp.SetValue(Node, null); OnTreeChanged.InvokeAsync(); }" title="Remove">✕</button>
+                    </div>
+                    <div class="tn-child-tree">
+                        <TreeEditor Node="@slotNode" Depth="@(Depth + 1)" OnTreeChanged="OnTreeChanged"
+                                    RemoveMe="@(node => { sp.SetValue(Node, null); OnTreeChanged.InvokeAsync(); })"
+                                    CopyMe="CopyNode" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="tn-empty">empty — click + to add</div>
+            }
+        </div>
+    }
 </div>
 
 @code {
@@ -150,9 +192,11 @@
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     private List<PropInfo> _properties = new();
+    private List<PropInfo> _singleNodeProps = new();
     private PropInfo? _childNodesProp;
     private IList<IGenerationNode> _childNodes = new List<IGenerationNode>();
     private bool _showAddMenu;
+    private PropInfo? _activeSlotProp;
     private string _filter = "";
 
     private List<CategoryTreeNode> _categoryTree = new();
@@ -265,7 +309,6 @@
         var nodeType = Node.GetType();
         var props = nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.CanRead && p.CanWrite)
-            .Where(p => p.Name is not "Id") // skip Id
             .ToList();
 
         foreach (var prop in props)
@@ -278,9 +321,14 @@
                 _childNodes = (IList<IGenerationNode>)prop.GetValue(Node)! ?? new List<IGenerationNode>();
                 continue;
             }
-            if (typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType) && prop.PropertyType != typeof(IGenerationNode))
+            if (typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType))
             {
-                continue; // single child node — skip for now, handled by TreeEditor
+                _singleNodeProps.Add(new PropInfo(prop, nodeType));
+                continue; // single child node — rendered as slot
+            }
+            if (prop.GetCustomAttribute<NodePropertyAttribute>() == null)
+            {
+                continue; // only expose properties explicitly decorated with [NodeProperty]
             }
             _properties.Add(new PropInfo(prop, nodeType));
         }
@@ -296,6 +344,7 @@
 
     private void ToggleAddMenu()
     {
+        _activeSlotProp = null;
         _showAddMenu = !_showAddMenu;
         _navPath.Clear();
         _filter = "";
@@ -303,7 +352,7 @@
 
     private async Task OnAddKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Escape") { _showAddMenu = false; }
+        if (e.Key == "Escape") { _showAddMenu = false; _activeSlotProp = null; }
     }
 
     private void AddChild(Type type)
@@ -312,14 +361,22 @@
         _filter = "";
         var instance = (IGenerationNode)Activator.CreateInstance(type)!;
         instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
-        _childNodes.Add(instance);
+
+        if (_activeSlotProp != null)
+        {
+            _activeSlotProp.SetValue(Node, instance);
+            _activeSlotProp = null;
+        }
+        else
+        {
+            _childNodes.Add(instance);
+        }
         OnTreeChanged.InvokeAsync();
     }
 
     private void CopyNode(IGenerationNode node)
     {
         NodeClipboard.Copy(node);
-        // Re-render to show paste button
         OnTreeChanged.InvokeAsync();
     }
 
@@ -329,6 +386,24 @@
         if (node != null)
         {
             _childNodes.Add(node);
+            OnTreeChanged.InvokeAsync();
+        }
+    }
+
+    private void ToggleSlotAdd(PropInfo prop)
+    {
+        _activeSlotProp = prop;
+        _showAddMenu = !_showAddMenu;
+        _navPath.Clear();
+        _filter = "";
+    }
+
+    private void PasteToSlot(PropInfo prop)
+    {
+        var node = NodeClipboard.Paste();
+        if (node != null)
+        {
+            prop.SetValue(Node, node);
             OnTreeChanged.InvokeAsync();
         }
     }
