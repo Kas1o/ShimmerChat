@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    [NodeInfo("node.st_style_macro", Icon = "🔤", Color = "#60c080", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.st_style_macro.desc")]
+    [NodeInfo("node.st_style_macro", Icon = "🔤", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.st_style_macro.desc")]
     public class STStyleMacroNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

@@ -6,7 +6,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 在终端打印当前瞬态状态（TransientEnv）的调试节点。
     /// 消息内容只显示前 20 字符和后 20 字符，避免输出过长。
     /// </summary>
-    [NodeInfo("node.transient_probe", Icon = "◉", Color = "#f0a030", CategoryKeys = ["category.debug"])]
+    [NodeInfo("node.transient_probe", Icon = "◉", Color = "var(--node-branch)", CategoryKeys = ["category.debug"])]
     public class TransientProbeNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

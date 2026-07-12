@@ -7,54 +7,54 @@
 <h3>消息渲染器配置</h3>
 
 <div class="shimmer-group" style="margin-bottom: 16px;">
-    <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" role="switch"
+    <div class="su-switch">
+        <input type="checkbox" role="switch"
                id="debugModeSwitch"
                @bind="messageDisplayService.DebugModeEnabled"
                @bind:after="SaveDebugModeSetting">
-        <label class="form-check-label" for="debugModeSwitch">
+        <label for="debugModeSwitch">
             <strong>启用调试模式</strong>
         </label>
     </div>
-    <small class="text-muted d-block">
+    <small class="su-text-2 su-d-block">
         开启后，渲染出错时将显示完整的渲染流程中间结果，便于排查问题。
     </small>
 </div>
 
-<button class="btn btn-primary" style="margin:5px" @onclick="ShowAddModifierPopup">添加渲染修改器</button>
+<button class="su-btn su-btn-primary" style="margin:5px" @onclick="ShowAddModifierPopup">添加渲染修改器</button>
 
 <div class="shimmer-group" style="margin-top:16px;">
     <h5>已激活的修改器</h5>
     @if (messageDisplayService.ActivatedModifiers.Any())
     {
-        <div class="list-group" ondragover="event.preventDefault();" @ondrop="() => HandleDrop()">
+        <div class="su-list" ondragover="event.preventDefault();" @ondrop="() => HandleDrop()">
             @foreach (var modifier in messageDisplayService.ActivatedModifiers)
             {
-                <div class="list-group-item d-flex justify-content-between align-items-center" 
+                <div class="su-list-item su-flex su-justify-between su-items-center" 
                      draggable="true" 
                      @ondragstart="() => HandleDragStart(messageDisplayService.ActivatedModifiers.IndexOf(modifier))"
                      @ondragover="() => HandleDragOver(messageDisplayService.ActivatedModifiers.IndexOf(modifier))"
                      data-index="@messageDisplayService.ActivatedModifiers.IndexOf(modifier)">
-                    <div class="d-flex align-items-center">
+                    <div class="su-flex su-items-center">
                         <i class="bi bi-grip-vertical" style="margin-right: 10px; cursor: move; color: #6c757d;"></i>
-                        <div class="me-2">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" 
+                        <div class="su-me-2">
+                            <div class="su-switch">
+                                <input type="checkbox" role="switch" 
                                        id="enableSwitch_@messageDisplayService.ActivatedModifiers.IndexOf(modifier)" 
                                        @bind="modifier.IsEnabled">
-                                <label class="form-check-label" for="enableSwitch_@messageDisplayService.ActivatedModifiers.IndexOf(modifier)">
+                                <label for="enableSwitch_@messageDisplayService.ActivatedModifiers.IndexOf(modifier)">
                                     <strong>@modifier.Name</strong>
                                 </label>
                             </div>
                             @if (!string.IsNullOrEmpty(modifier.Value))
                             {
-                                <small class="d-block text-muted">@modifier.Value</small>
+                                <small class="su-d-block su-text-2">@modifier.Value</small>
                             }
                         </div>
                     </div>
                     <div>
-                        <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => ShowEditModifierPopup(messageDisplayService.ActivatedModifiers.IndexOf(modifier))">Edit</button>
-                        <button class="btn btn-danger btn-sm" @onclick="() => RemoveModifier(messageDisplayService.ActivatedModifiers.IndexOf(modifier))">Remove</button>
+                        <button class="su-btn su-btn-outline-primary su-btn-sm su-me-2" @onclick="() => ShowEditModifierPopup(messageDisplayService.ActivatedModifiers.IndexOf(modifier))">Edit</button>
+                        <button class="su-btn su-btn-danger su-btn-sm" @onclick="() => RemoveModifier(messageDisplayService.ActivatedModifiers.IndexOf(modifier))">Remove</button>
                     </div>
                 </div>
             }
@@ -62,11 +62,11 @@
     }
     else
     {
-        <p class="text-muted">无激活的渲染修改器</p>
+        <p class="su-text-2">无激活的渲染修改器</p>
     }
 </div>
 
-<button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">保存配置</button>
+<button class="su-btn su-btn-primary" style="margin:5px" @onclick="SaveAll">保存配置</button>
 
 @if (_showAddModifierPopup)
 {

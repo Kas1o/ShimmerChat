@@ -9,144 +9,102 @@
 @inject IKVDataService KVData
 @inject IMessageStoreService messageStore
 
-<div class="shimmer-message">
-	<!-- #region 头部菜单 -->
-	<div class="shimmer-message-head">
-		<div>
-			@sender 
-			@(message.IsStreaming ? "(流式生成中...)" : "")
+<div class="chat-msg @MsgClass">
+	<div class="chat-msg-head">
+		<span class="chat-msg-sender">
+			@sender
 			@if (message.HasMultipleVersions)
 			{
-				<span class="version-indicator">(@(message.CurrentVersionIndex + 1)/@message.Versions.Count)</span>
+				<span class="chat-msg-ver">@(message.CurrentVersionIndex + 1)/@message.Versions.Count</span>
+				<button class="chat-msg-ver-btn" @onclick="() => NavigateToPreviousVersion()" disabled="@(message.CurrentVersionIndex <= 0)">◂</button>
+				<button class="chat-msg-ver-btn" @onclick="() => NavigateToNextVersion()" disabled="@(message.CurrentVersionIndex >= message.Versions.Count - 1)">▸</button>
 			}
-		</div>
-		<div class="shimmer-message-head-action">
-			@if (message.HasMultipleVersions)
+			@if (message.IsStreaming)
 			{
-				<div class="version-navigation">
-					<button class="version-btn" @onclick="() => NavigateToPreviousVersion()" disabled="@(message.CurrentVersionIndex <= 0)">
-						&lt;
-					</button>
-					<button class="version-btn" @onclick="() => NavigateToNextVersion()" disabled="@(message.CurrentVersionIndex >= message.Versions.Count - 1)">
-						&gt;
-					</button>
-				</div>
+				<span class="chat-msg-streaming">streaming…</span>
 			}
-			@if (message.sender == ShimmerChatLib.Sender.AI)
+		</span>
+		<span class="chat-msg-actions">
+			@if (message.sender == ShimmerChatLib.Sender.AI && !message.IsStreaming)
 			{
-				<div @onclick="RegenerateFromThisMessage" style="display: @(message.IsStreaming ? "none" : "block")">
-					@Loc["BUTTON_REGENERATE"]
-				</div>
-				@if (IsContinuationEnabled())
+				<button class="chat-msg-act" @onclick="RegenerateFromThisMessage">@Loc["BUTTON_REGENERATE"]</button>
+				if (IsContinuationEnabled())
 				{
-					<div @onclick="ContinueFromThisMessage" style="display: @(message.IsStreaming ? "none" : "block")">
-						@Loc["BUTTON_CONTINUE"]
-					</div>
+					<button class="chat-msg-act" @onclick="ContinueFromThisMessage">@Loc["BUTTON_CONTINUE"]</button>
 				}
 			}
-			<div @onclick="e => DeleteThisMessage()">
-				@Loc["BUTTON_DELETE"]
-			</div>
-			<div @onclick="CopyContentToClipboard">
-				@Loc["BUTTON_COPY"]
-			</div>
-			<div @onclick="EnterEditMode" style="display: @(message.IsStreaming ? "none" : "block")">
-				@Loc["BUTTON_EDIT"]
-			</div>
-		</div>
+			<button class="chat-msg-act" @onclick="CopyContentToClipboard">@Loc["BUTTON_COPY"]</button>
+			@if (!message.IsStreaming)
+			{
+				<button class="chat-msg-act" @onclick="EnterEditMode">@Loc["BUTTON_EDIT"]</button>
+			}
+			<button class="chat-msg-act chat-msg-act-del" @onclick="OnDeleteClick" title="@Loc["BUTTON_DELETE_FROM_TIP"]">@Loc["BUTTON_DELETE"]</button>
+		</span>
 	</div>
-	<!-- #endregion -->
 
-
-
-	<!-- #region 编辑器&常规内容 -->
 	@if (isEditMode)
 	{
-		<div>
-			<label>思考内容:</label>
-			<textarea @bind="editThinking" rows="3" style="width:100%; margin-bottom: 10px;"></textarea>
-			<label>消息内容:</label>
-			<textarea @bind="editContent" rows="4" style="width:100%"></textarea>
-			<!-- 这里有个长文本输入问题，Blazor SignalR 消息不允许过长的文本输入-->
-			<button class="btn btn-success" @onclick="SaveEdit">@Loc["BUTTON_SAVE"]</button>
-			<button class="btn" @onclick="CancelEdit">@Loc["BUTTON_CANCEL"]</button>
+		<div class="chat-msg-edit">
+			<label>Thinking:</label>
+			<textarea @bind="editThinking" rows="3" class="su-input su-mb-2"></textarea>
+			<label>Content:</label>
+			<textarea @bind="editContent" rows="4" class="su-input su-mb-2"></textarea>
+			<button class="su-btn su-btn-success su-btn-sm" @onclick="SaveEdit">@Loc["BUTTON_SAVE"]</button>
+			<button class="su-btn su-btn-sm" @onclick="CancelEdit">@Loc["BUTTON_CANCEL"]</button>
 		</div>
 	}
 	else
 	{
-		<!-- #region 思维链展示 -->
-		@if(!String.IsNullOrEmpty(CurrentMessageContent?.thinking))
+		@if (!string.IsNullOrEmpty(CurrentMessageContent?.thinking))
 		{
-			<div class="shimmer-message-thinking">
-				<details>
-					<summary>
-						思考……
-					</summary>
-					@DisplayThinking
-				</details>
-			</div>
+			<details class="chat-msg-thinking">
+				<summary>Thinking…</summary>
+				<div class="chat-msg-thinking-body">@DisplayThinking</div>
+			</details>
 		}
-		<!-- #endregion -->
-		
-		@DisplayContent
-		@if(message.IsStreaming)
-		{
-			<span class="shimmer-typing-indicator">▌</span>
-		}
-	}
-	<!-- #endregion -->
 
-	<!-- #region 工具调用 -->
-	@if(CurrentMessageContent?.toolCalls != null)
-	@if(CurrentMessageContent?.toolCalls.Count > 0)
+		<div class="chat-msg-body">
+			@DisplayContent
+			@if (message.IsStreaming)
+			{
+				<span class="chat-msg-cursor">▌</span>
+			}
+		</div>
+	}
+
+	@if (CurrentMessageContent?.toolCalls is { Count: > 0 })
 	{
 		<ToolCallMessage message="message" />
 	}
-	
-	<!-- #endregion -->
-
 </div>
 
-
 @code {
-	[Parameter]
-	public Action Delete { get; set; } = null;
+	string MsgClass => message.sender switch
+	{
+		ShimmerChatLib.Sender.User => "chat-msg-user",
+		ShimmerChatLib.Sender.ToolResult => "chat-msg-tool",
+		_ => "chat-msg-ai"
+	};
 
-	[Parameter]
-	public Action MakeDirty { get; set; } = null!; // Callback to make the parent component dirty
-
-	[Parameter]
-	public Action RegenerateFrom { get; set; } = null!; // Callback to regenerate from this message
-
-	[Parameter]
-	public Action ContinueFrom { get; set; } = null!; // Callback to continue from this message
-
-	[Parameter]
-	public ShimmerChatLib.Message message { get; set; } = null!; // The message object to display
-
-	[Parameter]
-	public string AgentName { get; set; } = "EmptyName";
-
-	[Parameter]
-	public Chat? Chat { get; set; }
-
-	[Parameter]
-	public Agent? Agent { get; set; }
+	[Parameter] public Action Delete { get; set; } = null;
+	[Parameter] public Action MakeDirty { get; set; } = null!;
+	[Parameter] public Action RegenerateFrom { get; set; } = null!;
+	[Parameter] public Action ContinueFrom { get; set; } = null!;
+	[Parameter] public Action DeleteFrom { get; set; } = null!;
+	[Parameter] public ShimmerChatLib.Message message { get; set; } = null!;
+	[Parameter] public string AgentName { get; set; } = "EmptyName";
+	[Parameter] public Chat? Chat { get; set; }
+	[Parameter] public Agent? Agent { get; set; }
 
 	bool isEditMode = false;
 	string editContent = string.Empty;
 	string editThinking = string.Empty;
 
-	// 获取当前版本的消息内容
 	ChatMessage CurrentMessageContent => message.CurrentVersion;
-
-	string stringContent => CurrentMessageContent?.Content ?? string.Empty; // The string content of the message
-
+	string stringContent => CurrentMessageContent?.Content ?? string.Empty;
 	MarkupString DisplayContent => MessageDisplayService.Render(stringContent, Chat, Agent);
 	MarkupString DisplayThinking => MessageDisplayService.Render(CurrentMessageContent?.thinking ?? string.Empty, Chat, Agent);
-
-
-	string imageContent => CurrentMessageContent?.ImageBase64 ?? string.Empty; // The base64 string for the image content, if any
+	string imageContent => CurrentMessageContent?.ImageBase64 ?? string.Empty;
 
 	string sender => message.sender switch
 	{
@@ -156,58 +114,23 @@
 		var other => other
 	};
 
-	// 当组件初始化时设置
-	protected override void OnInitialized()
-	{
-		base.OnInitialized();
-		// 订阅Message对象的事件
-		SubscribeToMessageEvents();
-	}
+	protected override void OnInitialized() { base.OnInitialized(); SubscribeToMessageEvents(); }
+	protected override void OnParametersSet() { base.OnParametersSet(); SubscribeToMessageEvents(); }
 
-	// 当message参数变化时重新订阅
-	protected override void OnParametersSet()
-	{
-		base.OnParametersSet();
-		// 重新订阅Message对象的事件
-		SubscribeToMessageEvents();
-	}
-
-	// 订阅Message对象的事件
 	private void SubscribeToMessageEvents()
 	{
-		// 移除可能存在的旧订阅
 		message.ContentChanged -= HandleContentChanged;
 		message.StreamingStateChanged -= HandleStreamingStateChanged;
 		message.VersionChanged -= HandleVersionChanged;
-
-		// 添加新订阅
 		message.ContentChanged += HandleContentChanged;
 		message.StreamingStateChanged += HandleStreamingStateChanged;
 		message.VersionChanged += HandleVersionChanged;
 	}
 
-	// 当内容变化时刷新UI
-	private void HandleContentChanged(object? sender, EventArgs e)
-	{
-		// 通知Blazor重新渲染组件
-		InvokeAsync(StateHasChanged);
-	}
+	private void HandleContentChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
+	private void HandleStreamingStateChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
+	private void HandleVersionChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
 
-	// 当流式状态变化时刷新UI
-	private void HandleStreamingStateChanged(object? sender, EventArgs e)
-	{
-		// 通知Blazor重新渲染组件
-		InvokeAsync(StateHasChanged);
-	}
-
-	// 当版本变化时刷新UI
-	private void HandleVersionChanged(object? sender, EventArgs e)
-	{
-		// 通知Blazor重新渲染组件
-		InvokeAsync(StateHasChanged);
-	}
-
-	// 组件销毁时取消订阅，防止内存泄漏
 	public void Dispose()
 	{
 		if (message != null)
@@ -218,85 +141,33 @@
 		}
 	}
 
-	// 导航到上一个版本
-	private void NavigateToPreviousVersion()
-	{
-		if (message.CurrentVersionIndex > 0)
-		{
-			message.CurrentVersionIndex--;
-			MakeDirty?.Invoke();
-		}
-	}
+	private void NavigateToPreviousVersion() { if (message.CurrentVersionIndex > 0) { message.CurrentVersionIndex--; MakeDirty?.Invoke(); } }
+	private void NavigateToNextVersion() { if (message.CurrentVersionIndex < message.Versions.Count - 1) { message.CurrentVersionIndex++; MakeDirty?.Invoke(); } }
 
-	// 导航到下一个版本
-	private void NavigateToNextVersion()
-	{
-		if (message.CurrentVersionIndex < message.Versions.Count - 1)
-		{
-			message.CurrentVersionIndex++;
-			MakeDirty?.Invoke();
-		}
-	}
+	void DeleteThisMessage() => Delete();
+	void OnDeleteClick(MouseEventArgs e) { if (e.ShiftKey) DeleteFrom(); else Delete(); }
+	void RegenerateFromThisMessage() => RegenerateFrom?.Invoke();
+	void ContinueFromThisMessage() => ContinueFrom?.Invoke();
 
-	// 渲染逻辑已迁移到IMessageDisplayService单例服务中
-	// 之前每个Message组件都会创建一个新的MarkdownPipeline实例，这是不必要的资源消耗
-	// 现在所有组件共享同一个服务实例，大幅减少了内存占用和初始化开销
-
-	void DeleteThisMessage()
-	{
-		Delete();
-	}
-
-	void RegenerateFromThisMessage()
-	{
-		RegenerateFrom?.Invoke();
-	}
-
-	void ContinueFromThisMessage()
-	{
-		ContinueFrom?.Invoke();
-	}
-
-	/// <summary>
-	/// 检查是否启用了继续功能（独立杂项设置，不依赖 API Settings 插件）
-	/// </summary>
 	bool IsContinuationEnabled()
 	{
 		var value = KVData.Read("MiscSettings", "enableContinue") ?? "false";
 		return bool.TryParse(value, out var enabled) && enabled;
 	}
 
-	async Task CopyContentToClipboard()
-	{
-		await JS.InvokeVoidAsync("copyTextToClipboard", stringContent);
-	}
+	async Task CopyContentToClipboard() => await JS.InvokeVoidAsync("copyTextToClipboard", stringContent);
 
 	void EnterEditMode()
 	{
-		if (isEditMode || message.IsStreaming)
-		{
-			CancelEdit();
-			return;
-		}
-		isEditMode = true;
-		editContent = stringContent;
-		editThinking = CurrentMessageContent?.thinking ?? string.Empty;
+		if (isEditMode || message.IsStreaming) { CancelEdit(); return; }
+		isEditMode = true; editContent = stringContent; editThinking = CurrentMessageContent?.thinking ?? string.Empty;
 	}
 
 	void SaveEdit()
 	{
-		if (CurrentMessageContent != null)
-		{
-			CurrentMessageContent.Content = editContent;
-			CurrentMessageContent.thinking = editThinking;
-		}
-		isEditMode = false;
-		Chat?.SaveMessage(messageStore, message);
-		MakeDirty?.Invoke();
+		if (CurrentMessageContent != null) { CurrentMessageContent.Content = editContent; CurrentMessageContent.thinking = editThinking; }
+		isEditMode = false; Chat?.SaveMessage(messageStore, message); MakeDirty?.Invoke();
 	}
 
-	void CancelEdit()
-	{
-		isEditMode = false;
-	}
+	void CancelEdit() => isEditMode = false;
 }

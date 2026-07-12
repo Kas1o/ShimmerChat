@@ -53,10 +53,10 @@
 }
 
 .nav-item ::deep .nav-link {
-    color: #d7d7d7;
+    color: var(--su-text-2);
     background: none;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--su-radius-sm);
     height: 3rem;
     display: flex;
     align-items: center;
@@ -103,8 +103,8 @@
     }
     .shimmer-sidebar {
         width: 270px;
-        background-color: var(--color-surface);
-        border-right: 1px solid var(--color-border);
+        background-color: var(--su-surface-1);
+        border-right: 1px solid var(--su-border-0);
         display: flex;
         flex-direction: column;
         transition: width 0.3s ease;
@@ -129,7 +129,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: var(--color-card);
+        background-color: var(--su-surface-1);
     }
 
     .shimmer-logo-image {
@@ -141,7 +141,7 @@
     .shimmer-brand-text {
         font-size: 1.25rem;
         font-weight: 700;
-        color: var(--color-primary);
+        color: var(--su-accent);
         margin: 0;
         white-space: nowrap;
         overflow: hidden;
@@ -151,7 +151,7 @@
     /* 导航分隔线 */
     .shimmer-nav-divider {
         height: 1px;
-        background-color: var(--color-border);
+        background-color: var(--su-border-0);
         margin: 0 16px;
     }
 
@@ -165,32 +165,32 @@
     ::deep .shimmer-nav-item {
         display: block;
         padding: 12px 16px;
-        border-radius: var(--radius-md);
+        border-radius: var(--su-radius-md);
         margin: 4px 8px;
-        transition: var(--transition);
+        transition: var(--su-transition);
         font-weight: 500;
         text-decoration: none;
-        color: var(--color-text-secondary);
+        color: var(--su-text-1);
         background-color: transparent;
         border: none;
         width: calc(100% - 16px);
     }
 
         ::deep .shimmer-nav-item:hover {
-            background-color: var(--color-surface);
-            color: var(--color-primary);
+            background-color: var(--su-surface-1);
+            color: var(--su-accent);
             transform: translateX(4px);
         }
 
         ::deep .shimmer-nav-item.active {
-            background-color: var(--color-primary-light);
-            color: var(--color-primary);
+            background-color: var(--su-accent-soft);
+            color: var(--su-accent);
             font-weight: 600;
-            box-shadow: var(--shadow-sm);
+            box-shadow: var(--su-shadow-sm);
         }
 
         ::deep .shimmer-nav-item.dark-theme.active {
-            background-color: rgba(123, 52, 235, 0.2);
+            background-color: var(--su-accent-soft);
         }
 
     .nav-item-content {
@@ -218,12 +218,12 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
-        color: var(--color-text-tertiary);
+        color: var(--su-text-2);
         margin-top: 8px;
     }
 
     .nav-badge {
-        background-color: var(--color-primary);
+        background-color: var(--su-accent);
         color: white;
         font-size: 0.8rem;
         padding: 2px 8px;
@@ -236,7 +236,7 @@
     /* 导航底部 */
     .shimmer-nav-footer {
         padding: 16px;
-        border-top: 1px solid var(--color-border);
+        border-top: 1px solid var(--su-border-0);
         display: flex;
         flex-direction: column;
         gap: 8px;
@@ -249,10 +249,10 @@
 
     .locale-select {
         padding: 4px 8px;
-        background: var(--color-surface);
-        border: 1px solid var(--color-border);
-        border-radius: 4px;
-        color: var(--color-text);
+        background: var(--su-surface-1);
+        border: 1px solid var(--su-border-0);
+        border-radius: var(--su-radius-sm);
+        color: var(--su-text-0);
         font-size: 0.78em;
         outline: none;
         cursor: pointer;
@@ -264,7 +264,7 @@
 
     /* 竖屏模式导航面板 */
     .shimmer-nav-portrait {
-        background-color: var(--color-surface);
+        background-color: var(--su-surface-1);
         display: flex;
         flex-direction: column;
         padding: 8px 0;
@@ -272,7 +272,7 @@
 
     .shimmer-nav-portrait .shimmer-nav-item {
         margin: 2px 8px;
-        border-radius: var(--radius-md);
+        border-radius: var(--su-radius-md);
     }
 
     .shimmer-nav-portrait .shimmer-nav-menu {

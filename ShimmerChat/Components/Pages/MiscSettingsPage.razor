@@ -9,27 +9,27 @@
 <div class="shimmer-group">
 	<h4>App Settings</h4>
 
-	<input type="checkbox" class="form-check-input" id="throw-exception" @bind="_throwExceptionInsteadOfPopupErrorMessage" />
-	<label class="form-check-label" for="throw-exception">Throw exception instead of popup error message</label>
+	<input type="checkbox" id="throw-exception" @bind="_throwExceptionInsteadOfPopupErrorMessage" />
+	<label for="throw-exception">Throw exception instead of popup error message</label>
 	
-	<input type="checkbox" class="form-check-input" id="enable-notifications" @bind="_enableNotifications" />
-	<label class="form-check-label" for="enable-notifications">Enable desktop notifications</label>
+	<input type="checkbox" id="enable-notifications" @bind="_enableNotifications" />
+	<label for="enable-notifications">Enable desktop notifications</label>
 	
-	<button class="btn btn-outline-primary" @onclick="RequestNotificationPermission" style="margin-left: 10px;">Request Notification Permission</button>
+	<button class="su-btn su-btn-outline-primary" @onclick="RequestNotificationPermission" style="margin-left: 10px;">Request Notification Permission</button>
 	<span style="margin-left: 10px;">Current status: <strong>@notificationPermissionStatus</strong></span>
 
-	<input type="checkbox" class="form-check-input" id="auto-scroll-down" @bind="_autoScrollDown" />
-	<label class="form-check-label" for="auto-scroll-down">Auto scroll down</label>
+	<input type="checkbox" id="auto-scroll-down" @bind="_autoScrollDown" />
+	<label for="auto-scroll-down">Auto scroll down</label>
 
-	<input type="checkbox" class="form-check-input" id="auto-scroll-down" @bind="_virtualize" />
-	<label class="form-check-label" for="auto-scroll-down">Virtualize</label>
+	<input type="checkbox" id="auto-scroll-down" @bind="_virtualize" />
+	<label for="auto-scroll-down">Virtualize</label>
 </div>
 
 <div class="shimmer-group">
 	<h4>User Settings</h4>
 
-	<label class="form-check-label" for="username">User Name</label>
-	<input type="text" class="form-control" id="username" @bind="_UserName" />
+	<label for="username">User Name</label>
+	<input type="text" class="su-input" id="username" @bind="_UserName" />
 </div>
 
 @code {

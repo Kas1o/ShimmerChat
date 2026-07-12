@@ -11,7 +11,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         Assistant
     }
 
-    [NodeInfo("node.merge_fragments", Icon = "🔗", Color = "#c080e0", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.merge_fragments.desc")]
+    [NodeInfo("node.merge_fragments", Icon = "🔗", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.merge_fragments.desc")]
     public class MergeFragmentsNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

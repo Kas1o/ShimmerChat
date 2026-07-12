@@ -29,6 +29,9 @@
   "BUTTON_REGENERATE": "重新生成",
   "BUTTON_CONTINUE": "继续",
   "BUTTON_SAVE": "保存",
+  "BUTTON_DELETE_FROM_TIP": "Shift + 点击可从此处删除后续所有消息",
+  "POPUP_DELETE_FROM_TITLE": "从此处删除",
+  "POPUP_DELETE_FROM": "是否删除此消息及其后的 {0} 条消息？",
   "ToolResult": "工具结果",
 
   "API GENERATION LENGTH": "生成长度",

@@ -6,7 +6,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 条件分支节点：如果 Condition 满足则执行 Then，否则执行 Else。
     /// Condition 目前仅支持 SharedState['key'] == "value"
     /// </summary>
-    [NodeInfo("node.condition", Icon = "◇", Color = "#f0a040", CategoryKeys = ["category.flow", "category.branching"])]
+    [NodeInfo("node.condition", Icon = "◇", Color = "var(--node-branch)", CategoryKeys = ["category.flow", "category.branching"])]
     public class IfNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

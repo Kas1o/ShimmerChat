@@ -9,412 +9,323 @@ namespace ShimmerChat.Singletons
         private readonly IJSRuntime _jsRuntime;
         private readonly IKVDataService _kvDataService;
         private Theme _currentTheme;
-        private bool _isInitialized = false;
-        private readonly object _lock = new object();
+        private bool _isInitialized;
+        private readonly object _lock = new();
         private const string THEME_STORAGE_KEY = "shimmerchat_current_theme_id";
         private const string THEMES_STORAGE_KEY = "shimmerchat_all_themes";
-        
-        public Theme CurrentTheme 
-        { 
-            get 
-            {
-                EnsureInitialized();
-                return _currentTheme; 
-            } 
+
+        private List<Theme> _availableThemes = [];
+
+        public Theme CurrentTheme
+        {
+            get { EnsureInitialized(); return _currentTheme; }
         }
-        
-        private List<Theme> _availableThemes = new();
-        
-        public List<Theme> AvailableThemes 
-        { 
-            get 
-            {
-                EnsureInitialized();
-                return _availableThemes; 
-            } 
+
+        public List<Theme> AvailableThemes
+        {
+            get { EnsureInitialized(); return _availableThemes; }
         }
-        
+
         public event Action<Theme>? OnThemeChanged;
-        
+
         public ThemeServiceV2(IJSRuntime jsRuntime, IKVDataService kvDataService)
         {
             _jsRuntime = jsRuntime;
             _kvDataService = kvDataService;
-            // 初始化在属性访问时进行，而不是在构造函数中
         }
-        
+
         private void EnsureInitialized()
         {
-            if (!_isInitialized)
+            if (_isInitialized) return;
+            lock (_lock)
             {
-                lock (_lock)
-                {
-                    if (!_isInitialized)
-                    {
-                        InitializeThemes();
-                        _isInitialized = true;
-                    }
-                }
+                if (_isInitialized) return;
+                InitializeThemes();
+                _isInitialized = true;
             }
         }
-        
+
         private void InitializeThemes()
         {
             try
             {
-                // 加载所有主题
                 LoadAllThemes();
-                
-                // 获取当前主题ID - 使用KVDataService
                 var currentThemeId = _kvDataService.Read(THEME_STORAGE_KEY, THEME_STORAGE_KEY);
-                
-                if (!string.IsNullOrEmpty(currentThemeId) && _availableThemes.Any(t => t.Id == currentThemeId))
-                {
-                    _currentTheme = _availableThemes.First(t => t.Id == currentThemeId);
-                }
-                else
-                {
-                    // 如果没有找到当前主题或当前主题不存在，则使用默认主题
-                    _currentTheme = _availableThemes.FirstOrDefault(t => t.IsDefault) ?? _availableThemes.FirstOrDefault() ?? GetBuiltInThemes().First();
-                }
-                
-                // 应用当前主题
+                _currentTheme = (!string.IsNullOrEmpty(currentThemeId)
+                    ? _availableThemes.FirstOrDefault(t => t.Id == currentThemeId)
+                    : null)
+                    ?? _availableThemes.FirstOrDefault(t => t.IsDefault)
+                    ?? _availableThemes.FirstOrDefault()
+                    ?? GetBuiltInThemes().First();
                 ApplyTheme(_currentTheme);
             }
-            catch (Exception ex)
+            catch
             {
-                // 如果初始化失败，使用默认主题
-                var builtInThemes = GetBuiltInThemes();
-                _currentTheme = builtInThemes.First();
-                _availableThemes = builtInThemes;
+                _availableThemes = GetBuiltInThemes();
+                _currentTheme = _availableThemes.First();
                 ApplyTheme(_currentTheme);
             }
         }
-        
+
         public List<Theme> GetBuiltInThemes()
         {
-            var themes = new List<Theme>();
-            
-            // 默认亮色主题
-            var lightTheme = new Theme
-            {
-                Id = "light_default",
-                Name = "Default Light",
-                Description = "Default light theme",
-                IsDefault = true,
-                IsBuiltIn = true,
-                // 颜色变量
-                ColorPrimary = "#ffa200",
-                ColorPrimaryHover = "#ff7700",
-                ColorPrimaryActive = "#e66b00",
-                ColorSecondary = "#9ca3af",
-                ColorSecondaryHover = "#b0b8c5",
-                ColorSecondaryActive = "#c2c9d6",
-                ColorSuccess = "#10b981",
-                ColorSuccessHover = "#0ea570",
-                ColorSuccessActive = "#0d9264",
-                ColorWarning = "#f59e0b",
-                ColorWarningHover = "#d97706",
-                ColorWarningActive = "#b45309",
-                ColorDanger = "#ef4444",
-                ColorDangerHover = "#dc2626",
-                ColorDangerActive = "#b91c1c",
-                ColorInfo = "#3b82f6",
-                ColorInfoHover = "#2563eb",
-                ColorInfoActive = "#1d4ed8",
-                ColorTextPrimary = "#111827",
-                ColorTextSecondary = "#4b5563",
-                ColorTextTertiary = "#9ca3af",
-                ColorTextInverse = "#ffffff",
-                ColorBgPrimary = "#ffffff",
-                ColorBgSecondary = "#f9fafb",
-                ColorBgTertiary = "#f3f4f6",
-                ColorBgInverse = "#111827",
-                ColorBorderPrimary = "#e5e7eb",
-                ColorBorderSecondary = "#d1d5db",
-                ColorBorderTertiary = "#9ca3af",
-                ColorOverlay = "rgba(0, 0, 0, 0.5)",
-                // 阴影变量
-                ShadowSm = "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
-                ShadowBase = "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)",
-                ShadowMd = "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-                ShadowLg = "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                ShadowXl = "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-                Shadow2Xl = "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                // 圆角变量
-                RadiusXs = "0.125rem",
-                RadiusSm = "0.25rem",
-                RadiusMd = "0.375rem",
-                RadiusLg = "0.5rem",
-                RadiusXl = "0.75rem",
-                Radius2Xl = "1rem",
-                Radius3Xl = "1.5rem",
-                RadiusFull = "9999px",
-                // 间距变量
-                SpacingXs = "0.25rem",
-                SpacingSm = "0.5rem",
-                SpacingMd = "0.75rem",
-                SpacingLg = "1rem",
-                SpacingXl = "1.5rem",
-                Spacing2Xl = "2rem",
-                Spacing3Xl = "2.5rem",
-                // 其他属性
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
-            };
-            
-            themes.Add(lightTheme);
-            
-            return themes;
+            return
+            [
+                new Theme
+                {
+                    Id = "light_default",
+                    Name = "Modern Light",
+                    Description = "Clean, minimal light theme",
+                    IsDefault = true,
+                    IsBuiltIn = true,
+                    IsDarkMode = false,
+                },
+                new Theme
+                {
+                    Id = "dark_default",
+                    Name = "Modern Dark",
+                    Description = "Clean, minimal dark theme",
+                    IsDefault = false,
+                    IsBuiltIn = true,
+                    IsDarkMode = true,
+                    Surface0 = "#0d0d0d",
+                    Surface1 = "#1a1a1a",
+                    Surface2 = "#242424",
+                    Surface3 = "#1f1f1f",
+                    Text0 = "#ecedee",
+                    Text1 = "#9ba1a6",
+                    Text2 = "#6b7280",
+                    Border0 = "#2e2e2e",
+                    Border1 = "#242424",
+                    Accent = "#6c74e0",
+                    AccentHover = "#7c83e8",
+                    AccentSoft = "#1a1b2e",
+                    Success = "#3fb950",
+                    SuccessSoft = "#122418",
+                    Warning = "#f0a020",
+                    WarningSoft = "#1f1808",
+                    Danger = "#f85149",
+                    DangerSoft = "#1f1114",
+                    Info = "#58a6ff",
+                    InfoSoft = "#0d1b2e",
+                    NodeFlow = "#60a5fa",
+                    NodeBranch = "#fbbf24",
+                    NodeLink = "#34d399",
+                    NodeFragment = "#818cf8",
+                    NodePrompt = "#c084fc",
+                    NodeTool = "#4ade80",
+                    NodeMemory = "#facc15",
+                    NodeConfig = "#f87171",
+                    NodeSubagent = "#f472b6",
+                    NodeDebug = "#94a3b8",
+                    ShadowSm = "0 1px 2px rgba(0,0,0,0.3)",
+                    ShadowMd = "0 4px 12px rgba(0,0,0,0.4)",
+                    ShadowLg = "0 12px 32px rgba(0,0,0,0.5)",
+                },
+            ];
         }
-        
-        public List<Theme> GetUserThemes()
-        {
-            return _availableThemes.Where(t => !t.IsBuiltIn).ToList();
-        }
-        
+
+        public List<Theme> GetUserThemes() =>
+            _availableThemes.Where(t => !t.IsBuiltIn).ToList();
+
         public void SetTheme(string themeId)
         {
             var theme = _availableThemes.FirstOrDefault(t => t.Id == themeId);
-            if (theme != null)
-            {
-                _currentTheme = theme;
-                SaveCurrentThemeId(themeId);
-                ApplyTheme(theme);
-                OnThemeChanged?.Invoke(theme);
-            }
+            if (theme == null) return;
+            _currentTheme = theme;
+            SaveCurrentThemeId(themeId);
+            ApplyTheme(theme);
+            OnThemeChanged?.Invoke(theme);
         }
-        
+
         public void ApplyTheme(Theme theme)
         {
             try
             {
-                // 构建CSS变量字符串
-                var cssVariables = BuildCssVariables(theme);
-                
-                // 通过JavaScript应用主题
-                var jsCode = $@"
-                    // 清除之前的主题类
-                    document.documentElement.className = document.documentElement.className
-                        .replace(/\b\w*-theme\b/g, '');
-                    
-                    // 添加当前主题类
-                    document.documentElement.classList.add('{theme.Id.Replace(" ", "-").ToLower()}-theme');
-                    
-                    // 设置CSS变量
+                var cssVars = BuildCssVariables(theme);
+                var js = $@"
                     const root = document.documentElement;
-                    {cssVariables}
+                    root.setAttribute('data-theme', '{(theme.IsDarkMode ? "dark" : "light")}');
+                    {cssVars}
                 ";
-                
-                _jsRuntime.InvokeVoidAsync("eval", jsCode);
+                _jsRuntime.InvokeVoidAsync("eval", js);
             }
-            catch (Exception ex)
-            {
-                // 忽略应用主题错误
-            }
+            catch { }
         }
-        
-        private string BuildCssVariables(Theme theme)
+
+        private static string BuildCssVariables(Theme t)
         {
             var sb = new System.Text.StringBuilder();
-            
-            // 添加颜色变量
-            sb.AppendLine($"root.style.setProperty('--color-primary', '{theme.ColorPrimary}');");
-            sb.AppendLine($"root.style.setProperty('--color-primary-hover', '{theme.ColorPrimaryHover}');");
-            sb.AppendLine($"root.style.setProperty('--color-primary-active', '{theme.ColorPrimaryActive}');");
-            sb.AppendLine($"root.style.setProperty('--color-secondary', '{theme.ColorSecondary}');");
-            sb.AppendLine($"root.style.setProperty('--color-secondary-hover', '{theme.ColorSecondaryHover}');");
-            sb.AppendLine($"root.style.setProperty('--color-secondary-active', '{theme.ColorSecondaryActive}');");
-            sb.AppendLine($"root.style.setProperty('--color-success', '{theme.ColorSuccess}');");
-            sb.AppendLine($"root.style.setProperty('--color-success-hover', '{theme.ColorSuccessHover}');");
-            sb.AppendLine($"root.style.setProperty('--color-success-active', '{theme.ColorSuccessActive}');");
-            sb.AppendLine($"root.style.setProperty('--color-warning', '{theme.ColorWarning}');");
-            sb.AppendLine($"root.style.setProperty('--color-warning-hover', '{theme.ColorWarningHover}');");
-            sb.AppendLine($"root.style.setProperty('--color-warning-active', '{theme.ColorWarningActive}');");
-            sb.AppendLine($"root.style.setProperty('--color-danger', '{theme.ColorDanger}');");
-            sb.AppendLine($"root.style.setProperty('--color-danger-hover', '{theme.ColorDangerHover}');");
-            sb.AppendLine($"root.style.setProperty('--color-danger-active', '{theme.ColorDangerActive}');");
-            sb.AppendLine($"root.style.setProperty('--color-info', '{theme.ColorInfo}');");
-            sb.AppendLine($"root.style.setProperty('--color-info-hover', '{theme.ColorInfoHover}');");
-            sb.AppendLine($"root.style.setProperty('--color-info-active', '{theme.ColorInfoActive}');");
-            sb.AppendLine($"root.style.setProperty('--color-text-primary', '{theme.ColorTextPrimary}');");
-            sb.AppendLine($"root.style.setProperty('--color-text-secondary', '{theme.ColorTextSecondary}');");
-            sb.AppendLine($"root.style.setProperty('--color-text-tertiary', '{theme.ColorTextTertiary}');");
-            sb.AppendLine($"root.style.setProperty('--color-text-inverse', '{theme.ColorTextInverse}');");
-            sb.AppendLine($"root.style.setProperty('--color-bg-primary', '{theme.ColorBgPrimary}');");
-            sb.AppendLine($"root.style.setProperty('--color-bg-secondary', '{theme.ColorBgSecondary}');");
-            sb.AppendLine($"root.style.setProperty('--color-bg-tertiary', '{theme.ColorBgTertiary}');");
-            sb.AppendLine($"root.style.setProperty('--color-bg-inverse', '{theme.ColorBgInverse}');");
-            sb.AppendLine($"root.style.setProperty('--color-border-primary', '{theme.ColorBorderPrimary}');");
-            sb.AppendLine($"root.style.setProperty('--color-border-secondary', '{theme.ColorBorderSecondary}');");
-            sb.AppendLine($"root.style.setProperty('--color-border-tertiary', '{theme.ColorBorderTertiary}');");
-            sb.AppendLine($"root.style.setProperty('--color-overlay', '{theme.ColorOverlay}');");
-            
-            // 添加阴影变量
-            sb.AppendLine($"root.style.setProperty('--shadow-sm', '{theme.ShadowSm}');");
-            sb.AppendLine($"root.style.setProperty('--shadow-base', '{theme.ShadowBase}');");
-            sb.AppendLine($"root.style.setProperty('--shadow-md', '{theme.ShadowMd}');");
-            sb.AppendLine($"root.style.setProperty('--shadow-lg', '{theme.ShadowLg}');");
-            sb.AppendLine($"root.style.setProperty('--shadow-xl', '{theme.ShadowXl}');");
-            sb.AppendLine($"root.style.setProperty('--shadow-2xl', '{theme.Shadow2Xl}');");
-            
-            // 添加圆角变量
-            sb.AppendLine($"root.style.setProperty('--radius-xs', '{theme.RadiusXs}');");
-            sb.AppendLine($"root.style.setProperty('--radius-sm', '{theme.RadiusSm}');");
-            sb.AppendLine($"root.style.setProperty('--radius-md', '{theme.RadiusMd}');");
-            sb.AppendLine($"root.style.setProperty('--radius-lg', '{theme.RadiusLg}');");
-            sb.AppendLine($"root.style.setProperty('--radius-xl', '{theme.RadiusXl}');");
-            sb.AppendLine($"root.style.setProperty('--radius-2xl', '{theme.Radius2Xl}');");
-            sb.AppendLine($"root.style.setProperty('--radius-3xl', '{theme.Radius3Xl}');");
-            sb.AppendLine($"root.style.setProperty('--radius-full', '{theme.RadiusFull}');");
-            
-            // 添加间距变量
-            sb.AppendLine($"root.style.setProperty('--spacing-xs', '{theme.SpacingXs}');");
-            sb.AppendLine($"root.style.setProperty('--spacing-sm', '{theme.SpacingSm}');");
-            sb.AppendLine($"root.style.setProperty('--spacing-md', '{theme.SpacingMd}');");
-            sb.AppendLine($"root.style.setProperty('--spacing-lg', '{theme.SpacingLg}');");
-            sb.AppendLine($"root.style.setProperty('--spacing-xl', '{theme.SpacingXl}');");
-            sb.AppendLine($"root.style.setProperty('--spacing-2xl', '{theme.Spacing2Xl}');");
-            sb.AppendLine($"root.style.setProperty('--spacing-3xl', '{theme.Spacing3Xl}');");
-            
+
+            void Set(string name, string value) =>
+                sb.AppendLine($"root.style.setProperty('{name}', '{value}');");
+
+            // Surface
+            Set("--su-surface-0", t.Surface0);
+            Set("--su-surface-1", t.Surface1);
+            Set("--su-surface-2", t.Surface2);
+            Set("--su-surface-3", t.Surface3);
+
+            // Text
+            Set("--su-text-0", t.Text0);
+            Set("--su-text-1", t.Text1);
+            Set("--su-text-2", t.Text2);
+
+            // Border
+            Set("--su-border-0", t.Border0);
+            Set("--su-border-1", t.Border1);
+
+            // Accent
+            Set("--su-accent", t.Accent);
+            Set("--su-accent-hover", t.AccentHover);
+            Set("--su-accent-soft", t.AccentSoft);
+
+            // Semantic
+            Set("--su-success", t.Success);
+            Set("--su-success-soft", t.SuccessSoft);
+            Set("--su-warning", t.Warning);
+            Set("--su-warning-soft", t.WarningSoft);
+            Set("--su-danger", t.Danger);
+            Set("--su-danger-soft", t.DangerSoft);
+            Set("--su-info", t.Info);
+            Set("--su-info-soft", t.InfoSoft);
+
+            // Node colors
+            Set("--node-flow", t.NodeFlow);
+            Set("--node-branch", t.NodeBranch);
+            Set("--node-link", t.NodeLink);
+            Set("--node-fragment", t.NodeFragment);
+            Set("--node-prompt", t.NodePrompt);
+            Set("--node-tool", t.NodeTool);
+            Set("--node-memory", t.NodeMemory);
+            Set("--node-config", t.NodeConfig);
+            Set("--node-subagent", t.NodeSubagent);
+            Set("--node-debug", t.NodeDebug);
+
+            // Shadows
+            Set("--su-shadow-sm", t.ShadowSm);
+            Set("--su-shadow-md", t.ShadowMd);
+            Set("--su-shadow-lg", t.ShadowLg);
+
+            // Radii
+            Set("--su-radius-sm", t.RadiusSm);
+            Set("--su-radius-md", t.RadiusMd);
+            Set("--su-radius-lg", t.RadiusLg);
+
+            // Spacing
+            Set("--su-space-1", t.Space1);
+            Set("--su-space-2", t.Space2);
+            Set("--su-space-3", t.Space3);
+            Set("--su-space-4", t.Space4);
+            Set("--su-space-5", t.Space5);
+            Set("--su-space-6", t.Space6);
+            Set("--su-space-8", t.Space8);
+            Set("--su-space-10", t.Space10);
+
+            // Typography
+            Set("--su-font-sans", t.FontSans);
+            Set("--su-font-mono", t.FontMono);
+            Set("--su-font-xs", t.FontXs);
+            Set("--su-font-sm", t.FontSm);
+            Set("--su-font-base", t.FontBase);
+            Set("--su-font-md", t.FontMd);
+            Set("--su-font-lg", t.FontLg);
+
+            // Misc
+            Set("--su-border-size", t.BorderSize);
+            Set("--su-transition", t.Transition);
+
             return sb.ToString();
         }
-        
+
+        // ── CRUD ────────────────────────────────────────────
+
         public void CreateTheme(Theme theme)
         {
             if (_availableThemes.Any(t => t.Id == theme.Id))
-            {
-                throw new InvalidOperationException($"Theme with ID '{theme.Id}' already exists.");
-            }
-            
-            theme.CreatedAt = DateTime.Now;
-            theme.UpdatedAt = DateTime.Now;
-            
+                throw new InvalidOperationException($"Theme '{theme.Id}' already exists.");
+            theme.CreatedAt = DateTime.UtcNow;
+            theme.UpdatedAt = DateTime.UtcNow;
             _availableThemes.Add(theme);
             SaveAllThemes();
         }
-        
+
         public void UpdateTheme(Theme theme)
         {
-            var existingIndex = _availableThemes.FindIndex(t => t.Id == theme.Id);
-            if (existingIndex >= 0)
-            {
-                theme.UpdatedAt = DateTime.Now;
-                _availableThemes[existingIndex] = theme;
-                
-                _currentTheme = theme;
-                ApplyTheme(theme);
-
-                SaveAllThemes();
-            }
+            var idx = _availableThemes.FindIndex(t => t.Id == theme.Id);
+            if (idx < 0) return;
+            theme.UpdatedAt = DateTime.UtcNow;
+            _availableThemes[idx] = theme;
+            _currentTheme = theme;
+            ApplyTheme(theme);
+            SaveAllThemes();
         }
-        
+
         public void DeleteTheme(string themeId)
         {
             var theme = _availableThemes.FirstOrDefault(t => t.Id == themeId);
-            if (theme != null && !theme.IsBuiltIn)
+            if (theme == null || theme.IsBuiltIn) return;
+            _availableThemes.Remove(theme);
+            if (_currentTheme.Id == themeId)
             {
-                _availableThemes.Remove(theme);
-                
-                // 如果删除的是当前主题，则切换到默认主题
-                if (_currentTheme.Id == themeId)
-                {
-                    var newTheme = _availableThemes.FirstOrDefault(t => t.IsDefault) ?? _availableThemes.FirstOrDefault() ?? GetBuiltInThemes().First();
-                    SetTheme(newTheme.Id);
-                }
-                
-                SaveAllThemes();
+                var fallback = _availableThemes.FirstOrDefault(t => t.IsDefault) ?? _availableThemes.FirstOrDefault() ?? GetBuiltInThemes().First();
+                SetTheme(fallback.Id);
             }
+            SaveAllThemes();
         }
-        
+
         public string ExportTheme(string themeId)
         {
-            var theme = _availableThemes.FirstOrDefault(t => t.Id == themeId);
-            if (theme == null)
-            {
-                throw new ArgumentException($"Theme with ID '{themeId}' not found.");
-            }
-            
-            return System.Text.Json.JsonSerializer.Serialize(theme, new System.Text.Json.JsonSerializerOptions 
-            { 
-                WriteIndented = true 
-            });
+            var theme = _availableThemes.FirstOrDefault(t => t.Id == themeId)
+                ?? throw new ArgumentException($"Theme '{themeId}' not found.");
+            return System.Text.Json.JsonSerializer.Serialize(theme, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         }
-        
+
         public void ImportTheme(string themeJson)
         {
-            try
-            {
-                var theme = System.Text.Json.JsonSerializer.Deserialize<Theme>(themeJson, new System.Text.Json.JsonSerializerOptions());
-                if (theme != null)
-                {
-                    // 生成新的ID以避免冲突
-                    theme.Id = Guid.NewGuid().ToString();
-                    theme.IsBuiltIn = false;
-                    theme.IsDefault = false;
-                    theme.CreatedAt = DateTime.Now;
-                    theme.UpdatedAt = DateTime.Now;
-                    
-                    _availableThemes.Add(theme);
-                    SaveAllThemes();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new ArgumentException("Invalid theme JSON format.", ex);
-            }
+            var theme = System.Text.Json.JsonSerializer.Deserialize<Theme>(themeJson);
+            if (theme == null) return;
+            theme.Id = Guid.NewGuid().ToString();
+            theme.IsBuiltIn = false;
+            theme.IsDefault = false;
+            theme.CreatedAt = DateTime.UtcNow;
+            theme.UpdatedAt = DateTime.UtcNow;
+            _availableThemes.Add(theme);
+            SaveAllThemes();
         }
-        
+
+        // ── Persistence ─────────────────────────────────────
+
         private void LoadAllThemes()
         {
             try
             {
-                var themesJson = _kvDataService.Read(THEMES_STORAGE_KEY, THEMES_STORAGE_KEY);
-                if (!string.IsNullOrEmpty(themesJson))
+                var json = _kvDataService.Read(THEMES_STORAGE_KEY, THEMES_STORAGE_KEY);
+                if (!string.IsNullOrEmpty(json))
                 {
-                    var savedThemes = System.Text.Json.JsonSerializer.Deserialize<List<Theme>>(themesJson, new System.Text.Json.JsonSerializerOptions());
-                    if (savedThemes != null)
-                    {
-                        _availableThemes = savedThemes;
-                    }
+                    var saved = System.Text.Json.JsonSerializer.Deserialize<List<Theme>>(json);
+                    if (saved != null) _availableThemes = saved;
                 }
             }
-            catch (Exception ex)
-            {
-                // 如果加载失败，使用内置主题
+            catch { _availableThemes = GetBuiltInThemes(); }
+            if (_availableThemes.Count == 0)
                 _availableThemes = GetBuiltInThemes();
-            }
-            
-            // 确保至少有一个内置主题
-            if (!_availableThemes.Any())
-            {
-                _availableThemes = GetBuiltInThemes();
-            }
         }
-        
+
         private void SaveAllThemes()
         {
             try
             {
-                var themesJson = System.Text.Json.JsonSerializer.Serialize(_availableThemes, new System.Text.Json.JsonSerializerOptions());
-                _kvDataService.Write(THEMES_STORAGE_KEY, THEMES_STORAGE_KEY, themesJson);
+                var json = System.Text.Json.JsonSerializer.Serialize(_availableThemes);
+                _kvDataService.Write(THEMES_STORAGE_KEY, THEMES_STORAGE_KEY, json);
             }
-            catch (Exception ex)
-            {
-                // 忽略存储错误
-            }
+            catch { }
         }
-        
+
         private void SaveCurrentThemeId(string themeId)
         {
-            try
-            {
-                _kvDataService.Write(THEME_STORAGE_KEY, THEME_STORAGE_KEY, themeId);
-            }
-            catch (Exception ex)
-            {
-                // 忽略存储错误
-            }
+            try { _kvDataService.Write(THEME_STORAGE_KEY, THEME_STORAGE_KEY, themeId); }
+            catch { }
         }
     }
 }

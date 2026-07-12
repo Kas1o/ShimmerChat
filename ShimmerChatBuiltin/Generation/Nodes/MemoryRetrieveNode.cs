@@ -10,7 +10,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// <summary>
     /// Qdrant 记忆检索注入节点：基于最近的 N 条消息检索相关记忆并注入到上下文
     /// </summary>
-    [NodeInfo("node.memory_retrieve", Icon = "🔍", Color = "#e0c060", CategoryKeys = ["category.content", "category.memory_node"])]
+    [NodeInfo("node.memory_retrieve", Icon = "🔍", Color = "var(--node-memory)", CategoryKeys = ["category.content", "category.memory_node"])]
     public class MemoryRetrieveNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

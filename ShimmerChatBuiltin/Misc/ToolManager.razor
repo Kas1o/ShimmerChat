@@ -19,7 +19,7 @@ else
     <div class="shimmer-group" style="margin-top:16px;">
         <h5>Tool Preset</h5>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
-            <select class="form-select" style="max-width:240px;"
+            <select class="su-select" style="max-width:240px;"
                     @bind="_selectedPresetId" @bind:after="OnPresetChanged">
                 <option value="">-- New preset --</option>
                 @foreach (var p in _presets)
@@ -27,7 +27,7 @@ else
                     <option value="@p.Id">@p.Name@(p.IsDefault ? " (default)" : "")</option>
                 }
             </select>
-            <input class="form-control" style="max-width:180px;" placeholder="Preset name"
+            <input class="su-input" style="max-width:180px;" placeholder="Preset name"
                    @bind="_editName" @bind:event="oninput"
                    disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
             <label style="display:flex;align-items:center;gap:4px;font-size:0.85em;white-space:nowrap;cursor:pointer;">
@@ -36,21 +36,21 @@ else
                        disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
                 Default
             </label>
-            <button class="btn btn-primary btn-sm" @onclick="SavePreset"
+            <button class="su-btn su-btn-primary su-btn-sm" @onclick="SavePreset"
                     disabled="@(string.IsNullOrEmpty(_editName) || string.IsNullOrEmpty(_selectedPresetId))">
                 Save
             </button>
-            <button class="btn btn-outline-primary btn-sm" @onclick="OpenSaveAsDialog">
+            <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="OpenSaveAsDialog">
                 Save As
             </button>
-            <button class="btn btn-outline-danger btn-sm" @onclick="DeletePreset"
+            <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="DeletePreset"
                     disabled="@(string.IsNullOrEmpty(_selectedPresetId))">
                 Delete
             </button>
         </div>
         @if (!string.IsNullOrEmpty(_status))
         {
-            <div class="alert @(_status.Contains("Error") ? "alert-danger" : "alert-success")" style="padding:4px 8px;font-size:0.85em;">@_status</div>
+            <div class="su-alert @(_status.Contains("Error") ? "su-alert-danger" : "su-alert-success")" style="padding:4px 8px;font-size:0.85em;">@_status</div>
         }
     </div>
 
@@ -60,11 +60,11 @@ else
         <div class="tm-overlay" @onclick="CancelSaveAsDialog">
             <div class="tm-dialog" @onclick:stopPropagation="true">
                 <div class="tm-dialog-title">Save As New Preset</div>
-                <input class="form-control" style="width:100%;" placeholder="Preset name"
+                <input class="su-input" style="width:100%;" placeholder="Preset name"
                        @bind="_saveAsName" @bind:event="oninput" />
                 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="CancelSaveAsDialog">Cancel</button>
-                    <button class="btn btn-primary btn-sm" @onclick="ConfirmSaveAs"
+                    <button class="su-btn su-btn-outline su-btn-sm" @onclick="CancelSaveAsDialog">Cancel</button>
+                    <button class="su-btn su-btn-primary su-btn-sm" @onclick="ConfirmSaveAs"
                             disabled="@(string.IsNullOrEmpty(_saveAsName))">
                         Save
                     </button>
@@ -75,7 +75,7 @@ else
 
     <div class="shimmer-group" style="margin-top:16px;">
         <h5>Available Tools</h5>
-        <p class="text-muted" style="font-size:0.85em;">Enable tools here, then use <strong>Tool Preset</strong> node in Generation Manager to load them.</p>
+        <p class="su-text-2" style="font-size:0.85em;">Enable tools here, then use <strong>Tool Preset</strong> node in Generation Manager to load them.</p>
 
         @foreach (var group in _groupedTools)
         {

@@ -1,28 +1,28 @@
 ::deep .shimmer-nav-item {
     display: block;
     padding: 12px 16px;
-    border-radius: var(--radius-md);
+    border-radius: var(--su-radius-md);
     margin: 4px 8px;
-    transition: var(--transition);
+    transition: var(--su-transition);
     font-weight: 500;
     text-decoration: none;
-    color: var(--color-text-secondary);
+    color: var(--su-text-1);
     background-color: transparent;
     border: none;
     width: calc(100% - 16px);
 }
 
 ::deep .shimmer-nav-item:hover {
-    background-color: var(--color-surface);
-    color: var(--color-primary);
+    background-color: var(--su-surface-1);
+    color: var(--su-accent);
     transform: translateX(4px);
 }
 
 ::deep .shimmer-nav-item.active {
-    background-color: var(--color-primary-light);
-    color: var(--color-primary);
+    background-color: var(--su-accent-soft);
+    color: var(--su-accent);
     font-weight: 600;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--su-shadow-sm);
 }
 
 .nav-item-content {
@@ -45,7 +45,7 @@
 }
 
 .nav-badge {
-    background-color: var(--color-primary);
+    background-color: var(--su-accent);
     color: white;
     font-size: 0.8rem;
     padding: 2px 8px;

@@ -10,7 +10,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// DynPrompt 动态提示词注入节点。
     /// 从 KVData 中读取 DynPromptSet，评估触发规则，将匹配的提示词注入到 TransientEnv.Fragments。
     /// </summary>
-    [NodeInfo("node.dyn_prompt", Icon = "📝", Color = "#b080d0", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.dyn_prompt.desc")]
+    [NodeInfo("node.dyn_prompt", Icon = "📝", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.dyn_prompt.desc")]
     public class DynPromptNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

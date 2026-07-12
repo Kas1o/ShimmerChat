@@ -5,7 +5,7 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    [NodeInfo("node.sub_agent", Icon = "🤖", Color = "#e06090", CategoryKeys = ["category.flow", "category.sub_agent"])]
+    [NodeInfo("node.sub_agent", Icon = "🤖", Color = "var(--node-subagent)", CategoryKeys = ["category.flow", "category.sub_agent"])]
     public class SubAgentNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

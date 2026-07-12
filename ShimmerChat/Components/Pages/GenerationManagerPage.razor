@@ -12,9 +12,9 @@
 
 @if (_isAgentMode)
 {
-    <div class="alert alert-warning" style="margin-top:16px;">
+    <div class="su-alert su-alert-warning" style="margin-top:16px;">
         <strong>Editing private tree for agent: @_agentName</strong>
-        <button class="btn btn-sm btn-outline-secondary" style="margin-left:12px;" @onclick="BackToAgent">← Back to Agent</button>
+        <button class="su-btn su-btn-sm su-btn-outline" style="margin-left:12px;" @onclick="BackToAgent">← Back to Agent</button>
     </div>
 }
 
@@ -23,7 +23,7 @@
     <!-- Preset 管理 -->
     <div class="shimmer-group" style="margin-top:16px;">
         <h5>预设管理</h5>
-        <select @bind="_selectedPresetId" class="form-select" style="max-width: 400px;">
+        <select @bind="_selectedPresetId" class="su-select" style="max-width: 400px;">
             @foreach (var preset in _presets)
             {
                 <option value="@preset.Id">@preset.Name @(preset.Id == DefaultPresetId ? "(默认)" : "")</option>
@@ -40,15 +40,15 @@
                       style="font-size: 0.72em; color: #999; font-family: monospace; overflow: hidden; text-overflow: ellipsis; flex: 1; cursor: pointer; user-select: all; padding: 2px 4px; background: rgba(255,255,255,0.03); border-radius: 3px;">
                     @_activePreset.Id
                 </code>
-                <button class="btn btn-sm btn-outline-secondary" style="font-size: 0.65em; padding: 1px 6px;" @onclick="CopyPresetId" title="Copy ID">Copy</button>
+                <button class="su-btn su-btn-sm su-btn-outline" style="font-size: 0.65em; padding: 1px 6px;" @onclick="CopyPresetId" title="Copy ID">Copy</button>
             </div>
         }
         <div style="margin-top: 8px;">
-            <button class="btn btn-primary btn-sm" @onclick="CreateNewPreset">新建预设</button>
-            <button class="btn btn-secondary btn-sm" style="margin-left: 5px;" @onclick="StartRename"
+            <button class="su-btn su-btn-primary su-btn-sm" @onclick="CreateNewPreset">新建预设</button>
+            <button class="su-btn su-btn-secondary su-btn-sm" style="margin-left: 5px;" @onclick="StartRename"
                     disabled="@(_activePreset?.Id == DefaultPresetId)">重命名</button>
-            <button class="btn btn-secondary btn-sm" style="margin-left: 5px;" @onclick="CloneCurrentPreset">克隆</button>
-            <button class="btn btn-danger btn-sm" style="margin-left: 5px;" @onclick="DeleteCurrentPreset"
+            <button class="su-btn su-btn-secondary su-btn-sm" style="margin-left: 5px;" @onclick="CloneCurrentPreset">克隆</button>
+            <button class="su-btn su-btn-danger su-btn-sm" style="margin-left: 5px;" @onclick="DeleteCurrentPreset"
                     disabled="@(_presets.Count <= 1 || _activePreset?.Id == DefaultPresetId)">删除</button>
         </div>
     </div>
@@ -56,22 +56,20 @@
 
 @if (_showNameDialog)
 {
-    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">@_nameDialogTitle</h5>
-                    <button type="button" class="btn-close" @onclick="() => _showNameDialog = false"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="text" class="form-control" @bind="_nameInput" @bind:event="oninput"
-                           placeholder="预设名称" />
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="() => _showNameDialog = false">取消</button>
-                    <button type="button" class="btn btn-primary" @onclick="ConfirmName"
-                            disabled="@string.IsNullOrWhiteSpace(_nameInput)">确认</button>
-                </div>
+    <div class="su-modal-mask" @onclick="() => _showNameDialog = false">
+        <div class="su-modal su-modal-sm" @onclick:stopPropagation="true">
+            <div class="su-modal-header">
+                @_nameDialogTitle
+                <button class="su-btn-close" @onclick="() => _showNameDialog = false">&times;</button>
+            </div>
+            <div class="su-modal-body">
+                <input type="text" class="su-input" @bind="_nameInput" @bind:event="oninput"
+                       placeholder="预设名称" />
+            </div>
+            <div class="su-modal-footer">
+                <button class="su-btn su-btn-secondary" @onclick="() => _showNameDialog = false">取消</button>
+                <button class="su-btn su-btn-primary" @onclick="ConfirmName"
+                        disabled="@string.IsNullOrWhiteSpace(_nameInput)">确认</button>
             </div>
         </div>
     </div>
@@ -82,19 +80,19 @@
     <h4>修改器树</h4>
     @if (_isAgentMode)
     {
-        <div class="card">
-            <div class="card-body">
+        <div class="su-card">
+            <div class="su-card-body">
                 <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
             </div>
         </div>
     }
     else if (_activePreset != null)
     {
-        <div class="card">
-            <div class="card-body">
+        <div class="su-card">
+            <div class="su-card-body">
                 @if (_activePreset.Id == DefaultPresetId)
                 {
-                    <div class="alert alert-warning" style="margin-bottom: 12px;">
+                    <div class="su-alert su-alert-warning" style="margin-bottom: 12px;">
                         <strong>Default 预设为只读。</strong> 请克隆后编辑自定义预设。
                     </div>
                     <div style="pointer-events: none; opacity: 0.7;">
@@ -114,7 +112,7 @@
     }
 </div>
 
-<button class="btn btn-primary" style="margin:16px 5px;" @onclick="SaveAll"
+<button class="su-btn su-btn-primary" style="margin:16px 5px;" @onclick="SaveAll"
         disabled="@(!_isAgentMode && _activePreset?.Id == DefaultPresetId)">保存</button>
 
 @code {

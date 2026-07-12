@@ -8,17 +8,17 @@
 @implements IChatPanelEventHandler
 
 <div class="variable-panel">
-    <div class="variable-actions mb-3">
-        <div class="input-group">
-            <span class="input-group-text bi bi-plus-circle"></span>
-            <input type="text" class="form-control" placeholder="变量名" @bind="_newVariableName">
-            <select class="form-select" style="max-width: 100px;" @bind="_newVariableType">
+    <div class="variable-actions su-mb-3">
+        <div class="su-input-group">
+            <span class="su-input-group-addon bi bi-plus-circle"></span>
+            <input type="text" class="su-input" placeholder="变量名" @bind="_newVariableName">
+            <select class="su-select" style="max-width: 100px;" @bind="_newVariableType">
                 <option value="String">字符串</option>
                 <option value="Int">整数</option>
                 <option value="Float">浮点数</option>
             </select>
-            <input type="text" class="form-control" placeholder="值" @bind="_newVariableValue">
-            <button class="btn btn-primary" @onclick="AddVariable">
+            <input type="text" class="su-input" placeholder="值" @bind="_newVariableValue">
+            <button class="su-btn su-btn-primary" @onclick="AddVariable">
                 <span class="bi bi-plus"></span> 添加
             </button>
         </div>
@@ -26,7 +26,7 @@
 
     @if (_variables.Variables.Count == 0)
     {
-        <div class="alert alert-info">
+        <div class="su-alert su-alert-info">
             <span class="bi bi-info-circle"></span> 暂无 Agent 变量，点击上方按钮添加
         </div>
     }
@@ -39,12 +39,12 @@
                     <div class="variable-info" @onclick="() => ToggleVariableEdit(variable)">
                         <div class="variable-name">
                             <span class="bi bi-tag"></span> @variable.Name
-                            <span class="badge bg-secondary">@variable.Type</span>
+                            <span class="su-badge">@variable.Type</span>
                         </div>
                         <div class="variable-value">
                             @if (variable.Type == VariableType.String)
                             {
-                                <span class="text-muted">"</span>@variable.StringValue<span class="text-muted">"</span>
+                                <span class="su-text-2">"</span>@variable.StringValue<span class="su-text-2">"</span>
                             }
                             else
                             {
@@ -52,11 +52,11 @@
                             }
                         </div>
                         <div class="variable-meta">
-                            <small class="text-muted">@variable.UpdatedAt</small>
+                            <small class="su-text-2">@variable.UpdatedAt</small>
                         </div>
                     </div>
                     <div class="variable-actions-item">
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteVariable(variable)">
+                        <button class="su-btn su-btn-sm su-btn-outline-danger" @onclick="() => DeleteVariable(variable)">
                             <span class="bi bi-trash"></span>
                         </button>
                     </div>
@@ -64,24 +64,24 @@
                 @if (_editingVariable?.Name == variable.Name)
                 {
                     <div class="variable-edit">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text">值</span>
+                        <div class="su-input-group su-input-group-sm">
+                            <span class="su-input-group-addon">值</span>
                             @if (variable.Type == VariableType.String)
                             {
-                                <input type="text" class="form-control" @bind="_editValue">
+                                <input type="text" class="su-input" @bind="_editValue">
                             }
                             else if (variable.Type == VariableType.Int)
                             {
-                                <input type="number" class="form-control" @bind="_editValue">
+                                <input type="number" class="su-input" @bind="_editValue">
                             }
                             else
                             {
-                                <input type="number" class="form-control" step="0.1" @bind="_editValue">
+                                <input type="number" class="su-input" step="0.1" @bind="_editValue">
                             }
-                            <button class="btn btn-outline-success" @onclick="() => SaveVariable(variable)">
+                            <button class="su-btn su-btn-outline-success" @onclick="() => SaveVariable(variable)">
                                 <span class="bi bi-check"></span>
                             </button>
-                            <button class="btn btn-outline-secondary" @onclick="CancelEdit">
+                            <button class="su-btn su-btn-outline" @onclick="CancelEdit">
                                 <span class="bi bi-x"></span>
                             </button>
                         </div>
@@ -93,7 +93,7 @@
 
     @if (!string.IsNullOrEmpty(_message))
     {
-        <div class="alert alert-info mt-3">
+        <div class="su-alert su-alert-info su-mt-3">
             @_message
         </div>
     }

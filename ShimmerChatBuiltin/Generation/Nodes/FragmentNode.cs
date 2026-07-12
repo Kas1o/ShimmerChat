@@ -6,7 +6,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// <summary>
     /// 向 TransientEnv.Fragments 末尾追加 ContextSegment
     /// </summary>
-    [NodeInfo("node.fragment", Icon = "▤", Color = "#60b0e0", CategoryKeys = ["category.content", "category.fragment"])]
+    [NodeInfo("node.fragment", Icon = "▤", Color = "var(--node-fragment)", CategoryKeys = ["category.content", "category.fragment"])]
     public class FragmentNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

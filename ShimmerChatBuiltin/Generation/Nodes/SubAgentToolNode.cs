@@ -8,7 +8,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 将指定的 SubAgent 配置注册到共享的 SubAgentToolV2 实例中。
     /// 多个 SubAgentToolNode 共享同一个工具，每个添加一个 SubAgent。
     /// </summary>
-    [NodeInfo("node.sub_agent_tool", Icon = "🔧", Color = "#e060a0", CategoryKeys = ["category.tool", "category.sub_agent"])]
+    [NodeInfo("node.sub_agent_tool", Icon = "🔧", Color = "var(--node-subagent)", CategoryKeys = ["category.tool", "category.sub_agent"])]
     [NodeEditor(typeof(SubAgentToolNodeEditor))]
     public class SubAgentToolNode : IGenerationNode
     {

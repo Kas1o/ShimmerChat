@@ -1,28 +1,26 @@
 @using ShimmerChat.Singletons
 @using ShimmerChatLib.Interface
 
-<div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">编辑消息渲染修改器</h5>
-                <button type="button" class="btn-close" @onclick="Cancel"></button>
+<div class="su-modal-mask" @onclick="Cancel">
+    <div class="su-modal" @onclick:stopPropagation="true">
+        <div class="su-modal-header">
+            编辑消息渲染修改器
+            <button class="su-btn-close" @onclick="Cancel">&times;</button>
+        </div>
+        <div class="su-modal-body">
+            <div class="su-mb-3">
+                <label for="modifier-name" class="su-label">修改器名称</label>
+                <input id="modifier-name" type="text" class="su-input" value="@_modifierName" readonly />
             </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="modifier-name" class="form-label">修改器名称</label>
-                    <input id="modifier-name" type="text" class="form-control" value="@_modifierName" readonly />
-                </div>
-                
-                <div class="mb-3">
-                    <label for="modifier-input" class="form-label">输入值 (可选配置)</label>
-                    <textarea id="modifier-input" @bind="_modifierInput" class="form-control" rows="3" placeholder="输入配置值...">@_modifierInput</textarea>
-                </div>
+            
+            <div class="su-mb-3">
+                <label for="modifier-input" class="su-label">输入值 (可选配置)</label>
+                <textarea id="modifier-input" @bind="_modifierInput" class="su-input" rows="3" placeholder="输入配置值...">@_modifierInput</textarea>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" @onclick="Cancel">取消</button>
-                <button type="button" class="btn btn-success" @onclick="Confirm">更新</button>
-            </div>
+        </div>
+        <div class="su-modal-footer">
+            <button class="su-btn su-btn-secondary" @onclick="Cancel">取消</button>
+            <button class="su-btn su-btn-success" @onclick="Confirm">更新</button>
         </div>
     </div>
 </div>

@@ -6,14 +6,14 @@
 
 <h3>@Loc["Api Settings"]</h3>
 <h4>@Loc["ApiConfigs Profile:"]</h4>
-<select @bind="_selectedIndex" class="form-select">
+<select @bind="_selectedIndex" class="su-select">
     @for (int i = 0; i < apiSettings.Count; i++)
     {
         <option value="@i">@apiSettings[i].Name</option>
     }
 </select>
-<button class="btn btn-primary" style="margin:5px" @onclick="CreateNewApiConfig">@Loc["Create New Api Setting Profile"]</button>
-<button class="btn btn-secondary" style="margin:5px" @onclick="CloneCurrentApiConfig">@Loc["Clone Current Api Setting Profile"]</button>
+<button class="su-btn su-btn-primary" style="margin:5px" @onclick="CreateNewApiConfig">@Loc["Create New Api Setting Profile"]</button>
+<button class="su-btn su-btn-secondary" style="margin:5px" @onclick="CloneCurrentApiConfig">@Loc["Clone Current Api Setting Profile"]</button>
 
 @if (topAPISetting != null)
 {
@@ -22,7 +22,7 @@
         <h5>@Loc["Profile Name:"]</h5>
         <input @bind="topAPISetting.Name" class="shimmer-input" />
         <h5>@Loc["Api Type:"]</h5>
-        <select @bind="topAPISetting.Type" class="form-select">
+        <select @bind="topAPISetting.Type" class="su-select">
             <option value="@ApiConfigType.Kobold">kobold</option>
             <option value="@ApiConfigType.OpenAI">openai</option>
             <option value="@ApiConfigType.DeepSeek">deepseek</option>
@@ -33,7 +33,7 @@
         
         @if (topAPISetting.Type == ApiConfigType.Pseudo)
         {
-            <div class="alert alert-info" style="margin-top: 12px; padding: 12px; background-color: #e8f4fd; border: 1px solid #b6d4fe; border-radius: 4px;">
+            <div class="su-alert su-alert-info" style="margin-top: 12px; padding: 12px; background-color: #e8f4fd; border: 1px solid #b6d4fe; border-radius: 4px;">
                 <strong>@Loc["PseudoAPI Info Title"]</strong><br/>
                 @Loc["PseudoAPI Info Description"]
             </div>
@@ -41,7 +41,7 @@
         
         @if (topAPISetting.Type == ApiConfigType.OpenAIText)
         {
-            <div class="alert alert-warning" style="margin-top: 12px; padding: 12px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+            <div class="su-alert su-alert-warning" style="margin-top: 12px; padding: 12px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
                 <strong>@Loc["OpenAIText Warning Title"]</strong><br/>
                 @Loc["OpenAIText Warning Description"]
             </div>
@@ -51,26 +51,26 @@
         @if (topAPISetting.Type == ApiConfigType.Kobold || topAPISetting.Type == ApiConfigType.Ollama || topAPISetting.Type == ApiConfigType.OpenAIText)
         {
             <h5>@Loc["Text Completion Settings:"]</h5>
-            <select @bind="topAPISetting.SelectedTextCompletionSettingIndex" class="form-select">
+            <select @bind="topAPISetting.SelectedTextCompletionSettingIndex" class="su-select">
                 @for (int i = 0; i < (topAPISetting.TextCompletionSettings?.Count ?? 0); i++)
                 {
                     <option value="@i">@(topAPISetting.TextCompletionSettings?[i]?.name ?? "Unnamed")</option>
                 }
             </select>
-            <button class="btn btn-primary" style="margin:5px" @onclick="CreateNewTextCompletionSetting">@Loc["Create New Text Completion Setting Profile"]</button>
+            <button class="su-btn su-btn-primary" style="margin:5px" @onclick="CreateNewTextCompletionSetting">@Loc["Create New Text Completion Setting Profile"]</button>
             
             @if (topAPISetting.TextCompletionSettings != null && topAPISetting.SelectedTextCompletionSettingIndex >= 0 && topAPISetting.SelectedTextCompletionSettingIndex < topAPISetting.TextCompletionSettings.Count)
             {
                 var currentTextSetting = topAPISetting.TextCompletionSettings[topAPISetting.SelectedTextCompletionSettingIndex];
                 <div class="shimmer-group" style="margin-top:16px;">
                     <h5>@Loc["NAME:"]</h5>
-                    <textarea class="form-control" rows="2" @bind="currentTextSetting.name"></textarea>
+                    <textarea class="su-input" rows="2" @bind="currentTextSetting.name"></textarea>
                     <h5>@Loc["SYSTEM_MESSAGE_TEMPLATE"]</h5>
-                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.SystemMessageTemplate"></textarea>
+                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="su-input" rows="2" @bind="currentTextSetting.SystemMessageTemplate"></textarea>
                     <h5>@Loc["USER_MESSAGE_TEMPLATE"]</h5>
-                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.UserMessageTemplate"></textarea>
+                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="su-input" rows="2" @bind="currentTextSetting.UserMessageTemplate"></textarea>
                     <h5>@Loc["AGENT_MESSAGE_TEMPLATE"]</h5>
-                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="form-control" rows="2" @bind="currentTextSetting.CharMessageTemplate"></textarea>
+                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="su-input" rows="2" @bind="currentTextSetting.CharMessageTemplate"></textarea>
                 </div>
             }
         }
@@ -220,7 +220,7 @@
     </div>
 }
 <br />
-<button class="btn btn-primary" style="margin:5px" @onclick="SaveAll">@Loc["Save"]</button>
+<button class="su-btn su-btn-primary" style="margin:5px" @onclick="SaveAll">@Loc["Save"]</button>
 
 @code {
     [Inject]

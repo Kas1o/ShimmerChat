@@ -130,3 +130,10 @@ window.isScrolledToTop = function (element, threshold) {
         return true;
     }
 };
+
+// textarea 自适应高度
+window.autoResizeTextarea = function (el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+};

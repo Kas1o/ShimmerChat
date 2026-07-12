@@ -8,7 +8,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 从 SharedState["ChatMessages"] 读取对话消息列表，追加到 TransientEnv.Fragments。
     /// 替代 GenerationManagerV2 中硬编码的 AppendChatHistory，让消息注入逻辑可配置。
     /// </summary>
-    [NodeInfo("node.append_chat_messages", Icon = "💬", Color = "#60b0e0", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.append_chat_messages.desc")]
+    [NodeInfo("node.append_chat_messages", Icon = "💬", Color = "var(--node-fragment)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.append_chat_messages.desc")]
     public class AppendChatMessagesNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

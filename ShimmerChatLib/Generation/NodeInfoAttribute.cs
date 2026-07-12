@@ -10,7 +10,7 @@ namespace ShimmerChatLib.Generation
     {
         public string LabelKey { get; }
         public string Icon { get; init; } = "●";
-        public string Color { get; init; } = "#888";
+        public string Color { get; init; }
         public string[] CategoryKeys { get; init; } = ["category.general"];
         public string? DescriptionKey { get; init; }
 

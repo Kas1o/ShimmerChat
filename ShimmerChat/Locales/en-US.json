@@ -29,6 +29,9 @@
   "BUTTON_REGENERATE": "Regenerate",
   "BUTTON_CONTINUE": "Continue",
   "BUTTON_SAVE": "Save",
+  "BUTTON_DELETE_FROM_TIP": "Shift + click to delete from here onward",
+  "POPUP_DELETE_FROM_TITLE": "Delete from here",
+  "POPUP_DELETE_FROM": "Delete this message and {0} messages after it?",
   "ToolResult": "Tool Result",
 
   "API GENERATION LENGTH": "Generation Length",

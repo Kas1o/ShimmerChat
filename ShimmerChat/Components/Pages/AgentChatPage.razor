@@ -11,57 +11,64 @@
 @inject IJSRuntime JS
 @inject IKVDataService KVData
 @inject IMessageStoreService messageStore
+@inject ILocService Loc
 @inject NavigationManager navigation
 
 @if (chat != null)
 {
-	<div id="container" style="background-image: url('@($"/userimages/{agent.BackgroundGuid}.png")'); background-size: cover; background-position: center;">
-		<div id="chat-info" class="shimmer-shadow-box">
-			<label>You are having chat with: </label>
-			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.Name</h2>
+	<div class="chat-page">
+		<div class="chat-topbar">
+			<button class="chat-back" @onclick="BackToAgentPage">← @agent!.Name</button>
 		</div>
-		<div id="chat-main" @ref="ChatMainElement" @onscroll="OnChatScroll">
-			@if (virtualize)
-			{
-				<Virtualize  Items="messages" Context="message" >
-					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
-				</Virtualize>
-			}
-			else
-			{
-				@foreach(var message in messages)
+
+		<div class="chat-messages" @ref="ChatMainElement" @onscroll="OnChatScroll">
+			<div class="chat-messages-inner">
+				@if (virtualize)
 				{
-					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
+					<Virtualize Items="messages" Context="message">
+						<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" DeleteFrom="() => DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
+					</Virtualize>
 				}
-			}
-			<br />
-			<br />
+				else
+				{
+					@foreach (var message in messages)
+					{
+						<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" DeleteFrom="() => DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
+					}
+				}
+			</div>
 		</div>
+
 		@if (!isUserAtBottom)
 		{
-			<button id="scroll-to-bottom-btn" @onclick="ScrollToBottomManually">
+			<button class="chat-scroll-btn" @onclick="ScrollToBottomManually">
 				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
 					<path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
 				</svg>
 			</button>
 		}
-		<div id="input-box" class="shimmer-shadow-box">
-			<!-- 输入框内容 -->
-			<textarea value="@inputText" @oninput="OnInput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
-			<div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
-				@if (generating)
-				{
-					<button class="btn btn-danger" @onclick="OnClickStopGenerationButton">停止生成</button>
-				}
-				else
-				{
-					<button class="btn btn-primary" @onclick="OnClickSendButton">发送</button>
-				}
-			</div>
+
+		<div class="chat-input">
+			<textarea @ref="inputArea"
+				value="@inputText" @oninput="OnInputResize"
+				@onkeydown="@(e => CheckEnter(e))"
+				placeholder="Type a message...  (Enter to send)"
+				rows="1"></textarea>
+			@if (generating)
+			{
+				<button class="chat-input-stop" @onclick="OnClickStopGenerationButton">
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>
+				</button>
+			}
+			else
+			{
+				<button class="chat-input-send" @onclick="OnClickSendButton" disabled="@(string.IsNullOrWhiteSpace(inputText))">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+				</button>
+			}
 		</div>
 	</div>
 	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.Guid" ChatGuid="chat.Guid" @ref="ChatPluginPanelContainer"/>
-
 }
 
 @if(chat == null)
@@ -84,6 +91,7 @@
 	/// 指向聊天容器，用于在生成时自动滚动到底部 <see cref="AddLLMReplyStream"/> <see cref="MiscSettingsPage._autoScrollDown"/>
 	/// </summary>
 	ElementReference ChatMainElement;
+	ElementReference inputArea;
 
 	bool generating = false; // 表示当前是否在生成中
 	CancellationTokenSource? cts; // 用于取消生成任务的令牌源
@@ -107,14 +115,11 @@
 	#region 交互
 	private bool _skipNextInput;
 
-	private void OnInput(ChangeEventArgs e)
+	private async void OnInputResize(ChangeEventArgs e)
 	{
-		if (_skipNextInput)
-		{
-			_skipNextInput = false;
-			return; // 直接丢弃 keydown 后的 oninput 覆盖
-		}
+		if (_skipNextInput) { _skipNextInput = false; return; }
 		inputText = e.Value?.ToString() ?? string.Empty;
+		await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
 	}
 	async Task CheckEnter(KeyboardEventArgs e)
 	{
@@ -514,13 +519,24 @@
 	}
 	async Task DeleteMessage(Message message)
 	{
-		// 如果删除的是当前正在生成的消息，先取消生成
-		if (message.IsGenerating)
-		{
-			StopGeneration();
-		}
-
+		if (message.IsGenerating) StopGeneration();
 		chat?.DeleteMessage(messageStore, message);
+		GetDirty();
+		await Refresh();
+	}
+	async Task DeleteMessagesFrom(Message message)
+	{
+		var count = messages.Count - messages.IndexOf(message) - 1;
+		var confirmed = await popupService.ShowAsync(
+			string.Format(Loc["POPUP_DELETE_FROM"], count),
+			Loc["POPUP_DELETE_FROM_TITLE"], showCancel: true);
+		if (!confirmed) return;
+
+		if (message.IsGenerating) StopGeneration();
+		var idx = messages.IndexOf(message);
+		if (idx < 0) return;
+		for (int i = messages.Count - 1; i >= idx; i--)
+			chat?.DeleteMessage(messageStore, messages[i]);
 		GetDirty();
 		await Refresh();
 	}

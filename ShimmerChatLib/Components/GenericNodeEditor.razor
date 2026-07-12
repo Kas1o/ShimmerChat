@@ -2,6 +2,7 @@
 @using ShimmerChatLib.Generation
 @typeparam TNode where TNode : IGenerationNode
 @inject ILocService Loc
+@inject IGenerationNodeSerializer Serializer
 
 @{
     RenderFragment AddNodePicker = @<text>
@@ -267,7 +268,7 @@
                             info?.LabelKey ?? type.Name,
                             type,
                             info?.Icon ?? "●",
-                            info?.Color ?? "#888",
+                            info?.Color ?? "var(--node-debug)",
                             info?.DescriptionKey,
                             info?.CategoryKeys is { Length: > 0 } cats ? string.Join("/", cats) : "category.general"
                         ));
@@ -376,13 +377,13 @@
 
     private void CopyNode(IGenerationNode node)
     {
-        NodeClipboard.Copy(node);
+        NodeClipboard.Copy(Serializer, node);
         OnTreeChanged.InvokeAsync();
     }
 
     private void PasteNode()
     {
-        var node = NodeClipboard.Paste();
+        var node = NodeClipboard.Paste(Serializer);
         if (node != null)
         {
             _childNodes.Add(node);
@@ -400,7 +401,7 @@
 
     private void PasteToSlot(PropInfo prop)
     {
-        var node = NodeClipboard.Paste();
+        var node = NodeClipboard.Paste(Serializer);
         if (node != null)
         {
             prop.SetValue(Node, node);

@@ -6,7 +6,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// <summary>
     /// 从 KVData 中加载工具预设。PresetName 为空时使用 IsDefault 预设，否则按名称匹配。
     /// </summary>
-    [NodeInfo("node.tool_preset", Icon = "📦", Color = "#40c0a0", CategoryKeys = ["category.tool", "category.preset"], DescriptionKey = "node.tool_preset.desc")]
+    [NodeInfo("node.tool_preset", Icon = "📦", Color = "var(--node-link)", CategoryKeys = ["category.tool", "category.preset"], DescriptionKey = "node.tool_preset.desc")]
     public class ToolPresetNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

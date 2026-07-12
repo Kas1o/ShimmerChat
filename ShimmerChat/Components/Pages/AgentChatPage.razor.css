@@ -1,159 +1,95 @@
+/* ── Chat Page Layout ──────────────────────────── */
+.chat-page {
+    display: flex; flex-direction: column;
+    height: 100%; overflow: hidden;
+    background: var(--su-surface-0);
+    position: relative;
+}
 
+/* ── Top bar ──────────────────────────────────── */
+.chat-topbar {
+    display: flex; align-items: center;
+    padding: 0 var(--su-space-4);
+    height: 48px; flex-shrink: 0;
+    border-bottom: var(--su-border-size) solid var(--su-border-0);
+    background: var(--su-surface-1);
+}
+.chat-back {
+    display: flex; align-items: center; gap: var(--su-space-2);
+    border: none; background: none;
+    font-family: var(--su-font-sans); font-size: var(--su-font-md); font-weight: 500;
+    color: var(--su-text-0); cursor: pointer;
+    padding: var(--su-space-1) var(--su-space-2);
+    border-radius: var(--su-radius-sm);
+    transition: background var(--su-transition);
+}
+.chat-back:hover { background: var(--su-surface-3); }
 
-		/* 父级容器 */
-		#container {
-			position: relative;
-			height: 100%;
-			display: flex;
-			flex-direction: column;
-			}
+/* ── Messages area ────────────────────────────── */
+.chat-messages {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    scroll-behavior: smooth;
+}
+.chat-messages-inner {
+    max-width: 768px; margin: 0 auto;
+    padding: var(--su-space-6) var(--su-space-4) var(--su-space-4);
+    display: flex; flex-direction: column;
+}
 
-		/* 聊天信息栏 */
-		#chat-info {
-		position: absolute; /* 固定在父级容器的左上角 */
-		top: 0;
-		left: 0;
-		padding: 10px;
-		z-index: 100;
-		width: 100%;
-		}
+/* ── Scroll-to-bottom button ──────────────────── */
+.chat-scroll-btn {
+    position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+    z-index: 50;
+    width: 36px; height: 36px; border-radius: 50%;
+    border: var(--su-border-size) solid var(--su-border-0);
+    background: var(--su-surface-1);
+    color: var(--su-text-1); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--su-shadow-md);
+    transition: background var(--su-transition), color var(--su-transition);
+}
+.chat-scroll-btn:hover { background: var(--su-surface-3); color: var(--su-text-0); }
 
-		/* 聊天主区域 */
-		#chat-main {
-		flex: 1; /* 占据剩余空间 */
-		overflow-y: auto; /* 允许垂直滚动 */
-		padding: 20px;
-		margin-top: 80px; /* 为 #chat-info 预留空间 */
-		margin-bottom: 100px; /* 为 #input-box 预留空间 */
-		box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-		}
+/* ── Input area ───────────────────────────────── */
+.chat-input {
+    flex-shrink: 0; width: 100%; max-width: 768px; margin: 0 auto;
+    padding: var(--su-space-4) var(--su-space-4) var(--su-space-6);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: var(--su-space-2);
+}
+.chat-input textarea {
+    padding: var(--su-space-3) var(--su-space-4);
+    font-family: var(--su-font-sans); font-size: var(--su-font-base);
+    color: var(--su-text-0);
+    background: var(--su-surface-1);
+    border: var(--su-border-size) solid var(--su-border-0);
+    border-radius: var(--su-radius-lg);
+    resize: none; outline: none;
+    line-height: 1.5; overflow-y: auto;
+    box-shadow: var(--su-shadow-sm);
+    transition: border-color var(--su-transition), box-shadow var(--su-transition);
+}
+.chat-input textarea:focus {
+    border-color: var(--su-accent);
+    box-shadow: 0 0 0 3px var(--su-accent-soft);
+}
+.chat-input textarea::placeholder { color: var(--su-text-2); }
 
-		/* 输入框 */
-		#input-box {
-		position: absolute; /* 固定在父级容器的左下角 */
-		bottom: 0;
-		left: 0;
-		width: 100%;
-		padding: 15px;
-		z-index: 100;
-		box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-		}
-
-		/* 回到底部按钮 */
-		#scroll-to-bottom-btn {
-			position: absolute;
-			bottom: 120px;
-			left: 50%;
-			transform: translateX(-50%);
-			z-index: 200;
-			width: 40px;
-			height: 40px;
-			border-radius: 50%;
-			border: none;
-			background-color: var(--color-primary);
-			color: var(--color-text-on-primary);
-			cursor: pointer;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			box-shadow: var(--shadow-md);
-			transition: var(--transition);
-		}
-
-		#scroll-to-bottom-btn:hover {
-			background-color: var(--color-primary-dark);
-			box-shadow: var(--shadow-lg);
-		}
-
-		#input-box > textarea{
-			width : 100%;
-			border : none;
-			resize: none;
-			border-radius: 15px;
-			padding: 5px;
-		}
-
-		/* 打字指示器动画 */
-		.shimmer-typing-indicator {
-			display: inline-block;
-			animation: blink 1s infinite;
-			font-weight: bold;
-			font-size: 1.2em;
-		}
-
-		@keyframes blink {
-			0%, 50% { opacity: 1; }
-			51%, 100% { opacity: 0; }
-		}
-
-		.shimmer-message {
-			padding: 16px;
-			border-radius: var(--radius-lg);
-			margin: 8px 0;
-			max-width: 100%;
-			word-break: break-word;
-			background-color: var(--color-card);
-			border: 1px solid var(--color-border);
-			box-shadow: var(--shadow-sm);
-			transition: var(--transition);
-		}
-
-				.shimmer-message:hover {
-					box-shadow: var(--shadow-md);
-				}
-
-		/* 消息头部 */
-		.shimmer-message-head {
-			font-size: 1.2rem;
-			font-weight: 600;
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			margin-bottom: 12px;
-			color: var(--color-text-primary);
-		}
-
-		/* 消息操作按钮 */
-		.shimmer-message-head-action {
-			font-size: 1rem;
-			display: flex;
-			gap: 12px;
-			cursor: pointer;
-			user-select: none;
-		}
-
-				.shimmer-message-head-action button {
-					background: none;
-					border: none;
-					color: var(--color-text-secondary);
-					cursor: pointer;
-					padding: 4px 8px;
-					border-radius: var(--radius-md);
-					transition: var(--transition);
-				}
-
-						.shimmer-message-head-action button:hover {
-						background-color: var(--color-surface);
-						color: var(--color-primary);
-					}
-
-		/* 思考中消息样式 */
-		.shimmer-message-thinking {
-			backdrop-filter: blur(10px);
-			background-color: var(--color-primary-light);
-			border-radius: var(--radius-lg);
-			padding: 20px;
-			border: 1px solid var(--color-primary-light);
-			color: var(--color-text-primary);
-		}
-
-		/* 工具调用样式 */
-		.shimmer-toolcall {
-			backdrop-filter: blur(10px);
-			background-color: var(--color-surface);
-			border: 1px solid var(--color-border);
-			border-radius: var(--radius-lg);
-			padding: 20px;
-			margin: 12px 0;
-			box-shadow: var(--shadow-sm);
-		}
+.chat-input-send, .chat-input-stop {
+    width: 38px; height: 38px; flex-shrink: 0;
+    border: none; border-radius: 50%;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background var(--su-transition), transform var(--su-transition);
+}
+.chat-input-send {
+    background: var(--su-accent); color: #fff;
+}
+.chat-input-send:hover:not(:disabled) { background: var(--su-accent-hover); transform: scale(1.05); }
+.chat-input-send:disabled { opacity: 0.35; cursor: not-allowed; }
+.chat-input-stop {
+    background: var(--su-danger); color: #fff;
+}
+.chat-input-stop:hover { opacity: 0.9; }

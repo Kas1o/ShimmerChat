@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShimmerUI Demo — 画布节点流</title>
+<style>
+/* ============================================================
+   Canvas Flow — ComfyUI / Node-RED / Houdini inspired
+   Core idea: node trees are spatial graphs, not lists
+   ============================================================ */
+
+:root {
+  --c-bg: #1a1a1f;
+  --c-canvas: #141418;
+  --c-surface: #222228;
+  --c-surface-hover: #2a2a32;
+  --c-text: #d4d4d8;
+  --c-text-secondary: #8e8e98;
+  --c-border: #2e2e36;
+  --c-accent: #7c8aff;
+  --c-grid: rgba(255,255,255,0.03);
+
+  --node-flow: #5b8def;
+  --node-branch: #f0a542;
+  --node-link: #3ecf8e;
+  --node-fragment: #7c8aff;
+  --node-prompt: #b98aff;
+  --node-tool: #43d675;
+  --node-memory: #f2c94c;
+  --node-config: #f05b5b;
+  --node-subagent: #f06292;
+  --node-debug: #71757a;
+
+  --font: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  --font-size: 11px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  font-size: var(--font-size);
+  color: var(--c-text);
+  background: var(--c-bg);
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ============================================================
+   App Shell — Full viewport, no chrome
+   ============================================================ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ---- Top bar — minimal ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+  z-index: 10;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--c-text-secondary);
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.topbar-agent { color: var(--c-accent); font-weight: 700; }
+.topbar-center { display: flex; align-items: center; gap: 6px; }
+.topbar-right { display: flex; align-items: center; gap: 6px; }
+
+.topbar-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--c-border);
+  border-radius: 3px;
+  background: var(--c-canvas);
+  color: var(--c-text-secondary);
+  font-family: var(--font);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 100ms;
+}
+.topbar-btn:hover { background: var(--c-surface-hover); color: var(--c-text); }
+.topbar-btn.accent { background: var(--c-accent); color: #000; border-color: var(--c-accent); }
+
+/* ---- Canvas area ---- */
+.canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(var(--c-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--c-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-color: var(--c-canvas);
+}
+
+.canvas-inner {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+/* ---- SVG connection layer ---- */
+.connections {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.connections path {
+  fill: none;
+  stroke: var(--c-border);
+  stroke-width: 1.5;
+}
+
+/* ---- Node cards on canvas ---- */
+.node {
+  position: absolute;
+  min-width: 180px;
+  max-width: 260px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  z-index: 1;
+  transition: border-color 120ms, box-shadow 120ms;
+  cursor: grab;
+  user-select: none;
+}
+
+.node:hover {
+  border-color: var(--c-text-secondary);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  z-index: 5;
+}
+
+.node.selected {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px rgba(124,138,255,0.25);
+}
+
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-radius: 6px 6px 0 0;
+}
+
+.node-header .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.node-body {
+  padding: 6px 8px;
+  color: var(--c-text-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.node-footer {
+  padding: 3px 8px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.node-tag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.04);
+  color: var(--c-text-secondary);
+}
+
+/* ---- Node connectors (input/output handles) ---- */
+.node-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--c-border);
+  background: var(--c-surface);
+  z-index: 2;
+  transition: all 120ms;
+}
+
+.node-handle:hover {
+  border-color: var(--c-accent);
+  background: var(--c-accent);
+  transform: scale(1.3);
+}
+
+.node-handle.input {
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.node-handle.input:hover { transform: translateY(-50%) scale(1.3); }
+
+.node-handle.output {
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.node-handle.output:hover { transform: translateY(-50%) scale(1.3); }
+
+/* ---- Minimap ---- */
+.minimap {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 160px;
+  height: 110px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  z-index: 20;
+  opacity: 0.85;
+  overflow: hidden;
+}
+
+.minimap-viewport {
+  position: absolute;
+  border: 1px solid var(--c-accent);
+  background: rgba(124,138,255,0.05);
+  border-radius: 2px;
+}
+
+/* ---- Floating toolbar ---- */
+.float-toolbar {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 10;
+}
+
+.float-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--c-border);
+  border-radius: 5px;
+  background: var(--c-surface);
+  color: var(--c-text-secondary);
+  font-family: var(--font);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 100ms;
+}
+.float-btn:hover { background: var(--c-surface-hover); color: var(--c-text); }
+
+/* ---- Bottom status bar ---- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 10px;
+  background: var(--c-surface);
+  border-top: 1px solid var(--c-border);
+  font-size: 9px;
+  color: var(--c-text-secondary);
+  flex-shrink: 0;
+}
+
+.status-left, .status-right { display: flex; align-items: center; gap: 12px; }
+
+/* ---- Demo navigation ---- */
+.demo-nav {
+  position: fixed;
+  top: 6px;
+  right: 160px;
+  z-index: 100;
+  display: flex;
+  gap: 4px;
+}
+.demo-nav a {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--c-surface);
+  color: var(--c-text-secondary);
+  text-decoration: none;
+  border: 1px solid var(--c-border);
+}
+.demo-nav a.active { background: var(--c-accent); color: #000; border-color: var(--c-accent); }
+</style>
+</head>
+<body>
+
+<div class="demo-nav" style="right:12px">
+  <a href="theme-modern.html">极简</a>
+  <a href="theme-dark.html">暗色工具</a>
+  <a href="theme-glass.html">毛玻璃</a>
+  <a href="canvas-flow.html" class="active">画布</a>
+  <a href="command-center.html">命令中心</a>
+  <a href="doc-inline.html">文档内联</a>
+  <a href="data-dashboard.html">驾驶舱</a>
+</div>
+
+<div class="app">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <span style="font-weight:700;color:var(--c-text)">ShimmerChat</span>
+      <span class="topbar-agent">Agent: Assistant Pipeline</span>
+    </div>
+    <div class="topbar-center">
+      <button class="topbar-btn">Run</button>
+      <button class="topbar-btn">Fit</button>
+      <button class="topbar-btn">100%</button>
+    </div>
+    <div class="topbar-right">
+      <button class="topbar-btn accent">+ Add Node</button>
+      <button class="topbar-btn">Layout</button>
+      <button class="topbar-btn">Export</button>
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-wrap">
+    <!-- Floating toolbar -->
+    <div class="float-toolbar">
+      <button class="float-btn" title="Select">⊞</button>
+      <button class="float-btn" title="Pan">✥</button>
+      <button class="float-btn" title="Add">+</button>
+      <button class="float-btn" title="Zoom in">⊕</button>
+      <button class="float-btn" title="Zoom out">⊖</button>
+    </div>
+
+    <div class="canvas-inner" id="canvasInner" style="transform: scale(1) translate(40px, 40px)">
+
+      <!-- SVG connections -->
+      <svg class="connections" style="width:900px;height:700px">
+        <!-- Sequence → Fragment -->
+        <path d="M 190 65 C 240 65, 270 120, 310 120" />
+        <!-- Sequence → AppendChat -->
+        <path d="M 190 65 C 240 65, 270 180, 310 180" />
+        <!-- Sequence → If -->
+        <path d="M 190 65 C 240 65, 270 240, 310 240" />
+        <!-- Fragment → APISelect (routing through) -->
+        <path d="M 510 120 C 540 120, 540 60, 510 60" opacity="0.3" stroke-dasharray="4 3" />
+        <!-- If → ToolPreset (branching) -->
+        <path d="M 510 240 C 560 240, 580 300, 310 300" />
+        <!-- If → Memory -->
+        <path d="M 510 240 C 560 240, 580 360, 310 360" />
+        <!-- Sequence → DynPrompt -->
+        <path d="M 190 65 C 220 65, 230 310, 310 310" />
+      </svg>
+
+      <!-- NODES -->
+
+      <!-- Sequence (root) -->
+      <div class="node" style="left:20px;top:30px;min-width:160px">
+        <div class="node-header" style="color:var(--node-flow)">
+          <span class="dot" style="background:var(--node-flow)"></span> Sequence
+        </div>
+        <div class="node-body">Agent Pipeline entry point. Executes children in order.</div>
+        <div class="node-footer">
+          <span class="node-tag">flow</span><span class="node-tag">root</span>
+        </div>
+        <div class="node-handle output"></div>
+      </div>
+
+      <!-- Fragment Node -->
+      <div class="node" style="left:320px;top:90px">
+        <div class="node-header" style="color:var(--node-fragment)">
+          <span class="dot" style="background:var(--node-fragment)"></span> System Prompt
+        </div>
+        <div class="node-body">"You are a helpful assistant..."<br><span style="color:var(--c-text-secondary)">template: default</span></div>
+        <div class="node-footer">
+          <span class="node-tag">fragment</span><span class="node-tag">prompt</span>
+        </div>
+        <div class="node-handle input"></div>
+        <div class="node-handle output"></div>
+      </div>
+
+      <!-- Append Chat Messages -->
+      <div class="node" style="left:320px;top:150px">
+        <div class="node-header" style="color:var(--node-fragment)">
+          <span class="dot" style="background:var(--node-fragment)"></span> Chat History
+        </div>
+        <div class="node-body">Last 20 messages<br><span style="color:var(--c-text-secondary)">max tokens: 4096</span></div>
+        <div class="node-footer">
+          <span class="node-tag">fragment</span><span class="node-tag">history</span>
+        </div>
+        <div class="node-handle input"></div>
+        <div class="node-handle output"></div>
+      </div>
+
+      <!-- If Node -->
+      <div class="node selected" style="left:320px;top:210px">
+        <div class="node-header" style="color:var(--node-branch)">
+          <span class="dot" style="background:var(--node-branch)"></span> If Branch
+        </div>
+        <div class="node-body">Check: <code style="color:var(--node-branch)">tool_count > 0</code></div>
+        <div class="node-footer">
+          <span class="node-tag">branch</span><span class="node-tag">condition</span>
+        </div>
+        <div class="node-handle input"></div>
+        <div class="node-handle output"></div>
+      </div>
+
+      <!-- DynPrompt Node -->
+      <div class="node" style="left:320px;top:280px">
+        <div class="node-header" style="color:var(--node-prompt)">
+          <span class="dot" style="background:var(--node-prompt)"></span> Dynamic Prompt
+        </div>
+        <div class="node-body">Rule: attach persona if {{user.role}} = "developer"</div>
+        <div class="node-footer">
+          <span class="node-tag">prompt</span><span class="node-tag">conditional</span>
+        </div>
+        <div class="node-handle input"></div>
+        <div class="node-handle output"></div>
+      </div>
+
+      <!-- ToolPreset Node (bottom) -->
+      <div class="node" style="left:20px;top:470px;min-width:200px">
+        <div class="node-header" style="color:var(--node-tool)">
+          <span class="dot" style="background:var(--node-tool)"></span> Load Tools
+        </div>
+        <div class="node-body">
+          <div>▸ Filesystem (r/w/browse)</div>
+          <div>▸ Memory</div>
+          <div>▸ Web Search</div>
+        </div>
+        <div class="node-footer">
+          <span class="node-tag">tool</span><span class="node-tag">preset</span>
+        </div>
+        <div class="node-handle input"></div>
+        <div class="node-handle output"></div>
+      </div>
+
+      <!-- Memory Retrieve -->
+      <div class="node" style="left:320px;top:470px">
+        <div class="node-header" style="color:var(--node-memory)">
+          <span class="dot" style="background:var(--node-memory)"></span> Memory Search
+        </div>
+        <div class="node-body">Top-K: 5<br><span style="color:var(--c-text-secondary)">threshold: 0.75</span></div>
+        <div class="node-footer">
+          <span class="node-tag">memory</span><span class="node-tag">retrieval</span>
+        </div>
+        <div class="node-handle input"></div>
+        <div class="node-handle output"></div>
+      </div>
+
+      <!-- SubAgent Node -->
+      <div class="node" style="left:20px;top:580px;min-width:200px">
+        <div class="node-header" style="color:var(--node-subagent)">
+          <span class="dot" style="background:var(--node-subagent)"></span> Sub-Agent
+        </div>
+        <div class="node-body">Delegate to: PlannerAgent<br><span style="color:var(--c-text-secondary)">max turns: 8</span></div>
+        <div class="node-footer">
+          <span class="node-tag">subagent</span><span class="node-tag">delegation</span>
+        </div>
+        <div class="node-handle input"></div>
+        <div class="node-handle output"></div>
+      </div>
+
+    </div>
+
+    <!-- Minimap -->
+    <div class="minimap">
+      <div class="minimap-viewport" style="left:2px;top:2px;width:100px;height:60px"></div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="statusbar">
+    <div class="status-left">
+      <span>Nodes: 8</span>
+      <span>Connections: 7</span>
+      <span style="color:var(--node-link)">Pipeline valid</span>
+    </div>
+    <div class="status-right">
+      <span>Zoom: 100%</span>
+      <span>Pan: (40, 40)</span>
+      <span>Node: If Branch selected</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShimmerUI Demo — 命令中心</title>
+<style>
+/* ============================================================
+   Command Center — Raycast / Linear / VS Code inspired
+   Core idea: keyboard-first, search-driven, minimal chrome
+   ============================================================ */
+
+:root {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-hover: #f5f5f5;
+  --surface-active: #efeff4;
+  --text: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary: #aeaeb2;
+  --border: #e5e5ea;
+  --accent: #0071e3;
+  --accent-soft: #e8f2fd;
+  --danger: #ff3b30;
+  --success: #34c759;
+  --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.12);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --radius: 10px;
+  --radius-sm: 6px;
+
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   App Shell — Extreme minimalism
+   ============================================================ */
+
+/* Top bar: barely visible, just a few controls */
+.shell-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.shell-top-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.shell-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shell-breadcrumb {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shell-breadcrumb .current {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ============================================================
+   The Command Bar — the centerpiece
+   ============================================================ */
+.command-bar-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 60px 20px 20px;
+}
+
+.command-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: all 150ms;
+}
+
+.command-bar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow);
+}
+
+.command-icon {
+  font-size: 18px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.command-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text);
+  background: transparent;
+}
+.command-input::placeholder { color: var(--text-tertiary); }
+
+.command-shortcut {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+/* ============================================================
+   Results panel
+   ============================================================ */
+.results-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.results-section {
+  margin-bottom: 24px;
+}
+
+.results-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  padding: 0 12px;
+  margin-bottom: 6px;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 80ms;
+}
+
+.result-item:hover { background: var(--surface-hover); }
+.result-item.active { background: var(--accent-soft); }
+
+.result-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.result-icon.app     { background: #e8f2fd; color: var(--accent); }
+.result-icon.agent   { background: #f0e6ff; color: #8b5cf6; }
+.result-icon.action  { background: #e6f7ed; color: var(--success); }
+.result-icon.danger  { background: #ffeaea; color: var(--danger); }
+
+.result-body { flex: 1; min-width: 0; }
+
+.result-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.result-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.result-hotkey {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  background: var(--surface-hover);
+  border-radius: 3px;
+  color: var(--text-tertiary);
+}
+
+/* ============================================================
+   Main content area (what shows when no search is active)
+   ============================================================ */
+.main-content {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 0;
+}
+
+.empty-state h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  max-width: 360px;
+  margin: 0 auto 20px;
+}
+
+.empty-hints {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.hint-card {
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 100ms;
+}
+
+.hint-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.hint-card .key {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--surface-hover);
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: inline-block;
+  margin-bottom: 4px;
+}
+
+.hint-card .label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ============================================================
+   Agent detail pane (what opens after selecting an agent)
+   ============================================================ */
+.agent-detail {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+
+.agent-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.agent-detail-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Quick actions row */
+.quick-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 100ms;
+}
+
+.quick-action:hover { background: var(--surface-hover); border-color: var(--text-tertiary); }
+.quick-action.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Property list */
+.prop-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.prop-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.prop-row:last-child { border-bottom: none; }
+
+.prop-label {
+  width: 140px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.prop-value {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prop-value .edit-hint {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity 100ms;
+}
+
+.prop-row:hover .edit-hint { opacity: 1; }
+
+/* ============================================================
+   Floating command palette (modal overlay)
+   ============================================================ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+}
+
+.palette {
+  width: 560px;
+  max-height: 480px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.palette-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.palette-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text);
+  background: transparent;
+}
+.palette-input::placeholder { color: var(--text-tertiary); }
+
+.palette-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.palette-item:hover { background: var(--surface-hover); }
+.palette-item.active { background: var(--accent-soft); }
+
+.palette-item-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 14px;
+  flex-shrink: 0;
+  background: var(--surface-hover);
+}
+
+.palette-item-body { flex: 1; }
+.palette-item-title { font-size: 13px; font-weight: 500; }
+.palette-item-desc { font-size: 11px; color: var(--text-secondary); }
+
+.palette-footer {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.palette-footer span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.palette-footer kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  background: var(--surface-hover);
+  border-radius: 2px;
+}
+
+/* ============================================================
+   Demo nav
+   ============================================================ */
+.demo-nav {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 200;
+  display: flex;
+  gap: 4px;
+}
+.demo-nav a {
+  font-size: 10px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  font-family: var(--font);
+}
+.demo-nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="demo-nav">
+  <a href="theme-modern.html">极简</a>
+  <a href="theme-dark.html">暗色工具</a>
+  <a href="theme-glass.html">毛玻璃</a>
+  <a href="canvas-flow.html">画布</a>
+  <a href="command-center.html" class="active">命令中心</a>
+  <a href="doc-inline.html">文档内联</a>
+  <a href="data-dashboard.html">驾驶舱</a>
+</div>
+
+<!-- Shell -->
+<div class="shell-top">
+  <div class="shell-top-left">
+    <span style="font-weight:700;font-size:14px">ShimmerChat</span>
+    <div class="shell-breadcrumb">
+      <span>Agents</span>
+      <span style="color:var(--text-tertiary)">/</span>
+      <span class="current">Assistant Pipeline</span>
+    </div>
+  </div>
+  <div class="shell-top-right">
+    <span style="font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono)">⌘K</span>
+  </div>
+</div>
+
+<!-- Agent detail view (the "resting" state after selecting an agent) -->
+<div class="agent-detail" style="padding-top:24px">
+  <div class="agent-detail-header">
+    <h2>Assistant Pipeline</h2>
+    <span class="quick-action primary">▶ Run Agent</span>
+  </div>
+
+  <div class="quick-actions">
+    <span class="quick-action">✎ Edit Pipeline</span>
+    <span class="quick-action">⚙ Configure Tools</span>
+    <span class="quick-action">⇄ Chat with Agent</span>
+    <span class="quick-action">⤓ Export</span>
+  </div>
+
+  <div class="prop-list">
+    <div class="prop-row">
+      <span class="prop-label">Model</span>
+      <span class="prop-value">GPT-4o <span class="edit-hint">Click to change</span></span>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">Pipeline Nodes</span>
+      <span class="prop-value">8 nodes — Sequence → Fragment → If → API → Tools <span class="edit-hint">Click to open</span></span>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">Tools</span>
+      <span class="prop-value">Filesystem, Memory, Web Search <span class="edit-hint">Click to manage</span></span>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">System Prompt</span>
+      <span class="prop-value" style="color:var(--text-secondary)">"You are a helpful AI assistant..." <span class="edit-hint">Click to edit</span></span>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">Last Run</span>
+      <span class="prop-value">2 minutes ago — 4 tool calls, 2048 tokens</span>
+    </div>
+  </div>
+</div>
+
+<!-- Command bar (always visible, the primary interaction point) -->
+<div class="command-bar-wrap">
+  <div class="command-bar">
+    <span class="command-icon">⌘</span>
+    <input class="command-input" placeholder="Search agents, nodes, settings..." autofocus />
+    <span class="command-shortcut">⌘K</span>
+  </div>
+</div>
+
+<!-- Search results (visible when typing) -->
+<div class="results-wrap">
+  <div class="results-section">
+    <div class="results-label">Agents</div>
+    <div class="result-item active">
+      <div class="result-icon agent">🤖</div>
+      <div class="result-body">
+        <div class="result-title">Assistant Pipeline</div>
+        <div class="result-desc">8 nodes · GPT-4o · 3 tools</div>
+      </div>
+      <span class="result-meta">⌘1</span>
+    </div>
+    <div class="result-item">
+      <div class="result-icon agent">📝</div>
+      <div class="result-body">
+        <div class="result-title">Writer Agent</div>
+        <div class="result-desc">5 nodes · Claude 3.5 · Filesystem</div>
+      </div>
+      <span class="result-meta">⌘2</span>
+    </div>
+    <div class="result-item">
+      <div class="result-icon agent">🔧</div>
+      <div class="result-body">
+        <div class="result-title">Code Review Bot</div>
+        <div class="result-desc">12 nodes · GPT-4o · Filesystem + Terminal</div>
+      </div>
+      <span class="result-meta">⌘3</span>
+    </div>
+  </div>
+
+  <div class="results-section">
+    <div class="results-label">Actions</div>
+    <div class="result-item">
+      <div class="result-icon action">+</div>
+      <div class="result-body">
+        <div class="result-title">Create New Agent</div>
+        <div class="result-desc">Start from scratch or use a template</div>
+      </div>
+      <span class="result-hotkey">⌘N</span>
+    </div>
+    <div class="result-item">
+      <div class="result-icon action">▶</div>
+      <div class="result-body">
+        <div class="result-title">Run "Assistant Pipeline"</div>
+        <div class="result-desc">Execute the current agent pipeline</div>
+      </div>
+      <span class="result-hotkey">⌘R</span>
+    </div>
+    <div class="result-item">
+      <div class="result-icon action">⇄</div>
+      <div class="result-body">
+        <div class="result-title">Chat with Agent...</div>
+        <div class="result-desc">Open a conversation with the selected agent</div>
+      </div>
+      <span class="result-hotkey">⌘⏎</span>
+    </div>
+  </div>
+
+  <div class="results-section">
+    <div class="results-label">Settings</div>
+    <div class="result-item">
+      <div class="result-icon app">⚡</div>
+      <div class="result-body"><div class="result-title">API Configuration</div></div>
+      <span class="result-meta">→</span>
+    </div>
+    <div class="result-item">
+      <div class="result-icon app">🎨</div>
+      <div class="result-body"><div class="result-title">Theme Settings</div></div>
+      <span class="result-meta">→</span>
+    </div>
+    <div class="result-item">
+      <div class="result-icon app">🧩</div>
+      <div class="result-body"><div class="result-title">Plugin Manager</div></div>
+      <span class="result-meta">→</span>
+    </div>
+  </div>
+</div>
+
+<!-- Floating command palette (the "⌘K everywhere" overlay) -->
+<div class="overlay" id="paletteOverlay" style="display:none" onclick="closePalette(event)">
+  <div class="palette" onclick="event.stopPropagation()">
+    <div class="palette-input-wrap">
+      <span style="color:var(--text-tertiary);font-size:14px">⌘</span>
+      <input class="palette-input" placeholder="Type a command..." id="paletteInput" />
+      <span class="command-shortcut">esc</span>
+    </div>
+    <div class="palette-list">
+      <div class="palette-item active">
+        <div class="palette-item-icon">🤖</div>
+        <div class="palette-item-body">
+          <div class="palette-item-title">Open Agent: Assistant Pipeline</div>
+          <div class="palette-item-desc">8 nodes · GPT-4o</div>
+        </div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-item-icon">📝</div>
+        <div class="palette-item-body">
+          <div class="palette-item-title">Open Agent: Writer Agent</div>
+          <div class="palette-item-desc">5 nodes · Claude 3.5</div>
+        </div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-item-icon">+</div>
+        <div class="palette-item-body">
+          <div class="palette-item-title">Create New Agent</div>
+          <div class="palette-item-desc">Start from scratch or template</div>
+        </div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-item-icon">▶</div>
+        <div class="palette-item-body">
+          <div class="palette-item-title">Run Current Agent</div>
+        </div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-item-icon">⇄</div>
+        <div class="palette-item-body">
+          <div class="palette-item-title">Chat with Agent</div>
+        </div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-item-icon">⚡</div>
+        <div class="palette-item-body">
+          <div class="palette-item-title">API Configuration</div>
+        </div>
+      </div>
+      <div class="palette-item">
+        <div class="palette-item-icon">🎨</div>
+        <div class="palette-item-body">
+          <div class="palette-item-title">Theme Settings</div>
+        </div>
+      </div>
+    </div>
+    <div class="palette-footer">
+      <span><kbd>↑↓</kbd> Navigate</span>
+      <span><kbd>⏎</kbd> Open</span>
+      <span><kbd>⌘K</kbd> Toggle</span>
+      <span><kbd>esc</kbd> Close</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// Toggle palette with Ctrl+K / Cmd+K
+document.addEventListener('keydown', function(e) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    var overlay = document.getElementById('paletteOverlay');
+    var isOpen = overlay.style.display === 'flex';
+    overlay.style.display = isOpen ? 'none' : 'flex';
+    if (!isOpen) {
+      document.getElementById('paletteInput').focus();
+    }
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('paletteOverlay').style.display = 'none';
+  }
+});
+
+function closePalette(e) {
+  if (e.target === document.getElementById('paletteOverlay')) {
+    document.getElementById('paletteOverlay').style.display = 'none';
+  }
+}
+
+// Focus command bar with /
+document.addEventListener('keydown', function(e) {
+  if (e.key === '/' && !e.target.closest('input') && document.getElementById('paletteOverlay').style.display !== 'flex') {
+    e.preventDefault();
+    document.querySelector('.command-input').focus();
+  }
+});
+</script>
+
+</body>
+</html>

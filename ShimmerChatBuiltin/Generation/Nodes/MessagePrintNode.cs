@@ -4,7 +4,7 @@ using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    [NodeInfo("node.message_print", Icon = "🖨️", Color = "#888", CategoryKeys = ["category.debug"], DescriptionKey = "node.message_print.desc")]
+    [NodeInfo("node.message_print", Icon = "🖨️", Color = "var(--node-debug)", CategoryKeys = ["category.debug"], DescriptionKey = "node.message_print.desc")]
     public class MessagePrintNode : IGenerationNode
     {
         private static readonly JsonSerializerSettings _settings = new()

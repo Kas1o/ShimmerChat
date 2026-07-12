@@ -1,69 +1,113 @@
+/* ── ShimmerUI Design Tokens ──────────────────────
+   Serves as initial values before ThemeServiceV2 injects runtime variables.
+   Mirrors Theme.cs defaults + dark variant.                  */
+
+/* ── Light (default) ───────────────────────────── */
 :root {
-    /* 亮色主题变量 */
-    --color-primary: #ffa200;
-    --color-primary-hover: #ff7300;
-    --color-primary-light: #ffebc8;
-    --color-secondary: #6b7280;
-    --color-background: #FAFAFA;
-    --color-surface: #fff;
-    --color-card: #ffffff;
-    --color-text-primary: #111827;
-    --color-text-secondary: #4b5563;
-    --color-text-tertiary: #9ca3af;
-    --color-border: #e5e7eb;
-    --color-border-hover: #d1d5db;
-    --color-error: #ef4444;
-    --color-error-light: rgba(239, 68, 68, 0.1);
-    --color-error-border: rgba(239, 68, 68, 0.2);
-    --color-success: #10b981;
-    --color-warning: #f59e0b;
-    --color-info: #3b82f6;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --radius-sm: 0.25rem;
-    --radius-md: 0.375rem;
-    --radius-lg: 0.5rem;
-    --radius-xl: 0.75rem;
-    --radius-2xl: 1rem;
-    --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    --transition: all 0.2s ease;
-    /* 间距变量 */
-    --spacing-xs: 0.25rem; /* 4px */
-    --spacing-sm: 0.5rem; /* 8px */
-    --spacing-md: 0.75rem; /* 12px */
-    --spacing-lg: 1rem; /* 16px */
-    --spacing-xl: 1.5rem; /* 24px */
-    --spacing-2xl: 2rem; /* 32px */
-    --spacing-3xl: 2.5rem; /* 40px */
-    --border-size: 1px;
+    --su-surface-0: #f8f9fa;
+    --su-surface-1: #ffffff;
+    --su-surface-2: #ffffff;
+    --su-surface-3: #f1f3f5;
+
+    --su-text-0: #11181c;
+    --su-text-1: #4a5568;
+    --su-text-2: #8896a4;
+
+    --su-border-0: #e2e8f0;
+    --su-border-1: #edf2f7;
+
+    --su-accent: #5e6ad2;
+    --su-accent-hover: #4f5ac7;
+    --su-accent-soft: #f0f1fd;
+
+    --su-success: #2da44e;
+    --su-success-soft: #e6f4ea;
+    --su-warning: #d97706;
+    --su-warning-soft: #fef3c7;
+    --su-danger: #cf222e;
+    --su-danger-soft: #fde8e8;
+    --su-info: #2563eb;
+    --su-info-soft: #eff6ff;
+
+    --node-flow: #3b82f6;
+    --node-branch: #f59e0b;
+    --node-link: #10b981;
+    --node-fragment: #6366f1;
+    --node-prompt: #a855f7;
+    --node-tool: #22c55e;
+    --node-memory: #eab308;
+    --node-config: #ef4444;
+    --node-subagent: #ec4899;
+    --node-debug: #94a3b8;
+
+    --su-shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --su-shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+    --su-shadow-lg: 0 12px 32px rgba(0,0,0,0.10);
+
+    --su-radius-sm: 4px;
+    --su-radius-md: 6px;
+    --su-radius-lg: 10px;
+
+    --su-space-1: 4px;
+    --su-space-2: 8px;
+    --su-space-3: 12px;
+    --su-space-4: 16px;
+    --su-space-5: 20px;
+    --su-space-6: 24px;
+    --su-space-8: 32px;
+    --su-space-10: 40px;
+
+    --su-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+    --su-font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    --su-font-xs: 11px;
+    --su-font-sm: 12px;
+    --su-font-base: 13px;
+    --su-font-md: 14px;
+    --su-font-lg: 16px;
+
+    --su-border-size: 1px;
+    --su-transition: 150ms ease;
 }
 
-/* 暗色主题变量 */
-.dark-theme {
-    --color-primary: #ffa200;
-    --color-primary-hover: #ff7300;
-    --color-primary-light: #4b2601;
-    --color-secondary: #9ca3af;
-    --color-background: #000;
-    --color-surface: #000;
-    --color-card: #000;
-    --color-text-primary: #f9fafb;
-    --color-text-secondary: #d1d5db;
-    --color-text-tertiary: #9ca3af;
-    --color-border: #1F1F1F;
-    --color-border-hover: #4b5563;
-    --color-error: #f87171;
-    --color-error-light: rgba(248, 113, 113, 0.15);
-    --color-error-border: rgba(248, 113, 113, 0.25);
-    --color-success: #34d399;
-    --color-warning: #fbbf24;
-    --color-info: #60a5fa;
-    --shadow-sm: 0 1px 2px 0 #fbbf2400;
-    --shadow-md: 0 4px 6px -1px #fbbf2420, 0 2px 4px -1px #fbbf2425;
-    --shadow-lg: 0 10px 15px -3px #fbbf40, 0 4px 6px -2px #fbbf2425;
-    --border-size: 1.5px;
-    --bs-body-bg: #000;
-    --bs-emphasis-color: #FFF;
-    color: #FFF
+/* ── Dark ──────────────────────────────────────── */
+[data-theme="dark"] {
+    --su-surface-0: #0d0d0d;
+    --su-surface-1: #1a1a1a;
+    --su-surface-2: #242424;
+    --su-surface-3: #1f1f1f;
+
+    --su-text-0: #ecedee;
+    --su-text-1: #9ba1a6;
+    --su-text-2: #6b7280;
+
+    --su-border-0: #2e2e2e;
+    --su-border-1: #242424;
+
+    --su-accent: #6c74e0;
+    --su-accent-hover: #7c83e8;
+    --su-accent-soft: #1a1b2e;
+
+    --su-success: #3fb950;
+    --su-success-soft: #122418;
+    --su-warning: #f0a020;
+    --su-warning-soft: #1f1808;
+    --su-danger: #f85149;
+    --su-danger-soft: #1f1114;
+    --su-info: #58a6ff;
+    --su-info-soft: #0d1b2e;
+
+    --node-flow: #60a5fa;
+    --node-branch: #fbbf24;
+    --node-link: #34d399;
+    --node-fragment: #818cf8;
+    --node-prompt: #c084fc;
+    --node-tool: #4ade80;
+    --node-memory: #facc15;
+    --node-config: #f87171;
+    --node-subagent: #f472b6;
+    --node-debug: #94a3b8;
+
+    --su-shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+    --su-shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+    --su-shadow-lg: 0 12px 32px rgba(0,0,0,0.5);
 }

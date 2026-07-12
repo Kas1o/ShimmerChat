@@ -6,7 +6,7 @@ using System.Text;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    [NodeInfo("node.message_print_v2", Icon = "🌈", Color = "#e08040", CategoryKeys = ["category.debug"], DescriptionKey = "node.message_print_v2.desc")]
+    [NodeInfo("node.message_print_v2", Icon = "🌈", Color = "var(--node-debug)", CategoryKeys = ["category.debug"], DescriptionKey = "node.message_print_v2.desc")]
     public class MessagePrintV2Node : IGenerationNode
     {
         private const string Reset = "\x1b[0m";

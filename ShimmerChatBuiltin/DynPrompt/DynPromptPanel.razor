@@ -9,18 +9,18 @@
 
 
 
-<div class="shimmer-content p-4">
-    <h2 class="text-2xl font-bold">DynPrompt 编辑器</h2>
+<div class="shimmer-content su-p-4">
+    <h2 class="su-text-lg su-font-bold">DynPrompt 编辑器</h2>
     
     <!-- 新建 DynPromptSet -->
     <div class="shimmer-group">
-        <h3 class="text-xl font-semibold">创建新的 DynPromptSet</h3>
-        <div class="d-flex gap-3 mt-3 align-items-center flex-wrap">
-            <input type="text" class="shimmer-input flex-1 @(validationErrors.ContainsKey("newSetName") ? "border-danger" : "")" 
+        <h3 class="su-text-lg su-font-bold">创建新的 DynPromptSet</h3>
+        <div class="su-flex su-gap-3 su-mt-3 su-items-center su-flex-wrap">
+            <input type="text" class="shimmer-input su-flex-1 @(validationErrors.ContainsKey("newSetName") ? "su-border-top" : "")" 
                    @bind="newSetName" placeholder="输入 DynPromptSet 名称" />
             @if (validationErrors.ContainsKey("newSetName"))
             {
-                <div class="text-danger text-sm">@validationErrors["newSetName"]</div>
+                <div class="su-text-danger su-text-sm">@validationErrors["newSetName"]</div>
             }
             <button class="btn" @onclick="CreateNewSet" disabled="@string.IsNullOrWhiteSpace(newSetName)">
                 创建
@@ -29,29 +29,29 @@
     </div>
 
     <!-- DynPromptSet 列表 -->
-    <div class="shimmer-group mt-5">
-        <h3 class="text-xl font-semibold">已有的 DynPromptSet (@sets.Count)</h3>
+    <div class="shimmer-group su-mt-5">
+        <h3 class="su-text-lg su-font-bold">已有的 DynPromptSet (@sets.Count)</h3>
         
         @if (sets.Count == 0)
         {
-            <p class="text-muted mt-3">暂无 DynPromptSet，请创建新的集合。</p>
+            <p class="su-text-2 su-mt-3">暂无 DynPromptSet，请创建新的集合。</p>
         }
         else
         {
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+            <div class="su-row su-gap-3 su-mt-3">
                 @foreach (var set in sets)
                 {
-                    <div class="card cursor-pointer p-3 hover:shadow-md transition-shadow duration-200 @(selectedSet?.Name == set.Name ? "border-primary shadow-md" : "")"
+                    <div class="su-card su-cursor-pointer su-p-3 @(selectedSet?.Name == set.Name ? "su-border-top su-shadow-md" : "")"
                          @onclick="() => EditSet(set)">
-                        <div class="set-header d-flex justify-content-between w-100">
-                            <h4 class="mb-0">@set.Name</h4>
-                            <div class="set-actions d-flex gap-2">
-                                <button class="btn btn-sm" @onclick:stopPropagation @onclick="() => EditSet(set)" title="编辑">✏️</button>
-                                <button class="btn btn-sm bg-danger text-white" @onclick:stopPropagation @onclick="async () => await DeleteSet(set)" title="删除">🗑️</button>
+                        <div class="set-header su-flex su-justify-between su-w-full">
+                            <h4 class="su-mb-0">@set.Name</h4>
+                            <div class="set-actions su-flex su-gap-2">
+                                <button class="su-btn su-btn-sm" @onclick:stopPropagation @onclick="() => EditSet(set)" title="编辑">✏️</button>
+                                <button class="su-btn su-btn-sm" @onclick:stopPropagation @onclick="async () => await DeleteSet(set)" title="删除">🗑️</button>
                             </div>
                         </div>
-                        <div class="set-content mt-2">
-                            <p class="text-sm text-muted">包含 @set.Terms.Count 个动态提示词</p>
+                        <div class="set-content su-mt-2">
+                            <p class="su-text-sm su-text-2">包含 @set.Terms.Count 个动态提示词</p>
                         </div>
                     </div>
                 }
@@ -62,12 +62,12 @@
     <!-- 编辑 DynPromptSet -->
     @if (selectedSet != null)
     {
-        <div class="shimmer-group mt-5">
+        <div class="shimmer-group su-mt-5">
             <h3>编辑: @selectedSet.Name</h3>
             
             <div class="set-info">
-                <div class="d-flex gap-3 mt-3 align-items-center">
-                    <label class="mt-1">集合名称:</label>
+                <div class="su-flex su-gap-3 su-mt-3 su-items-center">
+                    <label class="su-mt-1">集合名称:</label>
                     <input type="text" class="shimmer-input" @bind="editingSetName" />
                     <button class="btn" @onclick="UpdateSetName" disabled="@string.IsNullOrWhiteSpace(editingSetName)">
                         更新名称
@@ -81,25 +81,25 @@
                 
                 @if (selectedSet.Terms.Count == 0)
                 {
-                    <p class="text-muted mt-2">该集合暂无动态提示词，请添加。</p>
+                    <p class="su-text-2 su-mt-2">该集合暂无动态提示词，请添加。</p>
                 }
                 else
                 {
-                    <div class="space-y-3 mt-2">
+                    <div class="su-flex su-flex-col su-gap-3 su-mt-2">
                         @foreach (var term in selectedSet.Terms)
                         {
-                            <div class="card p-3 @(editingTerm == term ? "border-primary" : "")">
-                                <div class="term-header d-flex justify-content-between">
-                                    <h5 class="mb-0">@term.Name</h5>
-                                    <div class="term-actions d-flex gap-2">
-                                        <button class="btn btn-sm" @onclick="() => EditTerm(term)" title="编辑">✏️</button>
-                                        <button class="btn btn-sm bg-danger text-white" @onclick="async () => await DeleteTerm(term)" title="删除">🗑️</button>
+                            <div class="su-card su-p-3 @(editingTerm == term ? "su-border-top" : "")">
+                                <div class="term-header su-flex su-justify-between">
+                                    <h5 class="su-mb-0">@term.Name</h5>
+                                    <div class="term-actions su-flex su-gap-2">
+                                        <button class="su-btn su-btn-sm" @onclick="() => EditTerm(term)" title="编辑">✏️</button>
+                                        <button class="su-btn su-btn-sm" @onclick="async () => await DeleteTerm(term)" title="删除">🗑️</button>
                                     </div>
                                 </div>
-                                <div class="term-preview mt-2">
-                                    <p class="text-sm"><strong>内容:</strong> @(term.Content.Length > 100 ? term.Content.Substring(0, 100) + "..." : term.Content)</p>
-                                    <p class="text-sm"><strong>注入模式:</strong> @term.InjectionMode</p>
-                                    <p class="text-sm"><strong>触发规则:</strong> @(string.IsNullOrEmpty(term.TriggerRule) ? "无" : term.TriggerRule)</p>
+                                <div class="term-preview su-mt-2">
+                                    <p class="su-text-sm"><strong>内容:</strong> @(term.Content.Length > 100 ? term.Content.Substring(0, 100) + "..." : term.Content)</p>
+                                    <p class="su-text-sm"><strong>注入模式:</strong> @term.InjectionMode</p>
+                                    <p class="su-text-sm"><strong>触发规则:</strong> @(string.IsNullOrEmpty(term.TriggerRule) ? "无" : term.TriggerRule)</p>
                                 </div>
                             </div>
                         }
@@ -122,27 +122,27 @@
             <div class="shimmer-popup-content">
                 <h4>@(isEditingTerm ? "编辑动态提示词" : "添加新动态提示词")</h4>
                 
-                <div class="form-group mt-3">
+                <div class="su-form-group su-mt-3">
                     <label>名称:</label>
-                    <input type="text" class="shimmer-input @(validationErrors.ContainsKey("termName") ? "border-danger" : "")" 
+                    <input type="text" class="shimmer-input @(validationErrors.ContainsKey("termName") ? "su-border-top" : "")" 
                            @bind="termForm.Name" placeholder="输入提示词名称" />
                     @if (validationErrors.ContainsKey("termName"))
                     {
-                        <div class="text-danger text-sm mt-1">@validationErrors["termName"]</div>
+                        <div class="su-text-danger su-text-sm su-mt-1">@validationErrors["termName"]</div>
                     }
                 </div>
                 
-                <div class="form-group mt-3">
+                <div class="su-form-group su-mt-3">
                     <label>内容:</label>
-                    <textarea class="shimmer-textarea @(validationErrors.ContainsKey("termContent") ? "border-danger" : "")" 
+                    <textarea class="shimmer-textarea @(validationErrors.ContainsKey("termContent") ? "su-border-top" : "")" 
                               @bind="termForm.Content" placeholder="输入提示词内容" rows="5"></textarea>
                     @if (validationErrors.ContainsKey("termContent"))
                     {
-                        <div class="text-danger text-sm mt-1">@validationErrors["termContent"]</div>
+                        <div class="su-text-danger su-text-sm su-mt-1">@validationErrors["termContent"]</div>
                     }
                 </div>
                 
-                <div class="form-group mt-3">
+                <div class="su-form-group su-mt-3">
                     <label>注入模式:</label>
                     <select class="shimmer-input" @bind="termForm.InjectionMode">
                         @foreach (var mode in Enum.GetValues(typeof(DynPromptTermInjectionMode)))
@@ -152,32 +152,32 @@
                     </select>
                 </div>
                 
-                <div class="form-group mt-3">
+                <div class="su-form-group su-mt-3">
                     <label>注入深度 (当模式为 AtDepth 时有效):</label>
                     <input type="number" class="shimmer-input" @bind="termForm.InjectionDepth" min="1" />
                 </div>
                 
-                <div class="form-group mt-3">
+                <div class="su-form-group su-mt-3">
                     <label>触发规则:</label>
-                    <textarea class="shimmer-textarea @(validationErrors.ContainsKey("termTriggerRule") ? "border-danger" : "")" 
+                    <textarea class="shimmer-textarea @(validationErrors.ContainsKey("termTriggerRule") ? "su-border-top" : "")" 
                               @bind="termForm.TriggerRule" placeholder="输入触发规则，留空表示始终触发" rows="3"></textarea>
                     @if (validationErrors.ContainsKey("termTriggerRule"))
                     {
-                        <div class="text-danger text-sm mt-1">@validationErrors["termTriggerRule"]</div>
+                        <div class="su-text-danger su-text-sm su-mt-1">@validationErrors["termTriggerRule"]</div>
                     }
-                    <small class="text-muted mt-1">支持正则表达式和逻辑运算符: | (或), & (与), ! (非), () (分组)</small>
+                    <small class="su-text-2 su-mt-1">支持正则表达式和逻辑运算符: | (或), & (与), ! (非), () (分组)</small>
                     <a href="https://github.com/Kas1o/ShimmerChat/blob/master/ShimmerChatBuiltin/DynPrompt/TriggerRule.md">Doc Link</a>
                 </div>
                 
-                <div class="form-group mt-3">
-                    <div class="d-flex items-center gap-2">
+                <div class="su-form-group su-mt-3">
+                    <div class="su-flex su-items-center su-gap-2">
                         <input type="checkbox" id="allowRecursive" @bind="termForm.AllowBeTriggeredByRecursive" />
                         <label for="allowRecursive">允许被递归触发</label>
                     </div>
                 </div>
                 
-                <div class="form-actions d-flex gap-3 justify-end mt-4">
-                    <button class="btn bg-danger text-white" @onclick="CancelTermForm">取消</button>
+                <div class="form-actions su-flex su-gap-3 su-justify-end su-mt-4">
+                    <button class="su-btn" @onclick="CancelTermForm">取消</button>
                     <button class="btn" @onclick="SaveTerm">保存</button>
                 </div>
             </div>
@@ -189,21 +189,21 @@
     {
         <div class="shimmer-popup-overlay">
             <div class="shimmer-popup-content text-center">
-                <div class="text-primary mb-3">⏳</div>
-                <div class="text-lg">处理中...</div>
+                <div class="su-text-accent su-mb-3">⏳</div>
+                <div class="su-text-lg">处理中...</div>
             </div>
         </div>
     }
 
     <!-- 保存和状态消息 -->
-    <div class="mt-5 pt-3 border-t">
-        <div class="d-flex justify-between items-center">
+    <div class="su-mt-5 su-pt-3 su-border-top">
+        <div class="su-flex su-justify-between su-items-center">
             <button class="btn" @onclick="SaveAllChanges" disabled="@isLoading">保存所有更改</button>
             @if (!string.IsNullOrEmpty(statusMessage))
             {
-                <div class="px-4 py-2 rounded-md text-sm 
-                            @(statusType == "success" ? "bg-success/10 text-success" : 
-                              statusType == "error" ? "bg-error/10 text-error" : "bg-info/10 text-info")">
+                <div class="su-px-4 su-py-2 su-rounded su-text-sm 
+                            @(statusType == "success" ? "su-badge su-badge-success" : 
+                              statusType == "error" ? "su-badge su-badge-danger" : "su-badge")">
                     <span>
                         @(statusType == "success" ? "✓" : statusType == "error" ? "✗" : "i") 
                         @statusMessage

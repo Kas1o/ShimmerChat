@@ -12,9 +12,9 @@
             align-items: center;
             gap: 12px;
             padding: 12px 20px;
-            background-color: color-mix(in srgb, var(--color-card) 85%, black 15%);
+            background-color: color-mix(in srgb, var(--su-surface-1) 85%, black 15%);
             backdrop-filter: blur(8px);
-            border-bottom: 1px solid var(--color-border);
+            border-bottom: 1px solid var(--su-border-0);
             flex-shrink: 0;
         }
 
@@ -23,16 +23,16 @@
             border: none;
             cursor: pointer;
             font-size: 20px;
-            color: var(--color-text-primary);
+            color: var(--su-text-0);
             padding: 8px;
-            border-radius: var(--radius-md);
+            border-radius: var(--su-radius-md);
             transition: background-color 0.2s;
             display: flex;
             align-items: center;
         }
 
         .agent-back-btn:hover {
-            background-color: var(--color-surface);
+            background-color: var(--su-surface-3);
         }
 
         .agent-header-avatar {
@@ -40,7 +40,7 @@
             height: 48px;
             border-radius: 50%;
             object-fit: cover;
-            border: 2px solid var(--color-border);
+            border: 2px solid var(--su-border-0);
             flex-shrink: 0;
         }
 
@@ -52,7 +52,7 @@
         .agent-header-info h2 {
             margin: 0;
             font-size: 1.3rem;
-            color: var(--color-text-primary);
+            color: var(--su-text-0);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -61,7 +61,7 @@
         .agent-header-desc {
             margin: 2px 0 0 0;
             font-size: 0.85rem;
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -71,9 +71,9 @@
         .agent-tabs {
             display: none;
             flex-shrink: 0;
-            background-color: color-mix(in srgb, var(--color-card) 90%, black 10%);
+            background-color: color-mix(in srgb, var(--su-surface-1) 90%, black 10%);
             backdrop-filter: blur(8px);
-            border-bottom: 1px solid var(--color-border);
+            border-bottom: 1px solid var(--su-border-0);
         }
 
         .agent-tab {
@@ -84,7 +84,7 @@
             cursor: pointer;
             padding: 12px;
             font-size: 0.95rem;
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -93,8 +93,8 @@
         }
 
         .agent-tab.active {
-            color: var(--color-primary);
-            border-bottom-color: var(--color-primary);
+            color: var(--su-accent);
+            border-bottom-color: var(--su-accent);
             font-weight: 600;
         }
 
@@ -157,7 +157,7 @@
             align-items: center;
             gap: 6px;
             font-size: 0.85rem;
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
             cursor: pointer;
         }
 
@@ -166,11 +166,11 @@
             align-items: center;
             gap: 8px;
             font-size: 0.8rem;
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
         }
 
         .search-loading {
-            color: var(--color-primary);
+            color: var(--su-accent);
             font-weight: 600;
         }
 
@@ -190,23 +190,23 @@
             align-items: center;
             gap: 10px;
             padding: 12px 14px;
-            background-color: color-mix(in srgb, var(--color-card) 80%, transparent 20%);
+            background-color: color-mix(in srgb, var(--su-surface-1) 80%, transparent 20%);
             backdrop-filter: blur(4px);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-md);
+            border: 1px solid var(--su-border-0);
+            border-radius: var(--su-radius-md);
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .chat-item:hover {
-            border-color: var(--color-primary);
-            background-color: var(--color-surface);
-            box-shadow: var(--shadow-md);
+            border-color: var(--su-accent);
+            background-color: var(--su-surface-3);
+            box-shadow: var(--su-shadow-md);
         }
 
         .chat-item-icon {
             font-size: 1.1rem;
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
             flex-shrink: 0;
         }
 
@@ -217,7 +217,7 @@
 
         .chat-name {
             font-weight: 600;
-            color: var(--color-text-primary);
+            color: var(--su-text-0);
             margin-bottom: 2px;
             white-space: nowrap;
             overflow: hidden;
@@ -225,7 +225,7 @@
         }
 
         .chat-last-message {
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
             font-size: 0.85em;
             white-space: nowrap;
             overflow: hidden;
@@ -233,14 +233,14 @@
         }
 
         .new-chat-item {
-            background-color: var(--color-primary);
+            background-color: var(--su-accent);
             color: white;
-            border-color: var(--color-primary);
+            border-color: var(--su-accent);
         }
 
         .new-chat-item:hover {
-            background-color: var(--color-primary-hover);
-            border-color: var(--color-primary-hover);
+            background-color: var(--su-accent-hover);
+            border-color: var(--su-accent-hover);
         }
 
         .new-chat-item .chat-name,
@@ -250,7 +250,7 @@
 
         .chat-empty {
             text-align: center;
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
             padding: 32px 16px;
         }
 
@@ -280,7 +280,7 @@
 
         .pagination-left span {
             font-size: 0.85rem;
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
         }
 
         .page-size-select {
@@ -289,10 +289,10 @@
         }
 
         .chat-delete-btn {
-            background: rgba(0, 0, 0, 0.3);
+            background: color-mix(in srgb, var(--su-text-0) 30%, transparent);
             color: white;
             border: none;
-            border-radius: var(--radius-sm);
+            border-radius: var(--su-radius-sm);
             width: 30px;
             height: 30px;
             font-size: 0.9rem;
@@ -310,14 +310,14 @@
         }
 
         .chat-delete-btn:hover {
-            background: var(--color-error);
+            background: var(--su-danger);
         }
 
         /* Settings groups */
         .settings-group {
             margin-bottom: 20px;
             padding-bottom: 20px;
-            border-bottom: 1px solid var(--color-border);
+            border-bottom: 1px solid var(--su-border-0);
         }
 
         .settings-group:last-of-type {
@@ -327,14 +327,14 @@
         .settings-group h4 {
             margin: 0 0 12px 0;
             font-size: 1rem;
-            color: var(--color-text-primary);
+            color: var(--su-text-0);
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
         .settings-group h4 i {
-            color: var(--color-primary);
+            color: var(--su-accent);
         }
 
         .settings-field {
@@ -346,7 +346,7 @@
             margin-bottom: 4px;
             font-size: 0.85rem;
             font-weight: 500;
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
         }
 
         .settings-field .shimmer-input,
@@ -371,7 +371,7 @@
 
         .media-label {
             font-size: 0.85rem;
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
             font-weight: 500;
         }
 
@@ -379,8 +379,8 @@
             width: 100px;
             height: 100px;
             object-fit: cover;
-            border-radius: var(--radius-md);
-            border: 2px solid var(--color-border);
+            border-radius: var(--su-radius-md);
+            border: 2px solid var(--su-border-0);
         }
 
         /* Tags */
@@ -404,9 +404,9 @@
             font-size: 0.85rem;
             font-weight: 500;
             border-radius: 14px;
-            background-color: var(--color-primary-light);
-            color: var(--color-primary);
-            border: 1px solid var(--color-primary);
+            background-color: var(--su-accent-soft);
+            color: var(--su-accent);
+            border: 1px solid var(--su-accent);
         }
 
         .tag-remove-btn {
@@ -434,10 +434,10 @@
             top: 100%;
             left: 0;
             right: 0;
-            background-color: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: 0 0 var(--radius-md) var(--radius-md);
-            box-shadow: var(--shadow-md);
+            background-color: var(--su-surface-1);
+            border: 1px solid var(--su-border-0);
+            border-radius: 0 0 var(--su-radius-md) var(--su-radius-md);
+            box-shadow: var(--su-shadow-md);
             z-index: 100;
             max-height: 180px;
             overflow-y: auto;
@@ -446,12 +446,12 @@
         .tag-suggestion-item {
             padding: 8px 12px;
             cursor: pointer;
-            color: var(--color-text-primary);
+            color: var(--su-text-0);
             transition: background-color 0.15s;
         }
 
         .tag-suggestion-item:hover {
-            background-color: var(--color-surface);
+            background-color: var(--su-surface-3);
         }
 
         /* Tools */
@@ -476,25 +476,25 @@
             justify-content: space-between;
             align-items: center;
             padding: 8px 12px;
-            background-color: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-sm);
+            background-color: var(--su-surface-3);
+            border: 1px solid var(--su-border-0);
+            border-radius: var(--su-radius-sm);
         }
 
         .tool-name {
             font-weight: 500;
-            color: var(--color-text-primary);
+            color: var(--su-text-0);
             display: flex;
             align-items: center;
             gap: 6px;
         }
 
         .tool-name i {
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
         }
 
         .tool-empty {
-            color: var(--color-text-secondary);
+            color: var(--su-text-1);
             font-size: 0.85rem;
             text-align: center;
             padding: 12px;

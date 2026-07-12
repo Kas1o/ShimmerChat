@@ -8,7 +8,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// Token 裁剪节点：超过 TokenBudget 时从最早的消息开始裁剪。
     /// 合并了旧的 TokenLimit 和 LatestN 功能。
     /// </summary>
-    [NodeInfo("node.fragment_trim", Icon = "✂", Color = "#c080e0", CategoryKeys = ["category.content", "category.filter"])]
+    [NodeInfo("node.fragment_trim", Icon = "✂", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.filter"])]
     public class FragmentTrimNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();

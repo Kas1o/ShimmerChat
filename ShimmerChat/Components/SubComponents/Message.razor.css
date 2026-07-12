@@ -1,0 +1,127 @@
+/* ── Message bubble ───────────────────────────── */
+.chat-msg {
+    margin: var(--su-space-2) 0;
+    max-width: 85%;
+    animation: msgIn 0.2s ease-out;
+}
+@keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── User message (right-aligned, accent bg) ──── */
+.chat-msg-user {
+    align-self: flex-end;
+    background: var(--su-accent);
+    color: #fff;
+    border-radius: var(--su-radius-lg) var(--su-radius-sm) var(--su-radius-lg) var(--su-radius-lg);
+    padding: var(--su-space-3) var(--su-space-4);
+}
+.chat-msg-user .chat-msg-head { color: rgba(255,255,255,0.7); font-size: var(--su-font-xs); }
+.chat-msg-user .chat-msg-body { color: #fff; }
+.chat-msg-user .chat-msg-act { color: rgba(255,255,255,0.6); }
+.chat-msg-user .chat-msg-act:hover { color: #fff; background: rgba(255,255,255,0.15); }
+.chat-msg-user .chat-msg-act-del:hover { color: #fff; background: rgba(255,255,255,0.25); }
+
+/* ── AI message (left-aligned, card) ───────────── */
+.chat-msg-ai {
+    align-self: flex-start;
+    background: var(--su-surface-1);
+    border: var(--su-border-size) solid var(--su-border-0);
+    border-radius: var(--su-radius-lg);
+    padding: var(--su-space-4);
+    box-shadow: var(--su-shadow-sm);
+}
+
+/* ── Tool result (compact, distinct) ──────────── */
+.chat-msg-tool {
+    align-self: flex-start; max-width: 90%;
+    background: var(--su-surface-1);
+    border: var(--su-border-size) solid var(--su-border-0);
+    border-left: 3px solid var(--su-warning);
+    border-radius: 0 var(--su-radius-md) var(--su-radius-md) 0;
+    padding: var(--su-space-3) var(--su-space-4);
+    font-size: var(--su-font-sm);
+}
+.chat-msg-tool .chat-msg-head {
+    color: var(--su-warning); font-size: var(--su-font-xs); margin-bottom: var(--su-space-1);
+}
+.chat-msg-tool .chat-msg-sender { color: var(--su-warning); }
+.chat-msg-tool .chat-msg-body { color: var(--su-text-0); }
+.chat-msg-tool .chat-msg-body ::deep pre {
+    background: var(--su-surface-3); font-size: var(--su-font-xs);
+}
+
+/* ── Message header ────────────────────────────── */
+.chat-msg-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: var(--su-space-2);
+    font-size: var(--su-font-sm); font-weight: 500;
+    color: var(--su-text-1);
+    user-select: none;
+}
+.chat-msg-sender { display: flex; align-items: center; gap: var(--su-space-2); }
+.chat-msg-ver {
+    font-size: var(--su-font-xs);
+    background: var(--su-surface-3); color: var(--su-text-2);
+    padding: 0 6px; border-radius: 8px;
+}
+.chat-msg-ver-btn {
+    border: none; background: none; cursor: pointer;
+    color: var(--su-text-2); font-size: var(--su-font-xs); padding: 0 2px;
+}
+.chat-msg-ver-btn:hover:not(:disabled) { color: var(--su-accent); }
+.chat-msg-ver-btn:disabled { opacity: 0.3; cursor: default; }
+.chat-msg-streaming { font-size: var(--su-font-xs); color: var(--su-accent); font-style: italic; }
+
+/* ── Action buttons ────────────────────────────── */
+.chat-msg-actions { display: flex; gap: 2px; }
+.chat-msg-act {
+    border: none; background: none; cursor: pointer;
+    color: var(--su-text-2); font-size: var(--su-font-xs);
+    padding: 2px 6px; border-radius: var(--su-radius-sm);
+    transition: color var(--su-transition), background var(--su-transition);
+}
+.chat-msg-act:hover { color: var(--su-accent); background: var(--su-surface-3); }
+.chat-msg-act-del:hover { color: var(--su-danger); }
+
+/* ── Message body ──────────────────────────────── */
+.chat-msg-body {
+    font-size: var(--su-font-base); line-height: 1.65;
+    color: var(--su-text-0);
+    word-break: break-word;
+}
+.chat-msg-body ::deep p { margin: 0 0 var(--su-space-2); }
+.chat-msg-body ::deep p:last-child { margin-bottom: 0; }
+.chat-msg-body ::deep pre {
+    background: var(--su-surface-3); border-radius: var(--su-radius-md);
+    padding: var(--su-space-3); overflow-x: auto;
+    font-family: var(--su-font-mono); font-size: var(--su-font-sm);
+}
+.chat-msg-body ::deep code {
+    font-family: var(--su-font-mono); font-size: var(--su-font-sm);
+    background: var(--su-surface-3); padding: 1px 5px; border-radius: 3px;
+}
+
+/* ── Thinking section ──────────────────────────── */
+.chat-msg-thinking {
+    margin-bottom: var(--su-space-3);
+    font-size: var(--su-font-sm); color: var(--su-text-1);
+}
+.chat-msg-thinking summary {
+    cursor: pointer; color: var(--su-text-2); user-select: none;
+}
+.chat-msg-thinking-body {
+    margin-top: var(--su-space-2); padding: var(--su-space-3);
+    background: var(--su-surface-3); border-radius: var(--su-radius-md);
+    border-left: 2px solid var(--su-border-0);
+    font-size: var(--su-font-sm); color: var(--su-text-1);
+}
+
+/* ── Typing cursor ─────────────────────────────── */
+.chat-msg-cursor {
+    display: inline-block; animation: cursorBlink 1s infinite;
+    font-weight: bold; color: var(--su-accent);
+}
+@keyframes cursorBlink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+/* ── Edit mode ─────────────────────────────────── */
+.chat-msg-edit { display: flex; flex-direction: column; gap: var(--su-space-1); }
+.chat-msg-edit label { font-size: var(--su-font-xs); color: var(--su-text-1); }

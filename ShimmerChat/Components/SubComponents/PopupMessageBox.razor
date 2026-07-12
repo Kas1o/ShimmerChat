@@ -4,23 +4,21 @@
 
 @if (_options != null)
 {
-    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">@_options.Title</h5>
-                    <button type="button" class="btn-close" @onclick="Cancel"></button>
-                </div>
-                <div class="modal-body">
-                    @_options.Message
-                </div>
-                <div class="modal-footer">
-                    @if (_options.ShowCancel)
-                    {
-                        <button type="button" class="btn btn-secondary" @onclick="Cancel">@_options.CancelText</button>
-                    }
-                    <button type="button" class="btn btn-primary" @onclick="Confirm">@_options.ConfirmText</button>
-                </div>
+    <div class="su-modal-mask" @onclick="Cancel">
+        <div class="su-modal" @onclick:stopPropagation="true">
+            <div class="su-modal-header">
+                @_options.Title
+                <button class="su-btn-close" @onclick="Cancel">&times;</button>
+            </div>
+            <div class="su-modal-body">
+                @_options.Message
+            </div>
+            <div class="su-modal-footer">
+                @if (_options.ShowCancel)
+                {
+                    <button class="su-btn su-btn-secondary" @onclick="Cancel">@_options.CancelText</button>
+                }
+                <button class="su-btn su-btn-primary" @onclick="Confirm">@_options.ConfirmText</button>
             </div>
         </div>
     </div>

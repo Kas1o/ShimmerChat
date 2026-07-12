@@ -3,13 +3,13 @@
 
 @attribute [PluginPanelAttribute("panel.example", "panel.example.desc")]
 
-<div class="example-panel p-4">
-    <h3 class="text-xl font-bold mb-4">示例插件面板</h3>
-    <p class="mb-4">这是一个示例插件面板，用于演示如何创建和使用插件面板功能。</p>
+<div class="example-panel su-p-4">
+    <h3 class="su-text-lg su-font-bold su-mb-4">示例插件面板</h3>
+    <p class="su-mb-4">这是一个示例插件面板，用于演示如何创建和使用插件面板功能。</p>
     
-    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <h4 class="text-lg font-semibold mb-2">面板功能演示</h4>
-        <ul class="list-disc pl-5 space-y-2">
+    <div class="su-surface-3 su-p-4 su-rounded-lg border">
+        <h4 class="su-text-lg su-font-bold su-mb-2">面板功能演示</h4>
+        <ul class="su-ps-3 su-flex su-flex-col su-gap-2">
             <li>动态加载的Blazor组件</li>
             <li>通过PluginPanelAttribute注册</li>
             <li>可在应用程序中动态渲染</li>
@@ -17,13 +17,13 @@
         </ul>
     </div>
     
-    <div class="mt-6">
-        <button @onclick="OnButtonClick" class="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-all">
+    <div class="su-mt-6">
+        <button @onclick="OnButtonClick" class="su-btn su-btn-primary">
             点击我
         </button>
     </div>
     
-    <div class="mt-4 text-gray-500 text-sm">
+    <div class="su-mt-4 su-text-2 su-text-sm">
         @DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
     </div>
 </div>

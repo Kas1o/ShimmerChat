@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShimmerUI Demo — 毛玻璃分层</title>
+<style>
+/* ============================================================
+   ShimmerUI Design Tokens — Glassmorphism
+   Translucent surfaces, backdrop blur, layered depth
+   ============================================================ */
+
+:root {
+  /* Surface — translucent with blur */
+  --su-surface-0: #f0f2f5;
+  --su-surface-1: rgba(255,255,255,0.72);
+  --su-surface-2: rgba(255,255,255,0.85);
+  --su-surface-3: rgba(0,0,0,0.04);
+
+  --su-blur-surface-1: blur(16px) saturate(180%);
+  --su-blur-surface-2: blur(24px) saturate(180%);
+
+  --su-text-0: #1a1a2e;
+  --su-text-1: #555770;
+  --su-text-2: #8e8ea0;
+
+  --su-border-0: rgba(0,0,0,0.08);
+  --su-border-1: rgba(0,0,0,0.04);
+
+  --su-accent: #6c63ff;
+  --su-accent-hover: #5a52e0;
+  --su-accent-soft: rgba(108,99,255,0.10);
+
+  --su-success: #00b894;
+  --su-success-soft: rgba(0,184,148,0.10);
+  --su-warning: #fdcb6e;
+  --su-warning-soft: rgba(253,203,110,0.15);
+  --su-danger: #ff6b6b;
+  --su-danger-soft: rgba(255,107,107,0.10);
+  --su-info: #74b9ff;
+  --su-info-soft: rgba(116,185,255,0.12);
+
+  --node-flow: #6c63ff;
+  --node-branch: #f9a826;
+  --node-link: #00b894;
+  --node-fragment: #a29bfe;
+  --node-prompt: #c084fc;
+  --node-tool: #00cec9;
+  --node-memory: #fdcb6e;
+  --node-config: #ff6b6b;
+  --node-subagent: #fd79a8;
+  --node-debug: #b2bec3;
+
+  --su-shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.03);
+  --su-shadow-md: 0 8px 24px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  --su-shadow-lg: 0 20px 48px rgba(0,0,0,0.10), 0 0 0 1px rgba(0,0,0,0.05);
+
+  --su-radius-sm: 8px;
+  --su-radius-md: 12px;
+  --su-radius-lg: 18px;
+
+  --su-space-1: 4px;
+  --su-space-2: 8px;
+  --su-space-3: 12px;
+  --su-space-4: 16px;
+  --su-space-5: 20px;
+  --su-space-6: 24px;
+  --su-space-8: 32px;
+  --su-space-10: 40px;
+
+  --su-font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  --su-font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  --su-font-xs: 11px;
+  --su-font-sm: 12px;
+  --su-font-base: 13px;
+  --su-font-md: 14px;
+  --su-font-lg: 16px;
+
+  --su-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  --su-surface-0: #0f0f1a;
+  --su-surface-1: rgba(30,30,50,0.65);
+  --su-surface-2: rgba(40,40,60,0.80);
+  --su-surface-3: rgba(255,255,255,0.05);
+
+  --su-blur-surface-1: blur(20px) saturate(140%);
+  --su-blur-surface-2: blur(30px) saturate(140%);
+
+  --su-text-0: #e8e6f0;
+  --su-text-1: #9a98b0;
+  --su-text-2: #6a6880;
+
+  --su-border-0: rgba(255,255,255,0.08);
+  --su-border-1: rgba(255,255,255,0.04);
+
+  --su-accent: #a78bfa;
+  --su-accent-hover: #b9a5fb;
+  --su-accent-soft: rgba(167,139,250,0.12);
+
+  --su-success: #55efc4;
+  --su-success-soft: rgba(85,239,196,0.10);
+  --su-warning: #ffeaa7;
+  --su-warning-soft: rgba(255,234,167,0.12);
+  --su-danger: #ff7675;
+  --su-danger-soft: rgba(255,118,117,0.10);
+  --su-info: #81ecec;
+  --su-info-soft: rgba(129,236,236,0.10);
+
+  --node-flow: #a78bfa;
+  --node-branch: #fcc44c;
+  --node-link: #55efc4;
+  --node-fragment: #c4b5fd;
+  --node-prompt: #d8b4fe;
+  --node-tool: #5eead4;
+  --node-memory: #ffeaa7;
+  --node-config: #ff7675;
+  --node-subagent: #fda4af;
+  --node-debug: #94a3b8;
+
+  --su-shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+  --su-shadow-md: 0 8px 24px rgba(0,0,0,0.3);
+  --su-shadow-lg: 0 20px 48px rgba(0,0,0,0.4);
+}
+
+/* ============================================================
+   Body with gradient background for glass effect
+   ============================================================ */
+body {
+  font-family: var(--su-font-sans);
+  font-size: var(--su-font-base);
+  color: var(--su-text-0);
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 20%, rgba(108,99,255,0.08), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 80%, rgba(0,184,148,0.06), transparent),
+    var(--su-surface-0);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-theme="dark"] body {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 20%, rgba(167,139,250,0.06), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 80%, rgba(85,239,196,0.04), transparent),
+    var(--su-surface-0);
+}
+
+/* ============================================================
+   Reset
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.demo-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--su-space-8);
+}
+
+.demo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--su-space-10);
+  padding-bottom: var(--su-space-6);
+  border-bottom: 1px solid var(--su-border-0);
+}
+
+.demo-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.demo-header p {
+  font-size: var(--su-font-md);
+  color: var(--su-text-1);
+}
+
+.demo-section { margin-bottom: var(--su-space-10); }
+
+.demo-section h2 {
+  font-size: var(--su-font-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--su-text-2);
+  margin-bottom: var(--su-space-4);
+}
+
+.demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--su-space-3);
+  align-items: center;
+  margin-bottom: var(--su-space-4);
+}
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--su-space-4);
+}
+
+/* ============================================================
+   Components — Button
+   ============================================================ */
+.su-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--su-space-2);
+  padding: 7px 16px;
+  font-family: var(--su-font-sans);
+  font-size: var(--su-font-base);
+  font-weight: 500;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  border-radius: var(--su-radius-sm);
+  cursor: pointer;
+  transition: all var(--su-transition);
+  white-space: nowrap;
+  user-select: none;
+  backdrop-filter: var(--su-blur-surface-1);
+  -webkit-backdrop-filter: var(--su-blur-surface-1);
+}
+
+.su-btn:focus-visible {
+  outline: 2px solid var(--su-accent);
+  outline-offset: 2px;
+}
+
+.su-btn-primary {
+  background: var(--su-accent);
+  color: #fff;
+  box-shadow: var(--su-shadow-sm);
+}
+.su-btn-primary:hover { background: var(--su-accent-hover); transform: translateY(-1px); box-shadow: var(--su-shadow-md); }
+.su-btn-primary:active { transform: scale(0.98) translateY(0); }
+
+.su-btn-secondary {
+  background: var(--su-surface-1);
+  color: var(--su-text-0);
+  border-color: var(--su-border-0);
+}
+.su-btn-secondary:hover { background: var(--su-surface-2); }
+
+.su-btn-danger {
+  background: var(--su-danger);
+  color: #fff;
+  box-shadow: var(--su-shadow-sm);
+}
+.su-btn-danger:hover { opacity: 0.9; transform: translateY(-1px); }
+
+.su-btn-ghost {
+  background: transparent;
+  color: var(--su-text-1);
+}
+.su-btn-ghost:hover { background: var(--su-surface-3); color: var(--su-text-0); }
+
+.su-btn-sm { padding: 4px 12px; font-size: var(--su-font-sm); }
+.su-btn-lg { padding: 9px 22px; font-size: var(--su-font-md); }
+
+/* ============================================================
+   Components — Input / Select / Textarea
+   ============================================================ */
+.su-input, .su-select, .su-textarea {
+  padding: 7px 12px;
+  font-family: var(--su-font-sans);
+  font-size: var(--su-font-base);
+  color: var(--su-text-0);
+  background: var(--su-surface-1);
+  border: 1px solid var(--su-border-0);
+  border-radius: var(--su-radius-sm);
+  transition: all var(--su-transition);
+  outline: none;
+  width: 100%;
+  backdrop-filter: var(--su-blur-surface-1);
+  -webkit-backdrop-filter: var(--su-blur-surface-1);
+}
+
+.su-input:focus, .su-select:focus, .su-textarea:focus {
+  border-color: var(--su-accent);
+  box-shadow: 0 0 0 3px var(--su-accent-soft);
+}
+
+.su-input::placeholder, .su-textarea::placeholder { color: var(--su-text-2); }
+
+.su-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8ea0' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+.su-textarea { min-height: 80px; resize: vertical; }
+
+.su-label {
+  display: block;
+  font-size: var(--su-font-sm);
+  font-weight: 500;
+  color: var(--su-text-1);
+  margin-bottom: var(--su-space-1);
+}
+
+.su-form-group { display: flex; flex-direction: column; gap: var(--su-space-1); width: 100%; }
+
+/* ============================================================
+   Components — Card
+   ============================================================ */
+.su-card {
+  background: var(--su-surface-1);
+  border: 1px solid var(--su-border-0);
+  border-radius: var(--su-radius-lg);
+  overflow: hidden;
+  backdrop-filter: var(--su-blur-surface-2);
+  -webkit-backdrop-filter: var(--su-blur-surface-2);
+  box-shadow: var(--su-shadow-sm);
+}
+
+.su-card-header {
+  padding: var(--su-space-4) var(--su-space-5);
+  border-bottom: 1px solid var(--su-border-1);
+  font-weight: 600;
+  font-size: var(--su-font-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.su-card-body { padding: var(--su-space-5); }
+
+/* ============================================================
+   Components — Alert
+   ============================================================ */
+.su-alert {
+  padding: var(--su-space-3) var(--su-space-4);
+  border-radius: var(--su-radius-sm);
+  font-size: var(--su-font-base);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--su-space-2);
+  backdrop-filter: var(--su-blur-surface-1);
+  -webkit-backdrop-filter: var(--su-blur-surface-1);
+}
+
+.su-alert-info    { background: var(--su-info-soft);    color: var(--su-info); }
+.su-alert-success { background: var(--su-success-soft); color: var(--su-success); }
+.su-alert-warning { background: var(--su-warning-soft); color: var(--su-warning); }
+.su-alert-danger  { background: var(--su-danger-soft);  color: var(--su-danger); }
+
+/* ============================================================
+   Components — Badge
+   ============================================================ */
+.su-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: var(--su-font-xs);
+  font-weight: 500;
+  border-radius: 100px;
+  background: var(--su-surface-3);
+  color: var(--su-text-1);
+}
+
+.su-badge-accent  { background: var(--su-accent-soft);  color: var(--su-accent); }
+.su-badge-success { background: var(--su-success-soft); color: var(--su-success); }
+.su-badge-danger  { background: var(--su-danger-soft);  color: var(--su-danger); }
+
+/* ============================================================
+   Components — Table
+   ============================================================ */
+.su-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--su-font-base);
+}
+
+.su-table th {
+  text-align: left;
+  padding: var(--su-space-2) var(--su-space-3);
+  font-weight: 600;
+  font-size: var(--su-font-sm);
+  color: var(--su-text-1);
+  border-bottom: 2px solid var(--su-border-0);
+}
+
+.su-table td {
+  padding: var(--su-space-2) var(--su-space-3);
+  border-bottom: 1px solid var(--su-border-1);
+}
+
+.su-table tr:hover td { background: var(--su-surface-3); }
+
+/* ============================================================
+   Components — Modal
+   ============================================================ */
+.su-modal-mask {
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--su-space-8);
+  border-radius: var(--su-radius-lg);
+}
+
+.su-modal {
+  background: var(--su-surface-2);
+  border: 1px solid var(--su-border-0);
+  border-radius: var(--su-radius-lg);
+  box-shadow: var(--su-shadow-lg);
+  backdrop-filter: var(--su-blur-surface-2);
+  -webkit-backdrop-filter: var(--su-blur-surface-2);
+  width: 100%;
+  max-width: 440px;
+  overflow: hidden;
+}
+
+.su-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--su-space-4) var(--su-space-5);
+  border-bottom: 1px solid var(--su-border-1);
+  font-weight: 600;
+}
+
+.su-modal-body { padding: var(--su-space-5); color: var(--su-text-1); }
+.su-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--su-space-2);
+  padding: var(--su-space-3) var(--su-space-5) var(--su-space-4);
+}
+
+/* ============================================================
+   Components — Tabs
+   ============================================================ */
+.su-tabs {
+  display: flex;
+  gap: var(--su-space-1);
+  border-bottom: 1px solid var(--su-border-0);
+}
+
+.su-tab {
+  padding: var(--su-space-2) var(--su-space-4);
+  font-size: var(--su-font-base);
+  font-weight: 500;
+  color: var(--su-text-1);
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--su-radius-sm) var(--su-radius-sm) 0 0;
+  transition: all var(--su-transition);
+}
+
+.su-tab:hover { color: var(--su-text-0); background: var(--su-surface-3); }
+.su-tab.active {
+  color: var(--su-accent);
+  background: var(--su-accent-soft);
+}
+
+/* ============================================================
+   Components — Checkbox / Radio
+   ============================================================ */
+.su-checkbox, .su-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--su-space-2);
+  font-size: var(--su-font-base);
+  cursor: pointer;
+  user-select: none;
+}
+
+.su-checkbox input, .su-radio input {
+  accent-color: var(--su-accent);
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================================================
+   Components — Input Group
+   ============================================================ */
+.su-input-group { display: flex; width: 100%; }
+
+.su-input-group-addon {
+  display: flex;
+  align-items: center;
+  padding: 7px 12px;
+  font-size: var(--su-font-sm);
+  color: var(--su-text-1);
+  background: var(--su-surface-3);
+  border: 1px solid var(--su-border-0);
+  white-space: nowrap;
+}
+
+.su-input-group-addon:first-child {
+  border-right: 0;
+  border-radius: var(--su-radius-sm) 0 0 var(--su-radius-sm);
+}
+
+.su-input-group .su-input { border-radius: 0; }
+.su-input-group .su-input:last-child { border-radius: 0 var(--su-radius-sm) var(--su-radius-sm) 0; }
+.su-input-group .su-input:first-child { border-radius: var(--su-radius-sm) 0 0 var(--su-radius-sm); }
+
+.su-input-group-addon:last-child {
+  border-left: 0;
+  border-radius: 0 var(--su-radius-sm) var(--su-radius-sm) 0;
+}
+
+/* ============================================================
+   Components — Button Group
+   ============================================================ */
+.su-btn-group { display: inline-flex; }
+
+.su-btn-group .su-btn { border-radius: 0; }
+.su-btn-group .su-btn:first-child { border-radius: var(--su-radius-sm) 0 0 var(--su-radius-sm); }
+.su-btn-group .su-btn:last-child { border-radius: 0 var(--su-radius-sm) var(--su-radius-sm) 0; }
+.su-btn-group .su-btn + .su-btn { margin-left: -1px; }
+
+/* ============================================================
+   Components — Node Tree
+   ============================================================ */
+.su-node-tree { display: flex; flex-direction: column; gap: 3px; }
+
+.su-node-card {
+  display: flex;
+  align-items: center;
+  gap: var(--su-space-3);
+  padding: var(--su-space-3) var(--su-space-4);
+  background: var(--su-surface-1);
+  border: 1px solid var(--su-border-0);
+  border-left: 3px solid var(--su-border-0);
+  border-radius: 0 var(--su-radius-sm) var(--su-radius-sm) 0;
+  font-size: var(--su-font-base);
+  backdrop-filter: var(--su-blur-surface-1);
+  -webkit-backdrop-filter: var(--su-blur-surface-1);
+  box-shadow: var(--su-shadow-sm);
+  transition: all var(--su-transition);
+  cursor: pointer;
+}
+
+.su-node-card:hover {
+  background: var(--su-surface-2);
+  transform: translateX(2px);
+  box-shadow: var(--su-shadow-md);
+}
+
+.su-node-icon {
+  width: 20px;
+  text-align: center;
+  font-size: var(--su-font-md);
+  flex-shrink: 0;
+}
+
+.su-node-name { font-weight: 500; }
+.su-node-type {
+  font-size: var(--su-font-xs);
+  color: var(--su-text-2);
+  margin-left: auto;
+}
+
+.su-node-children {
+  margin-left: var(--su-space-6);
+  padding-left: var(--su-space-4);
+  border-left: 1px dashed var(--su-border-0);
+}
+
+/* Swatches */
+.su-swatch-row { display: flex; flex-wrap: wrap; gap: var(--su-space-3); }
+
+.su-swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--su-space-2);
+  padding: var(--su-space-2) var(--su-space-3);
+  background: var(--su-surface-1);
+  border: 1px solid var(--su-border-0);
+  border-radius: var(--su-radius-sm);
+  font-size: var(--su-font-sm);
+  backdrop-filter: var(--su-blur-surface-1);
+  -webkit-backdrop-filter: var(--su-blur-surface-1);
+}
+
+.su-swatch-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Theme Toggle
+   ============================================================ */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--su-space-2);
+  cursor: pointer;
+  padding: var(--su-space-2) var(--su-space-3);
+  border-radius: var(--su-radius-sm);
+  border: 1px solid var(--su-border-0);
+  background: var(--su-surface-1);
+  font-size: var(--su-font-sm);
+  color: var(--su-text-1);
+  backdrop-filter: var(--su-blur-surface-1);
+  -webkit-backdrop-filter: var(--su-blur-surface-1);
+}
+
+.theme-nav {
+  display: flex;
+  gap: var(--su-space-2);
+  align-items: center;
+}
+</style>
+</head>
+<body>
+<div class="demo-container">
+
+  <div class="demo-header">
+    <div>
+      <h1>ShimmerUI — 毛玻璃分层</h1>
+      <p>半透明表面 · backdrop-blur · 纵深层次感</p>
+    </div>
+    <div class="theme-nav">
+      <a href="theme-modern.html" class="su-badge" style="text-decoration:none">极简</a>
+      <a href="theme-dark.html" class="su-badge" style="text-decoration:none">暗色工具</a>
+      <a href="theme-glass.html" class="su-badge su-badge-accent" style="text-decoration:none">毛玻璃</a>
+      <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">
+        <span id="themeIcon">🌙</span> <span id="themeLabel">Dark</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Node Tree -->
+  <div class="demo-section">
+    <h2>节点树 (Node Tree) — 核心场景</h2>
+    <div class="su-node-tree">
+      <div class="su-node-card" style="border-left-color: var(--node-flow)">
+        <span class="su-node-icon" style="color:var(--node-flow)">▦</span>
+        <span class="su-node-name">Agent Pipeline</span>
+        <span class="su-node-type">SequenceNode</span>
+      </div>
+      <div class="su-node-children">
+        <div class="su-node-card" style="border-left-color: var(--node-fragment)">
+          <span class="su-node-icon" style="color:var(--node-fragment)">▤</span>
+          <span class="su-node-name">System Prompt</span>
+          <span class="su-node-type">FragmentNode</span>
+        </div>
+        <div class="su-node-card" style="border-left-color: var(--node-fragment)">
+          <span class="su-node-icon" style="color:var(--node-fragment)">💬</span>
+          <span class="su-node-name">Append Chat History</span>
+          <span class="su-node-type">AppendChatMessagesNode</span>
+        </div>
+        <div class="su-node-card" style="border-left-color: var(--node-branch)">
+          <span class="su-node-icon" style="color:var(--node-branch)">◇</span>
+          <span class="su-node-name">Check Tool Permission</span>
+          <span class="su-node-type">IfNode</span>
+        </div>
+        <div class="su-node-card" style="border-left-color: var(--node-config)">
+          <span class="su-node-icon" style="color:var(--node-config)">⚡</span>
+          <span class="su-node-name">Select LLM API</span>
+          <span class="su-node-type">APISelectNode</span>
+        </div>
+        <div class="su-node-card" style="border-left-color: var(--node-tool)">
+          <span class="su-node-icon" style="color:var(--node-tool)">📦</span>
+          <span class="su-node-name">Load Tool Preset</span>
+          <span class="su-node-type">ToolPresetNode</span>
+        </div>
+        <div class="su-node-card" style="border-left-color: var(--node-memory)">
+          <span class="su-node-icon" style="color:var(--node-memory)">🔍</span>
+          <span class="su-node-name">Retrieve Memory</span>
+          <span class="su-node-type">MemoryRetrieveNode</span>
+        </div>
+        <div class="su-node-children">
+          <div class="su-node-card" style="border-left-color: var(--node-subagent)">
+            <span class="su-node-icon" style="color:var(--node-subagent)">🤖</span>
+            <span class="su-node-name">Sub-Agent: Planner</span>
+            <span class="su-node-type">SubAgentNode</span>
+          </div>
+          <div class="su-node-card" style="border-left-color: var(--node-debug)">
+            <span class="su-node-icon" style="color:var(--node-debug)">🖨️</span>
+            <span class="su-node-name">Debug Print</span>
+            <span class="su-node-type">PrintNode</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Node Color Tokens -->
+  <div class="demo-section">
+    <h2>节点语义颜色 Token (10 个)</h2>
+    <div class="su-swatch-row">
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-flow)"></span> flow</div>
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-branch)"></span> branch</div>
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-link)"></span> link</div>
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-fragment)"></span> fragment</div>
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-prompt)"></span> prompt</div>
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-tool)"></span> tool</div>
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-memory)"></span> memory</div>
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-config)"></span> config</div>
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-subagent)"></span> subagent</div>
+      <div class="su-swatch"><span class="su-swatch-dot" style="background:var(--node-debug)"></span> debug</div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="demo-section">
+    <h2>按钮 (Button)</h2>
+    <div class="demo-row">
+      <button class="su-btn su-btn-primary">Primary</button>
+      <button class="su-btn su-btn-secondary">Secondary</button>
+      <button class="su-btn su-btn-danger">Danger</button>
+      <button class="su-btn su-btn-ghost">Ghost</button>
+    </div>
+    <div class="demo-row">
+      <button class="su-btn su-btn-primary su-btn-sm">Small</button>
+      <button class="su-btn su-btn-primary">Default</button>
+      <button class="su-btn su-btn-primary su-btn-lg">Large</button>
+    </div>
+  </div>
+
+  <!-- Form Controls -->
+  <div class="demo-section">
+    <h2>表单 (Input / Select / Textarea)</h2>
+    <div class="demo-row" style="align-items:flex-start">
+      <div class="su-form-group" style="max-width:240px">
+        <label class="su-label">Name</label>
+        <input class="su-input" placeholder="Enter name..." />
+      </div>
+      <div class="su-form-group" style="max-width:240px">
+        <label class="su-label">Role</label>
+        <select class="su-select">
+          <option>System</option>
+          <option>User</option>
+          <option>Assistant</option>
+        </select>
+      </div>
+      <div class="su-form-group" style="max-width:320px">
+        <label class="su-label">Description</label>
+        <textarea class="su-textarea" placeholder="Write something..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card -->
+  <div class="demo-section">
+    <h2>卡片 (Card)</h2>
+    <div class="demo-grid">
+      <div class="su-card">
+        <div class="su-card-header">Model Settings <span class="su-badge su-badge-accent">Active</span></div>
+        <div class="su-card-body" style="color:var(--su-text-1)">Configure model parameters like temperature, top-p, and max tokens.</div>
+      </div>
+      <div class="su-card">
+        <div class="su-card-header">API Configuration</div>
+        <div class="su-card-body" style="display:flex;flex-direction:column;gap:var(--su-space-3)">
+          <div class="su-form-group">
+            <label class="su-label">Endpoint</label>
+            <input class="su-input" value="https://api.openai.com/v1" />
+          </div>
+          <button class="su-btn su-btn-primary su-btn-sm" style="align-self:flex-end">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="demo-section">
+    <h2>提示 (Alert)</h2>
+    <div style="display:flex;flex-direction:column;gap:var(--su-space-2)">
+      <div class="su-alert su-alert-info">Information: A new version is available.</div>
+      <div class="su-alert su-alert-success">Success: Configuration saved.</div>
+      <div class="su-alert su-alert-warning">Warning: API key will expire in 3 days.</div>
+      <div class="su-alert su-alert-danger">Error: Connection timed out.</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="demo-section">
+    <h2>标签页 (Tabs)</h2>
+    <div class="su-tabs">
+      <button class="su-tab active">General</button>
+      <button class="su-tab">Nodes</button>
+      <button class="su-tab">Tools</button>
+      <button class="su-tab">Advanced</button>
+    </div>
+    <div style="padding:var(--su-space-4);color:var(--su-text-1)">Tab content area</div>
+  </div>
+
+  <!-- Table -->
+  <div class="demo-section">
+    <h2>表格 (Table)</h2>
+    <table class="su-table">
+      <thead>
+        <tr><th>Name</th><th>Type</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>System Prompt</td><td>FragmentNode</td><td><span class="su-badge su-badge-success">OK</span></td></tr>
+        <tr><td>Select API</td><td>APISelectNode</td><td><span class="su-badge su-badge-accent">Modified</span></td></tr>
+        <tr><td>Memory Search</td><td>MemoryRetrieveNode</td><td><span class="su-badge su-badge-danger">Error</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal -->
+  <div class="demo-section">
+    <h2>弹窗 (Modal)</h2>
+    <div class="su-modal-mask">
+      <div class="su-modal">
+        <div class="su-modal-header">Delete Agent</div>
+        <div class="su-modal-body">Are you sure you want to delete this agent? This action cannot be undone.</div>
+        <div class="su-modal-footer">
+          <button class="su-btn su-btn-secondary su-btn-sm">Cancel</button>
+          <button class="su-btn su-btn-danger su-btn-sm">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input Group & Button Group -->
+  <div class="demo-section">
+    <h2>输入组 / 按钮组</h2>
+    <div class="demo-row">
+      <div class="su-input-group" style="max-width:320px">
+        <span class="su-input-group-addon">https://</span>
+        <input class="su-input" placeholder="api.example.com" />
+        <span class="su-input-group-addon">/v1</span>
+      </div>
+    </div>
+    <div class="demo-row">
+      <div class="su-btn-group">
+        <button class="su-btn su-btn-secondary">Bold</button>
+        <button class="su-btn su-btn-secondary">Italic</button>
+        <button class="su-btn su-btn-secondary">Code</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Checkbox & Badge -->
+  <div class="demo-section">
+    <h2>Checkbox / Badge</h2>
+    <div class="demo-row">
+      <label class="su-checkbox"><input type="checkbox" checked /> Enable auto-save</label>
+      <label class="su-checkbox"><input type="checkbox" /> Enable debug logs</label>
+    </div>
+    <div class="demo-row" style="margin-top:var(--su-space-2)">
+      <span class="su-badge">Default</span>
+      <span class="su-badge su-badge-accent">Accent</span>
+      <span class="su-badge su-badge-success">Success</span>
+      <span class="su-badge su-badge-danger">Danger</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeIcon').textContent = isDark ? '🌙' : '☀️';
+  document.getElementById('themeLabel').textContent = isDark ? 'Dark' : 'Light';
+  localStorage.setItem('shimmer-theme', isDark ? 'light' : 'dark');
+}
+
+(function() {
+  const saved = localStorage.getItem('shimmer-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  document.getElementById('themeIcon').textContent = saved === 'dark' ? '☀️' : '🌙';
+  document.getElementById('themeLabel').textContent = saved === 'dark' ? 'Light' : 'Dark';
+})();
+</script>
+</body>
+</html>

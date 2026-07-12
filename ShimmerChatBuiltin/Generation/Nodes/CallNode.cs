@@ -6,7 +6,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// <summary>
     /// 根据 PresetId 从 KVData 加载预设并内联执行其根节点
     /// </summary>
-    [NodeInfo("node.call_preset", Icon = "↗", Color = "#40c0a0", CategoryKeys = ["category.flow", "category.link"], DescriptionKey = "node.call_preset.desc")]
+    [NodeInfo("node.call_preset", Icon = "↗", Color = "var(--node-link)", CategoryKeys = ["category.flow", "category.link"], DescriptionKey = "node.call_preset.desc")]
     [NodeEditor(typeof(CallNodeEditor))]
     public class CallNode : IGenerationNode
     {

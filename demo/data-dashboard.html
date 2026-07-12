@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShimmerUI Demo — 数据驾驶舱</title>
+<style>
+/* ============================================================
+   Data Dashboard — Retool / Airtable / Supabase inspired
+   Core idea: maximum information density, multi-panel
+   Everything visible at once, minimal clicks
+   ============================================================ */
+
+:root {
+  --bg: #f2f3f5;
+  --surface: #ffffff;
+  --surface-alt: #f8f9fb;
+  --text: #1e1e2e;
+  --text-secondary: #6c6c80;
+  --text-tertiary: #9c9cb0;
+  --border: #e4e5ea;
+  --accent: #5b5fe3;
+  --accent-soft: #f0efff;
+  --success: #1db56a;
+  --success-soft: #e8f8f0;
+  --warning: #f0a020;
+  --warning-soft: #fef8e8;
+  --danger: #e54545;
+  --danger-soft: #fde8e8;
+
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  --radius: 6px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ============================================================
+   App Shell — Full viewport grid
+   ============================================================ */
+.app {
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr;
+  grid-template-rows: 44px 1fr 1fr;
+  height: 100vh;
+  gap: 1px;
+  background: var(--border);
+}
+
+/* ---- Top bar (spans full width) ---- */
+.topbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+}
+
+.topbar-left { display: flex; align-items: center; gap: 16px; }
+.topbar-brand { font-weight: 700; font-size: 13px; color: var(--text); }
+.topbar-breadcrumb { font-size: 11px; color: var(--text-tertiary); }
+.topbar-right { display: flex; align-items: center; gap: 6px; }
+
+.tb-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  font-family: var(--font);
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-weight: 500;
+  transition: all 100ms;
+}
+.tb-btn:hover { border-color: var(--text-tertiary); color: var(--text); }
+.tb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ---- Left panel — Agent list ---- */
+.panel-left {
+  grid-column: 1;
+  grid-row: 2 / 4;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.panel-header .count { color: var(--text-tertiary); font-weight: 400; }
+
+.panel-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Agent list items */
+.agent-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: all 80ms;
+}
+
+.agent-item:hover { background: var(--surface-alt); }
+.agent-item.active { background: var(--accent-soft); border-left-color: var(--accent); }
+
+.agent-item-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  background: var(--surface-alt);
+}
+
+.agent-item-body { flex: 1; min-width: 0; }
+.agent-item-name { font-weight: 600; font-size: 12px; }
+.agent-item-desc { font-size: 10px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.agent-item-status {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-active  { background: var(--success); }
+.status-idle    { background: var(--text-tertiary); }
+.status-error   { background: var(--danger); }
+
+/* ---- Main top panel — Pipeline overview ---- */
+.panel-main-top {
+  grid-column: 2 / 4;
+  grid-row: 2;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+
+.panel-tab {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 100ms;
+}
+
+.panel-tab:hover { color: var(--text); }
+.panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.panel-tab .badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 100px;
+  background: var(--border);
+  margin-left: 4px;
+}
+
+/* Pipeline compact view */
+.pipeline-compact {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.pipe-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 0 2px;
+  min-width: 88px;
+  cursor: pointer;
+}
+
+.pipe-node-card {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  text-align: center;
+  width: 100%;
+  transition: all 100ms;
+  border-top: 3px solid;
+}
+
+.pipe-node-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+
+.pipe-node-icon { font-size: 18px; margin-bottom: 3px; }
+.pipe-node-name { font-size: 10px; font-weight: 600; }
+.pipe-node-type { font-size: 9px; color: var(--text-tertiary); }
+
+.pipe-arrow {
+  color: var(--text-tertiary);
+  font-size: 16px;
+  align-self: center;
+  padding-bottom: 18px;
+}
+
+.pipe-node-card.pc-flow       { border-top-color: #6366f1; }
+.pipe-node-card.pc-branch     { border-top-color: #f59e0b; }
+.pipe-node-card.pc-link       { border-top-color: #10b981; }
+.pipe-node-card.pc-fragment   { border-top-color: #6366f1; }
+.pipe-node-card.pc-prompt     { border-top-color: #a855f7; }
+.pipe-node-card.pc-tool       { border-top-color: #22c55e; }
+.pipe-node-card.pc-memory     { border-top-color: #eab308; }
+.pipe-node-card.pc-config     { border-top-color: #ef4444; }
+.pipe-node-card.pc-subagent   { border-top-color: #ec4899; }
+.pipe-node-card.pc-debug      { border-top-color: #94a3b8; }
+
+/* ---- Main bottom panels (2 columns) ---- */
+.panel-bottom-left {
+  grid-column: 2;
+  grid-row: 3;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-bottom-right {
+  grid-column: 3;
+  grid-row: 3;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Data table (compact) */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.data-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+
+.data-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.data-table tr:hover td { background: var(--surface-alt); }
+
+.data-table .mono     { font-family: var(--font-mono); font-size: 10px; }
+.data-table .num      { text-align: right; }
+.data-table .tag      { font-size: 9px; padding: 1px 5px; border-radius: 3px; }
+.data-table .tag-ok   { background: var(--success-soft); color: var(--success); }
+.data-table .tag-warn { background: var(--warning-soft); color: var(--warning); }
+.data-table .tag-err  { background: var(--danger-soft); color: var(--danger); }
+
+/* Mini stats */
+.mini-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 8px 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mini-stat {
+  text-align: center;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.mini-stat-value { font-size: 18px; font-weight: 700; font-family: var(--font-mono); }
+.mini-stat-label { font-size: 9px; color: var(--text-tertiary); text-transform: uppercase; margin-top: 1px; }
+
+/* ============================================================
+   Demo nav
+   ============================================================ */
+.demo-nav {
+  position: fixed;
+  top: 6px;
+  right: 6px;
+  z-index: 200;
+  display: flex;
+  gap: 3px;
+}
+.demo-nav a {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  font-family: var(--font);
+}
+.demo-nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="demo-nav">
+  <a href="theme-modern.html">极简</a>
+  <a href="theme-dark.html">暗色工具</a>
+  <a href="theme-glass.html">毛玻璃</a>
+  <a href="canvas-flow.html">画布</a>
+  <a href="command-center.html">命令中心</a>
+  <a href="doc-inline.html">文档内联</a>
+  <a href="data-dashboard.html" class="active">驾驶舱</a>
+</div>
+
+<div class="app">
+
+  <!-- ======== TOP BAR ======== -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-brand">ShimmerChat</span>
+      <span class="topbar-breadcrumb">Dashboard / Agent Overview</span>
+    </div>
+    <div class="topbar-right">
+      <button class="tb-btn">Import</button>
+      <button class="tb-btn primary">+ New Agent</button>
+    </div>
+  </div>
+
+  <!-- ======== LEFT PANEL — Agent List ======== -->
+  <div class="panel-left">
+    <div class="panel-header">
+      Agents <span class="count">5</span>
+      <span style="cursor:pointer;font-size:14px">+</span>
+    </div>
+    <div class="panel-scroll">
+      <div class="agent-item active">
+        <div class="agent-item-icon">🤖</div>
+        <div class="agent-item-body">
+          <div class="agent-item-name">Assistant Pipeline</div>
+          <div class="agent-item-desc">8 nodes · GPT-4o</div>
+        </div>
+        <span class="agent-item-status status-active"></span>
+      </div>
+      <div class="agent-item">
+        <div class="agent-item-icon">📝</div>
+        <div class="agent-item-body">
+          <div class="agent-item-name">Writer Agent</div>
+          <div class="agent-item-desc">5 nodes · Claude 3.5</div>
+        </div>
+        <span class="agent-item-status status-idle"></span>
+      </div>
+      <div class="agent-item">
+        <div class="agent-item-icon">🔧</div>
+        <div class="agent-item-body">
+          <div class="agent-item-name">Code Review Bot</div>
+          <div class="agent-item-desc">12 nodes · GPT-4o</div>
+        </div>
+        <span class="agent-item-status status-active"></span>
+      </div>
+      <div class="agent-item">
+        <div class="agent-item-icon">🔍</div>
+        <div class="agent-item-body">
+          <div class="agent-item-name">Research Agent</div>
+          <div class="agent-item-desc">6 nodes · Claude 3.5</div>
+        </div>
+        <span class="agent-item-status status-error"></span>
+      </div>
+      <div class="agent-item">
+        <div class="agent-item-icon">🎨</div>
+        <div class="agent-item-body">
+          <div class="agent-item-name">Image Generator</div>
+          <div class="agent-item-desc">4 nodes · DALL-E API</div>
+        </div>
+        <span class="agent-item-status status-idle"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== MAIN TOP — Pipeline Overview ======== -->
+  <div class="panel-main-top">
+    <div class="panel-tabs">
+      <span class="panel-tab active">Pipeline<span class="badge">8</span></span>
+      <span class="panel-tab">Tools<span class="badge">3</span></span>
+      <span class="panel-tab">Settings</span>
+      <span class="panel-tab">Variables</span>
+    </div>
+
+    <!-- Compact horizontal pipeline -->
+    <div class="pipeline-compact" style="padding:12px 14px">
+      <div class="pipe-node">
+        <div class="pipe-node-card pc-flow">
+          <div class="pipe-node-icon">▦</div>
+          <div class="pipe-node-name">Entry</div>
+          <div class="pipe-node-type">Sequence</div>
+        </div>
+      </div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-node">
+        <div class="pipe-node-card pc-fragment">
+          <div class="pipe-node-icon">▤</div>
+          <div class="pipe-node-name">Prompt</div>
+          <div class="pipe-node-type">Fragment</div>
+        </div>
+      </div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-node">
+        <div class="pipe-node-card pc-fragment">
+          <div class="pipe-node-icon">💬</div>
+          <div class="pipe-node-name">History</div>
+          <div class="pipe-node-type">Chat Msg</div>
+        </div>
+      </div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-node">
+        <div class="pipe-node-card pc-branch">
+          <div class="pipe-node-icon">◇</div>
+          <div class="pipe-node-name">Check</div>
+          <div class="pipe-node-type">If</div>
+        </div>
+      </div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-node">
+        <div class="pipe-node-card pc-config">
+          <div class="pipe-node-icon">⚡</div>
+          <div class="pipe-node-name">API</div>
+          <div class="pipe-node-type">Select</div>
+        </div>
+      </div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-node">
+        <div class="pipe-node-card pc-tool">
+          <div class="pipe-node-icon">📦</div>
+          <div class="pipe-node-name">Tools</div>
+          <div class="pipe-node-type">Preset</div>
+        </div>
+      </div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-node">
+        <div class="pipe-node-card pc-memory">
+          <div class="pipe-node-icon">🔍</div>
+          <div class="pipe-node-name">Memory</div>
+          <div class="pipe-node-type">Retrieve</div>
+        </div>
+      </div>
+      <span class="pipe-arrow">→</span>
+      <div class="pipe-node">
+        <div class="pipe-node-card pc-subagent">
+          <div class="pipe-node-icon">🤖</div>
+          <div class="pipe-node-name">Planner</div>
+          <div class="pipe-node-type">SubAgent</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== BOTTOM LEFT — Recent Runs ======== -->
+  <div class="panel-bottom-left">
+    <div class="panel-header">Recent Runs</div>
+    <div style="flex:1;overflow:auto">
+      <table class="data-table">
+        <thead>
+          <tr><th>Time</th><th>Duration</th><th>Tokens</th><th>Tools</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">14:32:05</td>
+            <td class="mono num">2.4s</td>
+            <td class="num">2,048</td>
+            <td class="num">4</td>
+            <td><span class="tag tag-ok">OK</span></td>
+          </tr>
+          <tr>
+            <td class="mono">14:28:12</td>
+            <td class="mono num">1.8s</td>
+            <td class="num">1,536</td>
+            <td class="num">2</td>
+            <td><span class="tag tag-ok">OK</span></td>
+          </tr>
+          <tr>
+            <td class="mono">14:15:44</td>
+            <td class="mono num">5.1s</td>
+            <td class="num">8,192</td>
+            <td class="num">8</td>
+            <td><span class="tag tag-warn">Slow</span></td>
+          </tr>
+          <tr>
+            <td class="mono">13:58:20</td>
+            <td class="mono num">0.8s</td>
+            <td class="num">512</td>
+            <td class="num">0</td>
+            <td><span class="tag tag-err">Error</span></td>
+          </tr>
+          <tr>
+            <td class="mono">13:45:01</td>
+            <td class="mono num">3.2s</td>
+            <td class="num">4,096</td>
+            <td class="num">6</td>
+            <td><span class="tag tag-ok">OK</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ======== BOTTOM RIGHT — Stats + Tool Usage ======== -->
+  <div class="panel-bottom-right">
+    <div class="mini-stats">
+      <div class="mini-stat">
+        <div class="mini-stat-value" style="color:var(--accent)">847</div>
+        <div class="mini-stat-label">Total Runs</div>
+      </div>
+      <div class="mini-stat">
+        <div class="mini-stat-value" style="color:var(--success)">98.2%</div>
+        <div class="mini-stat-label">Success Rate</div>
+      </div>
+      <div class="mini-stat">
+        <div class="mini-stat-value">2.4s</div>
+        <div class="mini-stat-label">Avg Latency</div>
+      </div>
+      <div class="mini-stat">
+        <div class="mini-stat-value">3,210</div>
+        <div class="mini-stat-label">Avg Tokens</div>
+      </div>
+    </div>
+    <div class="panel-header">Tool Usage</div>
+    <div style="flex:1;overflow:auto">
+      <table class="data-table">
+        <thead>
+          <tr><th>Tool</th><th class="num">Calls</th><th class="num">Avg ms</th><th class="num">Err%</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Filesystem</td><td class="num">2,341</td><td class="mono num">45</td><td class="num">0.2%</td></tr>
+          <tr><td>Memory</td><td class="num">1,892</td><td class="mono num">32</td><td class="num">0.1%</td></tr>
+          <tr><td>Web Search</td><td class="num">892</td><td class="mono num">320</td><td class="num">1.8%</td></tr>
+          <tr><td>Sub-Agent</td><td class="num">445</td><td class="mono num">180</td><td class="num">3.1%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

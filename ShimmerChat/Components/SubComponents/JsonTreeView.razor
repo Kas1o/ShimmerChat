@@ -1,10 +1,10 @@
 ﻿@using Newtonsoft.Json.Linq
 
-<div class="json-tree-node ms-2">
+<div class="json-tree-node su-ms-2">
     @if (Token is JObject jObject)
     {
-        <div class="d-flex align-items-center">
-            <span class="text-secondary me-2"
+        <div class="su-flex su-items-center">
+            <span class="su-text-1 su-me-2"
                   style="width: 20px; cursor: pointer;"
                   @onclick="ToggleExpand">
                 @if (_isExpanded)
@@ -17,20 +17,20 @@
                     <small>▶</small>
                 }
             </span>
-            <span class="text-muted small me-2">Object</span>
+            <span class="su-text-2 su-text-xs su-me-2">Object</span>
             @if (!_isExpanded)
             {
-                <span class="text-muted small fst-italic">{ @jObject.Count properties }</span>
+                <span class="su-text-2 su-text-xs su-font-italic">{ @jObject.Count properties }</span>
             }
         </div>
 
         @if (_isExpanded)
         {
-            <div class="border-start ps-3 mt-1">
+            <div class="su-border-start su-ps-3 su-mt-1">
                 @foreach (var property in jObject.Properties())
                 {
-                    <div class="mb-1">
-                        <span class="fw-bold text-primary user-select-none">@property.Name</span>:
+                    <div class="su-mb-1">
+                        <span class="su-font-bold su-text-accent su-select-none">@property.Name</span>:
                         <JsonTreeView Token="property.Value"
                                       CurrentLevel="@(CurrentLevel + 1)"
                                       DefaultExpandLevel="DefaultExpandLevel" />
@@ -41,8 +41,8 @@
     }
     else if (Token is JArray jArray)
     {
-        <div class="d-flex align-items-center">
-            <span class="text-secondary me-2"
+        <div class="su-flex su-items-center">
+            <span class="su-text-1 su-me-2"
                   style="width: 20px; cursor: pointer;"
                   @onclick="ToggleExpand">
                 @if (_isExpanded)
@@ -55,20 +55,20 @@
                     <small>▶</small>
                 }
             </span>
-            <span class="text-muted small me-2">Array[@jArray.Count]</span>
+            <span class="su-text-2 su-text-xs su-me-2">Array[@jArray.Count]</span>
             @if (!_isExpanded)
             {
-                <span class="text-muted small fst-italic">[ ... ]</span>
+                <span class="su-text-2 su-text-xs su-font-italic">[ ... ]</span>
             }
         </div>
 
         @if (_isExpanded)
         {
-            <div class="border-start ps-3 mt-1">
+            <div class="su-border-start su-ps-3 su-mt-1">
                 @for (int i = 0; i < jArray.Count; i++)
                 {
-                    <div class="mb-1">
-                        <span class="text-muted small user-select-none">[@i]</span>:
+                    <div class="su-mb-1">
+                        <span class="su-text-2 su-text-xs su-select-none">[@i]</span>:
                         <JsonTreeView Token="jArray[i]"
                                       CurrentLevel="@(CurrentLevel + 1)"
                                       DefaultExpandLevel="DefaultExpandLevel" />
@@ -85,7 +85,7 @@
     }
     else
     {
-        <span class="text-muted">Unknown Type</span>
+        <span class="su-text-2">Unknown Type</span>
     }
 </div>
 
@@ -112,11 +112,11 @@
     {
         return value.Type switch
         {
-            JTokenType.String => "text-success font-monospace",
-            JTokenType.Integer or JTokenType.Float => "text-primary font-monospace",
-            JTokenType.Boolean => "text-danger font-monospace",
-            JTokenType.Null or JTokenType.Undefined => "text-muted font-monospace",
-            _ => "text-dark font-monospace"
+            JTokenType.String => "su-text-success su-font-mono",
+            JTokenType.Integer or JTokenType.Float => "su-text-accent su-font-mono",
+            JTokenType.Boolean => "su-text-danger su-font-mono",
+            JTokenType.Null or JTokenType.Undefined => "su-text-2 su-font-mono",
+            _ => "su-text-0 su-font-mono"
         };
     }
 

@@ -118,11 +118,11 @@
 
                         <div class="pagination-bar shimmer-group">
                             <div class="pagination-left">
-                                <button class="btn btn-secondary btn-sm" @onclick="GoToPreviousPage" disabled="@(CurrentPage <= 1)">
+                                <button class="su-btn su-btn-secondary su-btn-sm" @onclick="GoToPreviousPage" disabled="@(CurrentPage <= 1)">
                                     <i class="bi bi-chevron-left"></i>
                                 </button>
                                 <span>@CurrentPage / @TotalPages</span>
-                                <button class="btn btn-secondary btn-sm" @onclick="GoToNextPage" disabled="@(CurrentPage >= TotalPages)">
+                                <button class="su-btn su-btn-secondary su-btn-sm" @onclick="GoToNextPage" disabled="@(CurrentPage >= TotalPages)">
                                     <i class="bi bi-chevron-right"></i>
                                 </button>
                             </div>
@@ -145,8 +145,8 @@
                             <h5>Delete Chat</h5>
                             <p>Are you sure you want to delete the chat "@ChatToDelete?.Name"?</p>
                             <div class="popup-actions">
-                                <button class="btn btn-secondary" @onclick="() => DeleteChatPopupVisible=false">Cancel</button>
-                                <button class="btn btn-danger" @onclick="DeleteChatConfirmed">Delete</button>
+                                <button class="su-btn su-btn-secondary" @onclick="() => DeleteChatPopupVisible=false">Cancel</button>
+                                <button class="su-btn su-btn-danger" @onclick="DeleteChatConfirmed">Delete</button>
                             </div>
                         </div>
                     </div>
@@ -240,10 +240,10 @@
                                     <span class="gen-config-hint">This agent has a custom modifier tree.</span>
                                 </div>
                                 <div style="margin-top:8px; display:flex; gap:8px;">
-                                    <button class="btn btn-primary btn-sm" @onclick="EditPrivateTree">
+                                    <button class="su-btn su-btn-primary su-btn-sm" @onclick="EditPrivateTree">
                                         <i class="bi bi-pencil"></i> Edit Private Tree
                                     </button>
-                                    <button class="btn btn-outline-secondary btn-sm" @onclick="RevertToPreset">
+                                    <button class="su-btn su-btn-outline su-btn-sm" @onclick="RevertToPreset">
                                         <i class="bi bi-arrow-counterclockwise"></i> Revert to Preset
                                     </button>
                                 </div>
@@ -262,7 +262,7 @@
                                             <option value="@p.Id">@p.Name</option>
                                         }
                                     </select>
-                                    <button class="btn btn-outline-primary btn-sm" @onclick="CreatePrivateTree">
+                                    <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePrivateTree">
                                         <i class="bi bi-pencil"></i> Create Private Tree
                                     </button>
                                 </div>
@@ -278,7 +278,7 @@
                     </div>
 
                     <div class="settings-actions">
-                        <button class="btn btn-primary" @onclick="Export">
+                        <button class="su-btn su-btn-primary" @onclick="Export">
                             <i class="bi bi-download"></i> Export Agent
                         </button>
                     </div>
