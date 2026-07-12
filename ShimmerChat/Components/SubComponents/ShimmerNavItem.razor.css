@@ -1,0 +1,56 @@
+::deep .shimmer-nav-item {
+    display: block;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    margin: 4px 8px;
+    transition: var(--transition);
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--color-text-secondary);
+    background-color: transparent;
+    border: none;
+    width: calc(100% - 16px);
+}
+
+::deep .shimmer-nav-item:hover {
+    background-color: var(--color-surface);
+    color: var(--color-primary);
+    transform: translateX(4px);
+}
+
+::deep .shimmer-nav-item.active {
+    background-color: var(--color-primary-light);
+    color: var(--color-primary);
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+}
+
+.nav-item-content {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.nav-icon {
+    margin-right: 12px;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+}
+
+.nav-text {
+    flex: 1;
+}
+
+.nav-badge {
+    background-color: var(--color-primary);
+    color: white;
+    font-size: 0.8rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    min-width: 24px;
+    text-align: center;
+    font-weight: 600;
+}
