@@ -589,9 +589,8 @@
 			continuationMessage.GenerationState = MessageGenerationState.Generating;
 			string originalContent = continuationMessage.CurrentVersion?.Content ?? "";
 
-			await generationManager.GenerateContinuationStreamAsync(
+			await generationManager.GenerateStreamAsync(
 				agent, chat,
-				continuationMessage,
 				onStreamDelta: async (accumulated) =>
 				{
 					// 将新内容追加到原始内容后面
@@ -622,15 +621,19 @@
 					ChatPluginPanelContainer?.OnAgentMessage(continuationMessage);
 					await InvokeAsync(StateHasChanged);
 				},
+				onToolCall: null!,
+				onToolResult: null!,
 				cancellationToken
 			);
 		}
 		catch (OperationCanceledException)
 		{
+			continuationMessage.IsContinuation = false;
 			// 操作被用户取消，这是预期行为，不需要显示错误
 		}
 		catch (Exception ex)
 		{
+			continuationMessage.IsContinuation = false;
 			// 发生错误时，标记所有生成中的消息为完成状态
 			foreach (var msg in messages.Where(m => m.IsGenerating))
 			{

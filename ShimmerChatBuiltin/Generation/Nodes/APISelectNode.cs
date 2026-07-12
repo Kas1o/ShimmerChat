@@ -8,6 +8,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// <summary>
     /// 设置 TransientEnv.API。
     /// APIIndex: -1 表示使用全局选中 API；>=0 表示使用指定索引的 API 配置。
+    /// 同时处理续写（IsContinuation）标记。
     /// </summary>
     [NodeInfo("node.api_select", Icon = "⚡", Color = "#e07070", CategoryKeys = ["category.config"], DescriptionKey = "node.api_select.desc")]
     [NodeEditor(typeof(APISelectNodeEditor))]
@@ -40,10 +41,35 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 int.TryParse(globalIndexStr, out index);
             }
 
-            if (index >= 0 && index < settings.Count)
-                context.Env.Transient.API = settings[index].ToAPISetting();
-            else
-                context.Env.Transient.API = settings[0].ToAPISetting();
+            var selectedConfig = index >= 0 && index < settings.Count
+                ? settings[index]
+                : settings[0];
+
+            context.Env.Transient.API = selectedConfig.ToAPISetting();
+
+            // 续写处理：检查 SharedState 中的 IsContinuation 标记
+            if (context.Env.Transient.SharedState.TryGetValue("IsContinuation", out var isCont)
+                && isCont is true)
+            {
+                if (selectedConfig.Type == ApiConfigType.OpenAI
+                    || selectedConfig.Type == ApiConfigType.DeepSeek)
+                {
+                    var messages = context.Env.Transient.SharedState["ChatMessages"] as List<Message>;
+                    var lastAi = messages?.LastOrDefault(m => m.sender == Sender.AI);
+                    if (lastAi != null)
+                    {
+                        lastAi.message.CustomProperties ??= new Dictionary<string, object>();
+                        lastAi.message.CustomProperties["prefix"] = true;
+                    }
+                }
+                else
+                {
+                    return Task.FromResult(NodeResult.Failure(
+                        NodeErrorCodes.ApiUnavailable,
+                        $"APISelect: Continuation requested but API type '{selectedConfig.Type}' does not support prefix continuation.",
+                        nodeId: Id, nodeName: Name));
+                }
+            }
 
             return Task.FromResult(NodeResult.SuccessResult());
         }

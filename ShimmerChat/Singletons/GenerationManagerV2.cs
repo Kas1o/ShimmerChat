@@ -107,43 +107,6 @@ namespace ShimmerChat.Singletons
         }
 
         /// <summary>
-        /// 流式继续生成（给最后一条 AI 消息追加 prefix: true 参数）
-        /// </summary>
-        public async Task GenerateContinuationStreamAsync(
-            Agent agent, Chat chat, Message continuationMessage,
-            Func<ResponseEx, Task> onStreamDelta,
-            Func<ResponseEx, Task> onAssistantComplete,
-            CancellationToken cancellationToken)
-        {
-            continuationMessage.message.CustomProperties ??= new Dictionary<string, object>();
-            continuationMessage.message.CustomProperties["prefix"] = true;
-
-            var env = await BuildEnvironment(agent, chat, cancellationToken);
-
-            var host = new MainLoopHost(this, agent, chat, env,
-                onStreamDelta, onAssistantComplete, null, null,
-                cancellationToken);
-
-            var apiSetting = env.Transient.API
-                ?? throw new InvalidOperationException("No API configured.");
-
-            if (!apiSetting.SupportsStreaming)
-            {
-                var pb = host.BuildPromptBuilder(env.Transient.Tools.Select(t => t.GetDefinition()).ToList());
-                var response = await apiSetting.ChatClient.GenerateAsync(pb);
-                await host.OnStreamDeltaAsync(response, cancellationToken);
-                await host.OnAssistantCompleteAsync(response, cancellationToken);
-                return;
-            }
-
-            await _loop.RunAsync(
-                apiSetting.ChatClient,
-                env.Transient.Tools.Select(t => t.GetDefinition()).ToList(),
-                host,
-                ct: cancellationToken);
-        }
-
-        /// <summary>
         /// 非流式生成 AI 响应
         /// </summary>
         public async Task GenerateAsync(
@@ -190,6 +153,11 @@ namespace ShimmerChat.Singletons
 
             var env = new GenerationEnv(persistent);
             env.Transient.SharedState["ChatMessages"] = chat.Messages.ToList();
+
+            // 续写检测：最后一条 AI 消息带 IsContinuation 标记
+            var lastMsg = chat.Messages.LastOrDefault();
+            if (lastMsg?.IsContinuation == true)
+                env.Transient.SharedState["IsContinuation"] = true;
 
             var context = new NodeExecutionContext(env, ct);
             var result = await rootNode.ExecuteAsync(context);
