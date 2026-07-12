@@ -6,7 +6,7 @@
 @inject ILocService Loc
 @implements IDisposable
 
-<div class="@(IsPortrait ? "shimmer-nav-portrait" : "shimmer-sidebar")">
+<div class="@(IsPortrait ? "shimmer-nav-portrait" : "")">
     @if (!IsPortrait)
     {
         <div class="shimmer-nav-header">

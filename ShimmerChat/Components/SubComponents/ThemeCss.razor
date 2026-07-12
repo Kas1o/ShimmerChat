@@ -1,0 +1,82 @@
+@using ShimmerChatLib.Interface
+@inject IThemeService ThemeService
+@implements IDisposable
+
+@if (ThemeService.CurrentTheme != null)
+{
+    var t = ThemeService.CurrentTheme;
+    <style>
+        :root {
+            --su-surface-0: @t.Surface0;
+            --su-surface-1: @t.Surface1;
+            --su-surface-2: @t.Surface2;
+            --su-surface-3: @t.Surface3;
+            --su-text-0: @t.Text0;
+            --su-text-1: @t.Text1;
+            --su-text-2: @t.Text2;
+            --su-border-0: @t.Border0;
+            --su-border-1: @t.Border1;
+            --su-accent: @t.Accent;
+            --su-accent-hover: @t.AccentHover;
+            --su-accent-soft: @t.AccentSoft;
+            --su-success: @t.Success;
+            --su-success-soft: @t.SuccessSoft;
+            --su-warning: @t.Warning;
+            --su-warning-soft: @t.WarningSoft;
+            --su-danger: @t.Danger;
+            --su-danger-soft: @t.DangerSoft;
+            --su-info: @t.Info;
+            --su-info-soft: @t.InfoSoft;
+            --node-flow: @t.NodeFlow;
+            --node-branch: @t.NodeBranch;
+            --node-link: @t.NodeLink;
+            --node-fragment: @t.NodeFragment;
+            --node-prompt: @t.NodePrompt;
+            --node-tool: @t.NodeTool;
+            --node-memory: @t.NodeMemory;
+            --node-config: @t.NodeConfig;
+            --node-subagent: @t.NodeSubagent;
+            --node-debug: @t.NodeDebug;
+            --su-shadow-sm: @t.ShadowSm;
+            --su-shadow-md: @t.ShadowMd;
+            --su-shadow-lg: @t.ShadowLg;
+            --su-radius-sm: @t.RadiusSm;
+            --su-radius-md: @t.RadiusMd;
+            --su-radius-lg: @t.RadiusLg;
+            --su-space-1: @t.Space1;
+            --su-space-2: @t.Space2;
+            --su-space-3: @t.Space3;
+            --su-space-4: @t.Space4;
+            --su-space-5: @t.Space5;
+            --su-space-6: @t.Space6;
+            --su-space-8: @t.Space8;
+            --su-space-10: @t.Space10;
+            --su-font-sans: @t.FontSans;
+            --su-font-mono: @t.FontMono;
+            --su-font-xs: @t.FontXs;
+            --su-font-sm: @t.FontSm;
+            --su-font-base: @t.FontBase;
+            --su-font-md: @t.FontMd;
+            --su-font-lg: @t.FontLg;
+            --su-border-size: @t.BorderSize;
+            --su-transition: @t.Transition;
+        }
+        [data-theme="dark"] { }
+        @if (!string.IsNullOrEmpty(t.CustomCss))
+        {
+            @((MarkupString)t.CustomCss)
+        }
+    </style>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        ThemeService.OnThemeChanged += _ => InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= _ => InvokeAsync(StateHasChanged);
+    }
+}
