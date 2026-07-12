@@ -2,16 +2,17 @@
 @using ShimmerChatLib
 @using ShimmerChatLib.Generation
 @inject IKVDataService KVData
+@inject ILocService Loc
 
 <div class="api-select-editor">
     <div class="ge-field">
-        <label class="ge-label" title="Select which API configuration to use for this generation">
-            API Config
+        <label class="ge-label" title="@Loc["node.api_select.tooltip"]">
+            @Loc["node.api_select.label"]
         </label>
         <div class="ge-value">
             <select class="ge-select" @bind="SelectedIndex" @bind:event="onchange"
                     style="width: 100%; max-width: 400px;">
-                <option value="-2">Use global default API</option>
+                <option value="-2">@Loc["node.api_select.global_default"]</option>
                 @for (int i = 0; i < _settings.Count; i++)
                 {
                     <option value="@i">@_settings[i].Name (@_settings[i].Type)</option>
@@ -20,20 +21,29 @@
             @if (_settings.Count == 0)
             {
                 <div style="font-size: 0.75em; color: #e66; margin-top: 4px;">
-                    No API settings configured. Please add one in the API Settings panel.
+                    @Loc["node.api_select.no_settings"]
                 </div>
             }
             else
             {
                 <div style="font-size: 0.72em; color: #666; margin-top: 4px;">
                     @(SelectedIndex == -2
-                        ? "Will use the globally selected API from API Settings."
+                        ? Loc["node.api_select.using_global"]
                         : SelectedIndex >= 0 && SelectedIndex < _settings.Count
-                            ? $"Using: {_settings[SelectedIndex].Name} ({_settings[SelectedIndex].Type}) — {(_settings[SelectedIndex].EnableStream ? "streaming" : "non-streaming")}"
+                            ? string.Format(Loc["node.api_select.using_format"],
+                                _settings[SelectedIndex].Name,
+                                _settings[SelectedIndex].Type,
+                                _settings[SelectedIndex].EnableStream
+                                    ? Loc["node.api_select.streaming"]
+                                    : Loc["node.api_select.non_streaming"])
                             : "")
                 </div>
             }
         </div>
+    </div>
+
+    <div style="font-size: 0.72em; color: #666; margin-top: 8px; padding: 6px 8px; background: #f4f4f4; border-left: 3px solid #aaa; border-radius: 2px; line-height: 1.5;">
+        @Loc["node.api_select.order_hint"]
     </div>
 </div>
 

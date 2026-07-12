@@ -93,5 +93,15 @@
   "Trim Stop": "Trim Stop",
   "Bypass EOS": "Bypass EOS",
   "Note: Logit bias settings are available in the API but not configurable through this interface.": "Note: Logit bias settings are available in the API but not configurable through this interface.",
-  "Completion Type:": "Completion Type:"
+  "Completion Type:": "Completion Type:",
+
+  "node.api_select.label": "API Config",
+  "node.api_select.tooltip": "Select which API configuration to use for this generation",
+  "node.api_select.global_default": "Use global default API",
+  "node.api_select.no_settings": "No API settings configured. Please add one in the API Settings panel.",
+  "node.api_select.using_global": "Will use the globally selected API from API Settings.",
+  "node.api_select.using_format": "Using: {0} ({1}) — {2}",
+  "node.api_select.streaming": "streaming",
+  "node.api_select.non_streaming": "non-streaming",
+  "node.api_select.order_hint": "Order-sensitive: place AFTER AppendChatMessagesNode. When using Continue: do not insert fragment nodes after the last AI message — the prefix marker targets the final AI message in the fragment list."
 }
