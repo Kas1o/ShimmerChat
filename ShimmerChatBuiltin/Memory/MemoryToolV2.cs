@@ -64,7 +64,7 @@ namespace ShimmerChatBuiltin.Memory
             var eUri = _kvData.Read("EmbeddingAPI", "uri") ?? string.Empty;
             var eApiKey = _kvData.Read("EmbeddingAPI", "apikey") ?? string.Empty;
             var eModelName = _kvData.Read("EmbeddingAPI", "modelname") ?? string.Empty;
-            var api = new OpenAIAPI(eUri, eApiKey, eModelName);
+            var api = new OpenAIChatCompletionClient(eUri, eApiKey, eModelName);
 
             var exists = await qclient.CollectionExistsAsync($"{_agentGuid}");
             if (!exists)
@@ -84,7 +84,7 @@ namespace ShimmerChatBuiltin.Memory
             };
         }
 
-        private static async Task<string> HandleAdd(QdrantClient qclient, OpenAIAPI api, InputAction action, string collectionName)
+        private static async Task<string> HandleAdd(QdrantClient qclient, OpenAIChatCompletionClient api, InputAction action, string collectionName)
         {
             if (action.content == null) return "Content cannot be null when adding memory.";
             var embd = await api.GetEmbedding(action.content);
@@ -105,7 +105,7 @@ namespace ShimmerChatBuiltin.Memory
             return $"Memory with ID {action.id} deleted.";
         }
 
-        private static async Task<string> HandleSearch(QdrantClient qclient, OpenAIAPI api, InputAction action, string collectionName)
+        private static async Task<string> HandleSearch(QdrantClient qclient, OpenAIChatCompletionClient api, InputAction action, string collectionName)
         {
             if (action.content == null) return "Content cannot be null when searching memory.";
             var sb = new System.Text.StringBuilder();

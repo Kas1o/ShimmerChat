@@ -41,7 +41,7 @@
     [Parameter] public APISelectNode Node { get; set; } = default!;
     [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
 
-    private List<ApiSetting> _settings = [];
+    private List<ApiConfig> _settings = [];
 
     private int SelectedIndex
     {
@@ -57,7 +57,7 @@
     protected override void OnInitialized()
     {
         var json = KVData.Read("ApiSettings", "apiSetting") ?? "[]";
-        _settings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? [];
+        _settings = JsonConvert.DeserializeObject<List<ApiConfig>>(json) ?? [];
 
         if (Node.APIIndex == -1)
             SelectedIndex = -2;

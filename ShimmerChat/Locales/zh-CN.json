@@ -50,9 +50,9 @@
   "API REASONING EFFORT OFF": "关闭",
   "PseudoAPI Info Title": "伪 API（不进行生成）",
   "PseudoAPI Info Description": "此 API 类型不会执行任何 AI 生成，而是直接返回最后一段消息内容作为响应。它专为高级自定义的 Agentic 工作流而设计，普通用户无需使用。",
+  "OpenAIText Warning Title": "注意：OpenAI 文本补全（/completions）",
+  "OpenAIText Warning Description": "大部分 OpenAI 兼容端点已废弃 /completions 接口。如果此模式无法正常工作，请改用 OpenAI（chat）类型。仅当你的 API 明确支持 /completions 端点时才应使用此选项。",
 
-  "Chat Completion": "聊天补全",
-  "Text Completion": "文本补全",
   "Text Completion Settings:": "文本补全设置：",
   "Create New Text Completion Setting Profile": "创建新文本补全设置",
   "NAME:": "名称：",

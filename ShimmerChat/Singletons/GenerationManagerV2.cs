@@ -84,11 +84,23 @@ namespace ShimmerChat.Singletons
                 onStreamDelta, onAssistantComplete, onToolCall, onToolResult,
                 cancellationToken);
 
-            var api = env.Transient.API
+            var apiSetting = env.Transient.API
                 ?? throw new InvalidOperationException("No API configured.");
 
+            if (!apiSetting.SupportsToolCalling && env.Transient.Tools.Count > 0)
+                Console.WriteLine($"[GenerationManagerV2] Warning: API does not support tool calling, but {env.Transient.Tools.Count} tool(s) are registered.");
+
+            if (!apiSetting.SupportsStreaming)
+            {
+                var pb = host.BuildPromptBuilder(env.Transient.Tools.Select(t => t.GetDefinition()).ToList());
+                var response = await apiSetting.ChatClient.GenerateAsync(pb);
+                await host.OnStreamDeltaAsync(response, cancellationToken);
+                await host.OnAssistantCompleteAsync(response, cancellationToken);
+                return;
+            }
+
             await _loop.RunAsync(
-                api,
+                apiSetting.ChatClient,
                 env.Transient.Tools.Select(t => t.GetDefinition()).ToList(),
                 host,
                 ct: cancellationToken);
@@ -112,11 +124,20 @@ namespace ShimmerChat.Singletons
                 onStreamDelta, onAssistantComplete, null, null,
                 cancellationToken);
 
-            var api = env.Transient.API
+            var apiSetting = env.Transient.API
                 ?? throw new InvalidOperationException("No API configured.");
 
+            if (!apiSetting.SupportsStreaming)
+            {
+                var pb = host.BuildPromptBuilder(env.Transient.Tools.Select(t => t.GetDefinition()).ToList());
+                var response = await apiSetting.ChatClient.GenerateAsync(pb);
+                await host.OnStreamDeltaAsync(response, cancellationToken);
+                await host.OnAssistantCompleteAsync(response, cancellationToken);
+                return;
+            }
+
             await _loop.RunAsync(
-                api,
+                apiSetting.ChatClient,
                 env.Transient.Tools.Select(t => t.GetDefinition()).ToList(),
                 host,
                 ct: cancellationToken);

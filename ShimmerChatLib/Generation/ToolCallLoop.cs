@@ -11,7 +11,7 @@ namespace ShimmerChatLib.Generation;
 public class ToolCallLoop
 {
     public async Task RunAsync(
-        ILLMAPI api,
+        IChatCompletionClient api,
         IReadOnlyList<Tool> toolDefinitions,
         IToolCallLoopHost host,
         int maxRounds = 50,
@@ -30,7 +30,7 @@ public class ToolCallLoop
                 FinishReason = FinishReason.None
             };
 
-            await foreach (var chunk in api.GenerateChatExStream(pb, ct))
+            await foreach (var chunk in api.GenerateStreamAsync(pb, ct))
             {
                 Accumulate(chunk, accumulated);
                 await host.OnStreamDeltaAsync(accumulated, ct);

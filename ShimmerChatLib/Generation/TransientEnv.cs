@@ -21,7 +21,7 @@ namespace ShimmerChatLib.Generation
         /// <summary>
         /// 当前使用的 API 实例
         /// </summary>
-        public ILLMAPI? API { get; set; }
+        public APISetting? API { get; set; }
 
         /// <summary>
         /// 节点间共享状态

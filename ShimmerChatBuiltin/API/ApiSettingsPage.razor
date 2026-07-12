@@ -5,15 +5,15 @@
 @inject ILocService Loc
 
 <h3>@Loc["Api Settings"]</h3>
-<h4>@Loc["ApiSettings Profile:"]</h4>
+<h4>@Loc["ApiConfigs Profile:"]</h4>
 <select @bind="_selectedIndex" class="form-select">
     @for (int i = 0; i < apiSettings.Count; i++)
     {
         <option value="@i">@apiSettings[i].Name</option>
     }
 </select>
-<button class="btn btn-primary" style="margin:5px" @onclick="CreateNewApiSetting">@Loc["Create New Api Setting Profile"]</button>
-<button class="btn btn-secondary" style="margin:5px" @onclick="CloneCurrentApiSetting">@Loc["Clone Current Api Setting Profile"]</button>
+<button class="btn btn-primary" style="margin:5px" @onclick="CreateNewApiConfig">@Loc["Create New Api Setting Profile"]</button>
+<button class="btn btn-secondary" style="margin:5px" @onclick="CloneCurrentApiConfig">@Loc["Clone Current Api Setting Profile"]</button>
 
 @if (topAPISetting != null)
 {
@@ -23,14 +23,15 @@
         <input @bind="topAPISetting.Name" class="shimmer-input" />
         <h5>@Loc["Api Type:"]</h5>
         <select @bind="topAPISetting.Type" class="form-select">
-            <option value="@ApiSettingType.Kobold">kobold</option>
-            <option value="@ApiSettingType.OpenAI">openai</option>
-            <option value="@ApiSettingType.DeepSeek">deepseek</option>
-            <option value="@ApiSettingType.Ollama">ollama</option>
-            <option value="@ApiSettingType.Pseudo">pseudo</option>
+            <option value="@ApiConfigType.Kobold">kobold</option>
+            <option value="@ApiConfigType.OpenAI">openai</option>
+            <option value="@ApiConfigType.DeepSeek">deepseek</option>
+            <option value="@ApiConfigType.Ollama">ollama</option>
+            <option value="@ApiConfigType.OpenAIText">openai (text)</option>
+            <option value="@ApiConfigType.Pseudo">pseudo</option>
         </select>
         
-        @if (topAPISetting.Type == ApiSettingType.Pseudo)
+        @if (topAPISetting.Type == ApiConfigType.Pseudo)
         {
             <div class="alert alert-info" style="margin-top: 12px; padding: 12px; background-color: #e8f4fd; border: 1px solid #b6d4fe; border-radius: 4px;">
                 <strong>@Loc["PseudoAPI Info Title"]</strong><br/>
@@ -38,15 +39,16 @@
             </div>
         }
         
-        <!-- Completion Type Selection -->
-        <h5>@Loc["Completion Type:"]</h5>
-        <select @bind="topAPISetting.CompletionType" class="form-select">
-            <option value="@ShimmerChatLib.CompletionType.ChatCompletion">@Loc["Chat Completion"]</option>
-            <option value="@ShimmerChatLib.CompletionType.TextCompletion">@Loc["Text Completion"]</option>
-        </select>
-        
-        <!-- Text Completion Settings (shown only when Text Completion is selected) -->
-        @if (topAPISetting.CompletionType == ShimmerChatLib.CompletionType.TextCompletion)
+        @if (topAPISetting.Type == ApiConfigType.OpenAIText)
+        {
+            <div class="alert alert-warning" style="margin-top: 12px; padding: 12px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                <strong>@Loc["OpenAIText Warning Title"]</strong><br/>
+                @Loc["OpenAIText Warning Description"]
+            </div>
+        }
+
+        <!-- Text Completion Settings (shown for text-based APIs) -->
+        @if (topAPISetting.Type == ApiConfigType.Kobold || topAPISetting.Type == ApiConfigType.Ollama || topAPISetting.Type == ApiConfigType.OpenAIText)
         {
             <h5>@Loc["Text Completion Settings:"]</h5>
             <select @bind="topAPISetting.SelectedTextCompletionSettingIndex" class="form-select">
@@ -75,7 +77,7 @@
         
         <h5>@Loc["Configs:"]</h5>
         <div class="shimmer-group">
-            @if (topAPISetting.Type == ApiSettingType.Kobold)
+            @if (topAPISetting.Type == ApiConfigType.Kobold)
             {
                 <div class="shimmer-group">
                     <h5>@Loc["Basic Settings"]</h5>
@@ -163,7 +165,7 @@
                 </div>
             }
 
-            @if (topAPISetting.Type == ApiSettingType.OpenAI)
+            @if (topAPISetting.Type == ApiConfigType.OpenAI)
             {
                 <label>@Loc["API URL"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.OpenAIUrl" />
@@ -175,13 +177,11 @@
                 <input class="shimmer-input" @bind="topAPISetting.OpenAICtx" />
                 <label>@Loc["API ENABLE STREAM"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIStream" />
-                <label>@Loc["API ENABLE CONTINUE"]</label>
-                <input type="checkbox" @bind="topAPISetting.OpenAIEnableContinuation" />
                 <label>@Loc["API ASIS"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIAsIs" />
             }
 
-            @if (topAPISetting.Type == ApiSettingType.DeepSeek)
+            @if (topAPISetting.Type == ApiConfigType.DeepSeek)
             {
                 <label>@Loc["API URL"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.DeepSeekUrl" />
@@ -193,8 +193,6 @@
                 <input class="shimmer-input" @bind="topAPISetting.DeepSeekCtx" />
                 <label>@Loc["API ENABLE STREAM"]</label>
                 <input type="checkbox" @bind="topAPISetting.DeepSeekStream" />
-                <label>@Loc["API ENABLE CONTINUE"]</label>
-                <input type="checkbox" @bind="topAPISetting.DeepSeekEnableContinuation" />
                 <label>@Loc["API ASIS"]</label>
                 <input type="checkbox" @bind="topAPISetting.DeepSeekAsIs" />
                 <div>
@@ -206,6 +204,18 @@
                     </select>
                 </div>
             }
+
+            @if (topAPISetting.Type == ApiConfigType.OpenAIText)
+            {
+                <label>@Loc["API URL"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.OpenAITextUrl" />
+                <label>@Loc["API KEY"]</label>
+                <input type="password" class="shimmer-input" @bind="topAPISetting.OpenAITextApiKey" />
+                <label>@Loc["API MODEL"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.OpenAITextModel" />
+                <label>@Loc["API GENERATION LENGTH"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.OpenAITextCtx" />
+            }
         </div>
     </div>
 }
@@ -216,18 +226,18 @@
     [Inject]
     public required IKVDataService KVData { get; set; }
 
-    List<ApiSetting> apiSettings { get; set; }
+    List<ApiConfig> apiSettings { get; set; }
 
     private int _selectedIndex { get; set; }
-    ApiSetting topAPISetting => (_selectedIndex >= 0 && _selectedIndex < apiSettings.Count) ? apiSettings[_selectedIndex] : null;
+    ApiConfig topAPISetting => (_selectedIndex >= 0 && _selectedIndex < apiSettings.Count) ? apiSettings[_selectedIndex] : null;
 
-    private void CreateNewApiSetting()
+    private void CreateNewApiConfig()
     {
-        apiSettings.Add(new ApiSetting { Name = "New API Setting" });
+        apiSettings.Add(new ApiConfig { Name = "New API Setting" });
         _selectedIndex = apiSettings.Count - 1;
     }
 
-    private void CloneCurrentApiSetting()
+    private void CloneCurrentApiConfig()
     {
         if (topAPISetting != null)
         {
@@ -261,7 +271,7 @@
     protected override void OnInitialized()
     {
         var apisettings = KVData.Read("ApiSettings", "apiSetting") ?? "[]";
-        apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings) ?? [];
+        apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiConfig>>(apisettings) ?? [];
         var selectedIndex = KVData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
         _selectedIndex = int.Parse(selectedIndex);
     }

@@ -25,7 +25,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         {
             var kvData = context.Env.Persistent.KVData;
             var json = kvData.Read("ApiSettings", "apiSetting") ?? "[]";
-            var settings = JsonConvert.DeserializeObject<List<ApiSetting>>(json) ?? [];
+            var settings = JsonConvert.DeserializeObject<List<ApiConfig>>(json) ?? [];
 
             if (settings.Count == 0)
                 return Task.FromResult(NodeResult.Failure(
@@ -41,9 +41,9 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             }
 
             if (index >= 0 && index < settings.Count)
-                context.Env.Transient.API = settings[index].LLMApi;
+                context.Env.Transient.API = settings[index].ToAPISetting();
             else
-                context.Env.Transient.API = settings[0].LLMApi;
+                context.Env.Transient.API = settings[0].ToAPISetting();
 
             return Task.FromResult(NodeResult.SuccessResult());
         }

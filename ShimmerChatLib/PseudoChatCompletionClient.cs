@@ -3,30 +3,9 @@ using SharperLLM.Util;
 
 namespace ShimmerChatLib
 {
-    public class PseudoAPI : ILLMAPI
+    public class PseudoChatCompletionClient : IChatCompletionClient
     {
-        public IAsyncEnumerable<string> GenerateTextStream(string prompt, CancellationToken cancellationToken)
-        {
-            return Yield(prompt);
-        }
-
-        public Task<string> GenerateText(string prompt, int retry = 0)
-        {
-            return Task.FromResult(prompt);
-        }
-
-        public IAsyncEnumerable<string> GenerateChatReplyStream(PromptBuilder promptBuilder, CancellationToken cancellationToken)
-        {
-            var lastMessage = GetLastMessageContent(promptBuilder);
-            return Yield(lastMessage);
-        }
-
-        public Task<string> GenerateChatReply(PromptBuilder promptBuilder)
-        {
-            return Task.FromResult(GetLastMessageContent(promptBuilder));
-        }
-
-        public IAsyncEnumerable<ResponseEx> GenerateChatExStream(PromptBuilder pb, CancellationToken cancellationToken)
+        public IAsyncEnumerable<ResponseEx> GenerateStreamAsync(PromptBuilder pb, CancellationToken cancellationToken)
         {
             var content = GetLastMessageContent(pb);
             var response = new ResponseEx
@@ -37,7 +16,7 @@ namespace ShimmerChatLib
             return Yield(response);
         }
 
-        public Task<ResponseEx> GenerateChatEx(PromptBuilder pb)
+        public Task<ResponseEx> GenerateAsync(PromptBuilder pb)
         {
             var content = GetLastMessageContent(pb);
             var response = new ResponseEx

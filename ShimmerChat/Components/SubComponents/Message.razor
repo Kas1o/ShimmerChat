@@ -258,18 +258,12 @@
 	}
 
 	/// <summary>
-	/// 检查是否启用了继续功能
+	/// 检查是否启用了继续功能（独立杂项设置，不依赖 API Settings 插件）
 	/// </summary>
 	bool IsContinuationEnabled()
 	{
-		var apisettings = KVData.Read("ApiSettings", "apiSetting") ?? "[]";
-		var apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiSetting>>(apisettings) ?? new List<ApiSetting>();
-		var selectedIndex = KVData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
-		if (int.TryParse(selectedIndex, out var index) && index >= 0 && index < apiSettings.Count)
-		{
-			return apiSettings[index].EnableContinuation;
-		}
-		return false;
+		var value = KVData.Read("MiscSettings", "enableContinue") ?? "false";
+		return bool.TryParse(value, out var enabled) && enabled;
 	}
 
 	async Task CopyContentToClipboard()

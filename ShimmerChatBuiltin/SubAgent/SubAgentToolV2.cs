@@ -15,7 +15,7 @@ namespace ShimmerChatBuiltin.SubAgent
     public class SubAgentToolV2 : IToolV2
     {
         private readonly IKVDataService _kvData;
-        private readonly ILLMAPI? _api;
+        private readonly IChatCompletionClient? _api;
         private readonly IToolRegistry _toolRegistry;
         private readonly Guid _chatGuid;
         private readonly Guid _agentGuid;
@@ -23,7 +23,7 @@ namespace ShimmerChatBuiltin.SubAgent
 
         private readonly List<SubAgentEntry> _entries = new();
 
-        public SubAgentToolV2(IKVDataService kvData, ILLMAPI? api,
+        public SubAgentToolV2(IKVDataService kvData, IChatCompletionClient? api,
             IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid,
             IGenerationNodeSerializer serializer)
         {
@@ -101,7 +101,7 @@ namespace ShimmerChatBuiltin.SubAgent
             try { subEnv = await _treeExecutor.ExecuteAsync(rootNode, persistent); }
             catch (Exception ex) { return $"[SubAgent Tree Error: {ex.Message}]"; }
 
-            var api = subEnv.Transient.API ?? _api;
+            var api = subEnv.Transient.API?.ChatClient ?? _api;
             var tools = subEnv.Transient.Tools;
             var toolDefs = tools.Select(t => t.GetDefinition()).ToList();
             var toolExecutor = new ToolV2Executor(tools);

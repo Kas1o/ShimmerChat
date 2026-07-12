@@ -50,9 +50,9 @@
   "API REASONING EFFORT OFF": "Off",
   "PseudoAPI Info Title": "Pseudo API (no generation)",
   "PseudoAPI Info Description": "This API type does not perform any AI generation. Instead, it directly returns the last message content as the response. It is designed for advanced custom Agentic workflows and is not needed by regular users.",
+  "OpenAIText Warning Title": "Note: OpenAI Text Completion (/completions)",
+  "OpenAIText Warning Description": "Most OpenAI-compatible endpoints have deprecated the /completions API. If this mode doesn't work, switch to OpenAI (chat) type instead. Only use this if your API explicitly supports the /completions endpoint.",
 
-  "Chat Completion": "Chat Completion",
-  "Text Completion": "Text Completion",
   "Text Completion Settings:": "Text Completion Settings:",
   "Create New Text Completion Setting Profile": "Create New Text Completion Setting Profile",
   "NAME:": "Name:",

@@ -100,7 +100,9 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
             try
             {
-                await loop.RunAsync(subEnv.Transient.API, toolDefs, host,
+                var api = subEnv.Transient.API?.ChatClient
+                    ?? throw new InvalidOperationException("No API configured for SubAgent.");
+                await loop.RunAsync(api, toolDefs, host,
                     maxRounds: MaxIterations,
                     continueOnToolError: true,
                     ct: context.CancellationToken);

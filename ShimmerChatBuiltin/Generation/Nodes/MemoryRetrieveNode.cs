@@ -84,7 +84,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 var eUri = kvData.Read("EmbeddingAPI", "uri") ?? string.Empty;
                 var eApiKey = kvData.Read("EmbeddingAPI", "apikey") ?? string.Empty;
                 var eModelName = kvData.Read("EmbeddingAPI", "modelname") ?? string.Empty;
-                var api = new OpenAIAPI(eUri, eApiKey, eModelName);
+                var api = new OpenAIChatCompletionClient(eUri, eApiKey, eModelName);
 
                 _vectorCache ??= new Dictionary<string, List<float>>();
 
