@@ -230,3 +230,41 @@
 .ti-item-name { font-weight: 600; color: var(--su-text-0); white-space: nowrap; min-width: 110px; }
 .ti-item-desc { font-size: 0.72em; color: var(--su-text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ti-empty { padding: 12px; color: var(--su-text-1); text-align: center; font-style: italic; }
+
+/* ── Drag & Drop ───────────────────────────────── */
+
+/* Dragging source */
+.tn-dragging {
+    opacity: 0.35;
+}
+
+/* Drop indicator: before a node (top border highlight on header) */
+.tn-drop-before {
+    border-top: 2px solid var(--su-accent) !important;
+}
+
+/* Drop indicator: after a node (bottom border highlight on header) */
+.tn-drop-after {
+    border-bottom: 2px solid var(--su-accent) !important;
+}
+
+/* Drop indicator: inside a container (background highlight) */
+.tn-drop-inside {
+    background: rgba(100, 150, 255, 0.08) !important;
+    outline: 1px dashed var(--su-accent);
+    outline-offset: -2px;
+}
+
+/* ── Drop Strips (insert-position indicators between children) ── */
+.tn-drop-strip {
+    height: 4px;
+    transition: height 0.12s, background 0.12s, margin 0.12s;
+}
+.tn-drop-strip-active {
+    height: 16px;
+    margin: 1px 0;
+    background: rgba(100, 150, 255, 0.15);
+    border-radius: 3px;
+    outline: 1px dashed var(--su-accent);
+    outline-offset: -1px;
+}

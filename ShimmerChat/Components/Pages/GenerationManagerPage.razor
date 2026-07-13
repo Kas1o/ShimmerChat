@@ -82,7 +82,9 @@
     {
         <div class="su-card">
             <div class="su-card-body">
-                <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+                <CascadingValue Value="_dragContext">
+                    <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+                </CascadingValue>
             </div>
         </div>
     }
@@ -101,7 +103,9 @@
                 }
                 else
                 {
-                    <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+                    <CascadingValue Value="_dragContext">
+                        <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+                    </CascadingValue>
                 }
             </div>
         </div>
@@ -124,6 +128,7 @@
     private List<GenerationPreset> _presets = new();
     private GenerationPreset? _activePreset;
     private IGenerationNode _editingRoot = new SequenceNode { Name = "Root" };
+    private TreeDragContext _dragContext = new();
 
     private bool _isAgentMode;
     private string _agentName = "";

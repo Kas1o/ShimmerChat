@@ -5,7 +5,9 @@
 @if (_info == null)
 {
     <div class="tree-node-card" style="border-left-color: var(--node-debug);">
-        <div class="tn-header">
+        <div class="tn-header @(_isDraggingSelf ? "tn-dragging" : "")"
+             draggable="@(_isDraggable ? "true" : null)"
+             @ondragstart="OnDragStart" @ondragend="OnDragEnd">
             <span class="tn-icon">●</span>
             <span class="tn-label">@Node.GetType().Name</span>
             <span class="tn-name">@Node.Name</span>
@@ -34,7 +36,10 @@ else
         )?.PropertyType ?? typeof(object));
 
     <div class="tree-node-card" style="border-left-color: @_info.Color;">
-        <div class="tn-header" @onclick="ToggleExpand">
+        <div class="tn-header @(_isDraggingSelf ? "tn-dragging" : "")"
+             @onclick="ToggleExpand"
+             draggable="@(_isDraggable ? "true" : null)"
+             @ondragstart="OnDragStart" @ondragend="OnDragEnd">
             <span class="tn-icon">@_info.Icon</span>
             <span class="tn-label">@Loc[_info.LabelKey]</span>
             <input class="tn-name-input" @bind="Node.Name" @bind:event="oninput"
@@ -87,18 +92,30 @@ else
     [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
+    /// <summary>
+    /// The parent list this node belongs to. When set, the node becomes draggable.
+    /// </summary>
+    [Parameter] public IList<IGenerationNode>? ParentList { get; set; }
+
+    /// <summary>
+    /// For single-node slots: called when this node is dragged away.
+    /// </summary>
+    [Parameter] public Func<Task>? OnDragRemove { get; set; }
+
+    [CascadingParameter] public TreeDragContext? DragContext { get; set; }
+
     private NodeInfoAttribute? _info;
     private Type? _customEditorType;
     private Dictionary<string, object> _editorParams = new();
     private bool _expanded = true;
+    private bool _isDraggingSelf => DragContext?.DraggedNode == Node;
+    private bool _isDraggable => (ParentList != null && Depth > 0) || OnDragRemove != null;
 
     protected override void OnInitialized()
     {
         var type = Node.GetType();
         _info = type.GetCustomAttribute<NodeInfoAttribute>();
-
         _customEditorType = type.GetCustomAttribute<NodeEditorAttribute>()?.EditorType;
-
         _editorParams = new Dictionary<string, object>
         {
             ["Node"] = Node,
@@ -112,5 +129,30 @@ else
     {
         if (e.Key == "Enter") await OnTreeChanged.InvokeAsync();
     }
-}
 
+    // ─── Drag Source ───────────────────────────────────
+
+    private async Task OnDragStart(DragEventArgs e)
+    {
+        if (DragContext == null || !_isDraggable) return;
+
+        // setData + effectAllowed handled synchronously by JS listener in util.js
+        e.DataTransfer.EffectAllowed = "move";
+
+        if (ParentList != null)
+        {
+            DragContext.BeginDrag(Node, ParentList, () => OnTreeChanged.InvokeAsync());
+        }
+        else if (OnDragRemove != null)
+        {
+            DragContext.BeginDrag(Node, OnDragRemove, () => OnTreeChanged.InvokeAsync());
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnDragEnd(DragEventArgs e)
+    {
+        DragContext?.EndDrag();
+        await InvokeAsync(StateHasChanged);
+    }
+}

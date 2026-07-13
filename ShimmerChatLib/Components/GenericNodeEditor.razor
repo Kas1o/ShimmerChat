@@ -116,6 +116,9 @@
                 @AddNodePicker
             }
 
+            @* Drop strip: insert at beginning *@
+            <DropStrip TargetList="@_childNodes" InsertIndex="0" OnDropped="OnTreeChanged" />
+
             @for (int i = 0; i < _childNodes.Count; i++)
             {
                 var index = i;
@@ -133,11 +136,15 @@
                     </div>
                     <div class="tn-child-tree">
                         <TreeEditor Node="@child" Depth="@(Depth + 1)"
+                                    ParentList="@_childNodes"
                                     OnTreeChanged="OnTreeChanged"
                                     RemoveMe="@(node => { _childNodes.Remove(node); OnTreeChanged.InvokeAsync(); })"
                                     CopyMe="CopyNode" />
                     </div>
                 </div>
+
+                @* Drop strip: insert after child i *@
+                <DropStrip TargetList="@_childNodes" InsertIndex="@(index + 1)" OnDropped="OnTreeChanged" />
             }
             @if (_childNodes.Count == 0)
             {
@@ -148,7 +155,9 @@
     @foreach (var sp in _singleNodeProps)
     {
         var slotNode = sp.GetValue(Node) as IGenerationNode;
-        <div class="ge-children">
+        <div class="ge-children @(_slotDropClass == sp ? "tn-drop-inside" : "")"
+             @ondragover="(e) => OnSlotDragOver(e, sp)" @ondragover:preventDefault
+             @ondragleave="OnSlotDragLeave" @ondrop="(e) => OnSlotDrop(e, sp)">
             <div class="ge-children-header">
                 <span class="ge-label">@Loc[sp.LabelKey]</span>
                 @if (slotNode == null)
@@ -173,7 +182,8 @@
                     <div class="tn-child-tree">
                         <TreeEditor Node="@slotNode" Depth="@(Depth + 1)" OnTreeChanged="OnTreeChanged"
                                     RemoveMe="@(node => { sp.SetValue(Node, null); OnTreeChanged.InvokeAsync(); })"
-                                    CopyMe="CopyNode" />
+                                    CopyMe="CopyNode"
+                                    OnDragRemove="@(async () => { sp.SetValue(Node, null); await OnTreeChanged.InvokeAsync(); })" />
                     </div>
                 </div>
             }
@@ -191,6 +201,8 @@
     [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+
+    [CascadingParameter] public TreeDragContext? DragContext { get; set; }
 
     private List<PropInfo> _properties = new();
     private List<PropInfo> _singleNodeProps = new();
@@ -314,24 +326,25 @@
 
         foreach (var prop in props)
         {
+            // All properties require [NodeProperty] to appear in the editor
+            if (prop.GetCustomAttribute<NodePropertyAttribute>() == null)
+                continue;
+
             if (typeof(IList<IGenerationNode>).IsAssignableFrom(prop.PropertyType) ||
                 (prop.PropertyType.IsGenericType && prop.PropertyType.GetGenericTypeDefinition() == typeof(List<>)
                  && typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType.GenericTypeArguments[0])))
             {
                 _childNodesProp = new PropInfo(prop, nodeType);
                 _childNodes = (IList<IGenerationNode>)prop.GetValue(Node)! ?? new List<IGenerationNode>();
-                continue;
             }
-            if (typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType))
+            else if (typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType))
             {
                 _singleNodeProps.Add(new PropInfo(prop, nodeType));
-                continue; // single child node — rendered as slot
             }
-            if (prop.GetCustomAttribute<NodePropertyAttribute>() == null)
+            else
             {
-                continue; // only expose properties explicitly decorated with [NodeProperty]
+                _properties.Add(new PropInfo(prop, nodeType));
             }
-            _properties.Add(new PropInfo(prop, nodeType));
         }
     }
 
@@ -423,6 +436,50 @@
         (_childNodes[index], _childNodes[index + 1]) = (_childNodes[index + 1], _childNodes[index]);
         OnTreeChanged.InvokeAsync();
         InvokeAsync(StateHasChanged);
+    }
+
+    // ─── Drop Target (single-node slots) ──
+
+    private PropInfo? _slotDropClass;
+
+    private void OnSlotDragOver(DragEventArgs e, PropInfo sp)
+    {
+        if (DragContext?.IsDragging != true) return;
+        if (DragContext.DraggedNode == sp.GetValue(Node)) return; // can't drop onto self
+
+        e.DataTransfer.DropEffect = "move";
+        _slotDropClass = sp;
+    }
+
+    private void OnSlotDragLeave()
+    {
+        _slotDropClass = null;
+    }
+
+    private async Task OnSlotDrop(DragEventArgs e, PropInfo sp)
+    {
+        _slotDropClass = null;
+        if (DragContext?.IsDragging != true) return;
+
+        var dragged = DragContext.DraggedNode!;
+        if (ReferenceEquals(dragged, sp.GetValue(Node))) return; // can't drop onto self
+        if (TreeDragContext.IsAncestorOf(dragged, Node)) return; // prevent cycle
+
+        try
+        {
+            // Set the slot
+            sp.SetValue(Node, dragged);
+
+            // Remove from source (list or single-slot)
+            await DragContext.RemoveFromSource();
+
+            DragContext.EndDrag();
+            await OnTreeChanged.InvokeAsync();
+        }
+        catch
+        {
+            DragContext?.EndDrag();
+        }
     }
 
     private RenderFragment RenderProperty(PropInfo prop) => builder =>

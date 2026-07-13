@@ -344,7 +344,9 @@ if (string.IsNullOrEmpty(config))
 
 ## 5. 自定义生成节点
 
-### 基本节点
+> **详见 [生成节点与编辑器开发指南](NodeDevelopment.md)** — 节点实现、属性编辑器、容器子列表、拖拽排序、自定义编辑器、上下文对象等完整文档。
+
+### 快速示例
 
 ```csharp
 using ShimmerChatLib.Generation;
@@ -372,66 +374,20 @@ public class MyFragmentNode : IGenerationNode
 }
 ```
 
-### 三个 Attribute
+### 核心概念速览
 
-| Attribute | 位置 | 说明 |
-|-----------|------|------|
-| `[NodeInfo]` | 类 | `LabelKey`（必填）、`Icon`、`Color`、`CategoryKeys` |
-| `[NodeProperty]` | 属性 | `LabelKey`（必填）、`HintKey`、`Order` |
-| `[NodeEditor]` | 类 | `EditorType` — 指定自定义 Blazor 编辑器组件 |
+| 概念 | 说明 |
+|------|------|
+| `IGenerationNode` | 节点接口：`Id`、`Name`、`ExecuteAsync` |
+| `[NodeInfo]` | 类级元数据：标签 Key、图标、颜色、分类 |
+| `[NodeProperty]` | 属性级元数据：标签 Key、提示、排序。支持 string/int/float/bool/enum |
+| `[NodeEditor(typeof(...))]` | 指定自定义 Blazor 编辑器组件 |
+| `List<IGenerationNode>` | 标记 `[NodeProperty]` 后生成子节点列表 UI，支持拖拽排序 |
+| `IGenerationNode` (单个) | 标记 `[NodeProperty]` 后生成单节点槽 UI |
+| `DropStrip` | 可复用放置条组件，自定义编辑器用它来支持拖放 |
+| `TreeDragContext` | 级联共享的拖拽状态，自动流入所有子组件 |
 
-`NodeInfo` 和 `NodeProperty` 的值均为**本地化 Key**，UI 通过 `LocService` 翻译。无 `[NodeEditor]` 时，`GenericNodeEditor` 根据 `[NodeProperty]` 自动生成编辑表单。
-
-### 自定义编辑器
-
-```csharp
-[NodeInfo("node.my_complex", Icon = "⚙", Color = "#d0a040")]
-[NodeEditor(typeof(MyComplexNodeEditor))]
-public class MyComplexNode : IGenerationNode { ... }
-```
-
-```razor
-@* MyComplexNodeEditor.razor — 放在同一程序集中 *@
-<div>
-    <label>自定义字段</label>
-    <input @bind="Node.SomeProperty" />
-</div>
-
-@code {
-    [Parameter] public MyComplexNode Node { get; set; } = default!;
-    [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
-}
-```
-
-编辑器组件自动接收 `Node` 和 `OnChanged` 两个参数。
-
-### 容器节点（含子节点列表）
-
-```csharp
-[NodeInfo("node.my_sequence", Icon = "☰", Color = "#60c060",
-    CategoryKeys = ["category.flow"])]
-public class MySequenceNode : IGenerationNode
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "My Sequence";
-
-    public List<IGenerationNode> Nodes { get; set; } = new();
-
-    public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
-    {
-        foreach (var child in Nodes)
-        {
-            var result = await child.ExecuteAsync(context);
-            if (!result.Success) return result;
-        }
-        return NodeResult.SuccessResult();
-    }
-}
-```
-
-只要声明 `List<IGenerationNode>` 类型的属性，`TreeEditor` 就会自动提供子节点管理 UI。
-
-### 关键上下文对象
+### 关键上下文对象速览
 
 ```csharp
 // context.Env.Persistent — 跨生成持久化
@@ -439,15 +395,13 @@ KVData        // IKVDataService  键值存储
 ChatGuid      // Guid            当前对话
 AgentGuid     // Guid            当前 Agent
 ToolRegistry  // IToolRegistry   工具注册表
-Serializer    // IGenerationNodeSerializer  序列化/反序列化节点树
+Serializer    // IGenerationNodeSerializer
 
 // context.Env.Transient — 每次生成重建
 Fragments     // List<ContextSegment>  要发送给 LLM 的上下文
 Tools         // List<IToolV2>         可用工具
-API           // ILLMAPI?              API 实例
+API           // APISetting?           API 配置
 SharedState   // Dictionary<string, object>  跨节点共享状态
-
-// context.CancellationToken — 取消令牌
 ```
 
 ---
