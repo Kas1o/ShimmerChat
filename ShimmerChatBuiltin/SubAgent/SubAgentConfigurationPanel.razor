@@ -1,5 +1,6 @@
 @attribute [PluginPanel("panel.sub_agent_config", "panel.sub_agent_config.desc", PanelDisplayPlace.Settings)]
 
+@using ShimmerChatLib.Components
 @using ShimmerChatLib.Generation
 @using ShimmerChatLib.Interface
 @using ShimmerChatBuiltin.SubAgent
@@ -117,8 +118,10 @@
                         @if (_editingTree != null)
                         {
                             <div class="tree-editor-container">
-                                <TreeEditor Node="@_editingTree"
-                                    OnTreeChanged="OnPrivateTreeChanged" />
+                                <CascadingValue Value="_dragContext">
+                                    <TreeEditor Node="@_editingTree"
+                                        OnTreeChanged="OnPrivateTreeChanged" />
+                                </CascadingValue>
                             </div>
                         }
                     }
@@ -166,6 +169,7 @@
     string statusMessage = "";
     string statusType = "success";
     IGenerationNode? _editingTree;
+    TreeDragContext _dragContext = new();
 
     protected override void OnInitialized()
     {
