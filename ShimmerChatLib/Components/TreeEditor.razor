@@ -70,7 +70,7 @@ else
                 @* Custom editor via [NodeEditor] *@
                 @if (_customEditorType != null)
                 {
-                    <DynamicComponent Type="_customEditorType" Parameters="@_editorParams" />
+                    <DynamicComponent Type="_customEditorType" Parameters="@_editorParams" @key="@Node.Id" />
                 }
                 else
                 {
@@ -111,11 +111,13 @@ else
     private bool _isDraggingSelf => DragContext?.DraggedNode == Node;
     private bool _isDraggable => (ParentList != null && Depth > 0) || OnDragRemove != null;
 
-    protected override void OnInitialized()
+    protected override void OnParametersSet()
     {
         var type = Node.GetType();
         _info = type.GetCustomAttribute<NodeInfoAttribute>();
         _customEditorType = type.GetCustomAttribute<NodeEditorAttribute>()?.EditorType;
+        // Must create a NEW dictionary instance so that Blazor detects the parameter change
+        // and propagates the updated Node to the DynamicComponent / custom editor.
         _editorParams = new Dictionary<string, object>
         {
             ["Node"] = Node,

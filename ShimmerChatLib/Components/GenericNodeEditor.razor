@@ -220,8 +220,12 @@
 
     protected override void OnInitialized()
     {
-        BuildPropertyList();
         BuildCategoryTree();
+    }
+
+    protected override void OnParametersSet()
+    {
+        BuildPropertyList();
     }
 
     private void BuildCategoryTree()
@@ -319,6 +323,12 @@
 
     private void BuildPropertyList()
     {
+        // Clear cached state so repeated calls (e.g. when Node changes) don't accumulate duplicates.
+        _properties.Clear();
+        _singleNodeProps.Clear();
+        _childNodesProp = null;
+        _childNodes = new List<IGenerationNode>();
+
         var nodeType = Node.GetType();
         var props = nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.CanRead && p.CanWrite)
