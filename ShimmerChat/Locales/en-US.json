@@ -33,6 +33,7 @@
   "POPUP_DELETE_FROM_TITLE": "Delete from here",
   "POPUP_DELETE_FROM": "Delete this message and {0} messages after it?",
   "ToolResult": "Tool Result",
+  "ToolResultDetail": "Details",
 
   "API GENERATION LENGTH": "Generation Length",
   "Api Settings": "API Settings",

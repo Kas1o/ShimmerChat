@@ -33,6 +33,7 @@
   "POPUP_DELETE_FROM_TITLE": "从此处删除",
   "POPUP_DELETE_FROM": "是否删除此消息及其后的 {0} 条消息？",
   "ToolResult": "工具结果",
+  "ToolResultDetail": "详细内容",
 
   "API GENERATION LENGTH": "生成长度",
   "Api Settings": "API 设置",

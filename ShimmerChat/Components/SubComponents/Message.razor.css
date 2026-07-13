@@ -55,7 +55,7 @@
 }
 .chat-msg-tool-summary {
     cursor: pointer; user-select: none;
-    color: var(--su-warning); font-size: var(--su-font-xs); font-weight: 500;
+    color: var(--su-text-2); font-size: var(--su-font-xs); font-weight: 500;
     list-style: none;
 }
 .chat-msg-tool-summary::-webkit-details-marker { display: none; }
