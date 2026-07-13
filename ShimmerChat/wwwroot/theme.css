@@ -1,8 +1,7 @@
-/* ── ShimmerUI Design Tokens ──────────────────────
-   Serves as initial values before ThemeServiceV2 injects runtime variables.
-   Mirrors Theme.cs defaults + dark variant.                  */
-
-/* ── Light (default) ───────────────────────────── */
+/* ── ShimmerUI Design Tokens ────────────────────────
+    Serves as initial values before ThemeService.
+    Mirrors Theme.cs defaults + dark variant.                                       
+ ── Light (default) ───────────────────────────── */
 :root {
     --su-surface-0: #f8f9fa;
     --su-surface-1: #ffffff;

@@ -1,17 +1,22 @@
 ﻿@inject IKVDataService KVData
 @attribute [PluginPanel("panel.qdrant_api_config", "panel.qdrant_api_config.desc")]
-<div class="shimmer-group">
-	<label> GRPc Host: </label>
-	<input type="text" @bind="Host" placeholder="localhost"/>
-	<br />
-	<label> Port: </label>
-	<input type="text" @bind="Port" placeholder="6334" />
-	<br />
-	<label> APIKEY: </label>
-	<input type="text" @bind="ApiKey" placeholder="your apikey" />
-	<br />
-	<label> DIM: </label>
-	<input type="text" @bind="Dim" placeholder="1024" />
+<div class="shimmer-group" style="display:flex;flex-direction:column;gap:12px;padding:12px;">
+	<div class="su-form-group">
+		<label class="su-label">gRPC Host</label>
+		<input class="su-input" type="text" @bind="Host" placeholder="localhost"/>
+	</div>
+	<div class="su-form-group">
+		<label class="su-label">Port</label>
+		<input class="su-input" type="text" @bind="Port" placeholder="6334" />
+	</div>
+	<div class="su-form-group">
+		<label class="su-label">APIKEY</label>
+		<input class="su-input" type="text" @bind="ApiKey" placeholder="your apikey" />
+	</div>
+	<div class="su-form-group">
+		<label class="su-label">DIM</label>
+		<input class="su-input" type="text" @bind="Dim" placeholder="1024" />
+	</div>
 </div>
 
 

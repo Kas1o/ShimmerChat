@@ -20,13 +20,13 @@
             </select>
             @if (_settings.Count == 0)
             {
-                <div style="font-size: 0.75em; color: #e66; margin-top: 4px;">
+                <div style="font-size: 0.75em; color: var(--su-danger); margin-top: 4px;">
                     @Loc["node.api_select.no_settings"]
                 </div>
             }
             else
             {
-                <div style="font-size: 0.72em; color: #666; margin-top: 4px;">
+                <div style="font-size: 0.72em; color: var(--su-text-1); margin-top: 4px;">
                     @(SelectedIndex == -2
                         ? Loc["node.api_select.using_global"]
                         : SelectedIndex >= 0 && SelectedIndex < _settings.Count
@@ -42,7 +42,7 @@
         </div>
     </div>
 
-    <div style="font-size: 0.72em; color: #666; margin-top: 8px; padding: 6px 8px; background: #f4f4f4; border-left: 3px solid #aaa; border-radius: 2px; line-height: 1.5;">
+    <div style="font-size: 0.72em; color: var(--su-text-1); margin-top: 8px; padding: 6px 8px; background: var(--su-surface-3); border-left: 3px solid var(--su-border-0); border-radius: 2px; line-height: 1.5;">
         @Loc["node.api_select.order_hint"]
     </div>
 </div>

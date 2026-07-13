@@ -1,10 +1,11 @@
 @inject IKVDataService KVData
 @attribute [PluginPanel("panel.tokenizer_api", "panel.tokenizer_api.desc")]
 
-<div class="shimmer-group">
-	<label> Model: </label>
-	<input type="text" @bind="Model" placeholder="./tokenizer.json" />
-	<br />
+<div class="shimmer-group" style="padding:12px;">
+	<div class="su-form-group">
+		<label class="su-label">Model</label>
+		<input class="su-input" type="text" @bind="Model" placeholder="./tokenizer.json" />
+	</div>
 </div>
 
 

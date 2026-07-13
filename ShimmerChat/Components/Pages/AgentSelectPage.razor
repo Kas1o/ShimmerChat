@@ -10,8 +10,10 @@
 	<div class="toolbar-left">
 		<button class="su-btn su-btn-primary" @onclick="OpenCreateAgentMenu">@Loc["Create New Agent"]</button>
 		<div class="import-group">
-			<InputFile OnChange="InputFileChanged" />
-			<button class="su-btn su-btn-primary" @onclick="Import">Import</button>
+			<InputFile OnChange="InputFileChanged" accept=".json" class="import-file-input" id="agent-import-file" />
+			<label for="agent-import-file" class="su-btn su-btn-secondary import-label">
+				<i class="bi bi-upload"></i> Import
+			</label>
 		</div>
 	</div>
 	<div class="toolbar-right">
@@ -50,7 +52,16 @@
 			{
 				<div class="agent-detail-row" @onclick="()=> NavigateToAgent(agent.Guid.ToString())">
 					<div class="agent-detail-avatar">
-						<img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
+						@if (agent.AvatarGuid != null)
+						{
+							<img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
+						}
+						else
+						{
+							<div class="agent-avatar-placeholder" style="background-color: @GetAvatarColor(agent.Name)">
+								@GetAvatarInitial(agent.Name)
+							</div>
+						}
 					</div>
 					<div class="agent-detail-divider"></div>
 					<div class="agent-detail-info">
@@ -89,9 +100,19 @@ else
 			{
 				<div class="shimmer-grid-item shimmer-grid-agent-item fixed-size">
 					<div class="content-wrapper">
-						<div class="agent-item-content" style="background-image: url('/userimages/@(agent.AvatarGuid).png');" @onclick="()=> NavigateToAgent( agent.Guid.ToString())">
-							@agent.Name
-						</div>
+						@if (agent.AvatarGuid != null)
+						{
+							<div class="agent-item-content" style="background-image: url('/userimages/@(agent.AvatarGuid).png');" @onclick="()=> NavigateToAgent( agent.Guid.ToString())">
+								@agent.Name
+							</div>
+						}
+						else
+						{
+							<div class="agent-item-content agent-item-placeholder" style="background-color: @GetAvatarColor(agent.Name)" @onclick="()=> NavigateToAgent( agent.Guid.ToString())">
+								<span class="agent-placeholder-initial">@GetAvatarInitial(agent.Name)</span>
+								@agent.Name
+							</div>
+						}
 					</div>
 					<button class="agent-delete-btn" @onclick:stopPropagation @onclick="()=> ShowDeleteConfirmation(agent)">
 						×
@@ -111,13 +132,21 @@ else
 	<div class="shimmer-popup-overlay" @onclick="() => CreatePopupVisible=false">
 		<div class="shimmer-popup-content" @onclick:stopPropagation>
 			<h5>@Loc["Create new Agent popup title"]</h5>
-			<label>@Loc["Name:"]</label>
-			<input class="shimmer-input" @bind=popupNewAgentName/>
-			<label>@Loc["Description:"]</label>
-			<textarea class="shimmer-textarea" @bind=popupNewAgentDescription/>
-			<label>@Loc["Greeting:"]</label>
-			<textarea class="shimmer-textarea" @bind=popupNewAgentGreeting/>
-			<button class="su-btn su-btn-primary" @onclick="CreateNewAgent">@Loc["Create"]</button>
+			<div class="su-form-group">
+				<label class="su-label">@Loc["Name:"]</label>
+				<input class="su-input" @bind=popupNewAgentName/>
+			</div>
+			<div class="su-form-group">
+				<label class="su-label">@Loc["Description:"]</label>
+				<textarea class="su-textarea" @bind=popupNewAgentDescription/>
+			</div>
+			<div class="su-form-group">
+				<label class="su-label">@Loc["Greeting:"]</label>
+				<textarea class="su-textarea" @bind=popupNewAgentGreeting/>
+			</div>
+			<div style="display:flex;justify-content:flex-end;margin-top:12px;">
+				<button class="su-btn su-btn-primary" @onclick="CreateNewAgent">@Loc["Create"]</button>
+			</div>
 		</div>
 	</div>
 }
@@ -280,6 +309,26 @@ else
 		ShowTagSuggestions = false;
 	}
 
+	static readonly string[] _avatarColors = new[]
+	{
+		"#5e6ad2", "#e74c3c", "#2ecc71", "#f39c12", "#1abc9c",
+		"#3498db", "#9b59b6", "#e67e22", "#27ae60", "#c0392b",
+	};
+
+	static string GetAvatarColor(string name)
+	{
+		var hash = 0;
+		foreach (var c in name ?? "?")
+			hash = ((hash << 5) + hash) ^ c;
+		return _avatarColors[Math.Abs(hash) % _avatarColors.Length];
+	}
+
+	static string GetAvatarInitial(string name)
+	{
+		if (string.IsNullOrWhiteSpace(name)) return "?";
+		return char.ToUpper(name.TrimStart()[0]).ToString();
+	}
+
 	void OpenCreateAgentMenu()
 	{
 		CreatePopupVisible = true;
@@ -326,9 +375,10 @@ else
 	}
 
 	IBrowserFile File { get; set; }
-	void InputFileChanged(InputFileChangeEventArgs e)
+	async Task InputFileChanged(InputFileChangeEventArgs e)
 	{
 		File = e.File;
+		await Import();
 	}
 
 	async Task<byte[]> ReadFullyAsync(Stream stream)

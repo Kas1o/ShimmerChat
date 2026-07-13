@@ -228,13 +228,13 @@
         builder.AddAttribute(5, "type", "color");
         builder.AddAttribute(6, "class", "su-input color-picker");
         builder.AddAttribute(7, "value", value);
-        builder.AddAttribute(8, "onchange", EventCallback.Factory.Create<string>(this, v => { setter(v); StateHasChanged(); }));
+        builder.AddAttribute(8, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, e => { var v = e.Value?.ToString(); if (v != null) { setter(v); StateHasChanged(); } }));
         builder.CloseElement();
         builder.OpenElement(9, "input");
         builder.AddAttribute(10, "type", "text");
         builder.AddAttribute(11, "class", "su-input");
         builder.AddAttribute(12, "value", value);
-        builder.AddAttribute(13, "onchange", EventCallback.Factory.Create<string>(this, v => { setter(v); StateHasChanged(); }));
+        builder.AddAttribute(13, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, e => { var v = e.Value?.ToString(); if (v != null) { setter(v); StateHasChanged(); } }));
         builder.CloseElement();
         builder.CloseElement();
     };

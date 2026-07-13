@@ -1,14 +1,18 @@
 ﻿@inject IKVDataService KVData
 @attribute [PluginPanel("panel.embedding_api_config", "panel.embedding_api_config.desc")]
-<div class="shimmer-group">
-	<label> URI: </label>
-	<input type="text" @bind="Uri" placeholder="localhost" />
-	<br />
-	<label> APIKEY: </label>
-	<input type="text" @bind="ApiKey" placeholder="your apikey" />
-	<br />
-	<label> MODELNAME: </label>
-	<input type="text" @bind="ModelName" placeholder="openai/text-embedding-3-small" />
+<div class="shimmer-group" style="display:flex;flex-direction:column;gap:12px;padding:12px;">
+	<div class="su-form-group">
+		<label class="su-label">URI</label>
+		<input class="su-input" type="text" @bind="Uri" placeholder="localhost" />
+	</div>
+	<div class="su-form-group">
+		<label class="su-label">APIKEY</label>
+		<input class="su-input" type="text" @bind="ApiKey" placeholder="your apikey" />
+	</div>
+	<div class="su-form-group">
+		<label class="su-label">MODELNAME</label>
+		<input class="su-input" type="text" @bind="ModelName" placeholder="openai/text-embedding-3-small" />
+	</div>
 </div>
 
 

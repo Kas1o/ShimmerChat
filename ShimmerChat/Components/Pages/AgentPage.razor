@@ -18,7 +18,16 @@
             <button class="agent-back-btn" @onclick="NavigateBack" title="Back">
                 <i class="bi bi-arrow-left"></i>
             </button>
-            <img class="agent-header-avatar" src="@AvatarPath" alt="avatar" />
+            @if (agent.AvatarGuid != null)
+            {
+                <img class="agent-header-avatar" src="@AvatarPath" alt="avatar" />
+            }
+            else
+            {
+                <div class="agent-header-avatar agent-avatar-placeholder" style="background-color: @GetAvatarColor(agent.Name)">
+                    @GetAvatarInitial(agent.Name)
+                </div>
+            }
             <div class="agent-header-info">
                 <h2>@agent.Name</h2>
                 @if(!string.IsNullOrWhiteSpace(agent.UserIntro))
@@ -211,7 +220,28 @@
                         </div>
                         <div class="settings-field">
                             <label>Alternative Greetings</label>
-                            <textarea class="shimmer-textarea" @bind="AlternativeGreetings" placeholder="Enter alternative greetings, sep by '<|>'" rows="3" />
+                            <div class="alt-greetings-list">
+                                @if (agent?.AlternativeGreetings != null)
+                                {
+                                    var idx = 0;
+                                    foreach (var g in agent.AlternativeGreetings.ToList())
+                                    {
+                                        var i = idx++;
+                                        <div class="alt-greeting-row">
+                                            <textarea class="shimmer-textarea" rows="2"
+                                                @bind="agent.AlternativeGreetings[i]" @bind:event="oninput" @bind:after="OnAltGreetingChanged"
+                                                placeholder="Enter an alternative greeting..." />
+                                            <button class="su-btn su-btn-sm su-btn-outline-danger alt-greeting-remove"
+                                                @onclick="() => RemoveAltGreeting(i)" title="Remove">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    }
+                                }
+                                <button class="su-btn su-btn-sm su-btn-outline" @onclick="AddAltGreeting">
+                                    <i class="bi bi-plus-lg"></i> Add Greeting
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -219,7 +249,16 @@
                         <h4><i class="bi bi-image"></i> Avatar &amp; Background</h4>
                         <div class="media-upload-row">
                             <div class="media-upload-item">
-                                <img id="avatar-preview" src="@AvatarPath" alt="avatar"/>
+                                @if (agent.AvatarGuid != null)
+                                {
+                                    <img id="avatar-preview" src="@AvatarPath" alt="avatar"/>
+                                }
+                                else
+                                {
+                                    <div id="avatar-preview" class="agent-avatar-placeholder" style="background-color: @GetAvatarColor(agent.Name)">
+                                        @GetAvatarInitial(agent.Name)
+                                    </div>
+                                }
                                 <InputFile OnChange="InputAvatar" accept="image/png" />
                             </div>
                             <div class="media-upload-item">
@@ -475,29 +514,48 @@
         AddTag(tag);
     }
 
-    string AlternativeGreetings
+    void AddAltGreeting()
     {
-        get => agent?.AlternativeGreetings != null ? string.Join("<|>", agent.AlternativeGreetings) : string.Empty;
-        set
-        {
-            if (agent != null)
-            {
-                // 将多行文本分割成列表
-                if (!string.IsNullOrEmpty(value))
-                {
-                    agent.AlternativeGreetings = value.Split("<|>", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-                }
-                else
-                {
-                    agent.AlternativeGreetings = new List<string>();
-                }
-                agent.Save(kvDataService);
-            }
-        }
+        if (agent == null) return;
+        agent.AlternativeGreetings ??= new();
+        agent.AlternativeGreetings.Add("");
+        agent.Save(kvDataService);
+    }
+
+    void RemoveAltGreeting(int index)
+    {
+        if (agent?.AlternativeGreetings == null || index < 0 || index >= agent.AlternativeGreetings.Count) return;
+        agent.AlternativeGreetings.RemoveAt(index);
+        agent.Save(kvDataService);
+    }
+
+    void OnAltGreetingChanged()
+    {
+        agent?.Save(kvDataService);
     }
 
     string AvatarPath => $"/userimages/{agent.AvatarGuid}.png";
     string BackgroudPath => $"/userimages/{agent.BackgroundGuid}.png";
+
+    static readonly string[] _avatarColors = new[]
+    {
+        "#5e6ad2", "#e74c3c", "#2ecc71", "#f39c12", "#1abc9c",
+        "#3498db", "#9b59b6", "#e67e22", "#27ae60", "#c0392b",
+    };
+
+    static string GetAvatarColor(string name)
+    {
+        var hash = 0;
+        foreach (var c in name ?? "?")
+            hash = ((hash << 5) + hash) ^ c;
+        return _avatarColors[Math.Abs(hash) % _avatarColors.Length];
+    }
+
+    static string GetAvatarInitial(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        return char.ToUpper(name.TrimStart()[0]).ToString();
+    }
 
     bool virtualize = false;
     List<ChatSummary> allChatSummaries = new();

@@ -383,6 +383,16 @@
             border: 2px solid var(--su-border-0);
         }
 
+        .agent-avatar-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            user-select: none;
+        }
+
         /* Tags */
         .tag-editor-wrapper {
             margin-bottom: 8px;
@@ -452,6 +462,29 @@
 
         .tag-suggestion-item:hover {
             background-color: var(--su-surface-3);
+        }
+
+        /* Alternative Greetings */
+        .alt-greetings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .alt-greeting-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .alt-greeting-row .shimmer-textarea {
+            flex: 1;
+            min-height: 48px;
+        }
+
+        .alt-greeting-remove {
+            flex-shrink: 0;
+            margin-top: 2px;
         }
 
         /* Tools */

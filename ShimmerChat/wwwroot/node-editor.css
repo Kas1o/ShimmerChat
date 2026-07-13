@@ -35,10 +35,10 @@
     font-size: 0.8em; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
 }
-.tn-btn-add  { background: rgba(100,200,100,0.12); color: #6c6; }
-.tn-btn-add:hover  { background: rgba(100,200,100,0.28); }
-.tn-btn-paste { background: rgba(100,150,220,0.12); color: #8af; font-size: 0.7em; }
-.tn-btn-paste:hover { background: rgba(100,150,220,0.28); }
+.tn-btn-add  { background: var(--su-success-soft); color: var(--su-success); }
+.tn-btn-add:hover  { opacity: 0.75; }
+.tn-btn-paste { background: var(--su-accent-soft); color: var(--su-accent); font-size: 0.7em; }
+.tn-btn-paste:hover { opacity: 0.75; }
 .tn-btn-move {
     width: 20px; height: 20px; border: none; border-radius: 3px;
     font-size: 0.65em; cursor: pointer;
@@ -47,10 +47,10 @@
 }
 .tn-btn-move:hover:not(:disabled) { background: var(--su-border-0); color: var(--su-text-2); }
 .tn-btn-move:disabled { opacity: 0.25; cursor: default; }
-.tn-btn-del   { background: rgba(220,80,80,0.12); color: #e66; }
-.tn-btn-del:hover   { background: rgba(220,80,80,0.28); }
-.tn-btn-copy  { background: rgba(100,150,220,0.12); color: #8af; font-size: 0.7em; }
-.tn-btn-copy:hover  { background: rgba(100,150,220,0.28); }
+.tn-btn-del   { background: var(--su-danger-soft); color: var(--su-danger); }
+.tn-btn-del:hover   { opacity: 0.75; }
+.tn-btn-copy  { background: var(--su-accent-soft); color: var(--su-accent); font-size: 0.7em; }
+.tn-btn-copy:hover  { opacity: 0.75; }
 .tn-btn-exp   { background: transparent; color: var(--su-text-1); font-size: 0.65em; }
 
 /* ── tn-child-row / tn-child-actions ──────────── */
