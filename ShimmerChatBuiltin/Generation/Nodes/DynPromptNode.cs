@@ -30,6 +30,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var loc = context.Env.Persistent.LocService;
             var kvData = context.Env.Persistent.KVData;
 
             var json = kvData.Read("DynPrompt", "DynPromptSets");
@@ -45,7 +46,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             {
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ParseError,
-                    "DynPrompt: Failed to parse DynPromptSets from KVData.",
+                    loc["node_err.dynprompt_parse_failed"],
                     details: ex.ToString(),
                     nodeId: Id, nodeName: Name));
             }
@@ -84,7 +85,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     {
                         return Task.FromResult(NodeResult.Failure(
                             NodeErrorCodes.ParseError,
-                            $"DynPrompt: Failed to evaluate trigger rule for term '{term.Name}'.",
+                            loc.Format("node_err.dynprompt_trigger_eval_failed", term.Name),
                             details: ex.ToString(),
                             nodeId: Id, nodeName: Name));
                     }

@@ -38,6 +38,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var loc = context.Env.Persistent.LocService;
             var kvData = context.Env.Persistent.KVData;
             var agentGuid = context.Env.Persistent.AgentGuid;
             var chat = context.Env.Persistent.GetChat();
@@ -56,13 +57,13 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             if (string.IsNullOrEmpty(qHost))
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
-                    "MemoryRetrieve: Qdrant host not configured.",
+                    loc["node_err.memory_no_host"],
                     nodeId: Id, nodeName: Name);
             var qPort = kvData.Read("QdrantAPI", "port");
             if (string.IsNullOrEmpty(qPort))
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
-                    "MemoryRetrieve: Qdrant port not configured.",
+                    loc["node_err.memory_no_port"],
                     nodeId: Id, nodeName: Name);
             var qApiKey = kvData.Read("QdrantAPI", "apikey");
 
@@ -147,7 +148,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             {
                 return NodeResult.Failure(
                     NodeErrorCodes.ServiceError,
-                    $"MemoryRetrieve: Failed to retrieve memories.",
+                    loc["node_err.memory_retrieve_failed"],
                     details: ex.ToString(),
                     nodeId: Id, nodeName: Name);
             }

@@ -23,6 +23,8 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var loc = context.Env.Persistent.LocService;
+
             if (string.IsNullOrWhiteSpace(ConfigName))
                 return NodeResult.SuccessResult();
 
@@ -30,12 +32,12 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             var config = LoadConfig(kvData, ConfigName);
             if (config == null)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    $"SubAgent: Config '{ConfigName}' not found.", nodeId: Id, nodeName: Name);
+                    loc.Format("node_err.subagent_config_not_found", ConfigName), nodeId: Id, nodeName: Name);
 
             var rootNode = ResolveTree(config, kvData, context.Env.Persistent.Serializer);
             if (rootNode == null)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    $"SubAgent: No modifier tree configured for '{ConfigName}'. Assign a preset or create a private tree.",
+                    loc.Format("node_err.subagent_no_tree", ConfigName),
                     nodeId: Id, nodeName: Name);
 
             // 1. 创建隔离的 GenerationEnv，将父级 Fragments 转为临时对话写入 SharedState
@@ -70,19 +72,19 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 var result = await rootNode.ExecuteAsync(ctx);
                 if (!result.Success)
                     return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                        $"SubAgent: Tree execution failed: {result.Message}", nodeId: Id, nodeName: Name);
+                        loc.Format("node_err.subagent_tree_failed", result.Message), nodeId: Id, nodeName: Name);
             }
             catch (Exception ex)
             {
                 return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                    $"SubAgent: Tree execution failed: {ex.Message}", nodeId: Id, nodeName: Name);
+                    loc.Format("node_err.subagent_tree_failed", ex.Message), nodeId: Id, nodeName: Name);
             }
 
             // 3. API：父级优先，树未设置则继承父级
             subEnv.Transient.API ??= context.Env.Transient.API;
             if (subEnv.Transient.API == null)
                 return NodeResult.Failure(NodeErrorCodes.ApiUnavailable,
-                    "SubAgent: No API configured.", nodeId: Id, nodeName: Name);
+                    loc["node_err.subagent_no_api"], nodeId: Id, nodeName: Name);
 
             // 4. Tool Call 循环（隔离 env 内独立运行）
             var tools = subEnv.Transient.Tools;

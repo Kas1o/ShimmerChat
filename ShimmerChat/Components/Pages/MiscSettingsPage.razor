@@ -3,45 +3,46 @@
 @using Microsoft.JSInterop
 @inject IKVDataService KVData
 @inject IJSRuntime JS
+@inject ILocService Loc
 
-<h3>MiscSettingsPage</h3>
+<h3>@Loc["misc.title"]</h3>
 
 <div class="su-group">
-	<h4>App Settings</h4>
+	<h4>@Loc["misc.app_settings"]</h4>
 
 	<input type="checkbox" id="throw-exception" @bind="_throwExceptionInsteadOfPopupErrorMessage" />
-	<label for="throw-exception">Throw exception instead of popup error message</label>
+	<label for="throw-exception">@Loc["misc.throw_exception"]</label>
 	
 	<input type="checkbox" id="enable-notifications" @bind="_enableNotifications" />
-	<label for="enable-notifications">Enable desktop notifications</label>
+	<label for="enable-notifications">@Loc["misc.enable_notifications"]</label>
 	
-	<button class="su-btn su-btn-outline-primary" @onclick="RequestNotificationPermission" style="margin-left: 10px;">Request Notification Permission</button>
-	<span style="margin-left: 10px;">Current status: <strong>@notificationPermissionStatus</strong></span>
+	<button class="su-btn su-btn-outline-primary" @onclick="RequestNotificationPermission" style="margin-left: 10px;">@Loc["misc.request_notification_permission"]</button>
+	<span style="margin-left: 10px;">@Loc["misc.current_status"] <strong>@notificationPermissionStatus</strong></span>
 
 	<input type="checkbox" id="auto-scroll-down" @bind="_autoScrollDown" />
-	<label for="auto-scroll-down">Auto scroll down</label>
+	<label for="auto-scroll-down">@Loc["misc.auto_scroll"]</label>
 
 	<input type="checkbox" id="auto-scroll-down" @bind="_virtualize" />
-	<label for="auto-scroll-down">Virtualize</label>
+	<label for="auto-scroll-down">@Loc["misc.virtualize"]</label>
 </div>
 
 <div class="su-group">
-	<h4>Display Settings</h4>
+	<h4>@Loc["misc.display_settings"]</h4>
 
 	<input type="checkbox" id="thinking-collapsed" @bind="_thinkingCollapsed" />
-	<label for="thinking-collapsed">Thinking default collapsed</label>
+	<label for="thinking-collapsed">@Loc["misc.thinking_collapsed"]</label>
 
 	<input type="checkbox" id="toolcall-collapsed" @bind="_toolCallCollapsed" />
-	<label for="toolcall-collapsed">Tool Call default collapsed</label>
+	<label for="toolcall-collapsed">@Loc["misc.tool_call_collapsed"]</label>
 
 	<input type="checkbox" id="toolresult-collapsed" @bind="_toolResultCollapsed" />
-	<label for="toolresult-collapsed">Tool Result default collapsed</label>
+	<label for="toolresult-collapsed">@Loc["misc.tool_result_collapsed"]</label>
 </div>
 
 <div class="su-group">
-	<h4>User Settings</h4>
+	<h4>@Loc["misc.user_settings"]</h4>
 
-	<label for="username">User Name</label>
+	<label for="username">@Loc["misc.user_name"]</label>
 	<input type="text" class="su-input" id="username" @bind="_UserName" />
 </div>
 
@@ -135,7 +136,7 @@
 	} = true;
 
 
-	private string notificationPermissionStatus = "Unknown";
+	private string notificationPermissionStatus = "";
 
 	bool Initialized = false;
 	private void Save()
@@ -183,7 +184,13 @@
 		Initialized = true;
 		
 		// 获取当前通知权限状态
-		notificationPermissionStatus = await JS.InvokeAsync<string>("eval", "Notification.permission");
+		var jsPermission = await JS.InvokeAsync<string>("eval", "Notification.permission");
+		notificationPermissionStatus = jsPermission?.ToLowerInvariant() switch
+		{
+			"granted" => Loc["misc.notification_granted"],
+			"denied" => Loc["misc.notification_denied"],
+			_ => Loc["misc.notification_unknown"]
+		};
 		StateHasChanged();
 	}
 	
@@ -192,13 +199,13 @@
 		var granted = await JS.InvokeAsync<bool>("requestNotificationPermission");
 		if (granted)
 		{
-			notificationPermissionStatus = "Granted";
+			notificationPermissionStatus = Loc["misc.notification_granted"];
 			// 同时启用通知设置
 			_enableNotifications = true;
 		}
 		else
 		{
-			notificationPermissionStatus = "Denied";
+			notificationPermissionStatus = Loc["misc.notification_denied"];
 		}
 		StateHasChanged();
 	}

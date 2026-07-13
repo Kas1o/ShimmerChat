@@ -4,21 +4,22 @@
 @inject IThemeService ThemeService
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
+@inject ILocService Loc
 
 <div class="theme-manager">
-    <h2>Theme Manager</h2>
+    <h2>@Loc["theme.title"]</h2>
 
     <div class="theme-actions">
-        <button class="su-btn su-btn-primary" @onclick="CreateNewTheme">Create Theme</button>
+        <button class="su-btn su-btn-primary" @onclick="CreateNewTheme">@Loc["theme.create"]</button>
         <div class="import-btn" style="position:relative;display:inline-block">
-            <button class="su-btn su-btn-secondary">Import</button>
+            <button class="su-btn su-btn-secondary">@Loc["theme.import"]</button>
             <InputFile OnChange="@OnImportFileSelected" accept=".json" style="position:absolute;inset:0;opacity:0;cursor:pointer" />
         </div>
-        <button class="su-btn su-btn-secondary" @onclick="ExportCurrentTheme" disabled="@(selectedTheme == null)">Export</button>
+        <button class="su-btn su-btn-secondary" @onclick="ExportCurrentTheme" disabled="@(selectedTheme == null)">@Loc["theme.export"]</button>
     </div>
 
     <div class="theme-list">
-        <h3>Available Themes</h3>
+        <h3>@Loc["theme.available"]</h3>
         <div class="theme-grid">
             @foreach (var theme in themes)
             {
@@ -32,20 +33,20 @@
                             <div class="color-box" style="background: @theme.Danger;" title="Danger"></div>
                         </div>
                         <div class="theme-meta">
-                            <small>@(theme.IsBuiltIn ? "Built-in" : "Custom") @(theme.IsDefault ? " | Default" : "") @(theme.IsDarkMode ? " | Dark" : " | Light")</small>
+                            <small>@(theme.IsBuiltIn ? Loc["theme.built_in"] : Loc["theme.custom"]) @(theme.IsDefault ? $" | {Loc["theme.is_default_label"]}" : "") @(theme.IsDarkMode ? $" | {Loc["theme.dark_mode_label"]}" : $" | {Loc["theme.light_mode_label"]}")</small>
                         </div>
                     </div>
                     <div class="theme-card-actions">
                         @if (!theme.IsBuiltIn)
                         {
-                            <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => EditTheme(theme.Id)" title="Edit">
+                            <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => EditTheme(theme.Id)" title="@Loc["theme.edit"]">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => DeleteTheme(theme.Id)" title="Delete" disabled="@theme.IsDefault">
+                            <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => DeleteTheme(theme.Id)" title="@Loc["theme.delete"]" disabled="@theme.IsDefault">
                                 <i class="bi bi-trash"></i>
                             </button>
                         }
-                        <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => DuplicateTheme(theme.Id)" title="Duplicate">
+                        <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => DuplicateTheme(theme.Id)" title="@Loc["theme.duplicate"]">
                             <i class="bi bi-files"></i>
                         </button>
                     </div>
@@ -58,106 +59,106 @@
     {
         <div class="theme-editor-overlay" @onclick="CancelEdit">
             <div class="theme-editor" @onclick:stopPropagation="true">
-                <h3>@(editingTheme.IsBuiltIn ? "View Theme" : editingTheme.Id == "new" ? "Create Theme" : "Edit Theme")</h3>
+                <h3>@(editingTheme.IsBuiltIn ? Loc["theme.view"] : editingTheme.Id == "new" ? Loc["theme.create"] : Loc["theme.edit"])</h3>
 
-                <div class="su-form-group"><label>Name:</label><input type="text" class="su-input" @bind="editingTheme.Name" /></div>
-                <div class="su-form-group"><label>Description:</label><input type="text" class="su-input" @bind="editingTheme.Description" /></div>
+                <div class="su-form-group"><label>@Loc["theme.label_name"]</label><input type="text" class="su-input" @bind="editingTheme.Name" /></div>
+                <div class="su-form-group"><label>@Loc["theme.label_description"]</label><input type="text" class="su-input" @bind="editingTheme.Description" /></div>
                 <div style="display:flex;gap:16px;margin-bottom:8px">
-                    <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" @bind="editingTheme.IsDefault" /> Default</label>
-                    <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" @bind="editingTheme.IsDarkMode" /> Dark mode</label>
+                    <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" @bind="editingTheme.IsDefault" /> @Loc["theme.is_default"]</label>
+                    <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" @bind="editingTheme.IsDarkMode" /> @Loc["theme.dark_mode"]</label>
                 </div>
 
-                <h4>Surface</h4>
+                <h4>@Loc["theme.css.surface"]</h4>
                 <div class="color-settings-grid">
-                    @ColorField("Page bg", editingTheme.Surface0, v => editingTheme.Surface0 = v)
-                    @ColorField("Card / Panel", editingTheme.Surface1, v => editingTheme.Surface1 = v)
-                    @ColorField("Elevated", editingTheme.Surface2, v => editingTheme.Surface2 = v)
-                    @ColorField("Input / Alt", editingTheme.Surface3, v => editingTheme.Surface3 = v)
+                    @ColorField(Loc["theme.css.page_bg"], editingTheme.Surface0, v => editingTheme.Surface0 = v)
+                    @ColorField(Loc["theme.css.card_panel"], editingTheme.Surface1, v => editingTheme.Surface1 = v)
+                    @ColorField(Loc["theme.css.elevated"], editingTheme.Surface2, v => editingTheme.Surface2 = v)
+                    @ColorField(Loc["theme.css.input_alt"], editingTheme.Surface3, v => editingTheme.Surface3 = v)
                 </div>
 
-                <h4>Text</h4>
+                <h4>@Loc["theme.css.text"]</h4>
                 <div class="color-settings-grid">
-                    @ColorField("Primary", editingTheme.Text0, v => editingTheme.Text0 = v)
-                    @ColorField("Secondary", editingTheme.Text1, v => editingTheme.Text1 = v)
-                    @ColorField("Tertiary", editingTheme.Text2, v => editingTheme.Text2 = v)
+                    @ColorField(Loc["theme.css.primary"], editingTheme.Text0, v => editingTheme.Text0 = v)
+                    @ColorField(Loc["theme.css.secondary"], editingTheme.Text1, v => editingTheme.Text1 = v)
+                    @ColorField(Loc["theme.css.tertiary"], editingTheme.Text2, v => editingTheme.Text2 = v)
                 </div>
 
-                <h4>Border</h4>
+                <h4>@Loc["theme.css.border"]</h4>
                 <div class="color-settings-grid">
-                    @ColorField("Primary", editingTheme.Border0, v => editingTheme.Border0 = v)
-                    @ColorField("Subtle", editingTheme.Border1, v => editingTheme.Border1 = v)
+                    @ColorField(Loc["theme.css.primary"], editingTheme.Border0, v => editingTheme.Border0 = v)
+                    @ColorField(Loc["theme.css.subtle"], editingTheme.Border1, v => editingTheme.Border1 = v)
                 </div>
 
-                <h4>Accent</h4>
+                <h4>@Loc["theme.css.accent"]</h4>
                 <div class="color-settings-grid">
-                    @ColorField("Base", editingTheme.Accent, v => editingTheme.Accent = v)
-                    @ColorField("Hover", editingTheme.AccentHover, v => editingTheme.AccentHover = v)
-                    @ColorField("Soft bg", editingTheme.AccentSoft, v => editingTheme.AccentSoft = v)
+                    @ColorField(Loc["theme.css.base"], editingTheme.Accent, v => editingTheme.Accent = v)
+                    @ColorField(Loc["theme.css.hover"], editingTheme.AccentHover, v => editingTheme.AccentHover = v)
+                    @ColorField(Loc["theme.css.soft_bg"], editingTheme.AccentSoft, v => editingTheme.AccentSoft = v)
                 </div>
 
-                <h4>Semantic</h4>
+                <h4>@Loc["theme.css.semantic"]</h4>
                 <div class="color-settings-grid">
-                    @ColorField("Success", editingTheme.Success, v => editingTheme.Success = v)
-                    @ColorField("Success bg", editingTheme.SuccessSoft, v => editingTheme.SuccessSoft = v)
-                    @ColorField("Warning", editingTheme.Warning, v => editingTheme.Warning = v)
-                    @ColorField("Warning bg", editingTheme.WarningSoft, v => editingTheme.WarningSoft = v)
-                    @ColorField("Danger", editingTheme.Danger, v => editingTheme.Danger = v)
-                    @ColorField("Danger bg", editingTheme.DangerSoft, v => editingTheme.DangerSoft = v)
-                    @ColorField("Info", editingTheme.Info, v => editingTheme.Info = v)
-                    @ColorField("Info bg", editingTheme.InfoSoft, v => editingTheme.InfoSoft = v)
+                    @ColorField(Loc["theme.css.success"], editingTheme.Success, v => editingTheme.Success = v)
+                    @ColorField(Loc["theme.css.success_bg"], editingTheme.SuccessSoft, v => editingTheme.SuccessSoft = v)
+                    @ColorField(Loc["theme.css.warning"], editingTheme.Warning, v => editingTheme.Warning = v)
+                    @ColorField(Loc["theme.css.warning_bg"], editingTheme.WarningSoft, v => editingTheme.WarningSoft = v)
+                    @ColorField(Loc["theme.css.danger"], editingTheme.Danger, v => editingTheme.Danger = v)
+                    @ColorField(Loc["theme.css.danger_bg"], editingTheme.DangerSoft, v => editingTheme.DangerSoft = v)
+                    @ColorField(Loc["theme.css.info"], editingTheme.Info, v => editingTheme.Info = v)
+                    @ColorField(Loc["theme.css.info_bg"], editingTheme.InfoSoft, v => editingTheme.InfoSoft = v)
                 </div>
 
-                <h4>Node Colors</h4>
+                <h4>@Loc["theme.css.node_colors"]</h4>
                 <div class="color-settings-grid">
-                    @ColorField("Flow", editingTheme.NodeFlow, v => editingTheme.NodeFlow = v)
-                    @ColorField("Branch", editingTheme.NodeBranch, v => editingTheme.NodeBranch = v)
-                    @ColorField("Link", editingTheme.NodeLink, v => editingTheme.NodeLink = v)
-                    @ColorField("Fragment", editingTheme.NodeFragment, v => editingTheme.NodeFragment = v)
-                    @ColorField("Prompt", editingTheme.NodePrompt, v => editingTheme.NodePrompt = v)
-                    @ColorField("Tool", editingTheme.NodeTool, v => editingTheme.NodeTool = v)
-                    @ColorField("Memory", editingTheme.NodeMemory, v => editingTheme.NodeMemory = v)
-                    @ColorField("Config", editingTheme.NodeConfig, v => editingTheme.NodeConfig = v)
-                    @ColorField("SubAgent", editingTheme.NodeSubagent, v => editingTheme.NodeSubagent = v)
-                    @ColorField("Debug", editingTheme.NodeDebug, v => editingTheme.NodeDebug = v)
+                    @ColorField(Loc["theme.css.flow"], editingTheme.NodeFlow, v => editingTheme.NodeFlow = v)
+                    @ColorField(Loc["theme.css.branch"], editingTheme.NodeBranch, v => editingTheme.NodeBranch = v)
+                    @ColorField(Loc["theme.css.link"], editingTheme.NodeLink, v => editingTheme.NodeLink = v)
+                    @ColorField(Loc["theme.css.fragment"], editingTheme.NodeFragment, v => editingTheme.NodeFragment = v)
+                    @ColorField(Loc["theme.css.prompt"], editingTheme.NodePrompt, v => editingTheme.NodePrompt = v)
+                    @ColorField(Loc["theme.css.tool"], editingTheme.NodeTool, v => editingTheme.NodeTool = v)
+                    @ColorField(Loc["theme.css.memory"], editingTheme.NodeMemory, v => editingTheme.NodeMemory = v)
+                    @ColorField(Loc["theme.css.config"], editingTheme.NodeConfig, v => editingTheme.NodeConfig = v)
+                    @ColorField(Loc["theme.css.subagent"], editingTheme.NodeSubagent, v => editingTheme.NodeSubagent = v)
+                    @ColorField(Loc["theme.css.debug"], editingTheme.NodeDebug, v => editingTheme.NodeDebug = v)
                 </div>
 
-                <h4>Shadows / Radii / Spacing</h4>
-                <div class="su-form-group"><label>Shadow sm:</label><input type="text" class="su-input" @bind="editingTheme.ShadowSm" /></div>
-                <div class="su-form-group"><label>Shadow md:</label><input type="text" class="su-input" @bind="editingTheme.ShadowMd" /></div>
-                <div class="su-form-group"><label>Shadow lg:</label><input type="text" class="su-input" @bind="editingTheme.ShadowLg" /></div>
-                <div class="su-form-group"><label>Radius sm:</label><input type="text" class="su-input" @bind="editingTheme.RadiusSm" /></div>
-                <div class="su-form-group"><label>Radius md:</label><input type="text" class="su-input" @bind="editingTheme.RadiusMd" /></div>
-                <div class="su-form-group"><label>Radius lg:</label><input type="text" class="su-input" @bind="editingTheme.RadiusLg" /></div>
+                <h4>@Loc["theme.css.shadows_radii_spacing"]</h4>
+                <div class="su-form-group"><label>@Loc["theme.css.shadow_sm"]:</label><input type="text" class="su-input" @bind="editingTheme.ShadowSm" /></div>
+                <div class="su-form-group"><label>@Loc["theme.css.shadow_md"]:</label><input type="text" class="su-input" @bind="editingTheme.ShadowMd" /></div>
+                <div class="su-form-group"><label>@Loc["theme.css.shadow_lg"]:</label><input type="text" class="su-input" @bind="editingTheme.ShadowLg" /></div>
+                <div class="su-form-group"><label>@Loc["theme.css.radius_sm"]:</label><input type="text" class="su-input" @bind="editingTheme.RadiusSm" /></div>
+                <div class="su-form-group"><label>@Loc["theme.css.radius_md"]:</label><input type="text" class="su-input" @bind="editingTheme.RadiusMd" /></div>
+                <div class="su-form-group"><label>@Loc["theme.css.radius_lg"]:</label><input type="text" class="su-input" @bind="editingTheme.RadiusLg" /></div>
                 <div style="display:flex;gap:8px">
-                    <div class="su-form-group"><label>Space 1:</label><input type="text" class="su-input" @bind="editingTheme.Space1" /></div>
-                    <div class="su-form-group"><label>Space 2:</label><input type="text" class="su-input" @bind="editingTheme.Space2" /></div>
-                    <div class="su-form-group"><label>Space 4:</label><input type="text" class="su-input" @bind="editingTheme.Space4" /></div>
-                    <div class="su-form-group"><label>Space 6:</label><input type="text" class="su-input" @bind="editingTheme.Space6" /></div>
-                    <div class="su-form-group"><label>Space 10:</label><input type="text" class="su-input" @bind="editingTheme.Space10" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.space_1"]:</label><input type="text" class="su-input" @bind="editingTheme.Space1" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.space_2"]:</label><input type="text" class="su-input" @bind="editingTheme.Space2" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.space_4"]:</label><input type="text" class="su-input" @bind="editingTheme.Space4" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.space_6"]:</label><input type="text" class="su-input" @bind="editingTheme.Space6" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.space_10"]:</label><input type="text" class="su-input" @bind="editingTheme.Space10" /></div>
                 </div>
 
-                <h4>Typography</h4>
-                <div class="su-form-group"><label>Font sans:</label><input type="text" class="su-input" @bind="editingTheme.FontSans" /></div>
-                <div class="su-form-group"><label>Font mono:</label><input type="text" class="su-input" @bind="editingTheme.FontMono" /></div>
+                <h4>@Loc["theme.css.typography"]</h4>
+                <div class="su-form-group"><label>@Loc["theme.css.font_sans"]:</label><input type="text" class="su-input" @bind="editingTheme.FontSans" /></div>
+                <div class="su-form-group"><label>@Loc["theme.css.font_mono"]:</label><input type="text" class="su-input" @bind="editingTheme.FontMono" /></div>
                 <div style="display:flex;gap:8px">
-                    <div class="su-form-group"><label>xs:</label><input type="text" class="su-input" @bind="editingTheme.FontXs" /></div>
-                    <div class="su-form-group"><label>sm:</label><input type="text" class="su-input" @bind="editingTheme.FontSm" /></div>
-                    <div class="su-form-group"><label>base:</label><input type="text" class="su-input" @bind="editingTheme.FontBase" /></div>
-                    <div class="su-form-group"><label>md:</label><input type="text" class="su-input" @bind="editingTheme.FontMd" /></div>
-                    <div class="su-form-group"><label>lg:</label><input type="text" class="su-input" @bind="editingTheme.FontLg" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.font_xs"]:</label><input type="text" class="su-input" @bind="editingTheme.FontXs" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.font_sm"]:</label><input type="text" class="su-input" @bind="editingTheme.FontSm" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.font_base"]:</label><input type="text" class="su-input" @bind="editingTheme.FontBase" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.font_md"]:</label><input type="text" class="su-input" @bind="editingTheme.FontMd" /></div>
+                    <div class="su-form-group"><label>@Loc["theme.css.font_lg"]:</label><input type="text" class="su-input" @bind="editingTheme.FontLg" /></div>
                 </div>
 
-                <h4>Custom CSS</h4>
+                <h4>@Loc["theme.css.custom_css"]</h4>
                 <div class="form-group">
-                    <textarea class="su-input custom-css" @bind="editingTheme.CustomCss" placeholder="Custom CSS overrides..."></textarea>
+                    <textarea class="su-input custom-css" @bind="editingTheme.CustomCss" placeholder="@Loc["theme.custom_css_placeholder"]"></textarea>
                 </div>
 
                 <div class="editor-actions">
-                    <button class="su-btn su-btn-primary" @onclick="SaveTheme">Save</button>
-                    <button class="su-btn su-btn-secondary" @onclick="CancelEdit">Cancel</button>
+                    <button class="su-btn su-btn-primary" @onclick="SaveTheme">@Loc["Save"]</button>
+                    <button class="su-btn su-btn-secondary" @onclick="CancelEdit">@Loc["Cancel"]</button>
                     @if (editingTheme.Id != "new" && !editingTheme.IsBuiltIn)
                     {
-                        <button class="su-btn su-btn-danger" @onclick="DeleteCurrentTheme">Delete</button>
+                        <button class="su-btn su-btn-danger" @onclick="DeleteCurrentTheme">@Loc["Delete"]</button>
                     }
                 </div>
             </div>
@@ -183,7 +184,7 @@
 
     private void CreateNewTheme()
     {
-        editingTheme = new Theme { Id = "new", Name = "New Theme", IsBuiltIn = false };
+        editingTheme = new Theme { Id = "new", Name = Loc["theme.default_name"], IsBuiltIn = false };
         showEditor = true;
     }
 
@@ -207,13 +208,13 @@
     private async Task DeleteTheme(string id)
     {
         var t = themes.FirstOrDefault(x => x.Id == id);
-        if (t is { IsBuiltIn: false, IsDefault: false } && await JSRuntime.InvokeAsync<bool>("confirm", $"Delete '{t.Name}'?"))
+        if (t is { IsBuiltIn: false, IsDefault: false } && await JSRuntime.InvokeAsync<bool>("confirm", Loc.Format("theme.delete_confirm", t.Name)))
         { ThemeService.DeleteTheme(id); LoadThemes(); }
     }
 
     private async Task DeleteCurrentTheme()
     {
-        if (editingTheme is { IsBuiltIn: false, IsDefault: false } && await JSRuntime.InvokeAsync<bool>("confirm", $"Delete '{editingTheme.Name}'?"))
+        if (editingTheme is { IsBuiltIn: false, IsDefault: false } && await JSRuntime.InvokeAsync<bool>("confirm", Loc.Format("theme.delete_confirm", editingTheme.Name)))
         { ThemeService.DeleteTheme(editingTheme.Id); LoadThemes(); showEditor = false; editingTheme = null; }
     }
 
@@ -242,7 +243,7 @@
     private void DuplicateTheme(string id)
     {
         var t = themes.FirstOrDefault(x => x.Id == id); if (t == null) return;
-        var copy = t.Clone(); copy.Id = Guid.NewGuid().ToString(); copy.Name = t.Name + " (Copy)";
+        var copy = t.Clone(); copy.Id = Guid.NewGuid().ToString(); copy.Name = Loc.Format("theme.copy_suffix", t.Name);
         copy.IsDefault = false; copy.IsBuiltIn = false;
         ThemeService.CreateTheme(copy); LoadThemes();
     }
@@ -251,16 +252,16 @@
     {
         var file = e.File;
         if (file == null || (!file.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && file.ContentType != "application/json"))
-        { await JSRuntime.InvokeVoidAsync("alert", "Please select a .json file."); return; }
-        if (file.Size > 1024 * 1024) { await JSRuntime.InvokeVoidAsync("alert", "File too large (max 1MB)."); return; }
+        { await JSRuntime.InvokeVoidAsync("alert", Loc["theme.alert_select_json"]); return; }
+        if (file.Size > 1024 * 1024) { await JSRuntime.InvokeVoidAsync("alert", Loc["theme.alert_file_too_large"]); return; }
         try
         {
             using var stream = file.OpenReadStream(1024 * 1024);
             using var reader = new StreamReader(stream);
             ThemeService.ImportTheme(await reader.ReadToEndAsync());
-            LoadThemes(); await JSRuntime.InvokeVoidAsync("alert", $"Imported '{file.Name}'.");
+            LoadThemes(); await JSRuntime.InvokeVoidAsync("alert", Loc.Format("theme.alert_imported", file.Name));
         }
-        catch (Exception ex) { await JSRuntime.InvokeVoidAsync("alert", $"Import failed: {ex.Message}"); }
+        catch (Exception ex) { await JSRuntime.InvokeVoidAsync("alert", Loc.Format("theme.alert_import_failed", ex.Message)); }
     }
 
     private async Task ExportCurrentTheme()

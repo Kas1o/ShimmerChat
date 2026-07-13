@@ -2,11 +2,12 @@
 @using System.Timers
 @using ShimmerChatLib.Models
 @inject IThemeService ThemeService
+@inject ILocService Loc
 @implements IDisposable
 <div id="bg-region" style="background-image: url('@BackgroundImagePath')">
 	<div id="main-content">
 		<div id="title">
-			SHIMMER CHAT
+			@Loc["home.title"]
 		</div>
 		<div id="time">
 			<p>@currentTime</p>

@@ -6,35 +6,36 @@
 @inject IJSRuntime JS
 
 @inject IKVDataService pluginData
+@inject ILocService Loc
 
 
 
 <div class="shimmer-content su-p-4">
-    <h2 class="su-text-lg su-font-bold">DynPrompt 编辑器</h2>
+    <h2 class="su-text-lg su-font-bold">@Loc["panel_dynprompt.title"]</h2>
     
     <!-- 新建 DynPromptSet -->
     <div class="su-group">
-        <h3 class="su-text-lg su-font-bold">创建新的 DynPromptSet</h3>
+        <h3 class="su-text-lg su-font-bold">@Loc["panel_dynprompt.create_new_set"]</h3>
         <div class="su-flex su-gap-3 su-mt-3 su-items-center su-flex-wrap">
             <input type="text" class="shimmer-input su-flex-1 @(validationErrors.ContainsKey("newSetName") ? "su-border-top" : "")" 
-                   @bind="newSetName" placeholder="输入 DynPromptSet 名称" />
+                    @bind="newSetName" placeholder="@Loc["panel_dynprompt.set_name_placeholder"]" />
             @if (validationErrors.ContainsKey("newSetName"))
             {
                 <div class="su-text-danger su-text-sm">@validationErrors["newSetName"]</div>
             }
             <button class="btn" @onclick="CreateNewSet" disabled="@string.IsNullOrWhiteSpace(newSetName)">
-                创建
+                @Loc["panel_dynprompt.create"]
             </button>
         </div>
     </div>
 
     <!-- DynPromptSet 列表 -->
     <div class="su-group su-mt-5">
-        <h3 class="su-text-lg su-font-bold">已有的 DynPromptSet (@sets.Count)</h3>
+        <h3 class="su-text-lg su-font-bold">@Loc["panel_dynprompt.existing_sets"] (@sets.Count)</h3>
         
         @if (sets.Count == 0)
         {
-            <p class="su-text-2 su-mt-3">暂无 DynPromptSet，请创建新的集合。</p>
+            <p class="su-text-2 su-mt-3">@Loc["panel_dynprompt.no_sets"]</p>
         }
         else
         {
@@ -42,16 +43,16 @@
                 @foreach (var set in sets)
                 {
                     <div class="su-card su-cursor-pointer su-p-3 @(selectedSet?.Name == set.Name ? "su-border-top su-shadow-md" : "")"
-                         @onclick="() => EditSet(set)">
+                        @onclick="() => EditSet(set)">
                         <div class="set-header su-flex su-justify-between su-w-full">
                             <h4 class="su-mb-0">@set.Name</h4>
                             <div class="set-actions su-flex su-gap-2">
-                                <button class="su-btn su-btn-sm" @onclick:stopPropagation @onclick="() => EditSet(set)" title="编辑">✏️</button>
-                                <button class="su-btn su-btn-sm" @onclick:stopPropagation @onclick="async () => await DeleteSet(set)" title="删除">🗑️</button>
+                                <button class="su-btn su-btn-sm" @onclick:stopPropagation @onclick="() => EditSet(set)" title="@Loc["panel_dynprompt.edit"]">✏️</button>
+                                <button class="su-btn su-btn-sm" @onclick:stopPropagation @onclick="async () => await DeleteSet(set)" title="@Loc["panel_dynprompt.delete"]">🗑️</button>
                             </div>
                         </div>
                         <div class="set-content su-mt-2">
-                            <p class="su-text-sm su-text-2">包含 @set.Terms.Count 个动态提示词</p>
+                            <p class="su-text-sm su-text-2">@Loc.Format("panel_dynprompt.term_count", set.Terms.Count)</p>
                         </div>
                     </div>
                 }
@@ -63,25 +64,25 @@
     @if (selectedSet != null)
     {
         <div class="su-group su-mt-5">
-            <h3>编辑: @selectedSet.Name</h3>
+            <h3>@Loc.Format("panel_dynprompt.edit_set_title", selectedSet.Name)</h3>
             
             <div class="set-info">
                 <div class="su-flex su-gap-3 su-mt-3 su-items-center">
-                    <label class="su-mt-1">集合名称:</label>
+                    <label class="su-mt-1">@Loc["panel_dynprompt.label_set_name"]</label>
                     <input type="text" class="shimmer-input" @bind="editingSetName" />
                     <button class="btn" @onclick="UpdateSetName" disabled="@string.IsNullOrWhiteSpace(editingSetName)">
-                        更新名称
+                        @Loc["panel_dynprompt.update_name"]
                     </button>
                 </div>
             </div>
 
             <!-- DynPromptTerm 列表 -->
             <div class="mt-4">
-                <h4>动态提示词列表 (@selectedSet.Terms.Count)</h4>
+                <h4>@Loc["panel_dynprompt.term_list"] (@selectedSet.Terms.Count)</h4>
                 
                 @if (selectedSet.Terms.Count == 0)
                 {
-                    <p class="su-text-2 su-mt-2">该集合暂无动态提示词，请添加。</p>
+                    <p class="su-text-2 su-mt-2">@Loc["panel_dynprompt.no_terms"]</p>
                 }
                 else
                 {
@@ -92,14 +93,14 @@
                                 <div class="term-header su-flex su-justify-between">
                                     <h5 class="su-mb-0">@term.Name</h5>
                                     <div class="term-actions su-flex su-gap-2">
-                                        <button class="su-btn su-btn-sm" @onclick="() => EditTerm(term)" title="编辑">✏️</button>
-                                        <button class="su-btn su-btn-sm" @onclick="async () => await DeleteTerm(term)" title="删除">🗑️</button>
+                                        <button class="su-btn su-btn-sm" @onclick="() => EditTerm(term)" title="@Loc["panel_dynprompt.edit"]">✏️</button>
+                                        <button class="su-btn su-btn-sm" @onclick="async () => await DeleteTerm(term)" title="@Loc["panel_dynprompt.delete"]">🗑️</button>
                                     </div>
                                 </div>
                                 <div class="term-preview su-mt-2">
-                                    <p class="su-text-sm"><strong>内容:</strong> @(term.Content.Length > 100 ? term.Content.Substring(0, 100) + "..." : term.Content)</p>
-                                    <p class="su-text-sm"><strong>注入模式:</strong> @term.InjectionMode</p>
-                                    <p class="su-text-sm"><strong>触发规则:</strong> @(string.IsNullOrEmpty(term.TriggerRule) ? "无" : term.TriggerRule)</p>
+                                    <p class="su-text-sm"><strong>@Loc["panel_dynprompt.label_content"]:</strong> @(term.Content.Length > 100 ? term.Content.Substring(0, 100) + "..." : term.Content)</p>
+                                    <p class="su-text-sm"><strong>@Loc["panel_dynprompt.label_inject_mode"]:</strong> @term.InjectionMode</p>
+                                    <p class="su-text-sm"><strong>@Loc["panel_dynprompt.label_trigger_rule"]:</strong> @(string.IsNullOrEmpty(term.TriggerRule) ? Loc["panel_dynprompt.none"] : term.TriggerRule)</p>
                                 </div>
                             </div>
                         }
@@ -109,8 +110,8 @@
 
             <!-- 添加 DynPromptTerm -->
             <div class="mt-4">
-                <h4>添加新的动态提示词</h4>
-                <button class="btn mt-2" @onclick="ShowAddTermForm">+ 添加提示词</button>
+                <h4>@Loc["panel_dynprompt.add_new_term"]</h4>
+                <button class="btn mt-2" @onclick="ShowAddTermForm">@Loc["panel_dynprompt.add_term_btn"]</button>
             </div>
         </div>
     }
@@ -120,12 +121,12 @@
     {
         <div class="su-modal-mask">
             <div class="su-modal su-modal-sm su-p-4">
-                <h4>@(isEditingTerm ? "编辑动态提示词" : "添加新动态提示词")</h4>
+                <h4>@(isEditingTerm ? Loc["panel_dynprompt.edit_term_title"] : Loc["panel_dynprompt.add_term_title"])</h4>
                 
                 <div class="su-form-group su-mt-3">
-                    <label>名称:</label>
+                    <label>@Loc["panel_dynprompt.label_term_name"]:</label>
                     <input type="text" class="shimmer-input @(validationErrors.ContainsKey("termName") ? "su-border-top" : "")" 
-                           @bind="termForm.Name" placeholder="输入提示词名称" />
+                            @bind="termForm.Name" placeholder="@Loc["panel_dynprompt.term_name_placeholder"]" />
                     @if (validationErrors.ContainsKey("termName"))
                     {
                         <div class="su-text-danger su-text-sm su-mt-1">@validationErrors["termName"]</div>
@@ -133,9 +134,9 @@
                 </div>
                 
                 <div class="su-form-group su-mt-3">
-                    <label>内容:</label>
+                    <label>@Loc["panel_dynprompt.label_content"]:</label>
                     <textarea class="shimmer-textarea @(validationErrors.ContainsKey("termContent") ? "su-border-top" : "")" 
-                              @bind="termForm.Content" placeholder="输入提示词内容" rows="5"></textarea>
+                                @bind="termForm.Content" placeholder="@Loc["panel_dynprompt.term_content_placeholder"]" rows="5"></textarea>
                     @if (validationErrors.ContainsKey("termContent"))
                     {
                         <div class="su-text-danger su-text-sm su-mt-1">@validationErrors["termContent"]</div>
@@ -143,7 +144,7 @@
                 </div>
                 
                 <div class="su-form-group su-mt-3">
-                    <label>注入模式:</label>
+                    <label>@Loc["panel_dynprompt.label_inject_mode"]:</label>
                     <select class="shimmer-input" @bind="termForm.InjectionMode">
                         @foreach (var mode in Enum.GetValues(typeof(DynPromptTermInjectionMode)))
                         {
@@ -153,32 +154,32 @@
                 </div>
                 
                 <div class="su-form-group su-mt-3">
-                    <label>注入深度 (当模式为 AtDepth 时有效):</label>
+                    <label>@Loc["panel_dynprompt.label_inject_depth"]:</label>
                     <input type="number" class="shimmer-input" @bind="termForm.InjectionDepth" min="1" />
                 </div>
                 
                 <div class="su-form-group su-mt-3">
-                    <label>触发规则:</label>
+                    <label>@Loc["panel_dynprompt.label_trigger_rule"]:</label>
                     <textarea class="shimmer-textarea @(validationErrors.ContainsKey("termTriggerRule") ? "su-border-top" : "")" 
-                              @bind="termForm.TriggerRule" placeholder="输入触发规则，留空表示始终触发" rows="3"></textarea>
+                                @bind="termForm.TriggerRule" placeholder="@Loc["panel_dynprompt.trigger_rule_placeholder"]" rows="3"></textarea>
                     @if (validationErrors.ContainsKey("termTriggerRule"))
                     {
                         <div class="su-text-danger su-text-sm su-mt-1">@validationErrors["termTriggerRule"]</div>
                     }
-                    <small class="su-text-2 su-mt-1">支持正则表达式和逻辑运算符: | (或), & (与), ! (非), () (分组)</small>
-                    <a href="https://github.com/Kas1o/ShimmerChat/blob/master/ShimmerChatBuiltin/DynPrompt/TriggerRule.md">Doc Link</a>
+                    <small class="su-text-2 su-mt-1">@Loc["panel_dynprompt.trigger_rule_help"]</small>
+                    <a href="https://github.com/Kas1o/ShimmerChat/blob/master/ShimmerChatBuiltin/DynPrompt/TriggerRule.md">@Loc["panel_dynprompt.doc_link"]</a>
                 </div>
                 
                 <div class="su-form-group su-mt-3">
                     <div class="su-flex su-items-center su-gap-2">
                         <input type="checkbox" id="allowRecursive" @bind="termForm.AllowBeTriggeredByRecursive" />
-                        <label for="allowRecursive">允许被递归触发</label>
+                        <label for="allowRecursive">@Loc["panel_dynprompt.allow_recursive"]</label>
                     </div>
                 </div>
                 
                 <div class="form-actions su-flex su-gap-3 su-justify-end su-mt-4">
-                    <button class="su-btn" @onclick="CancelTermForm">取消</button>
-                    <button class="btn" @onclick="SaveTerm">保存</button>
+                    <button class="su-btn" @onclick="CancelTermForm">@Loc["panel_dynprompt.cancel"]</button>
+                    <button class="btn" @onclick="SaveTerm">@Loc["panel_dynprompt.save"]</button>
                 </div>
             </div>
         </div>
@@ -190,7 +191,7 @@
         <div class="su-modal-mask">
             <div class="su-modal su-modal-sm su-p-4 su-text-center">
                 <div class="su-text-accent su-mb-3">⏳</div>
-                <div class="su-text-lg">处理中...</div>
+                <div class="su-text-lg">@Loc["panel_dynprompt.processing"]</div>
             </div>
         </div>
     }
@@ -198,12 +199,12 @@
     <!-- 保存和状态消息 -->
     <div class="su-mt-5 su-pt-3 su-border-top">
         <div class="su-flex su-justify-between su-items-center">
-            <button class="btn" @onclick="SaveAllChanges" disabled="@isLoading">保存所有更改</button>
+            <button class="btn" @onclick="SaveAllChanges" disabled="@isLoading">@Loc["panel_dynprompt.save_all"]</button>
             @if (!string.IsNullOrEmpty(statusMessage))
             {
                 <div class="su-px-4 su-py-2 su-rounded su-text-sm 
                             @(statusType == "success" ? "su-badge su-badge-success" : 
-                              statusType == "error" ? "su-badge su-badge-danger" : "su-badge")">
+                                statusType == "error" ? "su-badge su-badge-danger" : "su-badge")">
                     <span>
                         @(statusType == "success" ? "✓" : statusType == "error" ? "✗" : "i") 
                         @statusMessage
@@ -254,11 +255,11 @@
             isLoading = true;
             var data = pluginData.Read("DynPrompt", "DynPromptSets");
             sets = JsonConvert.DeserializeObject<List<DynPromptSet>>(data ?? "[]") ?? [];
-            ShowStatus("数据加载成功", "success");
+            ShowStatus(Loc["panel_dynprompt.msg_load_success"], "success");
         }
         catch (Exception ex)
         {
-            ShowStatus($"加载数据失败: {ex.Message}", "error");
+            ShowStatus(Loc.Format("panel_dynprompt.msg_load_failed", ex.Message), "error");
             sets = [];
         }
         finally
@@ -293,15 +294,15 @@
         
         if (string.IsNullOrWhiteSpace(newSetName))
         {
-            AddValidationError("newSetName", "请输入有效的集合名称");
-            ShowStatus("请输入有效的集合名称", "error");
+            AddValidationError("newSetName", Loc["panel_dynprompt.msg_invalid_set_name"]);
+            ShowStatus(Loc["panel_dynprompt.msg_invalid_set_name"], "error");
             return;
         }
 
         if (sets.Any(s => s.Name == newSetName))
         {
-            AddValidationError("newSetName", "集合名称已存在");
-            ShowStatus("集合名称已存在", "error");
+            AddValidationError("newSetName", Loc["panel_dynprompt.msg_set_name_exists"]);
+            ShowStatus(Loc["panel_dynprompt.msg_set_name_exists"], "error");
             return;
         }
 
@@ -313,14 +314,14 @@
             selectedSet = newSet;
             editingSetName = newSetName;
             newSetName = "";
-            ShowStatus("集合创建成功", "success");
+            ShowStatus(Loc["panel_dynprompt.msg_set_created"], "success");
             
             // 自动保存
             SaveAllChanges();
         }
         catch (Exception ex)
         {
-            ShowStatus($"创建集合失败: {ex.Message}", "error");
+            ShowStatus(Loc.Format("panel_dynprompt.msg_set_create_failed", ex.Message), "error");
         }
         finally
         {
@@ -350,26 +351,26 @@
         {
             // 使用JSInterop调用浏览器的confirm函数
             bool confirmed = await JS.InvokeAsync<bool>("confirm", 
-                $"确定要删除集合 '{set.Name}' 吗？这将删除所有相关的动态提示词。");
+                Loc.Format("panel_dynprompt.msg_confirm_delete_set", set.Name));
             
             if (confirmed)
             {
-                 isLoading = true;
-                 sets.Remove(set);
-                 if (selectedSet == set)
-                 {
-                     selectedSet = null;
-                     editingSetName = "";
-                 }
-                 ShowStatus("集合已删除", "success");
-                 
+                isLoading = true;
+                sets.Remove(set);
+                if (selectedSet == set)
+                {
+                    selectedSet = null;
+                    editingSetName = "";
+                }
+                ShowStatus(Loc["panel_dynprompt.msg_set_deleted"], "success");
+                
                  // 自动保存
-                 SaveAllChanges();
+                SaveAllChanges();
             }
         }
         catch (Exception ex)
         {
-            ShowStatus($"删除集合失败: {ex.Message}", "error");
+            ShowStatus(Loc.Format("panel_dynprompt.msg_set_delete_failed", ex.Message), "error");
         }
         finally
         {
@@ -381,18 +382,18 @@
     {
         if (selectedSet == null || string.IsNullOrWhiteSpace(editingSetName))
         {
-            ShowStatus("请输入有效的集合名称", "error");
+            ShowStatus(Loc["panel_dynprompt.msg_invalid_set_name"], "error");
             return;
         }
 
         if (sets.Any(s => s.Name == editingSetName && s != selectedSet))
         {
-            ShowStatus("集合名称已存在", "error");
+            ShowStatus(Loc["panel_dynprompt.msg_set_name_exists"], "error");
             return;
         }
 
         selectedSet.Name = editingSetName;
-        ShowStatus("集合名称已更新", "success");
+        ShowStatus(Loc["panel_dynprompt.msg_set_name_updated"], "success");
         
         // 自动保存
         SaveAllChanges();
@@ -402,7 +403,7 @@
     {
         if (selectedSet == null)
         {
-            ShowStatus("请先选择一个集合", "error");
+            ShowStatus(Loc["panel_dynprompt.msg_select_set_first"], "error");
             return;
         }
 
@@ -443,7 +444,7 @@
             {
                 // 使用JSInterop调用浏览器的confirm函数
                 bool confirmed = await JS.InvokeAsync<bool>("confirm", 
-                    $"确定要删除提示词 '{term.Name}' 吗？");
+                    Loc.Format("panel_dynprompt.msg_confirm_delete_term", term.Name));
                 
                 if (confirmed)
                 {
@@ -453,7 +454,7 @@
                     {
                         editingTerm = null;
                     }
-                    ShowStatus("提示词已删除", "success");
+                    ShowStatus(Loc["panel_dynprompt.msg_term_deleted"], "success");
                     
                     // 自动保存
                     SaveAllChanges();
@@ -462,7 +463,7 @@
         }
         catch (Exception ex)
         {
-            ShowStatus($"删除提示词失败: {ex.Message}", "error");
+            ShowStatus(Loc.Format("panel_dynprompt.msg_term_delete_failed", ex.Message), "error");
         }
         finally
         {
@@ -477,25 +478,25 @@
         
         if (selectedSet == null)
         {
-            ShowStatus("请先选择一个集合", "error");
+            ShowStatus(Loc["panel_dynprompt.msg_select_set_first"], "error");
             return;
         }
 
         // 验证必填字段
         if (string.IsNullOrWhiteSpace(termForm.Name))
         {
-            AddValidationError("termName", "请输入提示词名称");
+            AddValidationError("termName", Loc["panel_dynprompt.msg_term_name_required"]);
         }
 
         if (string.IsNullOrWhiteSpace(termForm.Content))
         {
-            AddValidationError("termContent", "请输入提示词内容");
+            AddValidationError("termContent", Loc["panel_dynprompt.msg_term_content_required"]);
         }
 
         // 验证触发规则
         if (!ValidateTriggerRule(termForm.TriggerRule, out var message))
         {
-            AddValidationError("termTriggerRule", $"触发规则语法错误: {message}");
+            AddValidationError("termTriggerRule", Loc.Format("panel_dynprompt.msg_trigger_syntax_error", message ?? ""));
         }
 
         // 检查名称冲突
@@ -505,14 +506,14 @@
             {
                 if (selectedSet.Terms.Any(t => t.Name == termForm.Name && t != editingTerm))
                 {
-                    AddValidationError("termName", "提示词名称已存在");
+                    AddValidationError("termName", Loc["panel_dynprompt.msg_term_name_exists"]);
                 }
             }
             else
             {
                 if (selectedSet.Terms.Any(t => t.Name == termForm.Name))
                 {
-                    AddValidationError("termName", "提示词名称已存在");
+                    AddValidationError("termName", Loc["panel_dynprompt.msg_term_name_exists"]);
                 }
             }
         }
@@ -520,7 +521,7 @@
         // 如果有验证错误，显示错误信息
         if (validationErrors.Count > 0)
         {
-            ShowStatus("请修正表单中的错误", "error");
+            ShowStatus(Loc["panel_dynprompt.msg_fix_form_errors"], "error");
             StateHasChanged();
             return;
         }
@@ -538,7 +539,7 @@
                 editingTerm.InjectionDepth = termForm.InjectionDepth;
                 editingTerm.TriggerRule = termForm.TriggerRule;
                 editingTerm.AllowBeTriggeredByRecursive = termForm.AllowBeTriggeredByRecursive;
-                ShowStatus("提示词已更新", "success");
+                ShowStatus(Loc["panel_dynprompt.msg_term_updated"], "success");
             }
             else
             {
@@ -553,7 +554,7 @@
                     AllowBeTriggeredByRecursive = termForm.AllowBeTriggeredByRecursive
                 };
                 selectedSet.Terms.Add(newTerm);
-                ShowStatus("提示词已添加", "success");
+                ShowStatus(Loc["panel_dynprompt.msg_term_added"], "success");
             }
 
             CancelTermForm();
@@ -563,7 +564,7 @@
             }
             catch (Exception ex)
             {
-                ShowStatus($"保存提示词失败: {ex.Message}", "error");
+                ShowStatus(Loc.Format("panel_dynprompt.msg_term_save_failed", ex.Message), "error");
             }
             finally
             {
@@ -591,7 +592,7 @@
                 if (string.IsNullOrWhiteSpace(set.Name))
                 {
                     hasErrors = true;
-                    ShowStatus("存在无效的集合名称", "error");
+                    ShowStatus(Loc["panel_dynprompt.msg_invalid_set_names"], "error");
                     break;
                 }
                 
@@ -600,14 +601,14 @@
                     if (string.IsNullOrWhiteSpace(term.Name) || string.IsNullOrWhiteSpace(term.Content))
                     {
                         hasErrors = true;
-                        ShowStatus("存在无效的提示词", "error");
+                        ShowStatus(Loc["panel_dynprompt.msg_invalid_terms"], "error");
                         break;
                     }
                     
                     if (!ValidateTriggerRule(term.TriggerRule, out _))
                     {
                         hasErrors = true;
-                        ShowStatus($"提示词 '{term.Name}' 的触发规则语法错误", "error");
+                        ShowStatus(Loc.Format("panel_dynprompt.msg_term_trigger_error", term.Name), "error");
                         break;
                     }
                 }
@@ -621,11 +622,11 @@
             
             var json = JsonConvert.SerializeObject(sets, Formatting.Indented);
             pluginData.Write("DynPrompt", "DynPromptSets", json);
-            ShowStatus("所有更改已保存", "success");
+            ShowStatus(Loc["panel_dynprompt.msg_all_saved"], "success");
         }
         catch (Exception ex)
         {
-            ShowStatus($"保存失败: {ex.Message}", "error");
+            ShowStatus(Loc.Format("panel_dynprompt.msg_save_all_failed", ex.Message), "error");
         }
         finally
         {

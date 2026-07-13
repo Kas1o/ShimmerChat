@@ -3,6 +3,7 @@
 @using ShimmerChatBuiltin.RegexModifier
 @using System.Text.RegularExpressions
 @inject IKVDataService KVData
+@inject ILocService Loc
 
 @attribute [PluginPanelAttribute("panel.regex_modifier", "panel.regex_modifier.desc", PanelDisplayPlace.Settings)]
 
@@ -12,9 +13,9 @@
         <div class="su-col-4">
             <div class="su-card su-h-full">
                 <div class="su-card-header su-flex su-justify-between su-items-center">
-                    <h5 class="su-mb-0">Regex Sets</h5>
+                    <h5 class="su-mb-0">@Loc["panel_regex.title"]</h5>
                     <button class="su-btn su-btn-sm su-btn-success" @onclick="CreateNewSet">
-                        <i class="bi bi-plus-lg"></i> New
+                        <i class="bi bi-plus-lg"></i> @Loc["panel_regex.new"]
                     </button>
                 </div>
                 <div class="su-list su-list-flush">
@@ -36,21 +37,21 @@
             {
                 <div class="su-card">
                     <div class="su-card-header su-flex su-justify-between su-items-center">
-                        <h5 class="su-mb-0">Edit Set</h5>
+                        <h5 class="su-mb-0">@Loc["panel_regex.edit_set"]</h5>
                         <div>
-                            <button class="su-btn su-btn-sm su-btn-primary su-me-2" @onclick="SaveSelectedSet">Save</button>
-                            <button class="su-btn su-btn-sm su-btn-danger" @onclick="DeleteSelectedSet">Delete</button>
+                            <button class="su-btn su-btn-sm su-btn-primary su-me-2" @onclick="SaveSelectedSet">@Loc["panel_regex.save"]</button>
+                            <button class="su-btn su-btn-sm su-btn-danger" @onclick="DeleteSelectedSet">@Loc["panel_regex.delete"]</button>
                         </div>
                     </div>
                     <div class="su-card-body">
                         <div class="su-mb-3">
-                            <label class="su-label">Set Name</label>
+                            <label class="su-label">@Loc["panel_regex.label_set_name"]</label>
                             <input type="text" class="su-input" @bind="_selectedSet.Name" />
                         </div>
 
                         <div class="su-mb-2 su-flex su-justify-between su-items-center">
-                            <h6>Rules</h6>
-                            <button class="su-btn su-btn-sm su-btn-outline-primary" @onclick="AddRule">Add Rule</button>
+                            <h6>@Loc["panel_regex.rules"]</h6>
+                            <button class="su-btn su-btn-sm su-btn-outline-primary" @onclick="AddRule">@Loc["panel_regex.add_rule"]</button>
                         </div>
 
                         @if (_selectedSet.Rules != null && _selectedSet.Rules.Count > 0)
@@ -59,10 +60,10 @@
                                 <table class="su-table su-table-sm">
                                     <thead>
                                         <tr>
-                                            <th style="width: 40px;">On</th>
-                                            <th>Pattern (Regex)</th>
-                                            <th>Replacement</th>
-                                            <th style="width: 120px;">Options</th>
+                                            <th style="width: 40px;">@Loc["panel_regex.th_enabled"]</th>
+                                            <th>@Loc["panel_regex.th_pattern"]</th>
+                                            <th>@Loc["panel_regex.th_replacement"]</th>
+                                            <th style="width: 120px;">@Loc["panel_regex.th_options"]</th>
                                             <th style="width: 40px;"></th>
                                         </tr>
                                     </thead>
@@ -74,16 +75,16 @@
                                                     <input type="checkbox" @bind="rule.IsEnabled" />
                                                 </td>
                                                 <td>
-                                                    <input type="text" class="su-input su-input-sm" @bind="rule.Pattern" @bind:event="oninput" placeholder="Regex Pattern" />
+                                                    <input type="text" class="su-input su-input-sm" @bind="rule.Pattern" @bind:event="oninput" placeholder="@Loc["panel_regex.pattern_placeholder"]" />
                                                 </td>
                                                 <td>
-                                                    <input type="text" class="su-input su-input-sm" @bind="rule.Replacement" @bind:event="oninput" placeholder="Replacement Text" />
+                                                    <input type="text" class="su-input su-input-sm" @bind="rule.Replacement" @bind:event="oninput" placeholder="@Loc["panel_regex.replacement_placeholder"]" />
                                                 </td>
                                                 <td>
                                                     <select multiple class="su-select su-select-sm" style="height: 85px;" @onchange="(e) => UpdateRuleOptions(rule, e)">
-                                                        <option value="IgnoreCase" selected="@rule.Options.HasFlag(RegexOptions.IgnoreCase)">IgnoreCase</option>
-                                                        <option value="Multiline" selected="@rule.Options.HasFlag(RegexOptions.Multiline)">Multiline</option>
-                                                        <option value="Singleline" selected="@rule.Options.HasFlag(RegexOptions.Singleline)">Singleline</option>
+                                                        <option value="IgnoreCase" selected="@rule.Options.HasFlag(RegexOptions.IgnoreCase)">@Loc["panel_regex.opt_ignorecase"]</option>
+                                                        <option value="Multiline" selected="@rule.Options.HasFlag(RegexOptions.Multiline)">@Loc["panel_regex.opt_multiline"]</option>
+                                                        <option value="Singleline" selected="@rule.Options.HasFlag(RegexOptions.Singleline)">@Loc["panel_regex.opt_singleline"]</option>
                                                     </select>
                                                 </td>
                                                 <td class="su-text-center">
@@ -99,21 +100,21 @@
                         }
                         else
                         {
-                            <p class="su-text-2 su-text-center su-py-3">No rules defined in this set.</p>
+                            <p class="su-text-2 su-text-center su-py-3">@Loc["panel_regex.no_rules"]</p>
                         }
                         
                         <hr />
                         
                         <!-- Test Section -->
                         <div class="su-mt-3">
-                            <h6>Test Playground</h6>
+                            <h6>@Loc["panel_regex.test_playground"]</h6>
                             <div class="su-row">
                                 <div class="su-col-6">
-                                    <label class="su-label">Input Text</label>
-                                    <textarea class="su-input" rows="3" @bind="_testInput" @bind:event="oninput" placeholder="Enter text to test..."></textarea>
+                                    <label class="su-label">@Loc["panel_regex.input_text"]</label>
+                                    <textarea class="su-input" rows="3" @bind="_testInput" @bind:event="oninput" placeholder="@Loc["panel_regex.test_placeholder"]"></textarea>
                                 </div>
                                 <div class="su-col-6">
-                                    <label class="su-label">Output Result</label>
+                                    <label class="su-label">@Loc["panel_regex.output_result"]</label>
                                     <textarea class="su-input" rows="3" readonly value="@_testOutput"></textarea>
                                 </div>
                             </div>
@@ -125,7 +126,7 @@
             else
             {
                 <div class="su-alert su-alert-secondary su-text-center" role="alert">
-                    Select a Regex Set to edit, or create a new one.
+                    @Loc["panel_regex.select_hint"]
                 </div>
             }
         </div>
@@ -189,7 +190,7 @@
     {
         var newSet = new RegexSet
         {
-            Name = "New Set " + (_regexSets.Count + 1),
+            Name = Loc.Format("panel_regex.default_set_name", _regexSets.Count + 1),
             Rules = new List<RegexRule>()
         };
         _regexSets.Add(newSet);

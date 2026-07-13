@@ -1,17 +1,18 @@
 @using ShimmerChat.Singletons
 @using ShimmerChatLib.Interface
+@inject ILocService Loc
 
 <div class="su-modal-mask" @onclick="Cancel">
     <div class="su-modal" @onclick:stopPropagation="true">
         <div class="su-modal-header">
-            添加消息渲染修改器
+            @Loc["sub.add_modifier_title"]
             <button class="su-btn-close" @onclick="Cancel">&times;</button>
         </div>
         <div class="su-modal-body">
             <div class="su-mb-3">
-                <label for="modifier-select" class="su-label">选择修改器</label>
+                <label for="modifier-select" class="su-label">@Loc["sub.select_modifier"]</label>
                 <select id="modifier-select" @bind="_selectedModifierName" class="su-select">
-                    <option value="">请选择...</option>
+                    <option value="">@Loc["sub.please_select"]</option>
                     @foreach (var modifier in _messageDisplayService.LoadedModifiers)
                     {
                         <option value="@modifier.Info.Name">@modifier.Info.Name - @modifier.Info.Description</option>
@@ -20,13 +21,13 @@
             </div>
             
             <div class="su-mb-3">
-                <label for="modifier-input" class="su-label">输入值 (可选配置)</label>
-                <textarea id="modifier-input" @bind="_modifierInput" class="su-input" rows="3" placeholder="输入配置值..."></textarea>
+                <label for="modifier-input" class="su-label">@Loc["sub.config_value"]</label>
+                <textarea id="modifier-input" @bind="_modifierInput" class="su-input" rows="3" placeholder="@Loc["sub.config_value_placeholder"]"></textarea>
             </div>
         </div>
         <div class="su-modal-footer">
-            <button class="su-btn su-btn-secondary" @onclick="Cancel">取消</button>
-            <button class="su-btn su-btn-primary" @onclick="Confirm" disabled="@string.IsNullOrEmpty(_selectedModifierName)">添加</button>
+            <button class="su-btn su-btn-secondary" @onclick="Cancel">@Loc["Cancel"]</button>
+            <button class="su-btn su-btn-primary" @onclick="Confirm" disabled="@string.IsNullOrEmpty(_selectedModifierName)">@Loc["sub.add"]</button>
         </div>
     </div>
 </div>

@@ -1,26 +1,27 @@
 @using ShimmerChat.Singletons
 @using ShimmerChatLib.Interface
+@inject ILocService Loc
 
 <div class="su-modal-mask" @onclick="Cancel">
     <div class="su-modal" @onclick:stopPropagation="true">
         <div class="su-modal-header">
-            编辑消息渲染修改器
+            @Loc["sub.edit_modifier_title"]
             <button class="su-btn-close" @onclick="Cancel">&times;</button>
         </div>
         <div class="su-modal-body">
             <div class="su-mb-3">
-                <label for="modifier-name" class="su-label">修改器名称</label>
+                <label for="modifier-name" class="su-label">@Loc["sub.modifier_name"]</label>
                 <input id="modifier-name" type="text" class="su-input" value="@_modifierName" readonly />
             </div>
             
             <div class="su-mb-3">
-                <label for="modifier-input" class="su-label">输入值 (可选配置)</label>
-                <textarea id="modifier-input" @bind="_modifierInput" class="su-input" rows="3" placeholder="输入配置值...">@_modifierInput</textarea>
+                <label for="modifier-input" class="su-label">@Loc["sub.config_value"]</label>
+                <textarea id="modifier-input" @bind="_modifierInput" class="su-input" rows="3" placeholder="@Loc["sub.config_value_placeholder"]">@_modifierInput</textarea>
             </div>
         </div>
         <div class="su-modal-footer">
-            <button class="su-btn su-btn-secondary" @onclick="Cancel">取消</button>
-            <button class="su-btn su-btn-success" @onclick="Confirm">更新</button>
+            <button class="su-btn su-btn-secondary" @onclick="Cancel">@Loc["Cancel"]</button>
+            <button class="su-btn su-btn-success" @onclick="Confirm">@Loc["sub.update"]</button>
         </div>
     </div>
 </div>

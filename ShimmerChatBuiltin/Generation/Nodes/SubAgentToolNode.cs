@@ -20,6 +20,8 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var loc = context.Env.Persistent.LocService;
+
             if (string.IsNullOrWhiteSpace(ConfigName))
                 return Task.FromResult(NodeResult.SuccessResult());
 
@@ -29,7 +31,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             if (config == null)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ConfigNotFound,
-                    $"SubAgentTool: Config '{ConfigName}' not found.",
+                    loc.Format("node_err.subagent_tool_config_not_found", ConfigName),
                     nodeId: Id, nodeName: Name));
 
             // 查找或创建 SubAgentToolV2 单例

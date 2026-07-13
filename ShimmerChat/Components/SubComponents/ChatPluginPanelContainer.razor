@@ -2,12 +2,12 @@
 @inject ILocService Loc
 
 <div class="plugin-sidebar @(_isExpanded ? "sidebar-expanded" : "sidebar-collapsed")">
-	<button class="sidebar-toggle" @onclick="ToggleSidebar" title="@(_isExpanded ? "收起" : "展开")">
+	<button class="sidebar-toggle" @onclick="ToggleSidebar" title="@(_isExpanded ? Loc["sub.collapse"] : Loc["sub.expand"])">
 		<i class="@(_isExpanded ? "bi bi-chevron-right" : "bi bi-chevron-left")"></i>
 	</button>
 	
 	<div class="sidebar-content">
-		<h5 class="sidebar-title">插件面板</h5>
+		<h5 class="sidebar-title">@Loc["sub.plugin_panels"]</h5>
 		
 		@foreach (var item in PluginPanelInfos)
 		{

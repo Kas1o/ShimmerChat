@@ -7,7 +7,7 @@
 @{
     RenderFragment AddNodePicker = @<text>
         <div class="tn-add-menu">
-            <input class="tn-add-search" placeholder="Filter..." @bind="_filter" @bind:event="oninput"
+            <input class="tn-add-search" placeholder="@Loc["node_editor.filter_placeholder"]" @bind="_filter" @bind:event="oninput"
                    @onkeydown="OnAddKeyDown" />
 
             @if (_navPath.Count == 0)
@@ -43,7 +43,7 @@
             {
                 var current = _navPath[^1];
                 <div class="tn-add-breadcrumb">
-                    <button class="tn-add-back" @onclick="NavigateUp" title="Back">←</button>
+                    <button class="tn-add-back" @onclick="NavigateUp" title="@Loc["node_editor.back"]">←</button>
                     @for (int i = 0; i < _navPath.Count; i++)
                     {
                         if (i > 0) { <span class="tn-bc-sep">›</span> }
@@ -104,10 +104,10 @@
             <div class="ge-children-header">
                 <span class="ge-label">@Loc[_childNodesProp.LabelKey]</span>
                 <span class="tn-count">(@_childNodes.Count)</span>
-                <button class="tn-btn tn-btn-add" @onclick="ToggleAddMenu" title="Add child">+</button>
+                <button class="tn-btn tn-btn-add" @onclick="ToggleAddMenu" title="@Loc["node_editor.add_child"]">+</button>
                 @if (NodeClipboard.HasContent)
                 {
-                    <button class="tn-btn tn-btn-paste" @onclick="PasteNode" title="Paste copied node">📋</button>
+                    <button class="tn-btn tn-btn-paste" @onclick="PasteNode" title="@Loc["node_editor.paste_copied"]">📋</button>
                 }
             </div>
 
@@ -128,11 +128,11 @@
                         <button class="tn-btn tn-btn-move"
                                 @onclick="() => MoveChildUp(index)"
                                 @onclick:stopPropagation="true"
-                                disabled="@(index == 0)" title="Move up">⇧</button>
+                                disabled="@(index == 0)" title="@Loc["node_editor.move_up"]">⇧</button>
                         <button class="tn-btn tn-btn-move"
                                 @onclick="() => MoveChildDown(index)"
                                 @onclick:stopPropagation="true"
-                                disabled="@(index == _childNodes.Count - 1)" title="Move down">⇩</button>
+                                disabled="@(index == _childNodes.Count - 1)" title="@Loc["node_editor.move_down"]">⇩</button>
                     </div>
                     <div class="tn-child-tree">
                         <TreeEditor Node="@child" Depth="@(Depth + 1)"
@@ -148,7 +148,7 @@
             }
             @if (_childNodes.Count == 0)
             {
-                <div class="tn-empty">empty — click + to add</div>
+                <div class="tn-empty">@Loc["node_editor.empty_hint"]</div>
             }
         </div>
     }
@@ -162,10 +162,10 @@
                 <span class="ge-label">@Loc[sp.LabelKey]</span>
                 @if (slotNode == null)
                 {
-                    <button class="tn-btn tn-btn-add" @onclick="() => ToggleSlotAdd(sp)" title="Add node">+</button>
+                    <button class="tn-btn tn-btn-add" @onclick="() => ToggleSlotAdd(sp)" title="@Loc["node_editor.add_node"]">+</button>
                     @if (NodeClipboard.HasContent)
                     {
-                        <button class="tn-btn tn-btn-paste" @onclick="() => PasteToSlot(sp)" title="Paste">📋</button>
+                        <button class="tn-btn tn-btn-paste" @onclick="() => PasteToSlot(sp)" title="@Loc["node_editor.paste"]">📋</button>
                     }
                 }
             </div>
@@ -177,7 +177,7 @@
             {
                 <div class="tn-child-row">
                     <div class="tn-child-actions">
-                        <button class="tn-btn tn-btn-del" @onclick="() => { sp.SetValue(Node, null); OnTreeChanged.InvokeAsync(); }" title="Remove">✕</button>
+                        <button class="tn-btn tn-btn-del" @onclick="() => { sp.SetValue(Node, null); OnTreeChanged.InvokeAsync(); }" title="@Loc["node_editor.remove"]">✕</button>
                     </div>
                     <div class="tn-child-tree">
                         <TreeEditor Node="@slotNode" Depth="@(Depth + 1)" OnTreeChanged="OnTreeChanged"
@@ -189,7 +189,7 @@
             }
             else
             {
-                <div class="tn-empty">empty — click + to add</div>
+                <div class="tn-empty">@Loc["node_editor.empty_hint"]</div>
             }
         </div>
     }
@@ -567,7 +567,7 @@
         }
         else
         {
-            builder.AddContent(0, value?.ToString() ?? "(null)");
+            builder.AddContent(0, value?.ToString() ?? Loc["node_editor.null_value"]);
         }
     };
 

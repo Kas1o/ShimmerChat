@@ -3,6 +3,7 @@
 @using ShimmerChatLib
 @using ShimmerChatLib.Interface
 @inject IKVDataService KVData
+@inject ILocService Loc
 
 @attribute [PluginPanelAttribute("panel.agent_variable", "panel.agent_variable.desc", PanelDisplayPlace.Agent)]
 @implements IChatPanelEventHandler
@@ -11,15 +12,15 @@
     <div class="variable-actions su-mb-3">
         <div class="su-input-group">
             <span class="su-input-group-addon bi bi-plus-circle"></span>
-            <input type="text" class="su-input" placeholder="变量名" @bind="_newVariableName">
+            <input type="text" class="su-input" placeholder="@Loc["panel_agent_variable.name_placeholder"]" @bind="_newVariableName">
             <select class="su-select" style="max-width: 100px;" @bind="_newVariableType">
-                <option value="String">字符串</option>
-                <option value="Int">整数</option>
-                <option value="Float">浮点数</option>
+                <option value="String">@Loc["panel_agent_variable.type_string"]</option>
+                <option value="Int">@Loc["panel_agent_variable.type_int"]</option>
+                <option value="Float">@Loc["panel_agent_variable.type_float"]</option>
             </select>
-            <input type="text" class="su-input" placeholder="值" @bind="_newVariableValue">
+            <input type="text" class="su-input" placeholder="@Loc["panel_agent_variable.value_placeholder"]" @bind="_newVariableValue">
             <button class="su-btn su-btn-primary" @onclick="AddVariable">
-                <span class="bi bi-plus"></span> 添加
+                <span class="bi bi-plus"></span> @Loc["panel_agent_variable.add"]
             </button>
         </div>
     </div>
@@ -27,7 +28,7 @@
     @if (_variables.Variables.Count == 0)
     {
         <div class="su-alert su-alert-info">
-            <span class="bi bi-info-circle"></span> 暂无 Agent 变量，点击上方按钮添加
+            <span class="bi bi-info-circle"></span> @Loc["panel_agent_variable.no_variables"]
         </div>
     }
     else
@@ -65,7 +66,7 @@
                 {
                     <div class="variable-edit">
                         <div class="su-input-group su-input-group-sm">
-                            <span class="su-input-group-addon">值</span>
+                            <span class="su-input-group-addon">@Loc["panel_agent_variable.label_value"]</span>
                             @if (variable.Type == VariableType.String)
                             {
                                 <input type="text" class="su-input" @bind="_editValue">
@@ -144,7 +145,7 @@
     {
         if (string.IsNullOrWhiteSpace(_newVariableName))
         {
-            _message = "请输入变量名";
+            _message = Loc["panel_agent_variable.msg_name_required"];
             return;
         }
 
@@ -158,7 +159,7 @@
         var value = ParseValue(_newVariableValue, type);
         if (value == null && type != VariableType.String)
         {
-            _message = $"值格式不正确，无法转换为 {type} 类型";
+            _message = Loc.Format("panel_agent_variable.msg_invalid_format", type);
             return;
         }
 
@@ -172,7 +173,7 @@
 
         VariableManager.SetAgentVariable(KVData, AgentGuid, variable);
 
-        _message = $"变量 '{_newVariableName}' 已添加";
+        _message = Loc.Format("panel_agent_variable.msg_var_added", _newVariableName);
         _newVariableName = string.Empty;
         _newVariableValue = string.Empty;
         LoadVariables();
@@ -185,7 +186,7 @@
         var value = ParseValue(_editValue, variable.Type);
         if (value == null && variable.Type != VariableType.String)
         {
-            _message = $"值格式不正确";
+            _message = Loc["panel_agent_variable.msg_invalid_value"];
             return;
         }
 
@@ -195,7 +196,7 @@
 
         _editingVariable = null;
         _editValue = string.Empty;
-        _message = $"变量 '{variable.Name}' 已更新";
+        _message = Loc.Format("panel_agent_variable.msg_var_updated", variable.Name);
         LoadVariables();
     }
 
@@ -208,7 +209,7 @@
     private void DeleteVariable(Variable variable)
     {
         VariableManager.RemoveAgentVariable(KVData, AgentGuid, variable.Name);
-        _message = $"变量 '{variable.Name}' 已删除";
+        _message = Loc.Format("panel_agent_variable.msg_var_deleted", variable.Name);
         LoadVariables();
     }
 

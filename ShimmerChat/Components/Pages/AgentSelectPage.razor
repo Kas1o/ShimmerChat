@@ -12,7 +12,7 @@
 		<div class="import-group">
 			<InputFile OnChange="InputFileChanged" accept=".json" class="import-file-input" id="agent-import-file" />
 			<label for="agent-import-file" class="su-btn su-btn-secondary import-label">
-				<i class="bi bi-upload"></i> Import
+				<i class="bi bi-upload"></i> @Loc["agent_select.import"]
 			</label>
 		</div>
 	</div>
@@ -226,9 +226,9 @@ else
 	}
 
 	#region Popup
-	string popupNewAgentName { get; set; } = "new agent";
-	string popupNewAgentDescription { get; set; } = "this is a cool agent!";
-	string popupNewAgentGreeting { get; set; } = "Hello! How can I help you today?";
+	string popupNewAgentName { get; set; } = "";
+	string popupNewAgentDescription { get; set; } = "";
+	string popupNewAgentGreeting { get; set; } = "";
 	#endregion
 
 	List<Agent> AllAgents { get; set; } = new();
@@ -331,13 +331,16 @@ else
 
 	void OpenCreateAgentMenu()
 	{
+		popupNewAgentName = Loc["agent_select.default_name"];
+		popupNewAgentDescription = Loc["agent_select.default_description"];
+		popupNewAgentGreeting = Loc["agent_select.default_greeting"];
 		CreatePopupVisible = true;
 	}
 
 	void CreateNewAgent()
 	{
 		if (popupNewAgentName == "")
-			popupNewAgentName = "new agent";
+			popupNewAgentName = Loc["agent_select.default_name"];
 
 		var newAgent = Agent.Create
 		(
@@ -397,7 +400,7 @@ else
 	{
 		if(File == null)
 		{
-			await PopupService.ShowAsync("未选择 Agent 文件。");
+			await PopupService.ShowAsync(Loc["agent_select.no_file_selected"]);
 			return;
 		}
 		var originStream = File.OpenReadStream(maxAllowedSize: 1024 * 1024 * 80);
@@ -407,7 +410,7 @@ else
 		var newAgent = Agent.Import(content);
 		if (AllAgents.Any(x => x.Guid == newAgent.Guid))
 		{
-			await PopupService.ShowAsync("已经存在同Agent");
+			await PopupService.ShowAsync(Loc["agent_select.duplicate_agent"]);
 		}
 
 		Agent.AddAgentToAll(newAgent, kvDataService);

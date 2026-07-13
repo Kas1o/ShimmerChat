@@ -15,12 +15,12 @@
                 @if (CopyMe != null)
                 {
                     <button class="tn-btn tn-btn-copy" @onclick="() => CopyMe?.Invoke(Node)"
-                            @onclick:stopPropagation="true" title="Copy">📋</button>
+                            @onclick:stopPropagation="true" title="@Loc["tree_editor.copy"]">📋</button>
                 }
                 @if (RemoveMe != null && Depth > 0)
                 {
                     <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)"
-                            @onclick:stopPropagation="true" title="Remove">✕</button>
+                            @onclick:stopPropagation="true" title="@Loc["tree_editor.remove"]">✕</button>
                 }
             </div>
         </div>
@@ -43,21 +43,21 @@ else
             <span class="tn-icon">@_info.Icon</span>
             <span class="tn-label">@Loc[_info.LabelKey]</span>
             <input class="tn-name-input" @bind="Node.Name" @bind:event="oninput"
-                   @onkeydown="OnNameKeyDown" @onclick:stopPropagation="true" placeholder="Name" />
+                   @onkeydown="OnNameKeyDown" @onclick:stopPropagation="true" placeholder="@Loc["tree_editor.name_placeholder"]" />
             <div class="tn-actions">
                 @if (CopyMe != null)
                 {
                     <button class="tn-btn tn-btn-copy" @onclick="() => CopyMe?.Invoke(Node)"
-                            @onclick:stopPropagation="true" title="Copy">📋</button>
+                            @onclick:stopPropagation="true" title="@Loc["tree_editor.copy"]">📋</button>
                 }
                 @if (RemoveMe != null && Depth > 0)
                 {
                     <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)"
-                            @onclick:stopPropagation="true" title="Remove">✕</button>
+                            @onclick:stopPropagation="true" title="@Loc["tree_editor.remove"]">✕</button>
                 }
                 @if (isContainer)
                 {
-                    <button class="tn-btn tn-btn-exp" @onclick="ToggleExpand" title="@(_expanded ? "Collapse" : "Expand")">
+                    <button class="tn-btn tn-btn-exp" @onclick="ToggleExpand" title="@(_expanded ? Loc["tree_editor.collapse"] : Loc["tree_editor.expand"])">
                         @(_expanded ? "▾" : "▸")
                     </button>
                 }

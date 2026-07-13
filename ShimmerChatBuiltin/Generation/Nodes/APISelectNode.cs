@@ -22,17 +22,18 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// </summary>
         public int APIIndex { get; set; } = -1;
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var loc = context.Env.Persistent.LocService;
             var kvData = context.Env.Persistent.KVData;
             var json = kvData.Read("ApiSettings", "apiSetting") ?? "[]";
             var settings = JsonConvert.DeserializeObject<List<ApiConfig>>(json) ?? [];
 
             if (settings.Count == 0)
-                return Task.FromResult(NodeResult.Failure(
+                return NodeResult.Failure(
                     NodeErrorCodes.ApiUnavailable,
-                    "APISelect: No API settings configured.",
-                    nodeId: Id, nodeName: Name));
+                    loc["node_err.api_no_settings"],
+                    nodeId: Id, nodeName: Name);
 
             int index = APIIndex;
             if (index == -1)
@@ -64,14 +65,14 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 }
                 else
                 {
-                    return Task.FromResult(NodeResult.Failure(
+                    return NodeResult.Failure(
                         NodeErrorCodes.ApiUnavailable,
-                        $"APISelect: Continuation requested but API type '{selectedConfig.Type}' does not support prefix continuation.",
-                        nodeId: Id, nodeName: Name));
+                        loc.Format("node_err.api_no_continuation", selectedConfig.Type),
+                        nodeId: Id, nodeName: Name);
                 }
             }
 
-            return Task.FromResult(NodeResult.SuccessResult());
+            return NodeResult.SuccessResult();
         }
     }
 }

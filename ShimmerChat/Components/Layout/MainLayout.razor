@@ -3,17 +3,18 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject IThemeService ThemeService
+@inject ILocService Loc
 
 <div class="shimmer-layout @(isPortrait ? "portrait" : "landscape")">
     @if (isPortrait)
     {
         <header class="shimmer-topbar">
-            <button class="hamburger-btn" @onclick="ToggleNav" aria-label="Toggle navigation">
+            <button class="hamburger-btn" @onclick="ToggleNav" aria-label="@Loc["layout.toggle_nav"]">
                 <i class="bi @(isNavExpanded ? "bi-x-lg" : "bi-list")"></i>
             </button>
             <div class="topbar-brand">
-                <img src="@(ThemeService.CurrentTheme?.IsDarkMode == true ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="ShimmerChat Logo" class="topbar-logo" />
-                <span class="topbar-title">ShimmerChat</span>
+                <img src="@(ThemeService.CurrentTheme?.IsDarkMode == true ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="@Loc["layout.logo_alt"]" class="topbar-logo" />
+                <span class="topbar-title">@Loc["ShimmerChat"]</span>
             </div>
             <div class="topbar-spacer"></div>
         </header>
@@ -41,8 +42,8 @@
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
+    @Loc["layout.error_unhandled"]
+    <a href="." class="reload">@Loc["layout.reload"]</a>
     <span class="dismiss">🗙</span>
 </div>
 

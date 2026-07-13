@@ -4,12 +4,12 @@
 @inject ILocService Loc
 
 <div class="ti-editor">
-    <div class="ti-label">Select Tool</div>
+    <div class="ti-label">@Loc["editor_tool_instantiate.select_tool"]</div>
     @if (_selectedToolName != null)
     {
         <div class="ti-selected">
             <span class="ti-sel-name">@_selectedToolName</span>
-            <button class="ti-sel-clear" @onclick="ClearSelection" title="Clear">✕</button>
+            <button class="ti-sel-clear" @onclick="ClearSelection" title="@Loc["editor_tool_instantiate.clear"]">✕</button>
         </div>
     }
 
@@ -32,14 +32,14 @@
             }
             @if (_groupedTools.Count == 0)
             {
-                <div class="ti-empty">No tools discovered.</div>
+                <div class="ti-empty">@Loc["editor_tool_instantiate.no_tools"]</div>
             }
         </div>
     }
     else
     {
         <button class="ti-btn" @onclick="() => _showPicker = true">
-            @(_selectedToolName != null ? "Change Tool..." : "Choose Tool...")
+            @(_selectedToolName != null ? Loc["editor_tool_instantiate.change_tool"] : Loc["editor_tool_instantiate.choose_tool"])
         </button>
     }
 </div>

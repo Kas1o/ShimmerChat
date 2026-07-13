@@ -2,7 +2,7 @@
 @inject IPluginPanelService PluginPanelService
 @inject ILocService Loc
 
-<PageTitle>@(panelType != null ? Loc[PanelName] : "插件面板")</PageTitle>
+<PageTitle>@(panelType != null ? Loc[PanelName] : Loc["plugin_panel.fallback_title"])</PageTitle>
 
 <div class="plugin-panel-container">
     @if (panelType != null)
@@ -17,9 +17,9 @@
     else
     {
         <div class="panel-not-found">
-            <h1 class="panel-error-title">面板不存在</h1>
+            <h1 class="panel-error-title">@Loc["plugin_panel.not_found"]</h1>
             <div class="panel-error-message">
-                <p>未找到名称为 "@Loc[PanelName]" 的插件面板</p>
+                <p>@Loc.Format("plugin_panel.not_found_msg", Loc[PanelName])</p>
             </div>
         </div>
     }

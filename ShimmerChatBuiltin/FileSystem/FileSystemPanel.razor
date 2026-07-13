@@ -4,35 +4,36 @@
 @using ShimmerChatBuiltin.FileSystem
 @using Newtonsoft.Json
 @inject IKVDataService pluginData
+@inject ILocService Loc
 
 <div class="shimmer-content su-p-4">
-    <h2 class="su-text-lg su-font-bold su-mb-4">File System Access Control</h2>
-    <p class="su-text-2 su-mb-4">Configure regex-based AllowList and BanList patterns to control which paths the File System tools can access.</p>
+    <h2 class="su-text-lg su-font-bold su-mb-4">@Loc["panel_filesystem.title"]</h2>
+    <p class="su-text-2 su-mb-4">@Loc["panel_filesystem.desc"]</p>
 
     <div class="su-row su-gap-4">
         <div class="su-col-6">
             <div class="su-group">
-                <h3 class="su-text-lg su-font-bold">AllowList</h3>
-                <p class="su-text-sm su-text-2 su-mb-2">Regex patterns for paths that are <strong>explicitly allowed</strong>. One pattern per line. If empty, all non-banned paths are allowed.</p>
+                <h3 class="su-text-lg su-font-bold">@Loc["panel_filesystem.allowlist"]</h3>
+                <p class="su-text-sm su-text-2 su-mb-2">@Loc["panel_filesystem.allowlist_desc"]</p>
                 <textarea class="shimmer-textarea su-w-full" rows="8"
-                          @bind="allowListText" placeholder="C:\\Users\\.*"></textarea>
+                          @bind="allowListText" placeholder="@Loc["panel_filesystem.allowlist_placeholder"]"></textarea>
             </div>
         </div>
         <div class="su-col-6">
             <div class="su-group">
-                <h3 class="su-text-lg su-font-bold">BanList</h3>
-                <p class="su-text-sm su-text-2 su-mb-2">Regex patterns for paths that are <strong>always denied</strong>. One pattern per line. BanList takes precedence over AllowList.</p>
+                <h3 class="su-text-lg su-font-bold">@Loc["panel_filesystem.banlist"]</h3>
+                <p class="su-text-sm su-text-2 su-mb-2">@Loc["panel_filesystem.banlist_desc"]</p>
                 <textarea class="shimmer-textarea su-w-full" rows="8"
-                          @bind="banListText" placeholder="C:\\Windows\\.*"></textarea>
+                          @bind="banListText" placeholder="@Loc["panel_filesystem.banlist_placeholder"]"></textarea>
             </div>
         </div>
     </div>
 
     <div class="su-group su-mt-4">
-        <h3 class="su-text-lg su-font-bold">Test Path</h3>
+        <h3 class="su-text-lg su-font-bold">@Loc["panel_filesystem.test_path"]</h3>
         <div class="su-flex su-gap-3 su-mt-2 su-items-center su-flex-wrap">
-            <input type="text" class="shimmer-input su-flex-1" @bind="testPath" placeholder="Enter a path to test against the rules..." />
-            <button class="btn" @onclick="TestPath">Test</button>
+            <input type="text" class="shimmer-input su-flex-1" @bind="testPath" placeholder="@Loc["panel_filesystem.test_path_placeholder"]" />
+            <button class="btn" @onclick="TestPath">@Loc["panel_filesystem.test"]</button>
         </div>
         @if (!string.IsNullOrEmpty(testResult))
         {
@@ -43,8 +44,8 @@
     </div>
 
     <div class="su-mt-5 su-pt-3 su-border-top su-flex su-justify-between su-items-center">
-        <button class="btn" @onclick="SaveConfig" disabled="@isLoading">Save Configuration</button>
-        <button class="btn" @onclick="ResetToDefaults">Reset to Defaults</button>
+        <button class="btn" @onclick="SaveConfig" disabled="@isLoading">@Loc["panel_filesystem.save_config"]</button>
+        <button class="btn" @onclick="ResetToDefaults">@Loc["panel_filesystem.reset_defaults"]</button>
         @if (!string.IsNullOrEmpty(statusMessage))
         {
             <div class="su-px-4 su-py-2 su-rounded su-text-sm @(statusType == "success" ? "su-badge su-badge-success" : "su-badge su-badge-danger")">
@@ -57,7 +58,7 @@
     {
         <div class="su-modal-mask">
             <div class="su-modal su-modal-sm su-p-4 su-text-center">
-                <div class="su-text-accent su-mb-3">Loading...</div>
+                <div class="su-text-accent su-mb-3">@Loc["panel_filesystem.loading"]</div>
             </div>
         </div>
     }
@@ -89,7 +90,7 @@
         }
         catch (Exception ex)
         {
-            ShowStatus($"Failed to load config: {ex.Message}", "error");
+            ShowStatus(Loc.Format("panel_filesystem.msg_load_failed", ex.Message), "error");
         }
         finally
         {
@@ -125,18 +126,18 @@
                 }
                 catch (Exception ex)
                 {
-                    ShowStatus($"Invalid regex pattern: '{pattern}' - {ex.Message}", "error");
+                    ShowStatus(Loc.Format("panel_filesystem.msg_invalid_regex", pattern, ex.Message), "error");
                     isLoading = false;
                     return;
                 }
             }
 
             FileSystemConfigManager.Save(pluginData, config);
-            ShowStatus("Configuration saved successfully.", "success");
+            ShowStatus(Loc["panel_filesystem.msg_saved"], "success");
         }
         catch (Exception ex)
         {
-            ShowStatus($"Failed to save config: {ex.Message}", "error");
+            ShowStatus(Loc.Format("panel_filesystem.msg_save_failed", ex.Message), "error");
         }
         finally
         {
@@ -148,7 +149,7 @@
     {
         if (string.IsNullOrWhiteSpace(testPath))
         {
-            testResult = "Please enter a path to test.";
+            testResult = Loc["panel_filesystem.msg_path_required"];
             testResultClass = "bg-info/10 text-info";
             return;
         }
@@ -181,7 +182,7 @@
                     {
                         if (System.Text.RegularExpressions.Regex.IsMatch(normalized, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
                         {
-                            testResult = $"BLOCKED - Matched BanList pattern: '{pattern}' (Full path: {normalized})";
+                            testResult = Loc.Format("panel_filesystem.msg_test_banned", pattern, normalized);
                             testResultClass = "bg-danger/10 text-danger";
                             return;
                         }
@@ -192,7 +193,7 @@
 
             if (config.AllowList.Count == 0)
             {
-                testResult = $"ALLOWED - No AllowList configured. (Full path: {normalized})";
+                testResult = Loc.Format("panel_filesystem.msg_test_allowed_no_allowlist", normalized);
                 testResultClass = "bg-success/10 text-success";
                 return;
             }
@@ -204,7 +205,7 @@
                 {
                     if (System.Text.RegularExpressions.Regex.IsMatch(normalized, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
                     {
-                        testResult = $"ALLOWED - Matched AllowList pattern: '{pattern}' (Full path: {normalized})";
+                        testResult = Loc.Format("panel_filesystem.msg_test_allowed_match", pattern, normalized);
                         testResultClass = "bg-success/10 text-success";
                         return;
                     }
@@ -212,12 +213,12 @@
                 catch { }
             }
 
-            testResult = $"BLOCKED - Did not match any AllowList pattern. (Full path: {normalized})";
+            testResult = Loc.Format("panel_filesystem.msg_test_blocked_no_match", normalized);
             testResultClass = "bg-danger/10 text-danger";
         }
         catch (Exception ex)
         {
-            testResult = $"Error: {ex.Message}";
+            testResult = Loc.Format("panel_filesystem.msg_test_error", ex.Message);
             testResultClass = "bg-danger/10 text-danger";
         }
     }
@@ -227,7 +228,7 @@
         allowListText = "";
         banListText = "";
         testResult = "";
-        ShowStatus("Form reset to defaults. Click Save to persist.", "success");
+        ShowStatus(Loc["panel_filesystem.msg_reset"], "success");
     }
 
     private void ShowStatus(string message, string type)

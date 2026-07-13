@@ -20,10 +20,12 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var loc = context.Env.Persistent.LocService;
+
             if (string.IsNullOrWhiteSpace(ToolTypeName))
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ToolNotFound,
-                    "ToolInstantiate: ToolTypeName is empty.",
+                    loc["node_err.tool_instantiate_empty"],
                     nodeId: Id, nodeName: Name));
 
             try
@@ -32,7 +34,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 if (tool == null)
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ToolNotFound,
-                        $"ToolInstantiate: Type '{ToolTypeName}' not found or does not implement IAutoCreateToolV2.",
+                        loc.Format("node_err.tool_instantiate_type_not_found", ToolTypeName),
                         nodeId: Id, nodeName: Name));
 
                 context.Env.Transient.Tools.Add(tool);
@@ -42,7 +44,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             {
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ToolNotFound,
-                    $"ToolInstantiate: Failed to create instance of '{ToolTypeName}'.",
+                    loc.Format("node_err.tool_instantiate_create_failed", ToolTypeName),
                     details: ex.ToString(),
                     nodeId: Id, nodeName: Name));
             }

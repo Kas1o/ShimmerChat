@@ -10,17 +10,18 @@
 @inject IJSRuntime JS
 @inject IMessageStoreService messageStore
 @inject IGenerationNodeSerializer Serializer
+@inject ILocService Loc
 
 @if(agent != null)
 {
     <div class="agent-page-container shimmer-content" style="background-image: url('@BackgroudPath'); background-size: cover; background-position: center; min-height: 100vh;">
         <div class="agent-header">
-            <button class="agent-back-btn" @onclick="NavigateBack" title="Back">
+            <button class="agent-back-btn" @onclick="NavigateBack" title="@Loc["agent.back"]">
                 <i class="bi bi-arrow-left"></i>
             </button>
             @if (agent.AvatarGuid != null)
             {
-                <img class="agent-header-avatar" src="@AvatarPath" alt="avatar" />
+                <img class="agent-header-avatar" src="@AvatarPath" alt="@Loc["agent.avatar_alt"]" />
             }
             else
             {
@@ -39,10 +40,10 @@
 
         <div class="agent-tabs">
             <button class="agent-tab @(activeTab == "chats" ? "active" : "")" @onclick='() => activeTab = "chats"'>
-                <i class="bi bi-chat-dots"></i> <span>Chats</span>
+                <i class="bi bi-chat-dots"></i> <span>@Loc["agent.tab_chats"]</span>
             </button>
             <button class="agent-tab @(activeTab == "settings" ? "active" : "")" @onclick='() => activeTab = "settings"'>
-                <i class="bi bi-sliders"></i> <span>Settings</span>
+                <i class="bi bi-sliders"></i> <span>@Loc["agent.tab_settings"]</span>
             </button>
         </div>
 
@@ -52,19 +53,19 @@
 
                 <div class="chat-toolbar su-group">
                     <input class="shimmer-input chat-search-input"
-                           placeholder="Search chats..."
+                           placeholder="@Loc["agent.search_chats_placeholder"]"
                            value="@ChatSearchQuery"
                            @oninput="OnChatSearchInput" />
                     <div class="chat-toolbar-row">
                         <label class="fulltext-toggle">
                             <input type="checkbox" checked="@EnableFullTextSearch" @onchange="OnEnableFullTextSearchChanged" />
-                            Full-text search
+                            @Loc["agent.full_text_search"]
                         </label>
                         <div class="chat-toolbar-meta">
-                            <span>@FilteredChatSummaries.Count result(s)</span>
+                            <span>@Loc.Format("agent.search_results", FilteredChatSummaries.Count)</span>
                             @if (IsSearchInProgress)
                             {
-                                <span class="search-loading">Searching...</span>
+                                <span class="search-loading">@Loc["agent.searching"]</span>
                             }
                         </div>
                     </div>
@@ -74,7 +75,7 @@
                     <div class="chat-item new-chat-item" @onclick="NewChat">
                         <i class="bi bi-plus-lg chat-item-icon"></i>
                         <div class="chat-info">
-                            <div class="chat-name">New Chat</div>
+                            <div class="chat-name">@Loc["agent.new_chat"]</div>
                         </div>
                     </div>
 
@@ -95,8 +96,8 @@
                             <Placeholder>
                                 <div class="chat-item chat-item-placeholder">
                                     <div class="chat-info">
-                                        <div class="chat-name">Loading...</div>
-                                        <div class="chat-last-message">Please wait</div>
+                                        <div class="chat-name">@Loc["agent.loading"]</div>
+                                        <div class="chat-last-message">@Loc["agent.please_wait"]</div>
                                     </div>
                                 </div>
                             </Placeholder>
@@ -121,7 +122,7 @@
                         {
                             <div class="chat-empty">
                                 <i class="bi bi-inbox"></i>
-                                <p>No chats found.</p>
+                                <p>@Loc["agent.no_chats"]</p>
                             </div>
                         }
 
@@ -151,8 +152,8 @@
                 {
                     <div class="su-modal-mask" @onclick="() => DeleteChatPopupVisible=false">
                         <div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
-                            <h5>Delete Chat</h5>
-                            <p>Are you sure you want to delete the chat "@ChatToDelete?.Name"?</p>
+                            <h5>@Loc["agent.delete_chat_title"]</h5>
+                            <p>@Loc.Format("agent.delete_chat_msg", ChatToDelete?.Name)</p>
                             <div class="su-modal-footer">
                                 <button class="su-btn su-btn-secondary" @onclick="() => DeleteChatPopupVisible=false">Cancel</button>
                                 <button class="su-btn su-btn-danger" @onclick="DeleteChatConfirmed">Delete</button>
@@ -164,19 +165,19 @@
             <div class="settings-section su-group @(activeTab == "settings" ? "tab-active" : "tab-hidden")">
                 <div class="settings-scroll">
                     <div class="settings-group">
-                        <h4><i class="bi bi-person-gear"></i> Basic Info</h4>
+                        <h4><i class="bi bi-person-gear"></i> @Loc["agent.section_basic_info"]</h4>
                         <div class="settings-field">
-                            <label>Name</label>
+                            <label>@Loc["agent.label_name"]</label>
                             <input class="shimmer-input" @bind="Name"/>
                         </div>
                         <div class="settings-field">
-                            <label>User Introduction</label>
-                            <textarea class="shimmer-textarea" @bind="UserIntro" rows="3" placeholder="A short description shown in the agent list and header" />
+                            <label>@Loc["agent.label_introduction"]</label>
+                            <textarea class="shimmer-textarea" @bind="UserIntro" rows="3" placeholder="@Loc["agent.introduction_placeholder"]" />
                         </div>
                     </div>
 
                     <div class="settings-group">
-                        <h4><i class="bi bi-tags"></i> Tags</h4>
+                        <h4><i class="bi bi-tags"></i> @Loc["agent.section_tags"]</h4>
                         <div class="tag-editor-wrapper">
                             <div class="tag-editor-chips">
                                 @if (agent?.Tags != null)
@@ -196,7 +197,7 @@
                                     @onkeydown="OnTagKeyDown"
                                     @onfocus="() => ShowTagAutocomplete = true"
                                     @onfocusout="OnTagAutocompleteFocusOut"
-                                    placeholder="Add tag..." />
+                                    placeholder="@Loc["agent.add_tag_placeholder"]" />
                                 @if (ShowTagAutocomplete && TagSuggestions.Count > 0)
                                 {
                                     <div class="tag-suggestions-dropdown">
@@ -213,13 +214,13 @@
                     </div>
 
                     <div class="settings-group">
-                        <h4><i class="bi bi-chat-heart"></i> Greetings</h4>
+                        <h4><i class="bi bi-chat-heart"></i> @Loc["agent.section_greetings"]</h4>
                         <div class="settings-field">
-                            <label>Greeting</label>
+                            <label>@Loc["agent.label_greeting"]</label>
                             <textarea class="shimmer-textarea" @bind="Greeting" rows="3" />
                         </div>
                         <div class="settings-field">
-                            <label>Alternative Greetings</label>
+                            <label>@Loc["agent.label_alt_greetings"]</label>
                             <div class="alt-greetings-list">
                                 @if (agent?.AlternativeGreetings != null)
                                 {
@@ -230,23 +231,23 @@
                                         <div class="alt-greeting-row">
                                             <textarea class="shimmer-textarea" rows="2"
                                                 @bind="agent.AlternativeGreetings[i]" @bind:event="oninput" @bind:after="OnAltGreetingChanged"
-                                                placeholder="Enter an alternative greeting..." />
+                                                placeholder="@Loc["agent.alt_greeting_placeholder"]" />
                                             <button class="su-btn su-btn-sm su-btn-outline-danger alt-greeting-remove"
-                                                @onclick="() => RemoveAltGreeting(i)" title="Remove">
+                                                @onclick="() => RemoveAltGreeting(i)" title="@Loc["agent.remove"]">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
                                     }
                                 }
                                 <button class="su-btn su-btn-sm su-btn-outline" @onclick="AddAltGreeting">
-                                    <i class="bi bi-plus-lg"></i> Add Greeting
+                                    <i class="bi bi-plus-lg"></i> @Loc["agent.add_greeting"]
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     <div class="settings-group">
-                        <h4><i class="bi bi-image"></i> Avatar &amp; Background</h4>
+                        <h4><i class="bi bi-image"></i> @Loc["agent.section_avatar_bg"]</h4>
                         <div class="media-upload-row">
                             <div class="media-upload-item">
                                 @if (agent.AvatarGuid != null)
@@ -262,47 +263,47 @@
                                 <InputFile OnChange="InputAvatar" accept="image/png" />
                             </div>
                             <div class="media-upload-item">
-                                <span class="media-label">Background Image</span>
+                                <span class="media-label">@Loc["agent.bg_image"]</span>
                                 <InputFile OnChange="InputBackground" accept="image/png" />
                             </div>
                         </div>
                     </div>
 
                     <div class="settings-group">
-                        <h4><i class="bi bi-diagram-3"></i> Generation Config</h4>
+                        <h4><i class="bi bi-diagram-3"></i> @Loc["agent.section_gen_config"]</h4>
                         <div class="settings-field">
-                            <label>Modifier Tree</label>
+                            <label>@Loc["agent.label_modifier_tree"]</label>
                             @if (!string.IsNullOrEmpty(agent?.ModifierTreeJson))
                             {
                                 <div class="gen-config-status">
-                                    <span class="gen-config-badge private">Private Tree</span>
-                                    <span class="gen-config-hint">This agent has a custom modifier tree.</span>
+                                    <span class="gen-config-badge private">@Loc["agent.badge_private_tree"]</span>
+                                    <span class="gen-config-hint">@Loc["agent.private_tree_hint"]</span>
                                 </div>
                                 <div style="margin-top:8px; display:flex; gap:8px;">
                                     <button class="su-btn su-btn-primary su-btn-sm" @onclick="EditPrivateTree">
-                                        <i class="bi bi-pencil"></i> Edit Private Tree
+                                        <i class="bi bi-pencil"></i> @Loc["agent.edit_private_tree"]
                                     </button>
                                     <button class="su-btn su-btn-outline su-btn-sm" @onclick="RevertToPreset">
-                                        <i class="bi bi-arrow-counterclockwise"></i> Revert to Preset
+                                        <i class="bi bi-arrow-counterclockwise"></i> @Loc["agent.revert_to_preset"]
                                     </button>
                                 </div>
                             }
                             else
                             {
                                 <div class="gen-config-status">
-                                    <span class="gen-config-badge preset">Using Preset</span>
-                                    <span class="gen-config-hint">Select a preset from Generation Manager.</span>
+                                    <span class="gen-config-badge preset">@Loc["agent.badge_using_preset"]</span>
+                                    <span class="gen-config-hint">@Loc["agent.using_preset_hint"]</span>
                                 </div>
                                 <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
                                     <select class="shimmer-input" style="flex:1;max-width:300px;" @bind="_selectedPresetId">
-                                        <option value="">-- No preset --</option>
+                                        <option value="">@Loc["agent.no_preset"]</option>
                                         @foreach (var p in _availablePresets)
                                         {
                                             <option value="@p.Id">@p.Name</option>
                                         }
                                     </select>
                                     <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePrivateTree">
-                                        <i class="bi bi-pencil"></i> Create Private Tree
+                                        <i class="bi bi-pencil"></i> @Loc["agent.create_private_tree"]
                                     </button>
                                 </div>
                             }
@@ -310,7 +311,7 @@
                     </div>
 
                     <div class="settings-group">
-                        <h4><i class="bi bi-puzzle"></i> Plugins</h4>
+                        <h4><i class="bi bi-puzzle"></i> @Loc["agent.section_plugins"]</h4>
                         <ShimmerChatLib.Components.PluginPanelContainer
                             PanelDisplayPlace="ShimmerChatLib.Panel.PanelDisplayPlace.Agent"
                             Parameters="AgentPluginParameters"/>
@@ -318,7 +319,7 @@
 
                     <div class="settings-actions">
                         <button class="su-btn su-btn-primary" @onclick="Export">
-                            <i class="bi bi-download"></i> Export Agent
+                            <i class="bi bi-download"></i> @Loc["agent.export_agent"]
                         </button>
                     </div>
                 </div>
@@ -334,7 +335,7 @@
 @if(agent == null)
 {
     <h1>404</h1>
-    <p>the agent "@agentguid" not exist.</p>
+    <p>@Loc.Format("agent.not_exist", agentguid)</p>
 }
 
 @code {
@@ -821,11 +822,11 @@
         var file = e.File;
         if (file.ContentType != "image/png")
         {
-            await PopupService.ShowAsync("Unsupported file type! Only .png file are supported.");
+            await PopupService.ShowAsync(Loc["agent.unsupported_file_type"]);
             return;
         }
         if (file.Size > 1024 * 1024 * 30) {
-            await PopupService.ShowAsync("File Too Large! 30MiB limit!");
+            await PopupService.ShowAsync(Loc["agent.file_too_large"]);
             return;
         }
 
@@ -845,12 +846,12 @@
         var file = e.File;
         if (file.ContentType != "image/png")
         {
-            await PopupService.ShowAsync("Unsupported file type! Only .png file are supported.");
+            await PopupService.ShowAsync(Loc["agent.unsupported_file_type"]);
             return;
         }
         if (file.Size > 1024 * 1024 * 30)
         {
-            await PopupService.ShowAsync("File Too Large! 30MiB limit!");
+            await PopupService.ShowAsync(Loc["agent.file_too_large"]);
             return;
         }
 

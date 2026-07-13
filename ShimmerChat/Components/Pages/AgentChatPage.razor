@@ -52,7 +52,7 @@
 			<textarea @ref="inputArea"
 				value="@inputText" @oninput="OnInputResize"
 				@onkeydown="@(e => CheckEnter(e))"
-				placeholder="Type a message...  (Enter to send)"
+				placeholder="@Loc["chat.input_placeholder"]"
 				rows="1"></textarea>
 			@if (generating)
 			{
@@ -73,7 +73,7 @@
 
 @if(chat == null)
 {
-	<p>Chat @AgentGuid / @ChatGuid Not Found</p>
+	<p>@Loc.Format("chat.not_found", AgentGuid, ChatGuid)</p>
 }
 
 @code {
@@ -242,7 +242,7 @@
 				}
 				else
 				{
-					popupService.ShowAsync(ex.Message, "停止生成时出错");
+					popupService.ShowAsync(ex.Message, Loc["chat.stop_error"]);
 				}
 			}
 		}
@@ -393,7 +393,7 @@
 			}
 			else
 			{
-				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
+				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", Loc.Format("chat.gen_error", ex.Source));
 			}
 		}
 		finally
@@ -485,7 +485,7 @@
 			}
 			else
 			{
-				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
+				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", Loc.Format("chat.gen_error", ex.Source));
 			}
 		}
 		finally
@@ -713,7 +713,7 @@
 				};
 
 				// 调用JavaScript中的通知函数
-				await JS.InvokeVoidAsync("showNotification", $"来自 {agent?.Name} 的新消息", notificationOptions);
+				await JS.InvokeVoidAsync("showNotification", Loc.Format("chat.new_message_notification", agent?.Name), notificationOptions);
 			}
 		}
 		catch (Exception ex)

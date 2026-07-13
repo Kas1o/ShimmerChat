@@ -17,19 +17,20 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var loc = context.Env.Persistent.LocService;
             var kvData = context.Env.Persistent.KVData;
             var json = kvData.Read("ToolPresets", "__presets__");
             if (string.IsNullOrEmpty(json))
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    "ToolPreset: No presets found.",
+                    loc["node_err.tool_preset_none"],
                     nodeId: Id, nodeName: Name));
 
             var presets = JsonConvert.DeserializeObject<List<ToolPreset>>(json);
             if (presets == null || presets.Count == 0)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    "ToolPreset: Preset list is empty.",
+                    loc["node_err.tool_preset_empty"],
                     nodeId: Id, nodeName: Name));
 
             ToolPreset? preset;
@@ -41,7 +42,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             if (preset == null)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    $"ToolPreset: Preset '{(string.IsNullOrWhiteSpace(PresetName) ? "(default)" : PresetName)}' not found.",
+                    loc.Format("node_err.tool_preset_not_found", string.IsNullOrWhiteSpace(PresetName) ? "(default)" : PresetName),
                     nodeId: Id, nodeName: Name));
 
             foreach (var typeName in preset.EnabledToolTypeNames)

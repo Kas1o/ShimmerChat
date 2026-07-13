@@ -1,25 +1,26 @@
 @using ShimmerChatLib.Panel
+@inject ILocService Loc
 
 
 @attribute [PluginPanelAttribute("panel.example", "panel.example.desc")]
 
 <div class="example-panel su-p-4">
-    <h3 class="su-text-lg su-font-bold su-mb-4">示例插件面板</h3>
-    <p class="su-mb-4">这是一个示例插件面板，用于演示如何创建和使用插件面板功能。</p>
+    <h3 class="su-text-lg su-font-bold su-mb-4">@Loc["panel_example.title"]</h3>
+    <p class="su-mb-4">@Loc["panel_example.desc"]</p>
     
     <div class="su-surface-3 su-p-4 su-rounded-lg border">
-        <h4 class="su-text-lg su-font-bold su-mb-2">面板功能演示</h4>
+        <h4 class="su-text-lg su-font-bold su-mb-2">@Loc["panel_example.demo_title"]</h4>
         <ul class="su-ps-3 su-flex su-flex-col su-gap-2">
-            <li>动态加载的Blazor组件</li>
-            <li>通过PluginPanelAttribute注册</li>
-            <li>可在应用程序中动态渲染</li>
-            <li>支持自定义图标和排序</li>
+            <li>@Loc["panel_example.feature_dynamic_load"]</li>
+            <li>@Loc["panel_example.feature_plugin_attr"]</li>
+            <li>@Loc["panel_example.feature_dynamic_render"]</li>
+            <li>@Loc["panel_example.feature_custom_icon"]</li>
         </ul>
     </div>
     
     <div class="su-mt-6">
         <button @onclick="OnButtonClick" class="su-btn su-btn-primary">
-            点击我
+            @Loc["panel_example.click_me"]
         </button>
     </div>
     

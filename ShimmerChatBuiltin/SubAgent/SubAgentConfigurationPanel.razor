@@ -9,27 +9,28 @@
 
 @inject IKVDataService pluginData
 @inject IGenerationNodeSerializer Serializer
+@inject ILocService Loc
 
 
 
 <div class="shimmer-content su-p-4">
-    <h2>SubAgent Configuration</h2>
-    <p class="su-text-2">Configure sub-agents for use with the SubAgentGeneration context modifier.</p>
+    <h2>@Loc["panel_subagent.title"]</h2>
+    <p class="su-text-2">@Loc["panel_subagent.desc"]</p>
 
     <div class="su-group">
         <div class="su-flex su-gap-3 su-mt-3 su-items-center su-flex-wrap">
-            <input type="text" class="shimmer-input" @bind="newConfigName" placeholder="New sub-agent name" />
+            <input type="text" class="shimmer-input" @bind="newConfigName" placeholder="@Loc["panel_subagent.name_placeholder"]" />
             <button class="su-btn su-btn-primary" @onclick="CreateNewConfig" disabled="@string.IsNullOrWhiteSpace(newConfigName)">
-                Create
+                @Loc["panel_subagent.create"]
             </button>
         </div>
     </div>
 
     <div class="su-group su-mt-4">
-        <h4>Existing Sub-Agents (@configs.Count)</h4>
+        <h4>@Loc["panel_subagent.existing"] (@configs.Count)</h4>
         @if (configs.Count == 0)
         {
-            <p class="su-text-2">No sub-agents configured yet.</p>
+            <p class="su-text-2">@Loc["panel_subagent.no_subagents"]</p>
         }
         else
         {
@@ -42,12 +43,12 @@
                         <div class="su-flex su-justify-between su-w-full">
                             <strong>@cfg.Name</strong>
                             <button class="su-btn su-btn-sm" @onclick:stopPropagation
-                                    @onclick="async () => await DeleteConfig(cfg)" title="Delete">
+                                    @onclick="async () => await DeleteConfig(cfg)" title="@Loc["panel_subagent.delete"]">
                                 X
                             </button>
                         </div>
                         <div class="su-text-sm su-text-2 su-mt-1">
-                            Preset: @GetPresetName(cfg) | Output: @cfg.OutputMode
+                            @Loc.Format("panel_subagent.preset_summary", GetPresetName(cfg), cfg.OutputMode)
                         </div>
                     </div>
                 }
@@ -58,44 +59,44 @@
     @if (selectedConfig != null)
     {
         <div class="su-group mt-4">
-            <h3>Edit: @selectedConfig.Name</h3>
+            <h3>@Loc.Format("panel_subagent.edit_title", selectedConfig.Name)</h3>
 
             <div class="mt-3">
-                <label><strong>Name</strong></label>
+                <label><strong>@Loc["panel_subagent.label_name"]</strong></label>
                 <input type="text" class="shimmer-input" @bind="selectedConfig.Name" />
             </div>
 
             <div class="mt-3">
-                <label><strong>Output Mode</strong></label>
+                <label><strong>@Loc["panel_subagent.label_output_mode"]</strong></label>
                 <select class="su-select" @bind="selectedConfig.OutputMode">
-                    <option value="LastMessage">Last Message (text only)</option>
-                    <option value="FullJson">Full JSON (serialized interaction)</option>
-                    <option value="None">None (no output returned)</option>
+                    <option value="LastMessage">@Loc["panel_subagent.output_last_msg"]</option>
+                    <option value="FullJson">@Loc["panel_subagent.output_full_json"]</option>
+                    <option value="None">@Loc["panel_subagent.output_none"]</option>
                 </select>
                 <p class="su-text-sm su-text-2 su-mt-1">
-                    <em>Last Message: returns only the final AI message text. Full JSON: serializes the entire sub-agent interaction (AI + tool calls + results). None: sub-agent executes silently, no output is returned to parent.</em>
+                    <em>@Loc["panel_subagent.output_help"]</em>
                 </p>
             </div>
 
             <div class="mt-4">
-                <h5>Modifier Tree</h5>
+                <h5>@Loc["panel_subagent.modifier_tree"]</h5>
 
                 @if (selectedConfig.UseSharedPreset)
                 {
                     <div class="gen-config-status mb-2">
-                        <span class="gen-config-badge preset">Using Preset</span>
-                        <span class="gen-config-hint">Select a preset from Generation Manager.</span>
+                        <span class="gen-config-badge preset">@Loc["panel_subagent.using_preset"]</span>
+                        <span class="gen-config-hint">@Loc["panel_subagent.select_preset_hint"]</span>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <select class="su-select" style="max-width:300px;" @bind="selectedConfig.ModifierPresetId">
-                            <option value="">— None —</option>
+                            <option value="">@Loc["panel_subagent.none_option"]</option>
                             @foreach (var preset in GetPresets())
                             {
                                 <option value="@preset.Id">@preset.Name</option>
                             }
                         </select>
                         <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePrivateTree">
-                            <i class="bi bi-pencil"></i> Create Private Tree
+                            <i class="bi bi-pencil"></i> @Loc["panel_subagent.create_private_tree"]
                         </button>
                     </div>
                 }
@@ -104,15 +105,15 @@
                     @if (!string.IsNullOrEmpty(selectedConfig.ModifierTreeJson))
                     {
                         <div class="gen-config-status mb-2">
-                            <span class="gen-config-badge private">Private Tree</span>
-                            <span class="gen-config-hint">This sub-agent has a custom modifier tree.</span>
+                            <span class="gen-config-badge private">@Loc["panel_subagent.private_tree"]</span>
+                            <span class="gen-config-hint">@Loc["panel_subagent.private_tree_hint"]</span>
                         </div>
                         <div style="display:flex; gap:8px; margin-bottom: 12px;">
                             <button class="su-btn su-btn-outline su-btn-sm" @onclick="RevertToPreset">
-                                <i class="bi bi-arrow-counterclockwise"></i> Revert to Preset
+                                <i class="bi bi-arrow-counterclockwise"></i> @Loc["panel_subagent.revert_to_preset"]
                             </button>
                             <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="ClearPrivateTree">
-                                Clear Private Tree
+                                @Loc["panel_subagent.clear_private_tree"]
                             </button>
                         </div>
                         @if (_editingTree != null)
@@ -128,18 +129,18 @@
                     else
                     {
                         <div class="gen-config-status mb-2">
-                            <span class="gen-config-badge private">Minimal</span>
-                            <span class="gen-config-hint">Runs with no system prompt or modifiers — just the task and tools.</span>
+                            <span class="gen-config-badge private">@Loc["panel_subagent.minimal"]</span>
+                            <span class="gen-config-hint">@Loc["panel_subagent.minimal_hint"]</span>
                         </div>
                         <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePrivateTree">
-                            <i class="bi bi-pencil"></i> Create Private Tree
+                            <i class="bi bi-pencil"></i> @Loc["panel_subagent.create_private_tree"]
                         </button>
                     }
                 }
             </div>
 
             <div class="su-mt-4">
-                <h5>Plugins</h5>
+                <h5>@Loc["panel_subagent.plugins"]</h5>
                 <PluginPanelContainer
                     PanelDisplayPlace="PanelDisplayPlace.Agent"
                     Parameters="SubAgentPluginParameters" />
@@ -147,7 +148,7 @@
 
             <div class="su-mt-4">
                 <button class="su-btn su-btn-primary" @onclick="SaveAll" disabled="@isLoading">
-                    @(isLoading ? "Saving..." : "Save All")
+                    @(isLoading ? Loc["panel_subagent.saving"] : Loc["panel_subagent.save_all"])
                 </button>
                 @if (!string.IsNullOrEmpty(statusMessage))
                 {
@@ -206,11 +207,11 @@
     string GetPresetName(SubAgentConfig cfg)
     {
         if (!cfg.UseSharedPreset)
-            return !string.IsNullOrEmpty(cfg.ModifierTreeJson) ? "Private Tree" : "Minimal";
+            return !string.IsNullOrEmpty(cfg.ModifierTreeJson) ? Loc["panel_subagent.private_tree"] : Loc["panel_subagent.minimal"];
         if (string.IsNullOrEmpty(cfg.ModifierPresetId))
-            return "None";
+            return Loc["panel_subagent.none_option_fallback"];
         var preset = GetPresets().FirstOrDefault(p => p.Id == cfg.ModifierPresetId);
-        return preset?.Name ?? "—";
+        return preset?.Name ?? Loc["panel_subagent.none_option_fallback"];
     }
 
     void CreateNewConfig()
@@ -280,11 +281,11 @@
         {
             isLoading = true;
             await SaveConfigsAsync();
-            ShowStatus("Saved successfully", "success");
+            ShowStatus(Loc["panel_subagent.msg_saved"], "success");
         }
         catch (Exception ex)
         {
-            ShowStatus($"Save failed: {ex.Message}", "error");
+            ShowStatus(Loc.Format("panel_subagent.msg_save_failed", ex.Message), "error");
         }
         finally
         {

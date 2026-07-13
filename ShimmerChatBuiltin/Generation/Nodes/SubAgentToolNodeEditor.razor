@@ -1,18 +1,19 @@
 @using Newtonsoft.Json
 @using ShimmerChatBuiltin.SubAgent
 @inject ShimmerChatLib.Interface.IKVDataService KVData
+@inject ILocService Loc
 
 @if (_typedNode != null)
 {
     <div class="subagent-editor">
         <div class="ge-field">
-            <label class="ge-label" title="Select a SubAgent configuration from the list">
-                SubAgent
+            <label class="ge-label" title="@Loc["editor_subagent.select_hint"]">
+                @Loc["editor_subagent.label"]
             </label>
             <div class="ge-value">
                 <select class="ge-select" @bind="SelectedName" @bind:event="onchange"
                         style="width: 100%; max-width: 400px;">
-                    <option value="">— Select SubAgent —</option>
+                    <option value="">@Loc["editor_subagent.select_option"]</option>
                     @foreach (var cfg in _configs)
                     {
                         <option value="@cfg.Name">@cfg.Name</option>
@@ -21,7 +22,7 @@
                 @if (_configs.Count == 0)
                 {
                     <div style="font-size: 0.75em; color: #e66; margin-top: 4px;">
-                        No SubAgent configurations found. Create one in the SubAgent Configuration panel.
+                        @Loc["editor_subagent.no_configs"]
                     </div>
                 }
                 else if (!string.IsNullOrEmpty(SelectedName))
@@ -30,14 +31,14 @@
                     if (selected != null)
                     {
                         <div style="font-size: 0.72em; color: #666; margin-top: 4px;">
-                            Output: @selected.OutputMode
+                            @Loc.Format("editor_subagent.output_label", selected.OutputMode)
                             @if (selected.UseSharedPreset)
                             {
-                                <span> | Preset: @(string.IsNullOrEmpty(selected.ModifierPresetId) ? "None" : selected.ModifierPresetId)</span>
+                                <span>@Loc.Format("editor_subagent.preset_label", string.IsNullOrEmpty(selected.ModifierPresetId) ? Loc["editor_subagent.none"] : selected.ModifierPresetId)</span>
                             }
                             else
                             {
-                                <span> | Private Tree</span>
+                                <span>@Loc["editor_subagent.private_tree_label"]</span>
                             }
                         </div>
                     }

@@ -21,7 +21,7 @@
 			}
 			@if (message.IsStreaming)
 			{
-				<span class="chat-msg-streaming">streaming…</span>
+				<span class="chat-msg-streaming">@Loc["msg.streaming"]</span>
 			}
 		</span>
 		<span class="chat-msg-actions">
@@ -45,9 +45,9 @@
 	@if (isEditMode)
 	{
 		<div class="chat-msg-edit">
-			<label>Thinking:</label>
+			<label>@Loc["msg.label_thinking"]</label>
 			<textarea @bind="editThinking" rows="3" class="su-input su-mb-2"></textarea>
-			<label>Content:</label>
+			<label>@Loc["msg.label_content"]</label>
 			<textarea @bind="editContent" rows="4" class="su-input su-mb-2"></textarea>
 			<button class="su-btn su-btn-success su-btn-sm" @onclick="SaveEdit">@Loc["BUTTON_SAVE"]</button>
 			<button class="su-btn su-btn-sm" @onclick="CancelEdit">@Loc["BUTTON_CANCEL"]</button>
@@ -58,7 +58,7 @@
 		@if (!string.IsNullOrEmpty(CurrentMessageContent?.thinking))
 		{
 			<details class="chat-msg-thinking" open="@(!_thinkingCollapsed)">
-				<summary>Thinking…</summary>
+				<summary>@Loc["msg.thinking"]</summary>
 				<div class="chat-msg-thinking-body">@DisplayThinking</div>
 			</details>
 		}
@@ -120,7 +120,7 @@
 
 	string sender => message.sender switch
 	{
-		ShimmerChatLib.Sender.User => KVData.Read("User", "username") ?? "User",
+		ShimmerChatLib.Sender.User => KVData.Read("User", "username") ?? Loc["msg.default_user"],
 		ShimmerChatLib.Sender.AI => AgentName,
 		ShimmerChatLib.Sender.ToolResult => Loc["ToolResult"],
 		var other => other

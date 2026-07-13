@@ -8,16 +8,18 @@ namespace ShimmerChatBuiltin.RegexModifier
     public class RegexRenderModifier : IMessageRenderModifier
     {
         private readonly IKVDataService _kvData;
+        private readonly ILocService _loc;
 
-        public RegexRenderModifier(IKVDataService kvData)
+        public RegexRenderModifier(IKVDataService kvData, ILocService loc)
         {
             _kvData = kvData;
+            _loc = loc;
         }
 
         public MessageRenderModifierInfo Info => new MessageRenderModifierInfo
         {
-            Name = "Regex Replacement",
-            Description = "Applies a set of Regex replacement rules to the message content. Input: Name of the Regex Set to apply."
+            Name = _loc["builtin.regex_render_modifier.name"],
+            Description = _loc["builtin.regex_render_modifier.desc"]
         };
 
         public string Modify(string content, string input, Chat? chat, Agent? agent)

@@ -18,10 +18,12 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var loc = context.Env.Persistent.LocService;
+
             if (string.IsNullOrWhiteSpace(PresetId))
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
-                    "CallNode: PresetId is empty.",
+                    loc["node_err.call_empty_id"],
                     nodeId: Id, nodeName: Name);
 
             var kvData = context.Env.Persistent.KVData;
@@ -29,7 +31,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             if (string.IsNullOrEmpty(json))
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
-                    "CallNode: No generation presets found in KVData.",
+                    loc["node_err.call_no_presets"],
                     nodeId: Id, nodeName: Name);
 
             var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
@@ -37,20 +39,20 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             if (preset == null)
                 return NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    $"CallNode: Generation preset '{PresetId}' not found.",
+                    loc.Format("node_err.call_preset_not_found", PresetId),
                     nodeId: Id, nodeName: Name);
 
             if (string.IsNullOrWhiteSpace(preset.RootNodeJson))
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
-                    $"CallNode: Generation preset '{PresetId}' has empty RootNodeJson.",
+                    loc.Format("node_err.call_empty_json", PresetId),
                     nodeId: Id, nodeName: Name);
 
             var node = context.Env.Persistent.Serializer.Deserialize(preset.RootNodeJson);
             if (node == null)
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
-                    $"CallNode: Failed to deserialize root node from preset '{PresetId}'.",
+                    loc.Format("node_err.call_deserialize_failed", PresetId),
                     nodeId: Id, nodeName: Name);
 
             var childResult = await node.ExecuteAsync(context);

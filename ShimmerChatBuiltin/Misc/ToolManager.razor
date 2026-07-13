@@ -8,44 +8,44 @@
 @inject IToolRegistry ToolRegistry
 @inject ILocService Loc
 
-<h3>Tool Manager</h3>
+<h3>@Loc["panel_toolmanager.title"]</h3>
 
 @if (_loading)
 {
-    <p>Loading...</p>
+    <p>@Loc["panel_toolmanager.loading"]</p>
 }
 else
 {
     <div class="su-group" style="margin-top:16px;">
-        <h5>Tool Preset</h5>
+        <h5>@Loc["panel_toolmanager.tool_preset"]</h5>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
             <select class="su-select" style="max-width:240px;"
                     @bind="_selectedPresetId" @bind:after="OnPresetChanged">
-                <option value="">-- New preset --</option>
+                <option value="">@Loc["panel_toolmanager.new_preset_option"]</option>
                 @foreach (var p in _presets)
                 {
-                    <option value="@p.Id">@p.Name@(p.IsDefault ? " (default)" : "")</option>
+                    <option value="@p.Id">@p.Name@(p.IsDefault ? Loc["panel_toolmanager.default_suffix"] : "")</option>
                 }
             </select>
-            <input class="su-input" style="max-width:180px;" placeholder="Preset name"
+            <input class="su-input" style="max-width:180px;" placeholder="@Loc["panel_toolmanager.preset_name_placeholder"]"
                    @bind="_editName" @bind:event="oninput"
                    disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
             <label style="display:flex;align-items:center;gap:4px;font-size:0.85em;white-space:nowrap;cursor:pointer;">
                 <input type="checkbox" checked="@_isDefault"
                        @onchange="e => _isDefault = (bool)(e.Value ?? false)"
                        disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
-                Default
+                @Loc["panel_toolmanager.label_default"]
             </label>
             <button class="su-btn su-btn-primary su-btn-sm" @onclick="SavePreset"
                     disabled="@(string.IsNullOrEmpty(_editName) || string.IsNullOrEmpty(_selectedPresetId))">
-                Save
+                @Loc["panel_toolmanager.save"]
             </button>
             <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="OpenSaveAsDialog">
-                Save As
+                @Loc["panel_toolmanager.save_as"]
             </button>
             <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="DeletePreset"
                     disabled="@(string.IsNullOrEmpty(_selectedPresetId))">
-                Delete
+                @Loc["panel_toolmanager.delete"]
             </button>
         </div>
         @if (!string.IsNullOrEmpty(_status))
@@ -59,14 +59,14 @@ else
     {
         <div class="tm-overlay" @onclick="CancelSaveAsDialog">
             <div class="tm-dialog" @onclick:stopPropagation="true">
-                <div class="tm-dialog-title">Save As New Preset</div>
-                <input class="su-input" style="width:100%;" placeholder="Preset name"
+                <div class="tm-dialog-title">@Loc["panel_toolmanager.save_as_title"]</div>
+                <input class="su-input" style="width:100%;" placeholder="@Loc["panel_toolmanager.preset_name_placeholder"]"
                        @bind="_saveAsName" @bind:event="oninput" />
                 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-                    <button class="su-btn su-btn-outline su-btn-sm" @onclick="CancelSaveAsDialog">Cancel</button>
+                    <button class="su-btn su-btn-outline su-btn-sm" @onclick="CancelSaveAsDialog">@Loc["panel_toolmanager.cancel"]</button>
                     <button class="su-btn su-btn-primary su-btn-sm" @onclick="ConfirmSaveAs"
                             disabled="@(string.IsNullOrEmpty(_saveAsName))">
-                        Save
+                        @Loc["panel_toolmanager.save"]
                     </button>
                 </div>
             </div>
@@ -74,8 +74,8 @@ else
     }
 
     <div class="su-group" style="margin-top:16px;">
-        <h5>Available Tools</h5>
-        <p class="su-text-2" style="font-size:0.85em;">Enable tools here, then use <strong>Tool Preset</strong> node in Generation Manager to load them.</p>
+        <h5>@Loc["panel_toolmanager.available_tools"]</h5>
+        <p class="su-text-2" style="font-size:0.85em;">@Loc["panel_toolmanager.available_tools_desc"]</p>
 
         @foreach (var group in _groupedTools)
         {
@@ -100,7 +100,7 @@ else
         }
         @if (_groupedTools.Count == 0)
         {
-            <div class="tm-row"><div colspan="3" style="color:#888;">No tools discovered.</div></div>
+            <div class="tm-row"><div colspan="3" style="color:#888;">@Loc["panel_toolmanager.no_tools"]</div></div>
         }
     </div>
 }
@@ -243,7 +243,7 @@ else
         preset.IsDefault = _isDefault;
         preset.EnabledToolTypeNames = _enabledTools.ToList();
         Persist();
-        _status = $"Saved: {_editName} ({_enabledTools.Count} tools)";
+        _status = Loc.Format("panel_toolmanager.msg_saved", _editName, _enabledTools.Count);
     }
 
     private void OpenSaveAsDialog()
@@ -278,7 +278,7 @@ else
         _presets.Add(preset);
         Persist();
         _selectedPresetId = preset.Id;
-        _status = $"Saved: {_saveAsName} ({_enabledTools.Count} tools)";
+        _status = Loc.Format("panel_toolmanager.msg_saved", _saveAsName, _enabledTools.Count);
     }
 
     private void DeletePreset()
@@ -289,7 +289,7 @@ else
         Persist();
         var def = _presets.FirstOrDefault(p => p.IsDefault);
         SelectPreset(def?.Id ?? "");
-        _status = "Preset deleted.";
+        _status = Loc["panel_toolmanager.msg_deleted"];
     }
 
     private void Persist()
