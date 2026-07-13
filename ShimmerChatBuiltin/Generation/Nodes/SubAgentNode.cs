@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using SharperLLM.Util;
+using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
 
@@ -14,16 +15,11 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.sub_agent.config_name", HintKey = "prop.sub_agent.config_name.hint")]
         public string ConfigName { get; set; } = "";
 
-        [NodeProperty("prop.sub_agent.task", HintKey = "prop.sub_agent.task.hint")]
-        public string Task { get; set; } = "";
-
         [NodeProperty("prop.sub_agent.output_mode", HintKey = "prop.sub_agent.output_mode.hint")]
         public string OutputMode { get; set; } = "";
 
         [NodeProperty("prop.sub_agent.max_iterations", HintKey = "prop.sub_agent.max_iterations.hint")]
         public int MaxIterations { get; set; } = 50;
-
-        private static readonly GenerationTreeExecutor _treeExecutor = new();
 
         public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
@@ -42,7 +38,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     $"SubAgent: No modifier tree configured for '{ConfigName}'. Assign a preset or create a private tree.",
                     nodeId: Id, nodeName: Name);
 
-            // 1. 创建隔离的 GenerationEnv，执行 SubAgent 修饰器树
+            // 1. 创建隔离的 GenerationEnv，将父级 Fragments 转为临时对话写入 SharedState
             var persistent = new PersistentEnv
             {
                 KVData = kvData,
@@ -53,10 +49,19 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 LocService = context.Env.Persistent.LocService
             };
 
-            // 1. 创建隔离 env，将对话历史放入 SharedState（由树中的 AppendChatMessages 节点负责注入）
             var subEnv = new GenerationEnv(persistent);
-            var chat = context.Env.Persistent.GetChat();
-            subEnv.Transient.SharedState["ChatMessages"] = chat.Messages.ToList();
+
+            var chatMessages = new List<Message>();
+            foreach (var seg in context.Env.Transient.Fragments)
+            {
+                chatMessages.Add(new Message
+                {
+                    message = seg.Message,
+                    sender = FragmentFromToSender(seg.From),
+                    timestamp = DateTime.Now
+                });
+            }
+            subEnv.Transient.SharedState["ChatMessages"] = chatMessages;
 
             // 2. 执行 SubAgent 修饰器树（树产物追加在历史之后）
             try
@@ -78,16 +83,6 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             if (subEnv.Transient.API == null)
                 return NodeResult.Failure(NodeErrorCodes.ApiUnavailable,
                     "SubAgent: No API configured.", nodeId: Id, nodeName: Name);
-
-            // 3. 若节点显式设置了 Task，追加为 user 消息
-            if (!string.IsNullOrWhiteSpace(Task))
-            {
-                subEnv.Transient.Fragments.Add(new ContextSegment
-                {
-                    Message = new ChatMessage { Content = Task },
-                    From = PromptBuilder.From.user
-                });
-            }
 
             // 4. Tool Call 循环（隔离 env 内独立运行）
             var tools = subEnv.Transient.Tools;
@@ -161,5 +156,14 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             var configs = JsonConvert.DeserializeObject<List<SubAgent.SubAgentConfig>>(json ?? "[]") ?? [];
             return configs.FirstOrDefault(c => c.Name == name);
         }
+
+        private static string FragmentFromToSender(PromptBuilder.From from) => from switch
+        {
+            PromptBuilder.From.user => Sender.User,
+            PromptBuilder.From.system => Sender.System,
+            PromptBuilder.From.assistant => Sender.AI,
+            PromptBuilder.From.tool_result => Sender.ToolResult,
+            _ => Sender.System
+        };
     }
 }

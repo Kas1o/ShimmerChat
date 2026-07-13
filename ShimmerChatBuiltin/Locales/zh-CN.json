@@ -124,8 +124,6 @@
   "prop.sequence.repeat.hint": "序列重复执行的次数",
   "prop.sub_agent.config_name": "配置名称",
   "prop.sub_agent.config_name.hint": "子智能体配置名称",
-  "prop.sub_agent.task": "任务",
-  "prop.sub_agent.task.hint": "生成前追加的可选任务消息，留空则继续父对话",
   "prop.sub_agent.output_mode": "输出模式",
   "prop.sub_agent.output_mode.hint": "LastMessage、FullJson 或 None。设置后将覆盖配置中的值",
   "prop.sub_agent.max_iterations": "最大迭代次数",

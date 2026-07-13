@@ -124,8 +124,6 @@
   "prop.sequence.repeat.hint": "Number of times to repeat the sequence",
   "prop.sub_agent.config_name": "Config Name",
   "prop.sub_agent.config_name.hint": "Name of the SubAgent configuration",
-  "prop.sub_agent.task": "Task",
-  "prop.sub_agent.task.hint": "Optional task message appended before generation. Leave empty to continue parent conversation",
   "prop.sub_agent.output_mode": "Output Mode",
   "prop.sub_agent.output_mode.hint": "LastMessage, FullJson, or None. Overrides config if set",
   "prop.sub_agent.max_iterations": "Max Iterations",

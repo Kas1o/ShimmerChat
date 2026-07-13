@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using SharperLLM.Util;
+using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
 using ShimmerChatBuiltin.Generation.Nodes;
@@ -72,8 +73,6 @@ namespace ShimmerChatBuiltin.SubAgent
             };
         }
 
-        private static readonly GenerationTreeExecutor _treeExecutor = new();
-
         public async Task<string> ExecuteAsync(string input)
         {
             var args = JsonConvert.DeserializeObject<SubAgentCallArgs>(input);
@@ -100,20 +99,30 @@ namespace ShimmerChatBuiltin.SubAgent
                 LocService = _locService
             };
 
-            GenerationEnv subEnv;
-            try { subEnv = await _treeExecutor.ExecuteAsync(rootNode, persistent); }
+            var subEnv = new GenerationEnv(persistent);
+            subEnv.Transient.SharedState["ChatMessages"] = new List<Message>
+            {
+                new Message
+                {
+                    message = new ChatMessage { Content = args.task ?? "Execute the configured task." },
+                    sender = ShimmerChatLib.Sender.User,
+                    timestamp = DateTime.Now
+                }
+            };
+
+            try
+            {
+                var ctx = new NodeExecutionContext(subEnv, CancellationToken.None);
+                var result = await rootNode.ExecuteAsync(ctx);
+                if (!result.Success)
+                    return $"[SubAgent Tree Error: {result.Message}]";
+            }
             catch (Exception ex) { return $"[SubAgent Tree Error: {ex.Message}]"; }
 
             var api = subEnv.Transient.API?.ChatClient ?? _api;
             var tools = subEnv.Transient.Tools;
             var toolDefs = tools.Select(t => t.GetDefinition()).ToList();
             var toolExecutor = new ToolV2Executor(tools);
-
-            subEnv.Transient.Fragments.Add(new ContextSegment
-            {
-                Message = new ChatMessage { Content = args.task ?? "Execute the configured task." },
-                From = PromptBuilder.From.user
-            });
 
             var promptCtx = new SubAgentPromptContext(
                 subEnv.Transient.Fragments.Select(s => (s.Message, s.From)));
