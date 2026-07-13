@@ -84,7 +84,7 @@
 ### GenerationManagerPage — tree editor UX (P2-1 基本完成)
 - [x] Cross-tree copy/paste via `NodeClipboard` (Copy/Paste/Clear/HasContent) + paste button in GenericNodeEditor
 - [x] Move up / move down buttons (⇧⇩) on child nodes in GenericNodeEditor
-- [ ] No drag-and-drop reorder.
+- [x] Drag-and-drop reorder (TreeDragContext, DropStrip, ondragstart/ondrop in TreeEditor + GenericNodeEditor, JS helper in util.js, CSS in node-editor.css).
 - [ ] Delete button only appears when `Depth > 0` in TreeEditor — depth-0 nodes can't be deleted directly.
 
 ### Streaming UX
@@ -105,8 +105,8 @@ Supports `SharedState['key'] == "value"` and `SharedState['key'] != "value"` lit
 ### FileSystem tools
 ToolEnvironment.KVData is set at startup. If KVData becomes unavailable at runtime (e.g., after storage migration), tools will fail silently.
 
-### GenerationTreeExecutor dead code
-`GenerationTreeExecutor.ExecuteAsync()` has detailed error formatting (StringBuilder with Code/Message/Details) but is never called. `GenerationManagerV2.BuildEnvironment()` calls `rootNode.ExecuteAsync(context)` directly, bypassing the executor. The `_executor` field is unused.
+### GenerationTreeExecutor partially unused
+`GenerationTreeExecutor.ExecuteAsync()` is now called from `SubAgentToolV2` (line 101). However, `GenerationManagerV2.BuildEnvironment()` and `SubAgentNode` still call `rootNode.ExecuteAsync(context)` directly, bypassing the executor. Their `_executor` / `_treeExecutor` fields remain unused allocations.
 
 ### Missing Stage B features
 - Enhanced ProbeNode (breakpoint/timing) — basic dump probe exists as `TransientProbeNode` (Console.WriteLine of Fragments/SharedState/Tools/API)
@@ -123,8 +123,8 @@ ToolEnvironment.KVData is set at startup. If KVData becomes unavailable at runti
 
 ## Human-Reported Issues (from SHIMMERCHAT-2-STATUS-HUMAN.md)
 
-### Static CSS not extracted
-Large inline `<style>` blocks remain in components. Notable: `AgentChatPage.razor` has ~167 lines of inline CSS (`.shimmer-content`, `#container`, `#chat-main`, `#input-box`, `.shimmer-typing-indicator`, `.shimmer-message`, `.shimmer-toolcall`, etc.). No `.razor.css` files exist for 20 of 22 razor components.
+### Static CSS extraction (partially done)
+17 `.razor.css` files now exist (AgentChatPage, AgentPage, Home, MainLayout, NavMenu, Message, ToolCallMessage, ToolManager, SubAgentConfigurationPanel, etc.). Some components may still have inline styles that could be extracted.
 
 ### Documentation gaps
 - No documentation on how to create a custom GenerationNode
