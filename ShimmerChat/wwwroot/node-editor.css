@@ -137,6 +137,13 @@
     border-radius: 4px; color: var(--su-text-0); font-size: 0.8em; outline: none;
 }
 .ge-input:focus { border-color: rgba(100,150,255,0.4); }
+.ge-textarea {
+    width: 100%; min-height: 60px; padding: 4px 8px;
+    background: var(--su-surface-3); border: 1px solid var(--su-border-1);
+    border-radius: 4px; color: var(--su-text-0); font-size: 0.8em; outline: none;
+    resize: vertical; font-family: inherit;
+}
+.ge-textarea:focus { border-color: rgba(100,150,255,0.4); }
 .ge-input-num { width: 100px; }
 .ge-check { width: 16px; height: 16px; accent-color: var(--su-accent); }
 .ge-select {

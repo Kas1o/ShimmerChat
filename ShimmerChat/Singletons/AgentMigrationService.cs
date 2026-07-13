@@ -60,7 +60,10 @@ namespace ShimmerChat.Singletons
                 Nodes = new List<IGenerationNode>()
             };
 
+
             // Description → FragmentNode (system)
+#pragma warning disable CS0618 // 类型或成员已过时
+
             if (!string.IsNullOrWhiteSpace(agent.Description))
             {
                 root.Nodes.Add(new FragmentNode
@@ -70,6 +73,8 @@ namespace ShimmerChat.Singletons
                     From = SharperLLM.Util.PromptBuilder.From.system
                 });
             }
+#pragma warning restore CS0618 // 类型或成员已过时
+
 
             root.Nodes.Add(new CallNode
             {

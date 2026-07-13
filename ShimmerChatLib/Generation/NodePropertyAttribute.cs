@@ -16,6 +16,9 @@ namespace ShimmerChatLib.Generation
         /// <summary>排序 (越小越靠前)</summary>
         public int Order { get; init; }
 
+        /// <summary>标记字符串属性使用多行文本框编辑</summary>
+        public bool MultiLine { get; init; }
+
         public NodePropertyAttribute(string labelKey)
         {
             LabelKey = labelKey;

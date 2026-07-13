@@ -257,16 +257,6 @@ namespace ShimmerChat.Singletons
         {
             var root = new SequenceNode { Name = agent.Name };
 
-            if (!string.IsNullOrWhiteSpace(agent.Description))
-            {
-                root.Nodes.Add(new FragmentNode
-                {
-                    Name = "System Prompt",
-                    Content = agent.Description,
-                    From = PromptBuilder.From.system
-                });
-            }
-
             root.Nodes.Add(new CallNode { PresetId = "__default__" });
 
             return root;

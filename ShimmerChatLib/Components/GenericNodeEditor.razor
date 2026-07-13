@@ -488,12 +488,24 @@
 
         if (prop.PropertyType == typeof(string))
         {
-            builder.OpenElement(0, "input");
-            builder.AddAttribute(1, "class", "ge-input");
-            builder.AddAttribute(2, "value", value as string ?? "");
-            builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
-                v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, value as string ?? ""));
-            builder.CloseElement();
+            if (prop.MultiLine)
+            {
+                builder.OpenElement(0, "textarea");
+                builder.AddAttribute(1, "class", "ge-textarea");
+                builder.AddAttribute(2, "value", value as string ?? "");
+                builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                    v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, value as string ?? ""));
+                builder.CloseElement();
+            }
+            else
+            {
+                builder.OpenElement(0, "input");
+                builder.AddAttribute(1, "class", "ge-input");
+                builder.AddAttribute(2, "value", value as string ?? "");
+                builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                    v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, value as string ?? ""));
+                builder.CloseElement();
+            }
         }
         else if (prop.PropertyType == typeof(int))
         {
@@ -554,6 +566,7 @@
         public string LabelKey { get; }
         public string? HintKey { get; }
         public int Order { get; }
+        public bool MultiLine { get; }
         public PropertyInfo Prop { get; }
         public Type PropertyType { get; }
 
@@ -565,6 +578,7 @@
             LabelKey = attr?.LabelKey ?? prop.Name;
             HintKey = attr?.HintKey;
             Order = attr?.Order ?? 0;
+            MultiLine = attr?.MultiLine ?? false;
         }
 
         public object? GetValue(object obj) => Prop.GetValue(obj);

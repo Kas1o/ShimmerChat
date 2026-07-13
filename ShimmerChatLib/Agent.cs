@@ -26,6 +26,7 @@ namespace ShimmerChatLib
         /// <summary>
         /// 描述，SystemPrompt组织中的主要部分
         /// </summary>
+        [Obsolete("ShimmerChat 2.0 中已被私有树替代")]
         public string Description { get; set; }
         /// <summary>
         /// Greeting，新对话时以AI Role发送的第一天Message，可为空
@@ -446,21 +447,20 @@ namespace ShimmerChatLib
         /// 创建一个新的智能体实例
         /// </summary>
         /// <param name="name">智能体名称</param>
-        /// <param name="desc">描述</param>
+        /// <param name="introduce">描述</param>
         /// <param name="greeting">欢迎语，可为空</param>
         /// <param name="alternativeGreetings">备选欢迎语列表，可为空</param>
         /// <returns>新创建的 Agent 实例</returns>
-        public static Agent Create(string name, string desc, string? greeting = null, List<string>? alternativeGreetings = null)
+        public static Agent Create(string name, string introduce, string? greeting = null, List<string>? alternativeGreetings = null)
 		{
 			return new Agent
 			{
 				ChatGuids = new List<Guid>(),
 				Name = name,
-				Description = desc,
+				UserIntro = introduce,
 				Guid= Guid.NewGuid(),
 				Greeting = greeting,
 				AlternativeGreetings = alternativeGreetings ?? new List<string>(),
-				UserIntro = "",
 				Tags = new List<string>()
 			};
 		}
