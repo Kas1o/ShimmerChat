@@ -3,6 +3,7 @@ using ShimmerChat.Singletons;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib;
 using ShimmerChatLib.Interface;
+using ShimmerChatLib.Models;
 using Microsoft.Extensions.FileProviders;
 using System.Reflection;
 
@@ -32,8 +33,8 @@ ConfigureKVDataStorage(builder);
 // ShimmerChat 2.0 服务
 builder.Services.AddSingleton<IToolRegistry, ToolRegistry>();
 builder.Services.AddSingleton<IGenerationNodeSerializer, GenerationNodeSerializer>();
-builder.Services.AddSingleton<GenerationManagerV2>();
-builder.Services.AddSingleton<AgentMigrationService>();
+builder.Services.AddSingleton<IGenerationManagerV2, GenerationManagerV2>();
+builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
 builder.Services.AddSingleton<IPopupService, PopupService>();
@@ -83,7 +84,7 @@ return;
 static void ExecuteAgentMigration(WebApplication app)
 {
     using var scope = app.Services.CreateScope();
-    var migrationService = scope.ServiceProvider.GetRequiredService<AgentMigrationService>();
+    var migrationService = scope.ServiceProvider.GetRequiredService<IAgentMigrationService>();
     try
     {
         int count = migrationService.MigrateAll();
@@ -129,15 +130,15 @@ static void ConfigureKVDataStorage(WebApplicationBuilder builder)
     // 始终注册两种消息存储实现（用于迁移服务）
     builder.Services.AddSingleton<FileMessageStoreService>();
     builder.Services.AddSingleton<LiteDBMessageStoreService>();
-    builder.Services.AddSingleton<MessageStoreMigrationService>();
+    builder.Services.AddSingleton<IMessageStoreMigrationService, MessageStoreMigrationService>();
 
     // 注册迁移标记管理器
-    builder.Services.AddSingleton<KVDataMigrationMarker>();
+    builder.Services.AddSingleton<IKVDataMigrationMarker, KVDataMigrationMarker>();
 
     // 始终注册两种 KV 存储实现（用于迁移服务）
     builder.Services.AddSingleton<LocalFileStorageKVData>();
     builder.Services.AddSingleton<LiteDBKVData>();
-    builder.Services.AddSingleton<KVDataMigrationService>();
+    builder.Services.AddSingleton<IKVDataMigrationService, KVDataMigrationService>();
 
     // 根据配置注册 IKVDataService 和 IMessageStoreService 的实现
     switch (config.GetStorageType())
@@ -165,9 +166,9 @@ static void ExecuteAutoMigration(WebApplication app)
     if (!config.AutoMigrateOnStartup || string.IsNullOrEmpty(config.AutoMigrateFrom))
         return;
 
-    var migrationService = scope.ServiceProvider.GetRequiredService<KVDataMigrationService>();
-    var messageMigrationService = scope.ServiceProvider.GetRequiredService<MessageStoreMigrationService>();
-    var marker = scope.ServiceProvider.GetRequiredService<KVDataMigrationMarker>();
+    var migrationService = scope.ServiceProvider.GetRequiredService<IKVDataMigrationService>();
+    var messageMigrationService = scope.ServiceProvider.GetRequiredService<IMessageStoreMigrationService>();
+    var marker = scope.ServiceProvider.GetRequiredService<IKVDataMigrationMarker>();
     var migrateFrom = config.GetAutoMigrateFromType();
 
     if (migrateFrom == null)

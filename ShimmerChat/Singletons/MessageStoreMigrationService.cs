@@ -5,7 +5,7 @@ namespace ShimmerChat.Singletons
     /// <summary>
     /// 消息存储双向迁移服务
     /// </summary>
-    public class MessageStoreMigrationService
+    public class MessageStoreMigrationService : IMessageStoreMigrationService
     {
         private readonly FileMessageStoreService _fileStore;
         private readonly LiteDBMessageStoreService _liteStore;

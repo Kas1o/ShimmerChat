@@ -1,4 +1,4 @@
-namespace ShimmerChat.Singletons
+namespace ShimmerChatLib.Models
 {
     /// <summary>
     /// KV 数据存储配置

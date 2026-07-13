@@ -12,7 +12,7 @@ namespace ShimmerChatLib.Generation
         public required Guid AgentGuid { get; init; }
         public required IToolRegistry ToolRegistry { get; init; }
         public required IGenerationNodeSerializer Serializer { get; init; }
-
+        public required ILocService LocService { get; init; }
         /// <summary>
         /// 获取当前对话对象（惰性加载）
         /// </summary>

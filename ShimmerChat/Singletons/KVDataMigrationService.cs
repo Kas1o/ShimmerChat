@@ -1,20 +1,12 @@
+using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
 {
     /// <summary>
-    /// KV 数据存储类型
-    /// </summary>
-    public enum KVStorageType
-    {
-        LocalFileStorage,
-        LiteDB
-    }
-
-    /// <summary>
     /// KV 数据迁移服务
     /// </summary>
-    public class KVDataMigrationService
+    public class KVDataMigrationService : IKVDataMigrationService
     {
         private readonly LocalFileStorageKVData _localFileStorage;
         private readonly LiteDBKVData _liteDBStorage;

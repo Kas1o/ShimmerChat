@@ -40,7 +40,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 tool = new SubAgent.SubAgentToolV2(
                     kvData, context.Env.Transient.API?.ChatClient,
                     p.ToolRegistry, p.ChatGuid, p.AgentGuid,
-                    p.Serializer);
+                    p.Serializer, p.LocService);
                 context.Env.Transient.Tools.Add(tool);
             }
 

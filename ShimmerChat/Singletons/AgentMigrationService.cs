@@ -10,7 +10,7 @@ namespace ShimmerChat.Singletons
     /// 遍历 Agent，将旧的 Description 转换为 ModifierTreeJson。
     /// CustomToolNames 已从 Agent 移除 (ShimmerChat 2.0)。
     /// </summary>
-    public class AgentMigrationService
+    public class AgentMigrationService : IAgentMigrationService
     {
         private readonly IKVDataService _kvData;
         private readonly IGenerationNodeSerializer _serializer;

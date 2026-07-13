@@ -14,20 +14,22 @@ namespace ShimmerChat.Singletons
     /// 执行修改器树 → 构建 Prompt → 调用 API → Tool Call 循环。
     /// Tool Call 循环委托给 ToolCallLoop，自身通过 MainLoopHost 适配。
     /// </summary>
-    public class GenerationManagerV2
+    public class GenerationManagerV2 : IGenerationManagerV2
     {
         private readonly IKVDataService _kvData;
         private readonly IToolRegistry _toolRegistry;
         private readonly IGenerationNodeSerializer _serializer;
+        private readonly ILocService _locService;
         private readonly GenerationTreeExecutor _executor = new();
         private readonly ToolCallLoop _loop = new();
 
         public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry,
-            IGenerationNodeSerializer serializer)
+            IGenerationNodeSerializer serializer, ILocService locService)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
             _serializer = serializer;
+            _locService = locService;
             EnsureDefaultPreset();
         }
 
@@ -137,7 +139,8 @@ namespace ShimmerChat.Singletons
                 ChatGuid = chat.Guid,
                 AgentGuid = agent.Guid,
                 ToolRegistry = _toolRegistry,
-                Serializer = _serializer
+                Serializer = _serializer,
+                LocService = _locService
             };
 
             IGenerationNode rootNode;

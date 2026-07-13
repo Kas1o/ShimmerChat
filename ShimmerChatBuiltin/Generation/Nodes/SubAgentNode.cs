@@ -49,7 +49,8 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 ChatGuid = context.Env.Persistent.ChatGuid,
                 AgentGuid = context.Env.Persistent.AgentGuid,
                 ToolRegistry = context.Env.Persistent.ToolRegistry,
-                Serializer = context.Env.Persistent.Serializer
+                Serializer = context.Env.Persistent.Serializer,
+                LocService = context.Env.Persistent.LocService
             };
 
             // 1. 创建隔离 env，将对话历史放入 SharedState（由树中的 AppendChatMessages 节点负责注入）
