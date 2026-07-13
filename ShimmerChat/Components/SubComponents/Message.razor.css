@@ -49,6 +49,20 @@
     background: var(--su-surface-3); font-size: var(--su-font-xs);
 }
 
+/* ── Tool result collapsible ───────────────────── */
+.chat-msg-tool-result {
+    margin: 0;
+}
+.chat-msg-tool-summary {
+    cursor: pointer; user-select: none;
+    color: var(--su-warning); font-size: var(--su-font-xs); font-weight: 500;
+    list-style: none;
+}
+.chat-msg-tool-summary::-webkit-details-marker { display: none; }
+.chat-msg-tool-result .chat-msg-body {
+    margin-top: var(--su-space-2);
+}
+
 /* ── Message header ────────────────────────────── */
 .chat-msg-head {
     display: flex; align-items: center; justify-content: space-between;

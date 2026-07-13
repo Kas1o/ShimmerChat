@@ -26,6 +26,19 @@
 </div>
 
 <div class="su-group">
+	<h4>Display Settings</h4>
+
+	<input type="checkbox" id="thinking-collapsed" @bind="_thinkingCollapsed" />
+	<label for="thinking-collapsed">Thinking default collapsed</label>
+
+	<input type="checkbox" id="toolcall-collapsed" @bind="_toolCallCollapsed" />
+	<label for="toolcall-collapsed">Tool Call default collapsed</label>
+
+	<input type="checkbox" id="toolresult-collapsed" @bind="_toolResultCollapsed" />
+	<label for="toolresult-collapsed">Tool Result default collapsed</label>
+</div>
+
+<div class="su-group">
 	<h4>User Settings</h4>
 
 	<label for="username">User Name</label>
@@ -88,6 +101,39 @@
 		}
 	} = true;
 
+	private bool _thinkingCollapsed
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = true;
+
+	private bool _toolCallCollapsed
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = true;
+
+	private bool _toolResultCollapsed
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = true;
+
 
 	private string notificationPermissionStatus = "Unknown";
 
@@ -99,6 +145,9 @@
 		KVData.Write("App", "enable_notifications", _enableNotifications ? "true": "false");
 		KVData.Write("App", "auto_scroll_down", _autoScrollDown ? "true": "false");
 		KVData.Write("App", "virtualize", _virtualize ? "true" : "false");
+		KVData.Write("App", "thinking_collapsed", _thinkingCollapsed ? "true" : "false");
+		KVData.Write("App", "toolcall_collapsed", _toolCallCollapsed ? "true" : "false");
+		KVData.Write("App", "toolresult_collapsed", _toolResultCollapsed ? "true" : "false");
 		KVData.Write("User", "username", _UserName);
 	}
 
@@ -117,6 +166,18 @@
 		if (bool.TryParse(KVData.Read("App", "virtualize"), out var virtualize))
 		{
 			_virtualize = virtualize;
+		}
+		if (bool.TryParse(KVData.Read("App", "thinking_collapsed"), out var thinkingCollapsed))
+		{
+			_thinkingCollapsed = thinkingCollapsed;
+		}
+		if (bool.TryParse(KVData.Read("App", "toolcall_collapsed"), out var toolCallCollapsed))
+		{
+			_toolCallCollapsed = toolCallCollapsed;
+		}
+		if (bool.TryParse(KVData.Read("App", "toolresult_collapsed"), out var toolResultCollapsed))
+		{
+			_toolResultCollapsed = toolResultCollapsed;
 		}
 		_UserName = KVData.Read("User", "username") ?? "";
 		Initialized = true;

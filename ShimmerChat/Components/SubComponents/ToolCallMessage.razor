@@ -1,9 +1,10 @@
 @using Newtonsoft.Json.Linq
+@inject IKVDataService KVData
 
 <div class="toolcalls">
     @foreach (var tc in message?.message?.toolCalls ?? [])
     {
-        <details class="tc-item">
+        <details class="tc-item" open="@(!_toolCallCollapsed)">
             <summary class="tc-summary">
                 <span class="tc-badge">@tc.name</span>
             </summary>
@@ -19,6 +20,15 @@
 
 @code {
     [Parameter] public ShimmerChatLib.Message message { get; set; } = null!;
+
+    private bool _toolCallCollapsed
+    {
+        get
+        {
+            var value = KVData.Read("App", "toolcall_collapsed") ?? "true";
+            return !bool.TryParse(value, out var b) || b;
+        }
+    }
 
     private static JToken ParseArgs(string args)
     {
