@@ -46,7 +46,7 @@
 
 @if (IsDetailMode)
 {
-	<div class="shimmer-group">
+	<div class="su-group">
 		<div class="agent-detail-list">
 			@foreach (var agent in FilteredAgents)
 			{
@@ -94,7 +94,7 @@
 }
 else
 {
-	<div class="shimmer-group">
+	<div class="su-group">
 		<div class="shimmer-grid">
 			@foreach (var agent in FilteredAgents)
 			{
@@ -129,8 +129,8 @@ else
 
 @if (CreatePopupVisible)
 {
-	<div class="shimmer-popup-overlay" @onclick="() => CreatePopupVisible=false">
-		<div class="shimmer-popup-content" @onclick:stopPropagation>
+	<div class="su-modal-mask" @onclick="() => CreatePopupVisible=false">
+		<div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
 			<h5>@Loc["Create new Agent popup title"]</h5>
 			<div class="su-form-group">
 				<label class="su-label">@Loc["Name:"]</label>
@@ -153,8 +153,8 @@ else
 
 @if (DeletePopupVisible)
 {
-	<div class="shimmer-popup-overlay" @onclick="() => DeletePopupVisible=false">
-		<div class="shimmer-popup-content" @onclick:stopPropagation>
+	<div class="su-modal-mask" @onclick="() => DeletePopupVisible=false">
+		<div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
 			<h5>@Loc["Delete Agent popup title"]</h5>
 			<p>@string.Format(Loc["Delete Agent confirmation message"], AgentToDelete?.Name)</p>
 			<div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">

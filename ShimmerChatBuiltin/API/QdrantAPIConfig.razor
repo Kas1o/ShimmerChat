@@ -1,6 +1,6 @@
-﻿@inject IKVDataService KVData
+@inject IKVDataService KVData
 @attribute [PluginPanel("panel.qdrant_api_config", "panel.qdrant_api_config.desc")]
-<div class="shimmer-group" style="display:flex;flex-direction:column;gap:12px;padding:12px;">
+<div class="su-group su-flex su-flex-col su-gap-3">
 	<div class="su-form-group">
 		<label class="su-label">gRPC Host</label>
 		<input class="su-input" type="text" @bind="Host" placeholder="localhost"/>

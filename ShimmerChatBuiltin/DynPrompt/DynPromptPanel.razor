@@ -13,7 +13,7 @@
     <h2 class="su-text-lg su-font-bold">DynPrompt 编辑器</h2>
     
     <!-- 新建 DynPromptSet -->
-    <div class="shimmer-group">
+    <div class="su-group">
         <h3 class="su-text-lg su-font-bold">创建新的 DynPromptSet</h3>
         <div class="su-flex su-gap-3 su-mt-3 su-items-center su-flex-wrap">
             <input type="text" class="shimmer-input su-flex-1 @(validationErrors.ContainsKey("newSetName") ? "su-border-top" : "")" 
@@ -29,7 +29,7 @@
     </div>
 
     <!-- DynPromptSet 列表 -->
-    <div class="shimmer-group su-mt-5">
+    <div class="su-group su-mt-5">
         <h3 class="su-text-lg su-font-bold">已有的 DynPromptSet (@sets.Count)</h3>
         
         @if (sets.Count == 0)
@@ -62,7 +62,7 @@
     <!-- 编辑 DynPromptSet -->
     @if (selectedSet != null)
     {
-        <div class="shimmer-group su-mt-5">
+        <div class="su-group su-mt-5">
             <h3>编辑: @selectedSet.Name</h3>
             
             <div class="set-info">
@@ -118,8 +118,8 @@
     <!-- 编辑或添加 DynPromptTerm 的表单 -->
     @if (showTermForm)
     {
-        <div class="shimmer-popup-overlay">
-            <div class="shimmer-popup-content">
+        <div class="su-modal-mask">
+            <div class="su-modal su-modal-sm su-p-4">
                 <h4>@(isEditingTerm ? "编辑动态提示词" : "添加新动态提示词")</h4>
                 
                 <div class="su-form-group su-mt-3">
@@ -187,8 +187,8 @@
     <!-- 加载指示器 -->
     @if (isLoading)
     {
-        <div class="shimmer-popup-overlay">
-            <div class="shimmer-popup-content text-center">
+        <div class="su-modal-mask">
+            <div class="su-modal su-modal-sm su-p-4 su-text-center">
                 <div class="su-text-accent su-mb-3">⏳</div>
                 <div class="su-text-lg">处理中...</div>
             </div>

@@ -15,7 +15,7 @@
     <h2>SubAgent Configuration</h2>
     <p class="su-text-2">Configure sub-agents for use with the SubAgentGeneration context modifier.</p>
 
-    <div class="shimmer-group">
+    <div class="su-group">
         <div class="su-flex su-gap-3 su-mt-3 su-items-center su-flex-wrap">
             <input type="text" class="shimmer-input" @bind="newConfigName" placeholder="New sub-agent name" />
             <button class="su-btn su-btn-primary" @onclick="CreateNewConfig" disabled="@string.IsNullOrWhiteSpace(newConfigName)">
@@ -24,7 +24,7 @@
         </div>
     </div>
 
-    <div class="shimmer-group su-mt-4">
+    <div class="su-group su-mt-4">
         <h4>Existing Sub-Agents (@configs.Count)</h4>
         @if (configs.Count == 0)
         {
@@ -56,7 +56,7 @@
 
     @if (selectedConfig != null)
     {
-        <div class="shimmer-group mt-4">
+        <div class="su-group mt-4">
             <h3>Edit: @selectedConfig.Name</h3>
 
             <div class="mt-3">

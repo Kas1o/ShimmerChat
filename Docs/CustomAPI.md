@@ -234,7 +234,7 @@ public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
 @inject IKVDataService KVData
 
 <h3>My API Settings</h3>
-<div class="shimmer-group">
+<div class="su-group">
     <label>URL</label>
     <input class="shimmer-input" @bind="_url" />
     <label>API Key</label>

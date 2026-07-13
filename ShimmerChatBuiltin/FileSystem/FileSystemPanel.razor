@@ -11,7 +11,7 @@
 
     <div class="su-row su-gap-4">
         <div class="su-col-6">
-            <div class="shimmer-group">
+            <div class="su-group">
                 <h3 class="su-text-lg su-font-bold">AllowList</h3>
                 <p class="su-text-sm su-text-2 su-mb-2">Regex patterns for paths that are <strong>explicitly allowed</strong>. One pattern per line. If empty, all non-banned paths are allowed.</p>
                 <textarea class="shimmer-textarea su-w-full" rows="8"
@@ -19,7 +19,7 @@
             </div>
         </div>
         <div class="su-col-6">
-            <div class="shimmer-group">
+            <div class="su-group">
                 <h3 class="su-text-lg su-font-bold">BanList</h3>
                 <p class="su-text-sm su-text-2 su-mb-2">Regex patterns for paths that are <strong>always denied</strong>. One pattern per line. BanList takes precedence over AllowList.</p>
                 <textarea class="shimmer-textarea su-w-full" rows="8"
@@ -28,7 +28,7 @@
         </div>
     </div>
 
-    <div class="shimmer-group su-mt-4">
+    <div class="su-group su-mt-4">
         <h3 class="su-text-lg su-font-bold">Test Path</h3>
         <div class="su-flex su-gap-3 su-mt-2 su-items-center su-flex-wrap">
             <input type="text" class="shimmer-input su-flex-1" @bind="testPath" placeholder="Enter a path to test against the rules..." />
@@ -55,8 +55,8 @@
 
     @if (isLoading)
     {
-        <div class="shimmer-popup-overlay">
-            <div class="shimmer-popup-content text-center">
+        <div class="su-modal-mask">
+            <div class="su-modal su-modal-sm su-p-4 su-text-center">
                 <div class="su-text-accent su-mb-3">Loading...</div>
             </div>
         </div>

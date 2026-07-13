@@ -139,6 +139,13 @@
 }
 .su-card-body { padding: var(--su-space-4); }
 
+.su-group {
+    background: var(--su-surface-1);
+    border: var(--su-border-size) solid var(--su-border-0);
+    border-radius: var(--su-radius-lg);
+    padding: var(--su-space-3);
+}
+
 /* ── Alert ─────────────────────────────────────── */
 .su-alert {
     padding: var(--su-space-3) var(--su-space-4);
