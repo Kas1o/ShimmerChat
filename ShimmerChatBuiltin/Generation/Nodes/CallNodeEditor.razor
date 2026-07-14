@@ -63,9 +63,7 @@
 
 @code {
     [Parameter] public CallNode Node { get; set; } = default!;
-    [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     private List<GenerationPreset> _presets = [];
@@ -121,7 +119,6 @@
         Node.PresetId = preset.Id;
         _showPicker = false;
         _searchText = "";
-        OnChanged.InvokeAsync(Node);
     }
 
     private void StartChange()

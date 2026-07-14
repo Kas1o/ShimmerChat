@@ -20,9 +20,6 @@
     /// <summary>The index at which to insert the dragged node.</summary>
     [Parameter] public int InsertIndex { get; set; }
 
-    /// <summary>Called after a successful drop so the parent can re-render.</summary>
-    [Parameter] public EventCallback OnDropped { get; set; }
-
     [CascadingParameter] public TreeDragContext? DragContext { get; set; }
 
     private bool _active;
@@ -48,7 +45,6 @@
         try
         {
             await DragContext.CommitDrop(TargetList, InsertIndex);
-            await OnDropped.InvokeAsync();
         }
         catch
         {

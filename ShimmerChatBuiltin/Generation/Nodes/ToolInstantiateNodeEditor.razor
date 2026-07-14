@@ -46,10 +46,7 @@
 
 @code {
     [Parameter] public IGenerationNode Node { get; set; } = default!;
-    [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
-    [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     private ToolInstantiateNode? _typedNode;
@@ -87,7 +84,6 @@
         _typedNode.ToolTypeName = tool.TypeName;
         _selectedToolName = tool.NameKey;
         _showPicker = false;
-        OnChanged.InvokeAsync(Node);
     }
 
     private void ClearSelection()
@@ -96,7 +92,6 @@
         _typedNode.ToolTypeName = "";
         _selectedToolName = null;
         _showPicker = true;
-        OnChanged.InvokeAsync(Node);
     }
 }
 

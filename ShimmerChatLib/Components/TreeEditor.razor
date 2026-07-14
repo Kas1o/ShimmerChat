@@ -73,7 +73,6 @@ else
                 {
                     @* Auto-generated editor *@
                     <NodeBodyRenderer Node="@Node" Depth="@Depth"
-                                      OnTreeChanged="OnTreeChanged"
                                       RemoveMe="RemoveMe"
                                       CopyMe="CopyMe" />
                 }
@@ -85,7 +84,6 @@ else
 @code {
     [Parameter] public IGenerationNode Node { get; set; } = default!;
     [Parameter] public int Depth { get; set; }
-    [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
@@ -113,13 +111,9 @@ else
         var type = Node.GetType();
         _info = type.GetCustomAttribute<NodeInfoAttribute>();
         _customEditorType = type.GetCustomAttribute<NodeEditorAttribute>()?.EditorType;
-        // Must create a NEW dictionary instance so that Blazor detects the parameter change
-        // and propagates the updated Node to the DynamicComponent / custom editor.
         _editorParams = new Dictionary<string, object>
         {
             ["Node"] = Node,
-            ["OnChanged"] = EventCallback.Factory.Create<IGenerationNode>(this, _ => OnTreeChanged.InvokeAsync()),
-            ["OnTreeChanged"] = OnTreeChanged,
             ["Depth"] = Depth,
             ["CopyMe"] = CopyMe
         };
@@ -127,9 +121,9 @@ else
 
     private void ToggleExpand() => _expanded = !_expanded;
 
-    private async Task OnNameKeyDown(KeyboardEventArgs e)
+    private Task OnNameKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter") await OnTreeChanged.InvokeAsync();
+        return Task.CompletedTask;
     }
 
     // ─── Drag Source ───────────────────────────────────
@@ -138,16 +132,15 @@ else
     {
         if (DragContext == null || !_isDraggable) return;
 
-        // setData + effectAllowed handled synchronously by JS listener in util.js
         e.DataTransfer.EffectAllowed = "move";
 
         if (ParentList != null)
         {
-            DragContext.BeginDrag(Node, ParentList, () => OnTreeChanged.InvokeAsync());
+            DragContext.BeginDrag(Node, ParentList, () => InvokeAsync(StateHasChanged));
         }
         else if (OnDragRemove != null)
         {
-            DragContext.BeginDrag(Node, OnDragRemove, () => OnTreeChanged.InvokeAsync());
+            DragContext.BeginDrag(Node, OnDragRemove, () => InvokeAsync(StateHasChanged));
         }
         await InvokeAsync(StateHasChanged);
     }

@@ -19,7 +19,6 @@
         <ChildListEditor Label="@Loc[_childNodesProp.LabelKey]"
                          ChildNodes="@_childNodes"
                          Depth="@Depth"
-                         OnTreeChanged="OnTreeChanged"
                          CopyMe="CopyNode" />
     }
     @foreach (var sp in _singleNodeProps)
@@ -28,9 +27,8 @@
         <SlotEditor Label="@Loc[sp.LabelKey]"
                     SlotNode="@slotNode"
                     Depth="@Depth"
-                    OnTreeChanged="OnTreeChanged"
-                    OnSet="v => { sp.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }"
-                    OnClear="() => { sp.SetValue(Node, null); OnTreeChanged.InvokeAsync(); }"
+                    OnSet="v => sp.SetValue(Node, v)"
+                    OnClear="() => sp.SetValue(Node, null)"
                     CopyMe="CopyNode" />
     }
 </div>
@@ -38,7 +36,6 @@
 @code {
     [Parameter] public TNode Node { get; set; } = default!;
     [Parameter] public int Depth { get; set; }
-    [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
@@ -89,7 +86,6 @@
     private void CopyNode(IGenerationNode node)
     {
         NodeClipboard.Copy(Serializer, node);
-        OnTreeChanged.InvokeAsync();
     }
 
     private RenderFragment RenderProperty(PropInfo prop) => builder =>
@@ -104,7 +100,7 @@
                 builder.AddAttribute(1, "class", "ge-textarea");
                 builder.AddAttribute(2, "value", value as string ?? "");
                 builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
-                    v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, value as string ?? ""));
+                    v => prop.SetValue(Node, v), value as string ?? ""));
                 builder.CloseElement();
             }
             else
@@ -113,7 +109,7 @@
                 builder.AddAttribute(1, "class", "ge-input");
                 builder.AddAttribute(2, "value", value as string ?? "");
                 builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
-                    v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, value as string ?? ""));
+                    v => prop.SetValue(Node, v), value as string ?? ""));
                 builder.CloseElement();
             }
         }
@@ -124,7 +120,7 @@
             builder.AddAttribute(2, "class", "ge-input ge-input-num");
             builder.AddAttribute(3, "value", (int)(value ?? 0));
             builder.AddAttribute(4, "onchange", EventCallback.Factory.CreateBinder<int>(this,
-                v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, (int)(value ?? 0)));
+                v => prop.SetValue(Node, v), (int)(value ?? 0)));
             builder.CloseElement();
         }
         else if (prop.PropertyType == typeof(bool))
@@ -134,7 +130,7 @@
             builder.AddAttribute(2, "class", "ge-check");
             builder.AddAttribute(3, "checked", (bool)(value ?? false));
             builder.AddAttribute(4, "onchange", EventCallback.Factory.CreateBinder<bool>(this,
-                v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, (bool)(value ?? false)));
+                v => prop.SetValue(Node, v), (bool)(value ?? false)));
             builder.CloseElement();
         }
         else if (prop.PropertyType.IsEnum)
@@ -144,7 +140,7 @@
             var current = value?.ToString() ?? "";
             builder.AddAttribute(2, "value", current);
             builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
-                v => { prop.SetValue(Node, Enum.Parse(prop.PropertyType, v)); OnTreeChanged.InvokeAsync(); }, current));
+                v => prop.SetValue(Node, Enum.Parse(prop.PropertyType, v)), current));
             foreach (var name in Enum.GetNames(prop.PropertyType))
             {
                 builder.OpenElement(4, "option");
@@ -162,7 +158,7 @@
             builder.AddAttribute(3, "class", "ge-input ge-input-num");
             builder.AddAttribute(4, "value", (float)(value ?? 0f));
             builder.AddAttribute(5, "onchange", EventCallback.Factory.CreateBinder<float>(this,
-                v => { prop.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }, (float)(value ?? 0f)));
+                v => prop.SetValue(Node, v), (float)(value ?? 0f)));
             builder.CloseElement();
         }
         else

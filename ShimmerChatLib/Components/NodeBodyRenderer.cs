@@ -13,7 +13,6 @@ public class NodeBodyRenderer : ComponentBase
 {
     [Parameter] public required IGenerationNode Node { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
@@ -24,9 +23,8 @@ public class NodeBodyRenderer : ComponentBase
         builder.OpenComponent(0, componentType);
         builder.AddAttribute(1, "Node", Node);
         builder.AddAttribute(2, "Depth", Depth);
-        builder.AddAttribute(3, "OnTreeChanged", OnTreeChanged);
-        builder.AddAttribute(4, "RemoveMe", RemoveMe);
-        builder.AddAttribute(5, "CopyMe", CopyMe);
+        builder.AddAttribute(3, "RemoveMe", RemoveMe);
+        builder.AddAttribute(4, "CopyMe", CopyMe);
         builder.CloseComponent();
     }
 }

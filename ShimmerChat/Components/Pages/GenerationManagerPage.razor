@@ -84,7 +84,7 @@
         <div class="su-card">
             <div class="su-card-body">
                 <CascadingValue Value="_dragContext">
-                    <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+                    <TreeEditor Node="@_editingRoot" />
                 </CascadingValue>
             </div>
         </div>
@@ -99,13 +99,13 @@
                         <strong>@Loc["gen_manager.default_readonly"]</strong> @Loc["gen_manager.default_readonly_hint"]
                     </div>
                     <div style="pointer-events: none; opacity: 0.7;">
-                        <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+                        <TreeEditor Node="@_editingRoot" />
                     </div>
                 }
                 else
                 {
                     <CascadingValue Value="_dragContext">
-                        <TreeEditor Node="@_editingRoot" OnTreeChanged="OnTreeChanged" />
+                        <TreeEditor Node="@_editingRoot" />
                     </CascadingValue>
                 }
             </div>
@@ -263,11 +263,6 @@
         _showNameDialog = false;
         _renameTargetId = null;
         SavePresets();
-    }
-
-    private async Task OnTreeChanged()
-    {
-        await InvokeAsync(StateHasChanged);
     }
 
     private void SaveAll()

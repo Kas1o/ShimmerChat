@@ -93,51 +93,42 @@
     <SlotEditor Label="@LocService["prop.if_node.then"]"
                 SlotNode="Node.Then"
                 Depth="Depth"
-                OnTreeChanged="OnTreeChanged"
-                OnSet="v => { Node.Then = v; Notify(); }"
-                OnClear="() => { Node.Then = null; Notify(); }" />
+                OnSet="v => Node.Then = v"
+                OnClear="() => Node.Then = null" />
 
     <SlotEditor Label="@LocService["prop.if_node.else"]"
                 SlotNode="Node.Else"
                 Depth="Depth"
-                OnTreeChanged="OnTreeChanged"
-                OnSet="v => { Node.Else = v; Notify(); }"
-                OnClear="() => { Node.Else = null; Notify(); }" />
+                OnSet="v => Node.Else = v"
+                OnClear="() => Node.Else = null" />
 </div>
 
 @code {
     [Parameter] public IfNode Node { get; set; } = default!;
-    [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
-    private void Notify() => OnChanged.InvokeAsync(Node);
-
-    private async Task OnSourceChanged(ChangeEventArgs e)
+    private void OnSourceChanged(ChangeEventArgs e)
     {
         if (Enum.TryParse<ConditionSource>(e.Value?.ToString(), out var val))
         {
             Node.Source = val;
-            await OnChanged.InvokeAsync(Node);
         }
     }
 
-    private async Task OnOperatorChanged(ChangeEventArgs e)
+    private void OnOperatorChanged(ChangeEventArgs e)
     {
         if (Enum.TryParse<ConditionOperator>(e.Value?.ToString(), out var val))
         {
             Node.Operator = val;
-            await OnChanged.InvokeAsync(Node);
         }
     }
 
-    private async Task OnConvertFailChanged(ChangeEventArgs e)
+    private void OnConvertFailChanged(ChangeEventArgs e)
     {
         if (Enum.TryParse<OnConvertFailBehavior>(e.Value?.ToString(), out var val))
         {
             Node.OnConvertFail = val;
-            await OnChanged.InvokeAsync(Node);
         }
     }
 }

@@ -120,8 +120,7 @@
                         {
                             <div class="tree-editor-container">
                                 <CascadingValue Value="_dragContext">
-                                    <TreeEditor Node="@_editingTree"
-                                        OnTreeChanged="OnPrivateTreeChanged" />
+                                    <TreeEditor Node="@_editingTree" />
                                 </CascadingValue>
                             </div>
                         }
@@ -245,15 +244,6 @@
         }
     }
 
-    void OnPrivateTreeChanged()
-    {
-        if (_editingTree != null && selectedConfig != null)
-        {
-            selectedConfig.ModifierTreeJson = Serializer.Serialize(_editingTree);
-        }
-        StateHasChanged();
-    }
-
     async Task DeleteConfig(SubAgentConfig config)
     {
         configs.Remove(config);
@@ -280,6 +270,10 @@
         try
         {
             isLoading = true;
+            if (_editingTree != null && selectedConfig != null)
+            {
+                selectedConfig.ModifierTreeJson = Serializer.Serialize(_editingTree);
+            }
             await SaveConfigsAsync();
             ShowStatus(Loc["panel_subagent.msg_saved"], "success");
         }

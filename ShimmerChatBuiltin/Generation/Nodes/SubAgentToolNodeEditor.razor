@@ -50,9 +50,7 @@
 
 @code {
     [Parameter] public SubAgentToolNode Node { get; set; } = default!;
-    [Parameter] public EventCallback<ShimmerChatLib.Generation.IGenerationNode> OnChanged { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<ShimmerChatLib.Generation.IGenerationNode>? CopyMe { get; set; }
 
     private List<SubAgentConfig> _configs = [];
@@ -63,12 +61,8 @@
         _configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
     }
 
-    private async Task OnConfigChanged(ChangeEventArgs e)
+    private void OnConfigChanged(ChangeEventArgs e)
     {
-        var configName = e.Value?.ToString() ?? "";
-        if (Node.ConfigName == configName) return;
-
-        Node.ConfigName = configName;
-        await OnChanged.InvokeAsync(Node);
+        Node.ConfigName = e.Value?.ToString() ?? "";
     }
 }

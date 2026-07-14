@@ -28,7 +28,6 @@
         <div class="tn-child-row">
             <div class="tn-child-tree">
                 <TreeEditor Node="@SlotNode" Depth="@(Depth + 1)"
-                            OnTreeChanged="OnTreeChanged"
                             RemoveMe="RemoveSlot"
                             OnDragRemove="RemoveSlotAsync"
                             CopyMe="CopyMe" />
@@ -45,7 +44,6 @@
     [Parameter] public string Label { get; set; } = "";
     [Parameter] public IGenerationNode? SlotNode { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? OnSet { get; set; }
     [Parameter] public Action? OnClear { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
@@ -71,7 +69,6 @@
         var instance = (IGenerationNode)Activator.CreateInstance(type)!;
         instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
         OnSet?.Invoke(instance);
-        OnTreeChanged.InvokeAsync();
     }
 
     private void PasteNode()
@@ -80,20 +77,18 @@
         if (node != null)
         {
             OnSet?.Invoke(node);
-            OnTreeChanged.InvokeAsync();
         }
     }
 
     private void RemoveSlot(IGenerationNode _)
     {
         OnClear?.Invoke();
-        OnTreeChanged.InvokeAsync();
     }
 
     private async Task RemoveSlotAsync()
     {
         OnClear?.Invoke();
-        await OnTreeChanged.InvokeAsync();
+        await Task.CompletedTask;
     }
 
     // ── Drop target ──────────────────────────────────
@@ -125,7 +120,6 @@
             OnSet?.Invoke(dragged);
             await DragContext.RemoveFromSource();
             DragContext.EndDrag();
-            await OnTreeChanged.InvokeAsync();
         }
         catch
         {

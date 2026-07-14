@@ -19,7 +19,7 @@
         <NodePickerMenu OnSelect="AddChild" OnClose="CloseAddMenu" />
     }
 
-    <DropStrip TargetList="@ChildNodes" InsertIndex="0" OnDropped="OnTreeChanged" />
+    <DropStrip TargetList="@ChildNodes" InsertIndex="0" />
 
     @for (int i = 0; i < ChildNodes.Count; i++)
     {
@@ -39,13 +39,12 @@
             <div class="tn-child-tree">
                 <TreeEditor Node="@child" Depth="@(Depth + 1)"
                             ParentList="@ChildNodes"
-                            OnTreeChanged="OnTreeChanged"
                             RemoveMe="RemoveChild"
                             CopyMe="CopyMe" />
             </div>
         </div>
 
-        <DropStrip TargetList="@ChildNodes" InsertIndex="@(index + 1)" OnDropped="OnTreeChanged" />
+        <DropStrip TargetList="@ChildNodes" InsertIndex="@(index + 1)" />
     }
     @if (ChildNodes.Count == 0)
     {
@@ -57,7 +56,6 @@
     [Parameter] public string Label { get; set; } = "";
     [Parameter] public required IList<IGenerationNode> ChildNodes { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     private bool _showAddMenu;
@@ -78,7 +76,6 @@
         var instance = (IGenerationNode)Activator.CreateInstance(type)!;
         instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
         ChildNodes.Add(instance);
-        OnTreeChanged.InvokeAsync();
     }
 
     private void PasteNode()
@@ -87,29 +84,23 @@
         if (node != null)
         {
             ChildNodes.Add(node);
-            OnTreeChanged.InvokeAsync();
         }
     }
 
     private void RemoveChild(IGenerationNode node)
     {
         ChildNodes.Remove(node);
-        OnTreeChanged.InvokeAsync();
     }
 
     private void MoveChildUp(int index)
     {
         if (index <= 0 || index >= ChildNodes.Count) return;
         (ChildNodes[index], ChildNodes[index - 1]) = (ChildNodes[index - 1], ChildNodes[index]);
-        OnTreeChanged.InvokeAsync();
-        StateHasChanged();
     }
 
     private void MoveChildDown(int index)
     {
         if (index < 0 || index >= ChildNodes.Count - 1) return;
         (ChildNodes[index], ChildNodes[index + 1]) = (ChildNodes[index + 1], ChildNodes[index]);
-        OnTreeChanged.InvokeAsync();
-        StateHasChanged();
     }
 }
