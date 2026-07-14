@@ -39,6 +39,7 @@
             <div class="tn-child-tree">
                 <TreeEditor Node="@child" Depth="@(Depth + 1)"
                             ParentList="@ChildNodes"
+                            OnDragSourceChanged="HandleDragSourceChanged"
                             RemoveMe="RemoveChild"
                             CopyMe="CopyMe" />
             </div>
@@ -59,6 +60,8 @@
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     private bool _showAddMenu;
+
+    private void HandleDragSourceChanged() { }
 
     private void ToggleAddMenu()
     {

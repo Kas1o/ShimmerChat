@@ -28,6 +28,7 @@
         <div class="tn-child-row">
             <div class="tn-child-tree">
                 <TreeEditor Node="@SlotNode" Depth="@(Depth + 1)"
+                            OnDragSourceChanged="HandleDragSourceChanged"
                             RemoveMe="RemoveSlot"
                             OnDragRemove="RemoveSlotAsync"
                             CopyMe="CopyMe" />
@@ -52,6 +53,8 @@
 
     private bool _showAddPicker;
     private bool _isDropTarget;
+
+    private void HandleDragSourceChanged() { }
 
     private void ToggleAddPicker()
     {

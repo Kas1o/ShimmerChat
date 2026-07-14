@@ -97,6 +97,13 @@ else
     /// </summary>
     [Parameter] public Func<Task>? OnDragRemove { get; set; }
 
+    /// <summary>
+    /// When this node is the source of a drag-drop, invoked after the node is
+    /// removed from its parent list. The owning component (ChildListEditor /
+    /// SlotEditor) uses this to re-render its child list.
+    /// </summary>
+    [Parameter] public EventCallback OnDragSourceChanged { get; set; }
+
     [CascadingParameter] public TreeDragContext? DragContext { get; set; }
 
     private NodeInfoAttribute? _info;
@@ -136,11 +143,11 @@ else
 
         if (ParentList != null)
         {
-            DragContext.BeginDrag(Node, ParentList, () => InvokeAsync(StateHasChanged));
+            DragContext.BeginDrag(Node, ParentList, () => OnDragSourceChanged.InvokeAsync());
         }
         else if (OnDragRemove != null)
         {
-            DragContext.BeginDrag(Node, OnDragRemove, () => InvokeAsync(StateHasChanged));
+            DragContext.BeginDrag(Node, OnDragRemove, () => OnDragSourceChanged.InvokeAsync());
         }
         await InvokeAsync(StateHasChanged);
     }
