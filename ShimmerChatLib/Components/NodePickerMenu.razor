@@ -1,0 +1,173 @@
+@using ShimmerChatLib.Generation
+@inject ILocService Loc
+@inject INodeTypeCatalog Catalog
+
+<div class="tn-add-menu">
+    <input class="tn-add-search" placeholder="@Loc["node_editor.filter_placeholder"]" @bind="_filter" @bind:event="oninput"
+           @onkeydown="OnKeyDown" />
+
+    @if (_navPath.Count == 0)
+    {
+        <div class="tn-add-categories">
+            @foreach (var child in _categoryTree)
+            {
+                var count = CountLeafNodes(child, _filter);
+                <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
+                    <span class="tn-cat-name">@Loc[child.Name]</span>
+                    <span class="tn-cat-count">@count</span>
+                </button>
+            }
+        </div>
+        @if (!string.IsNullOrEmpty(_filter))
+        {
+            <div class="tn-add-flat">
+                @foreach (var leaf in _allNodes.Where(n =>
+                    n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+                {
+                    <div class="tn-add-item" @onclick="() => Select(leaf.Type)" @onclick:preventDefault>
+                        <span class="tn-item-left">
+                            <span style="color:@leaf.Color">@leaf.Icon</span>
+                            <span class="tn-item-label">@Loc[leaf.LabelKey]</span>
+                        </span>
+                        <span class="tn-add-item-cat">@string.Join(" / ", leaf.FullCategory.Split('/').Select(k => Loc[k.Trim()]))</span>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        var current = _navPath[^1];
+        <div class="tn-add-breadcrumb">
+            <button class="tn-add-back" @onclick="NavigateUp" title="@Loc["node_editor.back"]">←</button>
+            @for (int i = 0; i < _navPath.Count; i++)
+            {
+                if (i > 0) { <span class="tn-bc-sep">›</span> }
+                <button class="tn-bc-item @(i == _navPath.Count - 1 ? "current" : "")"
+                        @onclick="() => NavigateTo(_navPath.Take(i + 1).ToList())">
+                    @Loc[_navPath[i].Name]
+                </button>
+            }
+        </div>
+        <div class="tn-add-categories">
+            @foreach (var child in current.Children)
+            {
+                var count = CountLeafNodes(child, _filter);
+                <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
+                    <span class="tn-cat-name">@Loc[child.Name]</span>
+                    <span class="tn-cat-count">@count</span>
+                </button>
+            }
+        </div>
+        @if (current.LeafNodes.Count > 0)
+        {
+            <div class="tn-add-nodes">
+                @foreach (var nt in current.LeafNodes.Where(n =>
+                    string.IsNullOrEmpty(_filter) ||
+                    n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+                {
+                    <div class="tn-add-item" @onclick="() => Select(nt.Type)" @onclick:preventDefault>
+                        <span class="tn-item-left">
+                            <span style="color:@nt.Color">@nt.Icon</span>
+                            <span class="tn-item-label">@Loc[nt.LabelKey]</span>
+                        </span>
+                        @if (nt.DescriptionKey != null)
+                        {
+                            <span class="tn-item-desc">@Loc[nt.DescriptionKey]</span>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback<Type> OnSelect { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private string _filter = "";
+    private List<CategoryTreeNode> _categoryTree = new();
+    private List<CategoryTreeNode> _navPath = new();
+    private IReadOnlyList<NodeTypeMetadata> _allNodes = Array.Empty<NodeTypeMetadata>();
+
+    protected override void OnInitialized()
+    {
+        _allNodes = Catalog.GetAllNodeTypes();
+
+        var root = new Dictionary<string, CategoryTreeNode>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var node in _allNodes)
+        {
+            var parts = node.FullCategory.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+            {
+                parts = ["category.general"];
+            }
+
+            Dictionary<string, CategoryTreeNode> current = root;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var part = parts[i];
+                if (!current.TryGetValue(part, out var treeNode))
+                {
+                    treeNode = new CategoryTreeNode { Name = part };
+                    current[part] = treeNode;
+                }
+
+                if (i == parts.Length - 1)
+                {
+                    treeNode.LeafNodes.Add(node);
+                }
+
+                current = treeNode.ChildrenDict;
+            }
+        }
+
+        _categoryTree = root.Values.OrderBy(c => c.Name).ToList();
+    }
+
+    private static int CountLeafNodes(CategoryTreeNode node, string filter)
+    {
+        int count = node.LeafNodes.Count(n =>
+            string.IsNullOrEmpty(filter) || n.LabelKey.Contains(filter, StringComparison.OrdinalIgnoreCase));
+        foreach (var child in node.Children)
+            count += CountLeafNodes(child, filter);
+        return count;
+    }
+
+    private void NavigateInto(CategoryTreeNode node) => _navPath.Add(node);
+
+    private void NavigateUp()
+    {
+        if (_navPath.Count > 0)
+            _navPath.RemoveAt(_navPath.Count - 1);
+    }
+
+    private void NavigateTo(List<CategoryTreeNode> path) => _navPath = path;
+
+    private async Task Select(Type type)
+    {
+        _filter = "";
+        _navPath.Clear();
+        await OnSelect.InvokeAsync(type);
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            _filter = "";
+            _navPath.Clear();
+            await OnClose.InvokeAsync();
+        }
+    }
+
+    private class CategoryTreeNode
+    {
+        public string Name { get; set; } = "";
+        public Dictionary<string, CategoryTreeNode> ChildrenDict { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<CategoryTreeNode> Children => ChildrenDict.Values.OrderBy(c => c.Name).ToList();
+        public List<NodeTypeMetadata> LeafNodes { get; } = new();
+    }
+}

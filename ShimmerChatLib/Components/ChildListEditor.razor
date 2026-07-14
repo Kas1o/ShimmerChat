@@ -1,0 +1,115 @@
+@using System.Reflection
+@using ShimmerChatLib.Generation
+@inject ILocService Loc
+@inject IGenerationNodeSerializer Serializer
+
+<div class="ge-children">
+    <div class="ge-children-header">
+        <span class="ge-label">@Label</span>
+        <span class="tn-count">(@ChildNodes.Count)</span>
+        <button class="tn-btn tn-btn-add" @onclick="ToggleAddMenu" title="@Loc["node_editor.add_child"]">+</button>
+        @if (NodeClipboard.HasContent)
+        {
+            <button class="tn-btn tn-btn-paste" @onclick="PasteNode" title="@Loc["node_editor.paste_copied"]">📋</button>
+        }
+    </div>
+
+    @if (_showAddMenu)
+    {
+        <NodePickerMenu OnSelect="AddChild" OnClose="CloseAddMenu" />
+    }
+
+    <DropStrip TargetList="@ChildNodes" InsertIndex="0" OnDropped="OnTreeChanged" />
+
+    @for (int i = 0; i < ChildNodes.Count; i++)
+    {
+        var index = i;
+        var child = ChildNodes[i];
+        <div class="tn-child-row" @key="child.Id">
+            <div class="tn-child-actions">
+                <button class="tn-btn tn-btn-move"
+                        @onclick="() => MoveChildUp(index)"
+                        @onclick:stopPropagation="true"
+                        disabled="@(index == 0)" title="@Loc["node_editor.move_up"]">⇧</button>
+                <button class="tn-btn tn-btn-move"
+                        @onclick="() => MoveChildDown(index)"
+                        @onclick:stopPropagation="true"
+                        disabled="@(index == ChildNodes.Count - 1)" title="@Loc["node_editor.move_down"]">⇩</button>
+            </div>
+            <div class="tn-child-tree">
+                <TreeEditor Node="@child" Depth="@(Depth + 1)"
+                            ParentList="@ChildNodes"
+                            OnTreeChanged="OnTreeChanged"
+                            RemoveMe="RemoveChild"
+                            CopyMe="CopyMe" />
+            </div>
+        </div>
+
+        <DropStrip TargetList="@ChildNodes" InsertIndex="@(index + 1)" OnDropped="OnTreeChanged" />
+    }
+    @if (ChildNodes.Count == 0)
+    {
+        <div class="tn-empty">@Loc["node_editor.empty_hint"]</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public required IList<IGenerationNode> ChildNodes { get; set; }
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public EventCallback OnTreeChanged { get; set; }
+    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+
+    private bool _showAddMenu;
+
+    private void ToggleAddMenu()
+    {
+        _showAddMenu = !_showAddMenu;
+    }
+
+    private void CloseAddMenu()
+    {
+        _showAddMenu = false;
+    }
+
+    private void AddChild(Type type)
+    {
+        _showAddMenu = false;
+        var instance = (IGenerationNode)Activator.CreateInstance(type)!;
+        instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
+        ChildNodes.Add(instance);
+        OnTreeChanged.InvokeAsync();
+    }
+
+    private void PasteNode()
+    {
+        var node = NodeClipboard.Paste(Serializer);
+        if (node != null)
+        {
+            ChildNodes.Add(node);
+            OnTreeChanged.InvokeAsync();
+        }
+    }
+
+    private void RemoveChild(IGenerationNode node)
+    {
+        ChildNodes.Remove(node);
+        OnTreeChanged.InvokeAsync();
+    }
+
+    private void MoveChildUp(int index)
+    {
+        if (index <= 0 || index >= ChildNodes.Count) return;
+        (ChildNodes[index], ChildNodes[index - 1]) = (ChildNodes[index - 1], ChildNodes[index]);
+        OnTreeChanged.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private void MoveChildDown(int index)
+    {
+        if (index < 0 || index >= ChildNodes.Count - 1) return;
+        (ChildNodes[index], ChildNodes[index + 1]) = (ChildNodes[index + 1], ChildNodes[index]);
+        OnTreeChanged.InvokeAsync();
+        StateHasChanged();
+    }
+}

@@ -28,13 +28,6 @@
 }
 else
 {
-    var isContainer = typeof(IList<IGenerationNode>).IsAssignableFrom(
-        Node.GetType().GetProperties().FirstOrDefault(p =>
-            p.PropertyType.IsGenericType &&
-            p.PropertyType.GetGenericTypeDefinition() == typeof(List<>) &&
-            typeof(IGenerationNode).IsAssignableFrom(p.PropertyType.GenericTypeArguments[0])
-        )?.PropertyType ?? typeof(object));
-
     <div class="tree-node-card" style="border-left-color: @_info.Color;">
         <div class="tn-header @(_isDraggingSelf ? "tn-dragging" : "")"
              @onclick="ToggleExpand"
@@ -54,12 +47,6 @@ else
                 {
                     <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)"
                             @onclick:stopPropagation="true" title="@Loc["tree_editor.remove"]">✕</button>
-                }
-                @if (isContainer)
-                {
-                    <button class="tn-btn tn-btn-exp" @onclick="ToggleExpand" title="@(_expanded ? Loc["tree_editor.collapse"] : Loc["tree_editor.expand"])">
-                        @(_expanded ? "▾" : "▸")
-                    </button>
                 }
             </div>
         </div>

@@ -20,37 +20,18 @@
 
     @if (_showAddPicker && SlotNode == null)
     {
-        <div class="tn-add-menu">
-            <input class="tn-add-search" placeholder="@Loc["node_editor.filter_placeholder"]"
-                   @bind="_filter" @bind:event="oninput" />
-            <div class="tn-add-flat">
-                @foreach (var nt in GetFlatNodes().Where(n =>
-                    string.IsNullOrEmpty(_filter) ||
-                    n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
-                {
-                    <div class="tn-add-item" @onclick="() => AddChild(nt.Type)" @onclick:preventDefault>
-                        <span class="tn-item-left">
-                            <span style="color:@nt.Color">@nt.Icon</span>
-                            <span class="tn-item-label">@Loc[nt.LabelKey]</span>
-                        </span>
-                        @if (nt.DescriptionKey != null)
-                        {
-                            <span class="tn-item-desc">@Loc[nt.DescriptionKey]</span>
-                        }
-                    </div>
-                }
-            </div>
-        </div>
+        <NodePickerMenu OnSelect="AddChild" OnClose="ClosePicker" />
     }
 
     @if (SlotNode != null)
     {
         <div class="tn-child-row">
             <div class="tn-child-tree">
-                <TreeEditor Node="SlotNode" Depth="@(Depth + 1)"
+                <TreeEditor Node="@SlotNode" Depth="@(Depth + 1)"
                             OnTreeChanged="OnTreeChanged"
-                            RemoveMe="node => ClearSlot()"
-                            OnDragRemove="ClearSlotAsync" />
+                            RemoveMe="RemoveSlot"
+                            OnDragRemove="RemoveSlotAsync"
+                            CopyMe="CopyMe" />
             </div>
         </div>
     }
@@ -67,55 +48,26 @@
     [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<IGenerationNode>? OnSet { get; set; }
     [Parameter] public Action? OnClear { get; set; }
+    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     [CascadingParameter] private TreeDragContext? DragContext { get; set; }
 
     private bool _showAddPicker;
-    private string _filter = "";
     private bool _isDropTarget;
-
-    private static List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey)>? _cachedFlats;
-
-    private static List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey)> GetFlatNodes()
-    {
-        if (_cachedFlats != null) return _cachedFlats;
-
-        _cachedFlats = new();
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            if (asm.IsDynamic) continue;
-            try
-            {
-                foreach (var type in asm.GetExportedTypes())
-                {
-                    if (typeof(IGenerationNode).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
-                    {
-                        var info = type.GetCustomAttribute<NodeInfoAttribute>();
-                        _cachedFlats.Add((
-                            info?.LabelKey ?? type.Name,
-                            type,
-                            info?.Icon ?? "●",
-                            info?.Color ?? "var(--node-debug)",
-                            info?.DescriptionKey
-                        ));
-                    }
-                }
-            }
-            catch { }
-        }
-        return _cachedFlats;
-    }
 
     private void ToggleAddPicker()
     {
         _showAddPicker = !_showAddPicker;
-        _filter = "";
+    }
+
+    private void ClosePicker()
+    {
+        _showAddPicker = false;
     }
 
     private void AddChild(Type type)
     {
         _showAddPicker = false;
-        _filter = "";
         var instance = (IGenerationNode)Activator.CreateInstance(type)!;
         instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
         OnSet?.Invoke(instance);
@@ -132,13 +84,13 @@
         }
     }
 
-    private void ClearSlot()
+    private void RemoveSlot(IGenerationNode _)
     {
         OnClear?.Invoke();
         OnTreeChanged.InvokeAsync();
     }
 
-    private async Task ClearSlotAsync()
+    private async Task RemoveSlotAsync()
     {
         OnClear?.Invoke();
         await OnTreeChanged.InvokeAsync();
@@ -166,6 +118,7 @@
 
         var dragged = DragContext.DraggedNode!;
         if (ReferenceEquals(dragged, SlotNode)) return;
+        if (SlotNode != null && TreeDragContext.IsAncestorOf(dragged, SlotNode)) return;
 
         try
         {

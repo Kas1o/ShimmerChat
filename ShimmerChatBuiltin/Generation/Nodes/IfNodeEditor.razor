@@ -90,19 +90,19 @@
         </div>
     </div>
 
-    <SingleSlotEditor Label="@LocService["prop.if_node.then"]"
-                      SlotNode="Node.Then"
-                      Depth="Depth"
-                      OnTreeChanged="OnTreeChanged"
-                      OnSet="v => { Node.Then = v; Notify(); }"
-                      OnClear="() => { Node.Then = null; Notify(); }" />
+    <SlotEditor Label="@LocService["prop.if_node.then"]"
+                SlotNode="Node.Then"
+                Depth="Depth"
+                OnTreeChanged="OnTreeChanged"
+                OnSet="v => { Node.Then = v; Notify(); }"
+                OnClear="() => { Node.Then = null; Notify(); }" />
 
-    <SingleSlotEditor Label="@LocService["prop.if_node.else"]"
-                      SlotNode="Node.Else"
-                      Depth="Depth"
-                      OnTreeChanged="OnTreeChanged"
-                      OnSet="v => { Node.Else = v; Notify(); }"
-                      OnClear="() => { Node.Else = null; Notify(); }" />
+    <SlotEditor Label="@LocService["prop.if_node.else"]"
+                SlotNode="Node.Else"
+                Depth="Depth"
+                OnTreeChanged="OnTreeChanged"
+                OnSet="v => { Node.Else = v; Notify(); }"
+                OnClear="() => { Node.Else = null; Notify(); }" />
 </div>
 
 @code {

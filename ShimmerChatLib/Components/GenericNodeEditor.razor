@@ -4,90 +4,6 @@
 @inject ILocService Loc
 @inject IGenerationNodeSerializer Serializer
 
-@{
-    RenderFragment AddNodePicker = @<text>
-        <div class="tn-add-menu">
-            <input class="tn-add-search" placeholder="@Loc["node_editor.filter_placeholder"]" @bind="_filter" @bind:event="oninput"
-                   @onkeydown="OnAddKeyDown" />
-
-            @if (_navPath.Count == 0)
-            {
-                <div class="tn-add-categories">
-                    @foreach (var child in _categoryTree)
-                    {
-                        var count = CountLeafNodes(child, _filter);
-                        <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
-                            <span class="tn-cat-name">@Loc[child.Name]</span>
-                            <span class="tn-cat-count">@count</span>
-                        </button>
-                    }
-                </div>
-                @if (!string.IsNullOrEmpty(_filter))
-                {
-                    <div class="tn-add-flat">
-                        @foreach (var leaf in _flatNodes.Where(n =>
-                            n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            <div class="tn-add-item" @onclick="() => AddChild(leaf.Type)" @onclick:preventDefault>
-                                <span class="tn-item-left">
-                                    <span style="color:@leaf.Color">@leaf.Icon</span>
-                                    <span class="tn-item-label">@Loc[leaf.LabelKey]</span>
-                                </span>
-                                <span class="tn-add-item-cat">@string.Join(" / ", leaf.FullCategory.Split('/').Select(k => Loc[k.Trim()]))</span>
-                            </div>
-                        }
-                    </div>
-                }
-            }
-            else
-            {
-                var current = _navPath[^1];
-                <div class="tn-add-breadcrumb">
-                    <button class="tn-add-back" @onclick="NavigateUp" title="@Loc["node_editor.back"]">←</button>
-                    @for (int i = 0; i < _navPath.Count; i++)
-                    {
-                        if (i > 0) { <span class="tn-bc-sep">›</span> }
-                        <button class="tn-bc-item @(i == _navPath.Count - 1 ? "current" : "")"
-                                @onclick="() => NavigateTo(_navPath.Take(i + 1).ToList())">
-                            @Loc[_navPath[i].Name]
-                        </button>
-                    }
-                </div>
-                <div class="tn-add-categories">
-                    @foreach (var child in current.Children)
-                    {
-                        var count = CountLeafNodes(child, _filter);
-                        <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
-                            <span class="tn-cat-name">@Loc[child.Name]</span>
-                            <span class="tn-cat-count">@count</span>
-                        </button>
-                    }
-                </div>
-                @if (current.LeafNodes.Count > 0)
-                {
-                    <div class="tn-add-nodes">
-                        @foreach (var nt in current.LeafNodes.Where(n =>
-                            string.IsNullOrEmpty(_filter) ||
-                            n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            <div class="tn-add-item" @onclick="() => AddChild(nt.Type)" @onclick:preventDefault>
-                                <span class="tn-item-left">
-                                    <span style="color:@nt.Color">@nt.Icon</span>
-                                    <span class="tn-item-label">@Loc[nt.LabelKey]</span>
-                                </span>
-                                @if (nt.DescriptionKey != null)
-                                {
-                                    <span class="tn-item-desc">@Loc[nt.DescriptionKey]</span>
-                                }
-                            </div>
-                        }
-                    </div>
-                }
-            }
-        </div>
-    </text>;
-}
-
 <div class="generic-editor">
     @foreach (var prop in _properties.OrderBy(p => p.Order))
     {
@@ -100,98 +16,22 @@
     }
     @if (_childNodesProp != null)
     {
-        <div class="ge-children">
-            <div class="ge-children-header">
-                <span class="ge-label">@Loc[_childNodesProp.LabelKey]</span>
-                <span class="tn-count">(@_childNodes.Count)</span>
-                <button class="tn-btn tn-btn-add" @onclick="ToggleAddMenu" title="@Loc["node_editor.add_child"]">+</button>
-                @if (NodeClipboard.HasContent)
-                {
-                    <button class="tn-btn tn-btn-paste" @onclick="PasteNode" title="@Loc["node_editor.paste_copied"]">📋</button>
-                }
-            </div>
-
-            @if (_showAddMenu)
-            {
-                @AddNodePicker
-            }
-
-            @* Drop strip: insert at beginning *@
-            <DropStrip TargetList="@_childNodes" InsertIndex="0" OnDropped="OnTreeChanged" />
-
-            @for (int i = 0; i < _childNodes.Count; i++)
-            {
-                var index = i;
-                var child = _childNodes[i];
-                <div class="tn-child-row" @key="child.Id">
-                    <div class="tn-child-actions">
-                        <button class="tn-btn tn-btn-move"
-                                @onclick="() => MoveChildUp(index)"
-                                @onclick:stopPropagation="true"
-                                disabled="@(index == 0)" title="@Loc["node_editor.move_up"]">⇧</button>
-                        <button class="tn-btn tn-btn-move"
-                                @onclick="() => MoveChildDown(index)"
-                                @onclick:stopPropagation="true"
-                                disabled="@(index == _childNodes.Count - 1)" title="@Loc["node_editor.move_down"]">⇩</button>
-                    </div>
-                    <div class="tn-child-tree">
-                        <TreeEditor Node="@child" Depth="@(Depth + 1)"
-                                    ParentList="@_childNodes"
-                                    OnTreeChanged="OnTreeChanged"
-                                    RemoveMe="@(node => { _childNodes.Remove(node); OnTreeChanged.InvokeAsync(); })"
-                                    CopyMe="CopyNode" />
-                    </div>
-                </div>
-
-                @* Drop strip: insert after child i *@
-                <DropStrip TargetList="@_childNodes" InsertIndex="@(index + 1)" OnDropped="OnTreeChanged" />
-            }
-            @if (_childNodes.Count == 0)
-            {
-                <div class="tn-empty">@Loc["node_editor.empty_hint"]</div>
-            }
-        </div>
+        <ChildListEditor Label="@Loc[_childNodesProp.LabelKey]"
+                         ChildNodes="@_childNodes"
+                         Depth="@Depth"
+                         OnTreeChanged="OnTreeChanged"
+                         CopyMe="CopyNode" />
     }
     @foreach (var sp in _singleNodeProps)
     {
         var slotNode = sp.GetValue(Node) as IGenerationNode;
-        <div class="ge-children @(_slotDropClass == sp ? "tn-drop-inside" : "")"
-             @ondragover="(e) => OnSlotDragOver(e, sp)" @ondragover:preventDefault
-             @ondragleave="OnSlotDragLeave" @ondrop="(e) => OnSlotDrop(e, sp)">
-            <div class="ge-children-header">
-                <span class="ge-label">@Loc[sp.LabelKey]</span>
-                @if (slotNode == null)
-                {
-                    <button class="tn-btn tn-btn-add" @onclick="() => ToggleSlotAdd(sp)" title="@Loc["node_editor.add_node"]">+</button>
-                    @if (NodeClipboard.HasContent)
-                    {
-                        <button class="tn-btn tn-btn-paste" @onclick="() => PasteToSlot(sp)" title="@Loc["node_editor.paste"]">📋</button>
-                    }
-                }
-            </div>
-            @if (_showAddMenu && _activeSlotProp == sp)
-            {
-                @AddNodePicker
-            }
-            @if (slotNode != null)
-            {
-                <div class="tn-child-row">
-                    <div class="tn-child-actions">
-                        <button class="tn-btn tn-btn-del" @onclick="() => { sp.SetValue(Node, null); OnTreeChanged.InvokeAsync(); }" title="@Loc["node_editor.remove"]">✕</button>
-                    </div>
-                    <div class="tn-child-tree">
-                        <TreeEditor Node="@slotNode" Depth="@(Depth + 1)" OnTreeChanged="OnTreeChanged"
-                                    RemoveMe="@(node => { sp.SetValue(Node, null); OnTreeChanged.InvokeAsync(); })"
-                                    CopyMe="CopyNode"
-                                    OnDragRemove="@(async () => { sp.SetValue(Node, null); await OnTreeChanged.InvokeAsync(); })" />
-                    </div>
-                </div>
-            }
-            else
-            {
-                <div class="tn-empty">@Loc["node_editor.empty_hint"]</div>
-            }
-        </div>
+        <SlotEditor Label="@Loc[sp.LabelKey]"
+                    SlotNode="@slotNode"
+                    Depth="@Depth"
+                    OnTreeChanged="OnTreeChanged"
+                    OnSet="v => { sp.SetValue(Node, v); OnTreeChanged.InvokeAsync(); }"
+                    OnClear="() => { sp.SetValue(Node, null); OnTreeChanged.InvokeAsync(); }"
+                    CopyMe="CopyNode" />
     }
 </div>
 
@@ -202,128 +42,18 @@
     [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
     [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
-    [CascadingParameter] public TreeDragContext? DragContext { get; set; }
-
     private List<PropInfo> _properties = new();
     private List<PropInfo> _singleNodeProps = new();
     private PropInfo? _childNodesProp;
     private IList<IGenerationNode> _childNodes = new List<IGenerationNode>();
-    private bool _showAddMenu;
-    private PropInfo? _activeSlotProp;
-    private string _filter = "";
-
-    private List<CategoryTreeNode> _categoryTree = new();
-    private List<CategoryTreeNode> _navPath = new();
-    private List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey, string FullCategory)> _flatNodes = new();
-
-    private static List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey, string FullCategory)>? _cachedFlats;
-
-    protected override void OnInitialized()
-    {
-        BuildCategoryTree();
-    }
 
     protected override void OnParametersSet()
     {
         BuildPropertyList();
     }
 
-    private void BuildCategoryTree()
-    {
-        var flatNodes = GetFlatNodes();
-        _flatNodes = flatNodes;
-
-        var root = new Dictionary<string, CategoryTreeNode>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var node in flatNodes)
-        {
-            var parts = node.FullCategory.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0)
-            {
-                parts = new[] { "category.general" };
-            }
-
-            Dictionary<string, CategoryTreeNode> current = root;
-            for (int i = 0; i < parts.Length; i++)
-            {
-                var part = parts[i];
-                if (!current.TryGetValue(part, out var treeNode))
-                {
-                    treeNode = new CategoryTreeNode { Name = part };
-                    current[part] = treeNode;
-                }
-
-                if (i == parts.Length - 1)
-                {
-                    treeNode.LeafNodes.Add(node);
-                }
-
-                current = treeNode.ChildrenDict;
-            }
-        }
-
-        _categoryTree = root.Values.OrderBy(c => c.Name).ToList();
-    }
-
-    private static List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey, string FullCategory)> GetFlatNodes()
-    {
-        if (_cachedFlats != null) return _cachedFlats;
-
-        _cachedFlats = new();
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            if (asm.IsDynamic) continue;
-            try
-            {
-                foreach (var type in asm.GetExportedTypes())
-                {
-                    if (typeof(IGenerationNode).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
-                    {
-                        var info = type.GetCustomAttribute<NodeInfoAttribute>();
-                        _cachedFlats.Add((
-                            info?.LabelKey ?? type.Name,
-                            type,
-                            info?.Icon ?? "●",
-                            info?.Color ?? "var(--node-debug)",
-                            info?.DescriptionKey,
-                            info?.CategoryKeys is { Length: > 0 } cats ? string.Join("/", cats) : "category.general"
-                        ));
-                    }
-                }
-            }
-            catch { }
-        }
-        return _cachedFlats;
-    }
-
-    private static int CountLeafNodes(CategoryTreeNode node, string filter)
-    {
-        int count = node.LeafNodes.Count(n =>
-            string.IsNullOrEmpty(filter) || n.LabelKey.Contains(filter, StringComparison.OrdinalIgnoreCase));
-        foreach (var child in node.Children)
-            count += CountLeafNodes(child, filter);
-        return count;
-    }
-
-    private void NavigateInto(CategoryTreeNode node)
-    {
-        _navPath.Add(node);
-    }
-
-    private void NavigateUp()
-    {
-        if (_navPath.Count > 0)
-            _navPath.RemoveAt(_navPath.Count - 1);
-    }
-
-    private void NavigateTo(List<CategoryTreeNode> path)
-    {
-        _navPath = path;
-    }
-
     private void BuildPropertyList()
     {
-        // Clear cached state so repeated calls (e.g. when Node changes) don't accumulate duplicates.
         _properties.Clear();
         _singleNodeProps.Clear();
         _childNodesProp = null;
@@ -331,12 +61,10 @@
 
         var nodeType = Node.GetType();
         var props = nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.CanRead && p.CanWrite)
-            .ToList();
+            .Where(p => p.CanRead && p.CanWrite);
 
         foreach (var prop in props)
         {
-            // All properties require [NodeProperty] to appear in the editor
             if (prop.GetCustomAttribute<NodePropertyAttribute>() == null)
                 continue;
 
@@ -344,152 +72,24 @@
                 (prop.PropertyType.IsGenericType && prop.PropertyType.GetGenericTypeDefinition() == typeof(List<>)
                  && typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType.GenericTypeArguments[0])))
             {
-                _childNodesProp = new PropInfo(prop, nodeType);
+                _childNodesProp = new PropInfo(prop);
                 _childNodes = (IList<IGenerationNode>)prop.GetValue(Node)! ?? new List<IGenerationNode>();
             }
             else if (typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType))
             {
-                _singleNodeProps.Add(new PropInfo(prop, nodeType));
+                _singleNodeProps.Add(new PropInfo(prop));
             }
             else
             {
-                _properties.Add(new PropInfo(prop, nodeType));
+                _properties.Add(new PropInfo(prop));
             }
         }
-    }
-
-    private class CategoryTreeNode
-    {
-        public string Name { get; set; } = "";
-        public Dictionary<string, CategoryTreeNode> ChildrenDict { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public List<CategoryTreeNode> Children => ChildrenDict.Values.OrderBy(c => c.Name).ToList();
-        public List<(string LabelKey, Type Type, string Icon, string Color, string? DescriptionKey, string FullCategory)> LeafNodes { get; } = new();
-    }
-
-    private void ToggleAddMenu()
-    {
-        _activeSlotProp = null;
-        _showAddMenu = !_showAddMenu;
-        _navPath.Clear();
-        _filter = "";
-    }
-
-    private async Task OnAddKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape") { _showAddMenu = false; _activeSlotProp = null; }
-    }
-
-    private void AddChild(Type type)
-    {
-        _showAddMenu = false;
-        _filter = "";
-        var instance = (IGenerationNode)Activator.CreateInstance(type)!;
-        instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
-
-        if (_activeSlotProp != null)
-        {
-            _activeSlotProp.SetValue(Node, instance);
-            _activeSlotProp = null;
-        }
-        else
-        {
-            _childNodes.Add(instance);
-        }
-        OnTreeChanged.InvokeAsync();
     }
 
     private void CopyNode(IGenerationNode node)
     {
         NodeClipboard.Copy(Serializer, node);
         OnTreeChanged.InvokeAsync();
-    }
-
-    private void PasteNode()
-    {
-        var node = NodeClipboard.Paste(Serializer);
-        if (node != null)
-        {
-            _childNodes.Add(node);
-            OnTreeChanged.InvokeAsync();
-        }
-    }
-
-    private void ToggleSlotAdd(PropInfo prop)
-    {
-        _activeSlotProp = prop;
-        _showAddMenu = !_showAddMenu;
-        _navPath.Clear();
-        _filter = "";
-    }
-
-    private void PasteToSlot(PropInfo prop)
-    {
-        var node = NodeClipboard.Paste(Serializer);
-        if (node != null)
-        {
-            prop.SetValue(Node, node);
-            OnTreeChanged.InvokeAsync();
-        }
-    }
-
-    private void MoveChildUp(int index)
-    {
-        if (index <= 0 || index >= _childNodes.Count) return;
-        (_childNodes[index], _childNodes[index - 1]) = (_childNodes[index - 1], _childNodes[index]);
-        OnTreeChanged.InvokeAsync();
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void MoveChildDown(int index)
-    {
-        if (index < 0 || index >= _childNodes.Count - 1) return;
-        (_childNodes[index], _childNodes[index + 1]) = (_childNodes[index + 1], _childNodes[index]);
-        OnTreeChanged.InvokeAsync();
-        InvokeAsync(StateHasChanged);
-    }
-
-    // ─── Drop Target (single-node slots) ──
-
-    private PropInfo? _slotDropClass;
-
-    private void OnSlotDragOver(DragEventArgs e, PropInfo sp)
-    {
-        if (DragContext?.IsDragging != true) return;
-        if (DragContext.DraggedNode == sp.GetValue(Node)) return; // can't drop onto self
-
-        e.DataTransfer.DropEffect = "move";
-        _slotDropClass = sp;
-    }
-
-    private void OnSlotDragLeave()
-    {
-        _slotDropClass = null;
-    }
-
-    private async Task OnSlotDrop(DragEventArgs e, PropInfo sp)
-    {
-        _slotDropClass = null;
-        if (DragContext?.IsDragging != true) return;
-
-        var dragged = DragContext.DraggedNode!;
-        if (ReferenceEquals(dragged, sp.GetValue(Node))) return; // can't drop onto self
-        if (TreeDragContext.IsAncestorOf(dragged, Node)) return; // prevent cycle
-
-        try
-        {
-            // Set the slot
-            sp.SetValue(Node, dragged);
-
-            // Remove from source (list or single-slot)
-            await DragContext.RemoveFromSource();
-
-            DragContext.EndDrag();
-            await OnTreeChanged.InvokeAsync();
-        }
-        catch
-        {
-            DragContext?.EndDrag();
-        }
     }
 
     private RenderFragment RenderProperty(PropInfo prop) => builder =>
@@ -580,7 +180,7 @@
         public PropertyInfo Prop { get; }
         public Type PropertyType { get; }
 
-        public PropInfo(PropertyInfo prop, Type nodeType)
+        public PropInfo(PropertyInfo prop)
         {
             Prop = prop;
             PropertyType = prop.PropertyType;
