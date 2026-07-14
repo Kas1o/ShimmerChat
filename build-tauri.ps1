@@ -48,7 +48,7 @@ if (Test-Path (Join-Path $Root "version.json")) {
     Write-Host "`n[2/5] Syncing version from Nerdbank.GitVersioning..." -ForegroundColor Yellow
 
     # 从 nbgv 获取版本号（需提交 version.json 后才生效）
-    $nbgvOutput = nbgv get-version -f "{AssemblyInformationalVersion}" 2>$null
+    $nbgvOutput = nbgv get-version -v AssemblyInformationalVersion 2>&1
     if ($LASTEXITCODE -eq 0 -and $nbgvOutput) {
         # 去掉 build metadata（+ 后面的 commit hash），得到干净的 semver
         $semver = ($nbgvOutput.Trim() -split '\+')[0]
