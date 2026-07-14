@@ -207,6 +207,18 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f
 
+      - name: Collect file list
+        id: files
+        shell: bash
+        run: |
+          # 收集所有文件的相对路径，传给 gh-release
+          files=$(find artifacts -type f -print0 | xargs -0 printf '%s\n')
+          {
+            echo "files<<EOF"
+            echo "$files"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
       - name: Generate Changelog
         id: changelog
         shell: bash
@@ -249,4 +261,4 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           generate_release_notes: false
-          files: artifacts/*
+          files: ${{ steps.files.outputs.files }}
