@@ -1,4 +1,5 @@
 use std::io::{BufRead, BufReader};
+use std::net::TcpListener;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
@@ -123,8 +124,15 @@ fn find_server_binary(app: &tauri::App) -> Option<std::path::PathBuf> {
 fn spawn_server(exe_path: &std::path::Path) -> Result<(Child, u16), String> {
     let working_dir = exe_path.parent().unwrap_or(std::path::Path::new("."));
 
+    // 让 OS 分配一个空闲端口，再传给 .NET sidecar（通过 ASPNETCORE_URLS），
+    // .NET 侧无需任何端口逻辑：收到就绑定该端口，没收到则走 appsettings 默认。
+    let port = pick_free_port()?;
+    let url = format!("http://127.0.0.1:{}", port);
+    println!("[ShimmerChat] Reserved port {} for sidecar", port);
+
     let mut child = Command::new(exe_path)
         .current_dir(working_dir)
+        .env("ASPNETCORE_URLS", &url)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -142,7 +150,7 @@ fn spawn_server(exe_path: &std::path::Path) -> Result<(Child, u16), String> {
         }
     });
 
-    // Read stdout line by line until we find SHIMMER_READY marker
+    // 等待 .NET 发出 SHIMMER_READY 作为就绪信号（端口已由我们指定，无需解析）
     let mut reader = BufReader::new(stdout);
     let mut line = String::new();
 
@@ -169,18 +177,8 @@ fn spawn_server(exe_path: &std::path::Path) -> Result<(Child, u16), String> {
             Ok(_) => {
                 print!("[server] {}", line);
 
-                let trimmed = line.trim();
-                if let Some(port_str) = trimmed.strip_prefix("SHIMMER_READY:http://127.0.0.1:") {
-                    if let Ok(p) = port_str.parse::<u16>() {
-                        return Ok((child, p));
-                    }
-                }
-                if let Some(port_str) =
-                    trimmed.strip_prefix("SHIMMER_READY:http://localhost:")
-                {
-                    if let Ok(p) = port_str.parse::<u16>() {
-                        return Ok((child, p));
-                    }
+                if line.trim().starts_with("SHIMMER_READY:") {
+                    return Ok((child, port));
                 }
             }
             Err(e) => {
@@ -188,4 +186,17 @@ fn spawn_server(exe_path: &std::path::Path) -> Result<(Child, u16), String> {
             }
         }
     }
+}
+
+/// 绑定 127.0.0.1:0 让 OS 分配空闲端口，立即释放供 sidecar 使用。
+/// 存在极小的 TOCTOU 竞态窗口，但 sidecar 紧随其后启动，实践中可接受。
+fn pick_free_port() -> Result<u16, String> {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .map_err(|e| format!("Cannot bind to find free port: {}", e))?;
+    let port = listener
+        .local_addr()
+        .map_err(|e| format!("Cannot get local addr: {}", e))?
+        .port();
+    drop(listener);
+    Ok(port)
 }

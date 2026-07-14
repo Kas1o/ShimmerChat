@@ -1,6 +1,7 @@
 [package]
 name = "shimmer-chat"
-version = "0.1.0"
+# 此版本号在构建时由 build-tauri.ps1 从 version.json (Nerdbank.GitVersioning) 覆盖，此处仅为占位
+version = "0.0.0-placeholder"
 edition = "2021"
 description = "ShimmerChat Desktop App"
 

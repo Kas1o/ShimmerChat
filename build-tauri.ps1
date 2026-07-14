@@ -17,7 +17,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 # Step 1: Publish .NET backend
 if (-not $SkipPublish) {
-    Write-Host "`n[1/3] Publishing .NET backend..." -ForegroundColor Yellow
+    Write-Host "`n[1/5] Publishing .NET backend..." -ForegroundColor Yellow
     
     if (Test-Path $ServerOutput) {
         Write-Host "  Cleaning previous publish..." -ForegroundColor Gray
@@ -35,13 +35,52 @@ if (-not $SkipPublish) {
     Write-Host "  .NET backend published to $ServerOutput" -ForegroundColor Green
 }
 else {
-    Write-Host "`n[1/3] Skipping .NET publish (--SkipPublish)" -ForegroundColor Gray
+    Write-Host "`n[1/5] Skipping .NET publish (--SkipPublish)" -ForegroundColor Gray
 }
 
-# Step 2: Generate Tauri icons from favicon (if needed)
+# Step 2: Sync version from Nerdbank.GitVersioning into Tauri config
+# version.json 是唯一版本源；tauri.conf.json / Cargo.toml 里的 version 在构建时被覆盖
+$TauriConf = Join-Path $Root "src-tauri/tauri.conf.json"
+$CargoToml = Join-Path $Root "src-tauri/Cargo.toml"
+$VersionSynced = $false
+
+if (Test-Path (Join-Path $Root "version.json")) {
+    Write-Host "`n[2/5] Syncing version from Nerdbank.GitVersioning..." -ForegroundColor Yellow
+
+    # 从 nbgv 获取版本号（需提交 version.json 后才生效）
+    $nbgvOutput = nbgv get-version -f "{AssemblyInformationalVersion}" 2>$null
+    if ($LASTEXITCODE -eq 0 -and $nbgvOutput) {
+        # 去掉 build metadata（+ 后面的 commit hash），得到干净的 semver
+        $semver = ($nbgvOutput.Trim() -split '\+')[0]
+        Write-Host "  Nerdbank version: $semver" -ForegroundColor Gray
+
+        # 注入 tauri.conf.json
+        $conf = Get-Content $TauriConf -Raw | ConvertFrom-Json
+        $conf.version = $semver
+        $conf | ConvertTo-Json -Depth 10 | Set-Content $TauriConf -NoNewline
+        Write-Host "  tauri.conf.json version -> $semver" -ForegroundColor Gray
+
+        # 注入 Cargo.toml
+        $cargo = Get-Content $CargoToml -Raw
+        $cargo = $cargo -replace '(?m)^version\s*=\s*".*"', "version = `"$semver`""
+        Set-Content $CargoToml $cargo -NoNewline
+        Write-Host "  Cargo.toml version -> $semver" -ForegroundColor Gray
+
+        $VersionSynced = $true
+        Write-Host "  Version synced" -ForegroundColor Green
+    }
+    else {
+        Write-Host "  nbgv not available, using version from config as-is" -ForegroundColor Yellow
+    }
+}
+else {
+    Write-Host "`n[2/5] No version.json found, skipping version sync" -ForegroundColor Gray
+}
+
+# Step 3: Generate Tauri icons from favicon (if needed)
 $IconDir = Join-Path $Root "src-tauri/icons"
 if (-not (Test-Path (Join-Path $IconDir "icon.ico"))) {
-    Write-Host "`n[2/3] Generating icons..." -ForegroundColor Yellow
+    Write-Host "`n[3/5] Generating icons..." -ForegroundColor Yellow
     $Favicon = Join-Path $Root "ShimmerChat/wwwroot/favicon.png"
     if (Test-Path $Favicon) {
         # Use the Tauri CLI icon generator
@@ -76,12 +115,12 @@ if (-not (Test-Path (Join-Path $IconDir "icon.ico"))) {
     }
 }
 else {
-    Write-Host "`n[2/3] Icons already exist, skipping" -ForegroundColor Gray
+    Write-Host "`n[3/5] Icons already exist, skipping" -ForegroundColor Gray
 }
 
-# Step 3: Build Tauri
+# Step 4: Build Tauri
 if (-not $SkipTauri) {
-    Write-Host "`n[3/3] Building Tauri app..." -ForegroundColor Yellow
+    Write-Host "`n[4/5] Building Tauri app..." -ForegroundColor Yellow
     Push-Location (Join-Path $Root "src-tauri")
     try {
         npx @tauri-apps/cli build 2>&1
@@ -94,7 +133,18 @@ if (-not $SkipTauri) {
     Write-Host "  Output: src-tauri/target/release/" -ForegroundColor Green
 }
 else {
-    Write-Host "`n[3/3] Skipping Tauri build (--SkipTauri)" -ForegroundColor Gray
+    Write-Host "`n[4/5] Skipping Tauri build (--SkipTauri)" -ForegroundColor Gray
+}
+
+# Step 5: 还原被脚本覆盖的 tauri.conf.json / Cargo.toml，保持工作区干净
+if ($VersionSynced) {
+    git checkout -- $TauriConf $CargoToml 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "`n[5/5] Restored tauri.conf.json and Cargo.toml to repo version" -ForegroundColor Gray
+    }
+    else {
+        Write-Host "`n[5/5] Warning: could not restore tauri.conf.json / Cargo.toml (not in git?)" -ForegroundColor Yellow
+    }
 }
 
 Write-Host "`nDone!" -ForegroundColor Cyan

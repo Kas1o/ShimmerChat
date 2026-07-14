@@ -44,10 +44,6 @@ builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
 builder.Services.AddSingleton<ILocService, LocService>();
 builder.Services.AddSingleton<IDebugOutputService, DebugOutputService>();
 
-// 默认动态端口：让 OS 分配空闲端口，避免端口冲突
-// dev 模式下 dotnet run --urls 参数优先级更高，不受影响
-builder.WebHost.UseUrls("http://127.0.0.1:0");
-
 var app = builder.Build();
 
 // 执行自动迁移（如果需要）
