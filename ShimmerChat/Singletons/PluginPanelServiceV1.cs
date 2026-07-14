@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System.Reflection;
 using ShimmerChatLib.Panel;
 using ShimmerChatLib.Interface;
@@ -8,11 +9,13 @@ namespace ShimmerChat.Singletons
     {
         private readonly IPluginLoaderService _pluginLoaderService;
         private readonly List<PluginPanelInfo> _pluginPanels = new();
+        private readonly ILogger<PluginPanelServiceV1> _logger;
         private bool _panelsLoaded = false;
 
-        public PluginPanelServiceV1(IPluginLoaderService pluginLoaderService)
+        public PluginPanelServiceV1(IPluginLoaderService pluginLoaderService, ILogger<PluginPanelServiceV1> logger)
         {
             _pluginLoaderService = pluginLoaderService;
+            _logger = logger;
         }
 
         public void LoadAllPluginPanels()
@@ -28,20 +31,20 @@ namespace ShimmerChat.Singletons
 
                     var panelTypes = _pluginLoaderService.GetTypesWithAttribute<PluginPanelAttribute>();
 
-                    Console.WriteLine($"找到 {panelTypes.Count} 个面板类型");
+                    _logger.LogInformation("找到 {Count} 个面板类型", panelTypes.Count);
                     AddPanelsFromTypes(panelTypes);
 
                     _pluginPanels.Sort((a, b) => a.Order.CompareTo(b.Order));
                     _panelsLoaded = true;
 
-                    Console.WriteLine($"成功加载了 {_pluginPanels.Count} 个插件面板");
+                    _logger.LogInformation("成功加载了 {Count} 个插件面板", _pluginPanels.Count);
                     foreach (var panel in _pluginPanels)
-                        Console.WriteLine($"  - {panel.NameKey}: {panel.PanelType.FullName}");
+                        _logger.LogInformation("  - {Name}: {Type}", panel.NameKey, panel.PanelType.FullName);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"加载插件面板时出错: {ex.Message}");
-                    Console.WriteLine(ex.StackTrace);
+                    _logger.LogError(ex, "加载插件面板时出错: {Message}", ex.Message);
+                    _logger.LogError(ex, "{StackTrace}", ex.StackTrace);
                 }
             }
         }
@@ -73,7 +76,7 @@ namespace ShimmerChat.Singletons
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"处理面板类型 {panelType.Name} 时出错: {ex.Message}");
+                    _logger.LogError(ex, "处理面板类型 {TypeName} 时出错: {Message}", panelType.Name, ex.Message);
                 }
             }
         }

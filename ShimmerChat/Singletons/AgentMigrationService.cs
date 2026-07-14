@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
@@ -14,11 +15,13 @@ namespace ShimmerChat.Singletons
     {
         private readonly IKVDataService _kvData;
         private readonly IGenerationNodeSerializer _serializer;
+        private readonly ILogger<AgentMigrationService> _logger;
 
-        public AgentMigrationService(IKVDataService kvData, IGenerationNodeSerializer serializer)
+        public AgentMigrationService(IKVDataService kvData, IGenerationNodeSerializer serializer, ILogger<AgentMigrationService> logger)
         {
             _kvData = kvData;
             _serializer = serializer;
+            _logger = logger;
         }
 
         /// <summary>
@@ -37,7 +40,7 @@ namespace ShimmerChat.Singletons
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[AgentMigration] Failed to migrate agent {guid}: {ex.Message}");
+                    _logger.LogError(ex, "[AgentMigration] Failed to migrate agent {Guid}: {Message}", guid, ex.Message);
                 }
             }
             return migrated;

@@ -13,6 +13,8 @@
 @inject IMessageStoreService messageStore
 @inject ILocService Loc
 @inject NavigationManager navigation
+@inject ILogger<AgentChatPage> logger
+
 
 @if (chat != null)
 {
@@ -719,7 +721,7 @@
 		catch (Exception ex)
 		{
 			// 如果通知失败，记录错误但不中断程序
-			Console.WriteLine($"显示通知时出错: {ex.Message}");
+			logger.LogError($"显示通知时出错: {ex.Message}");
 		}
 	}
 	void GetDirty()

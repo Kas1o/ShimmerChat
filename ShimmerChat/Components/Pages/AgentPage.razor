@@ -11,6 +11,7 @@
 @inject IMessageStoreService messageStore
 @inject IGenerationNodeSerializer Serializer
 @inject ILocService Loc
+@inject ILogger<AgentPage> logger
 
 @if(agent != null)
 {
@@ -639,12 +640,12 @@
     bool CanUseVirtualizedList => virtualize && string.IsNullOrWhiteSpace(ChatSearchQuery) && !EnableFullTextSearch;
 
     const bool EnablePerfLog = true;
-    static string PerfNow() => DateTime.Now.ToString("HH:mm:ss.fff");
-    static void PerfLog(string message)
+    string PerfNow() => DateTime.Now.ToString("HH:mm:ss.fff");
+    void PerfLog(string message)
     {
         if (EnablePerfLog)
         {
-            Console.WriteLine($"[PERF][AgentPage][{PerfNow()}] {message}");
+            logger.Log( LogLevel.Information,$"[AgentPage][{PerfNow()}] {message}");
         }
     }
 

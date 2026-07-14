@@ -1,6 +1,7 @@
 using Markdig;
 using Markdig.Extensions.Tables;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using ShimmerChatLib.Interface;
 using Newtonsoft.Json;
 using System.Text;
@@ -46,6 +47,7 @@ namespace ShimmerChat.Singletons
 
         private readonly IPluginLoaderService _pluginLoaderService;
         private readonly IKVDataService _pluginDataService;
+        private readonly ILogger<MessageDisplayServiceV1> _logger;
 
         public List<IMessageRenderModifier> LoadedModifiers { get; private set; } = new();
         public List<ActivatedMessageRenderModifier> ActivatedModifiers { get; private set; } = new();
@@ -59,10 +61,11 @@ namespace ShimmerChat.Singletons
         /// 构造函数
         /// 初始化Markdown渲染管道，配置所需的扩展
         /// </summary>
-        public MessageDisplayServiceV1(IPluginLoaderService pluginLoaderService, IKVDataService pluginDataService)
+        public MessageDisplayServiceV1(IPluginLoaderService pluginLoaderService, IKVDataService pluginDataService, ILogger<MessageDisplayServiceV1> logger)
         {
             _pluginLoaderService = pluginLoaderService;
             _pluginDataService = pluginDataService;
+            _logger = logger;
 
             // 创建并配置MarkdownPipeline
             // 只在服务初始化时创建一次，所有消息组件共享使用
@@ -87,14 +90,14 @@ namespace ShimmerChat.Singletons
                 {
                     var name = modifier.Info.Name;
                     if (modifierDict.ContainsKey(name))
-                        Console.WriteLine($"MessageRenderModifier名称冲突: {name}");
+                        _logger.LogWarning("MessageRenderModifier名称冲突: {Name}", name);
                     else
                         modifierDict[name] = modifier;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"加载MessageRenderModifier失败: {ex.Message}");
+                _logger.LogError(ex, "加载MessageRenderModifier失败: {Message}", ex.Message);
             }
 
             LoadedModifiers = modifierDict.Values.ToList();
@@ -119,7 +122,7 @@ namespace ShimmerChat.Singletons
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"加载激活的MessageRenderModifier失败: {ex.Message}");
+                _logger.LogError(ex, "加载激活的MessageRenderModifier失败: {Message}", ex.Message);
                 ActivatedModifiers = new List<ActivatedMessageRenderModifier>();
             }
         }
@@ -133,7 +136,7 @@ namespace ShimmerChat.Singletons
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"保存激活的MessageRenderModifier失败: {ex.Message}");
+                _logger.LogError(ex, "保存激活的MessageRenderModifier失败: {Message}", ex.Message);
             }
         }
 
@@ -146,7 +149,7 @@ namespace ShimmerChat.Singletons
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"保存调试模式设置失败: {ex.Message}");
+                _logger.LogError(ex, "保存调试模式设置失败: {Message}", ex.Message);
             }
         }
 
@@ -247,7 +250,7 @@ namespace ShimmerChat.Singletons
                     catch (Exception ex)
                     {
                         var errorMsg = $"Error applying modifier '{activatedModifier.Name}': {ex.Message}";
-                        Console.WriteLine(errorMsg);
+                        _logger.LogError("Error applying modifier '{Name}': {Message}", activatedModifier.Name, ex.Message);
 
                         if (DebugModeEnabled)
                         {
@@ -290,7 +293,7 @@ namespace ShimmerChat.Singletons
             catch (Exception ex)
             {
                 var errorMsg = $"Error during Markdown rendering: {ex.Message}";
-                Console.WriteLine(errorMsg);
+                _logger.LogError("Error during Markdown rendering: {Message}", ex.Message);
 
                 if (DebugModeEnabled)
                 {

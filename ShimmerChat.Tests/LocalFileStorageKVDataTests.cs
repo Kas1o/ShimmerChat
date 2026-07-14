@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using ShimmerChat.Singletons;
 
 namespace ShimmerChat.Tests;
@@ -10,7 +11,7 @@ public class LocalFileStorageKVDataTests : IDisposable
 
     public LocalFileStorageKVDataTests()
     {
-        _kvData = new LocalFileStorageKVData();
+        _kvData = new LocalFileStorageKVData(Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalFileStorageKVData>.Instance);
         _kvDataRoot = _kvData.RootPath;
         _kvData.ClearAll();
     }

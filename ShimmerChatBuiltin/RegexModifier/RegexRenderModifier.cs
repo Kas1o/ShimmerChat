@@ -1,5 +1,6 @@
 using ShimmerChatLib;
 using ShimmerChatLib.Interface;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Text.RegularExpressions;
 
@@ -9,11 +10,13 @@ namespace ShimmerChatBuiltin.RegexModifier
     {
         private readonly IKVDataService _kvData;
         private readonly ILocService _loc;
+        private readonly ILogger<RegexRenderModifier> _logger;
 
-        public RegexRenderModifier(IKVDataService kvData, ILocService loc)
+        public RegexRenderModifier(IKVDataService kvData, ILocService loc, ILogger<RegexRenderModifier> logger)
         {
             _kvData = kvData;
             _loc = loc;
+            _logger = logger;
         }
 
         public MessageRenderModifierInfo Info => new MessageRenderModifierInfo
@@ -43,7 +46,7 @@ namespace ShimmerChatBuiltin.RegexModifier
                     catch (Exception ex)
                     {
                         // In case of invalid regex, ignore this rule
-                        Console.WriteLine($"[RegexRenderModifier] Invalid regex pattern '{rule.Pattern}': {ex.Message}");
+                        _logger.LogWarning(ex, "[RegexRenderModifier] Invalid regex pattern '{Pattern}': {Message}", rule.Pattern, ex.Message);
                     }
                 }
             }

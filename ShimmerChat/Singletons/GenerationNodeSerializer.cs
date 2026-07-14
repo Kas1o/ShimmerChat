@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using ShimmerChatLib.Generation;
@@ -9,9 +10,11 @@ namespace ShimmerChat.Singletons
     {
         private readonly JsonSerializerSettings _settings;
         private readonly Dictionary<string, Type> _typeMap;
+        private readonly ILogger<GenerationNodeSerializer> _logger;
 
-        public GenerationNodeSerializer(IPluginLoaderService pluginLoader)
+        public GenerationNodeSerializer(IPluginLoaderService pluginLoader, ILogger<GenerationNodeSerializer> logger)
         {
+            _logger = logger;
             var types = pluginLoader.GetImplementingTypes(typeof(IGenerationNode));
             _typeMap = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase);
             foreach (var t in types)
@@ -41,8 +44,8 @@ namespace ShimmerChat.Singletons
             try { return JsonConvert.DeserializeObject<IGenerationNode>(json, _settings); }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GenerationNodeSerializer] 反序列化失败: {ex.Message}");
-                Console.WriteLine(ex.StackTrace);
+                _logger.LogError("[GenerationNodeSerializer] 反序列化失败: {Message}", ex.Message);
+                _logger.LogError(ex, "{StackTrace}", ex.StackTrace);
                 return null;
             }
         }

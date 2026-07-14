@@ -1,11 +1,19 @@
 using Newtonsoft.Json;
 using ShimmerChatLib;
 using ShimmerChatLib.Interface;
+using Microsoft.Extensions.Logging;
 
 namespace ShimmerChatBuiltin.Variable
 {
     public static class VariableManager
     {
+        private static ILogger? _logger;
+
+        public static void SetLogger(ILogger logger)
+        {
+            _logger = logger;
+        }
+
         private const string AgentSpacePrefix = "AgentVariables";
         private const string ChatSpacePrefix = "ChatVariables";
 
@@ -145,7 +153,7 @@ namespace ShimmerChatBuiltin.Variable
             }
             catch (JsonException ex)
             {
-                Console.WriteLine($"[VariableManager] Error deserializing variables: {ex.Message}");
+                _logger?.LogError(ex, "[VariableManager] Error deserializing variables: {Message}", ex.Message);
                 return null;
             }
         }

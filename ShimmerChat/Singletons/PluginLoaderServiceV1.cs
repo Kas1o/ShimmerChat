@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,10 +14,12 @@ namespace ShimmerChat.Singletons
         private static readonly Assembly LibAssembly = typeof(IPluginInitializer).Assembly;
         private readonly IServiceProvider _serviceProvider;
         private readonly List<AssemblyLoadContext> _pluginContexts = new();
+        private readonly ILogger<PluginLoaderServiceV1> _logger;
 
-        public PluginLoaderServiceV1(IServiceProvider serviceProvider)
+        public PluginLoaderServiceV1(IServiceProvider serviceProvider, ILogger<PluginLoaderServiceV1> logger)
         {
             _serviceProvider = serviceProvider;
+            _logger = logger;
             PreloadPlugins();
         }
 
@@ -28,7 +31,8 @@ namespace ShimmerChat.Singletons
 
             foreach (var dir in Directory.GetDirectories(pluginsDir))
             {
-                var ctx = new PluginLoadContext(dir);
+                var ctxLogger = _serviceProvider.GetRequiredService<ILogger<PluginLoadContext>>();
+                var ctx = new PluginLoadContext(dir, ctxLogger);
                 if (ctx.TryLoadFromManifest(dir))
                     _pluginContexts.Add(ctx);
             }
@@ -56,7 +60,7 @@ namespace ShimmerChat.Singletons
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Plugin initializer {type.FullName} failed: {ex.Message}");
+                    _logger.LogError(ex, "Plugin initializer {TypeName} failed: {Message}", type.FullName, ex.Message);
                 }
             }
         }
@@ -77,13 +81,13 @@ namespace ShimmerChat.Singletons
                 }
                 catch (ReflectionTypeLoadException ex)
                 {
-                    Console.WriteLine($"从程序集 {assembly.FullName} 加载类型时出错: {ex.Message}");
+                    _logger.LogError(ex, "从程序集 {AssemblyName} 加载类型时出错: {Message}", assembly.FullName, ex.Message);
                     foreach (var loaderException in ex.LoaderExceptions)
-                        Console.WriteLine($"加载异常: {loaderException.Message}");
+                        _logger.LogError("加载异常: {Message}", loaderException.Message);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"处理程序集 {assembly.FullName} 时出错: {ex.Message}");
+                    _logger.LogError(ex, "处理程序集 {AssemblyName} 时出错: {Message}", assembly.FullName, ex.Message);
                 }
             }
 
@@ -123,19 +127,19 @@ namespace ShimmerChat.Singletons
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"无法创建 {type.Name} 的实例: {ex.Message}");
+                        _logger.LogError(ex, "无法创建 {TypeName} 的实例: {Message}", type.Name, ex.Message);
                     }
                 }
             }
             catch (ReflectionTypeLoadException ex)
             {
-                Console.WriteLine($"从程序集 {assembly.FullName} 加载类型时出错: {ex.Message}");
+                _logger.LogError(ex, "从程序集 {AssemblyName} 加载类型时出错: {Message}", assembly.FullName, ex.Message);
                 foreach (var loaderException in ex.LoaderExceptions)
-                    Console.WriteLine($"加载异常: {loaderException.Message}");
+                    _logger.LogError("加载异常: {Message}", loaderException.Message);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"处理程序集 {assembly.FullName} 时出错: {ex.Message}");
+                _logger.LogError(ex, "处理程序集 {AssemblyName} 时出错: {Message}", assembly.FullName, ex.Message);
             }
 
             return implementations;
@@ -152,13 +156,13 @@ namespace ShimmerChat.Singletons
             }
             catch (ReflectionTypeLoadException ex)
             {
-                Console.WriteLine($"从程序集 {assembly.FullName} 获取标记类型时出错: {ex.Message}");
+                _logger.LogError(ex, "从程序集 {AssemblyName} 获取标记类型时出错: {Message}", assembly.FullName, ex.Message);
                 foreach (var loaderException in ex.LoaderExceptions)
-                    Console.WriteLine($"加载异常: {loaderException.Message}");
+                    _logger.LogError("加载异常: {Message}", loaderException.Message);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"处理程序集 {assembly.FullName} 时出错: {ex.Message}");
+                _logger.LogError(ex, "处理程序集 {AssemblyName} 时出错: {Message}", assembly.FullName, ex.Message);
             }
 
             return types;

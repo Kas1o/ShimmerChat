@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatLib.Generation
@@ -14,10 +15,12 @@ namespace ShimmerChatLib.Generation
     public class ToolRegistry : IToolRegistry
     {
         private readonly Lazy<IReadOnlyList<ToolMetadata>> _tools;
+        private readonly ILogger<ToolRegistry> _logger;
 
-        public ToolRegistry(IPluginLoaderService pluginLoader)
+        public ToolRegistry(IPluginLoaderService pluginLoader, ILogger<ToolRegistry> logger)
         {
-            _tools = new Lazy<IReadOnlyList<ToolMetadata>>(() => ScanAll(pluginLoader));
+            _logger = logger;
+            _tools = new Lazy<IReadOnlyList<ToolMetadata>>(() => ScanAll(pluginLoader, _logger));
         }
 
         public IReadOnlyList<ToolMetadata> AllTools => _tools.Value;
@@ -43,7 +46,7 @@ namespace ShimmerChatLib.Generation
             return (IAutoCreateToolV2)createMethod.Invoke(null, [env])!;
         }
 
-        private static List<ToolMetadata> ScanAll(IPluginLoaderService pluginLoader)
+        private static List<ToolMetadata> ScanAll(IPluginLoaderService pluginLoader, ILogger<ToolRegistry> logger)
         {
             var types = pluginLoader.GetImplementingTypes(typeof(IAutoCreateToolV2));
             var result = new List<ToolMetadata>(types.Count);
@@ -67,7 +70,7 @@ namespace ShimmerChatLib.Generation
                 }
                 catch(Exception ex)
                 {
-                    Console.WriteLine($"AutoCreateTool Error({type.FullName}): {ex}");
+                    logger.LogError(ex, "AutoCreateTool Error({TypeName}): {Ex}", type.FullName, ex);
                 }
             }
             return result;

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using LiteDB;
+using Microsoft.Extensions.Logging;
 using ShimmerChat.Singletons;
 
 namespace ShimmerChat.Tests;
@@ -11,7 +12,8 @@ public class KVDataMigrationServiceTests : IDisposable
     private readonly TestLocalFileStorage _localFile;
     private readonly KVDataMigrationService _migrationService;
 
-    private class TestLocalFileStorage : LocalFileStorageKVData
+    private class TestLocalFileStorage(ILogger<LocalFileStorageKVData> logger)
+        : LocalFileStorageKVData(logger)
     {
         public new string RootPath => base.RootPath;
     }
@@ -19,10 +21,10 @@ public class KVDataMigrationServiceTests : IDisposable
     public KVDataMigrationServiceTests()
     {
         _database = new LiteDatabase(":memory:");
-        _liteDB = new LiteDBKVData(_database);
-        _localFile = new TestLocalFileStorage();
+        _liteDB = new LiteDBKVData(_database, Microsoft.Extensions.Logging.Abstractions.NullLogger<LiteDBKVData>.Instance);
+        _localFile = new TestLocalFileStorage(Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalFileStorageKVData>.Instance);
         _localFile.ClearAll();
-        _migrationService = new KVDataMigrationService(_localFile, _liteDB);
+        _migrationService = new KVDataMigrationService(_localFile, _liteDB, Microsoft.Extensions.Logging.Abstractions.NullLogger<KVDataMigrationService>.Instance);
     }
 
     public void Dispose()

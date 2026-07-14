@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System.Reflection;
 using System.Runtime.Loader;
 using Newtonsoft.Json;
@@ -10,6 +11,7 @@ namespace ShimmerChat.Singletons
     public class PluginLoadContext : AssemblyLoadContext
     {
         private AssemblyDependencyResolver? _resolver;
+        private readonly ILogger<PluginLoadContext> _logger;
 
         private static readonly HashSet<string> SharedPrefixes = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -21,9 +23,10 @@ namespace ShimmerChat.Singletons
             "netstandard",
         };
 
-        public PluginLoadContext(string pluginDir)
+        public PluginLoadContext(string pluginDir, ILogger<PluginLoadContext> logger)
             : base(name: $"PluginContext_{Path.GetFileName(pluginDir)}", isCollectible: true)
         {
+            _logger = logger;
         }
 
         /// <summary>从 plugin.json manifest 加载入口程序集。</summary>
@@ -36,7 +39,7 @@ namespace ShimmerChat.Singletons
             try { manifest = JsonConvert.DeserializeObject<PluginManifest>(File.ReadAllText(manifestPath)); }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ALC] Failed to parse {manifestPath}: {ex.Message}");
+                _logger.LogError(ex, "[ALC] Failed to parse {ManifestPath}: {Message}", manifestPath, ex.Message);
                 return false;
             }
 
@@ -48,7 +51,7 @@ namespace ShimmerChat.Singletons
             _resolver = new AssemblyDependencyResolver(asmPath);
 
             try { LoadFromAssemblyPath(asmPath); }
-            catch (Exception ex) { Console.WriteLine($"[ALC] Failed to load {asmPath}: {ex.Message}"); return false; }
+            catch (Exception ex) { _logger.LogError(ex, "[ALC] Failed to load {AsmPath}: {Message}", asmPath, ex.Message); return false; }
 
             return true;
         }

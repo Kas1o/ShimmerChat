@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
@@ -23,16 +24,18 @@ namespace ShimmerChat.Singletons
         private readonly IDebugOutputService _debugOutput;
         private readonly GenerationTreeExecutor _executor = new();
         private readonly ToolCallLoop _loop = new();
+        private readonly ILogger<GenerationManagerV2> _logger;
 
         public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry,
             IGenerationNodeSerializer serializer, ILocService locService,
-            IDebugOutputService debugOutput)
+            IDebugOutputService debugOutput, ILogger<GenerationManagerV2> logger)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
             _serializer = serializer;
             _locService = locService;
             _debugOutput = debugOutput;
+            _logger = logger;
             EnsureDefaultPreset();
         }
 
@@ -93,7 +96,7 @@ namespace ShimmerChat.Singletons
                 ?? throw new InvalidOperationException("No API configured.");
 
             if (!apiSetting.SupportsToolCalling && env.Transient.Tools.Count > 0)
-                Console.WriteLine($"[GenerationManagerV2] Warning: API does not support tool calling, but {env.Transient.Tools.Count} tool(s) are registered.");
+                _logger.LogWarning("[GenerationManagerV2] Warning: API does not support tool calling, but {Count} tool(s) are registered.", env.Transient.Tools.Count);
 
             if (!apiSetting.SupportsStreaming)
             {

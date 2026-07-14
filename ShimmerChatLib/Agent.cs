@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
@@ -69,13 +70,15 @@ namespace ShimmerChatLib
         /// </summary>
 		public List<string> Tags { get; set; } = new List<string>();
 
+		private readonly ILogger<Agent>? _logger;
+
 		const bool EnablePerfLog = false;
 		static string PerfNow() => DateTime.Now.ToString("HH:mm:ss.fff");
-		static void PerfLog(string message)
+		void PerfLog(string message)
 		{
 			if (EnablePerfLog)
 			{
-				Console.WriteLine($"[PERF][Agent][{PerfNow()}] {message}");
+				_logger?.LogTrace("[PERF][Agent][{PerfTime}] {Message}", PerfNow(), message);
 			}
 		}
 
@@ -299,7 +302,7 @@ namespace ShimmerChatLib
                 catch (Exception ex)
                 {
                     // Handle exception if chat fails to load
-                    Console.WriteLine($"Failed to load chat with GUID '{chatGuid}': {ex.Message}");
+                    _logger?.LogWarning("Failed to load chat with GUID '{ChatGuid}': {Message}", chatGuid, ex.Message);
                 }
             }
             return chats;
@@ -326,7 +329,7 @@ namespace ShimmerChatLib
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Failed to load chat with GUID '{chatGuid}': {ex.Message}");
+                    _logger?.LogWarning("Failed to load chat with GUID '{ChatGuid}': {Message}", chatGuid, ex.Message);
                 }
             }
 
@@ -377,7 +380,7 @@ namespace ShimmerChatLib
                 catch (Exception ex)
                 {
                     failedCount++;
-                    Console.WriteLine($"Failed to load chat summary for GUID '{chatGuid}': {ex.Message}");
+                    _logger?.LogWarning("Failed to load chat summary for GUID '{ChatGuid}': {Message}", chatGuid, ex.Message);
                 }
             }
 
@@ -441,6 +444,11 @@ namespace ShimmerChatLib
         private Agent()
         {
 
+        }
+
+        private Agent(ILogger<Agent> logger)
+        {
+            _logger = logger;
         }
         #pragma warning restore CS8618
         /// <summary>

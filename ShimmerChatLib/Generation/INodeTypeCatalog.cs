@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatLib.Generation;
@@ -27,15 +28,17 @@ public interface INodeTypeCatalog
 public class NodeTypeCatalog : INodeTypeCatalog
 {
     private readonly Lazy<IReadOnlyList<NodeTypeMetadata>> _types;
+    private readonly ILogger<NodeTypeCatalog> _logger;
 
-    public NodeTypeCatalog(IPluginLoaderService pluginLoader)
+    public NodeTypeCatalog(IPluginLoaderService pluginLoader, ILogger<NodeTypeCatalog> logger)
     {
-        _types = new Lazy<IReadOnlyList<NodeTypeMetadata>>(() => ScanAll(pluginLoader));
+        _logger = logger;
+        _types = new Lazy<IReadOnlyList<NodeTypeMetadata>>(() => ScanAll(pluginLoader, _logger));
     }
 
     public IReadOnlyList<NodeTypeMetadata> GetAllNodeTypes() => _types.Value;
 
-    private static List<NodeTypeMetadata> ScanAll(IPluginLoaderService pluginLoader)
+    private static List<NodeTypeMetadata> ScanAll(IPluginLoaderService pluginLoader, ILogger<NodeTypeCatalog> logger)
     {
         var types = pluginLoader.GetImplementingTypes(typeof(IGenerationNode));
         var result = new List<NodeTypeMetadata>(types.Count);
@@ -56,7 +59,7 @@ public class NodeTypeCatalog : INodeTypeCatalog
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"NodeTypeCatalog scan error ({type.FullName}): {ex.Message}");
+                logger.LogWarning(ex, "NodeTypeCatalog scan error ({TypeName}): {Message}", type.FullName, ex.Message);
             }
         }
 
