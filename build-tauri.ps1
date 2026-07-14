@@ -123,7 +123,7 @@ if (-not $SkipTauri) {
     Write-Host "`n[4/5] Building Tauri app..." -ForegroundColor Yellow
     Push-Location (Join-Path $Root "src-tauri")
     try {
-        npx @tauri-apps/cli build 2>&1
+        npx @tauri-apps/cli build --bundles nsis 2>&1
         if ($LASTEXITCODE -ne 0) { throw "tauri build failed" }
     }
     finally {
