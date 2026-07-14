@@ -47,6 +47,7 @@
   "Temperature": "Temperature",
   "启用继续功能（对最后一条AI消息附加prefix）": "Enable Continue (append prefix to last AI message)",
   "Clone Current Api Setting Profile": "Clone Current API Setting Profile",
+  "Delete Current Api Setting Profile": "Delete Current API Setting Profile",
   "API ASIS": "ASIS (Advanced)",
   "API ENABLE STREAM": "Enable Stream",
   "API ENABLE CONTINUE": "Enable Continue",

@@ -47,6 +47,7 @@
   "Temperature": "温度",
   "启用继续功能（对最后一条AI消息附加prefix）": "启用继续功能（对最后一条AI消息附加prefix）",
   "Clone Current Api Setting Profile": "克隆当前API设置",
+  "Delete Current Api Setting Profile": "删除当前API设置",
   "API ASIS": "原样输出（高级设置）",
   "API ENABLE STREAM": "流式传输",
   "API ENABLE CONTINUE": "启用 \"继续\" 功能",

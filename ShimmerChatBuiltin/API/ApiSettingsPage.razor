@@ -14,6 +14,7 @@
 </select>
 <button class="su-btn su-btn-primary" style="margin:5px" @onclick="CreateNewApiConfig">@Loc["Create New Api Setting Profile"]</button>
 <button class="su-btn su-btn-secondary" style="margin:5px" @onclick="CloneCurrentApiConfig">@Loc["Clone Current Api Setting Profile"]</button>
+<button class="su-btn su-btn-danger" style="margin:5px" @onclick="DeleteCurrentApiConfig">@Loc["Delete Current Api Setting Profile"]</button>
 
 @if (topAPISetting != null)
 {
@@ -245,6 +246,22 @@
             clonedSetting.Name = $"{clonedSetting.Name} - Copy";
             apiSettings.Add(clonedSetting);
             _selectedIndex = apiSettings.Count - 1;
+        }
+    }
+
+    private void DeleteCurrentApiConfig()
+    {
+        if (topAPISetting != null)
+        {
+            apiSettings.RemoveAt(_selectedIndex);
+            if (apiSettings.Count > 0)
+            {
+                _selectedIndex = Math.Max(0, _selectedIndex - 1);
+            }
+            else
+            {
+                _selectedIndex = -1;
+            }
         }
     }
 
