@@ -3,7 +3,7 @@
 @inject ShimmerChatLib.Interface.IKVDataService KVData
 @inject ILocService Loc
 
-@if (_typedNode != null)
+@if (Node != null)
 {
     <div class="subagent-editor">
         <div class="ge-field">
@@ -11,7 +11,7 @@
                 @Loc["editor_subagent.label"]
             </label>
             <div class="ge-value">
-                <select class="ge-select" @bind="SelectedName" @bind:event="onchange"
+                <select class="ge-select" value="@Node.ConfigName" @onchange="OnConfigChanged"
                         style="width: 100%; max-width: 400px;">
                     <option value="">@Loc["editor_subagent.select_option"]</option>
                     @foreach (var cfg in _configs)
@@ -25,9 +25,9 @@
                         @Loc["editor_subagent.no_configs"]
                     </div>
                 }
-                else if (!string.IsNullOrEmpty(SelectedName))
+                else if (!string.IsNullOrEmpty(Node.ConfigName))
                 {
-                    var selected = _configs.FirstOrDefault(c => c.Name == SelectedName);
+                    var selected = _configs.FirstOrDefault(c => c.Name == Node.ConfigName);
                     if (selected != null)
                     {
                         <div style="font-size: 0.72em; color: #666; margin-top: 4px;">
@@ -49,36 +49,26 @@
 }
 
 @code {
-    [Parameter] public ShimmerChatLib.Generation.IGenerationNode Node { get; set; } = default!;
+    [Parameter] public SubAgentToolNode Node { get; set; } = default!;
     [Parameter] public EventCallback<ShimmerChatLib.Generation.IGenerationNode> OnChanged { get; set; }
     [Parameter] public int Depth { get; set; }
     [Parameter] public EventCallback OnTreeChanged { get; set; }
     [Parameter] public Action<ShimmerChatLib.Generation.IGenerationNode>? CopyMe { get; set; }
 
-    private SubAgentToolNode? _typedNode;
     private List<SubAgentConfig> _configs = [];
 
-    private string SelectedName
+    protected override void OnInitialized()
     {
-        get => field;
-        set
-        {
-            field = value;
-            if (_typedNode != null)
-            {
-                _typedNode.ConfigName = value;
-                OnChanged.InvokeAsync(Node);
-            }
-        }
-    } = "";
-
-    protected override void OnParametersSet()
-    {
-        _typedNode = Node as SubAgentToolNode;
-        if (_typedNode == null) return;
-
         var json = KVData.Read("SubAgent", "configs");
         _configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
-        SelectedName = _typedNode.ConfigName ?? "";
+    }
+
+    private async Task OnConfigChanged(ChangeEventArgs e)
+    {
+        var configName = e.Value?.ToString() ?? "";
+        if (Node.ConfigName == configName) return;
+
+        Node.ConfigName = configName;
+        await OnChanged.InvokeAsync(Node);
     }
 }
