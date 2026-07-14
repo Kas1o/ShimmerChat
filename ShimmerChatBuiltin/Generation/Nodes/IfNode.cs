@@ -2,95 +2,156 @@ using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
+    public enum ConditionSource
+    {
+        KVData,
+        LastMessage,
+        AllMessages,
+        SharedState
+    }
+
+    public enum ConditionOperator
+    {
+        Is,
+        Contains,
+        IsNot,
+        NotContains
+    }
+
+    public enum OnConvertFailBehavior
+    {
+        Failure,
+        AsFalse
+    }
+
     /// <summary>
-    /// 条件分支节点：如果 Condition 满足则执行 Then，否则执行 Else。
-    /// Condition 目前仅支持 SharedState['key'] == "value"
+    /// 简单条件分支节点：选择数据源 → 选运算符 → 填比较值。
+    /// 支持 KVData / LastMessage / AllMessages / SharedState 四种数据源。
     /// </summary>
     [NodeInfo("node.condition", Icon = "◇", Color = "var(--node-branch)", CategoryKeys = ["category.flow", "category.branching"])]
+    [NodeEditor(typeof(IfNodeEditor))]
     public class IfNode : IGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "If";
 
-        /// <summary>
-        /// 条件表达式，格式: SharedState['key'] == "value"
-        /// </summary>
-        [NodeProperty("prop.if_node.condition", HintKey = "prop.if_node.condition.hint")]
-        public string Condition { get; set; } = "";
+        [NodeProperty("prop.if_node.source", HintKey = "prop.if_node.source.hint", Order = 1)]
+        public ConditionSource Source { get; set; } = ConditionSource.KVData;
 
-        [NodeProperty("prop.if_node.then")]
+        [NodeProperty("prop.if_node.kv_collection", HintKey = "prop.if_node.kv_collection.hint", Order = 2)]
+        public string KVDataCollection { get; set; } = "";
+
+        [NodeProperty("prop.if_node.kv_key", HintKey = "prop.if_node.kv_key.hint", Order = 3)]
+        public string KVDataKey { get; set; } = "";
+
+        [NodeProperty("prop.if_node.ss_key", HintKey = "prop.if_node.ss_key.hint", Order = 4)]
+        public string SharedStateKey { get; set; } = "";
+
+        [NodeProperty("prop.if_node.operator", HintKey = "prop.if_node.operator.hint", Order = 5)]
+        public ConditionOperator Operator { get; set; } = ConditionOperator.Is;
+
+        [NodeProperty("prop.if_node.value", HintKey = "prop.if_node.value.hint", Order = 6)]
+        public string Value { get; set; } = "";
+
+        [NodeProperty("prop.if_node.on_convert_fail", HintKey = "prop.if_node.on_convert_fail.hint", Order = 7)]
+        public OnConvertFailBehavior OnConvertFail { get; set; } = OnConvertFailBehavior.AsFalse;
+
+        [NodeProperty("prop.if_node.then", Order = 8)]
         public IGenerationNode? Then { get; set; }
-        [NodeProperty("prop.if_node.else")]
+
+        [NodeProperty("prop.if_node.else", Order = 9)]
         public IGenerationNode? Else { get; set; }
 
         public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
-            bool result = EvaluateCondition(context);
+            string? leftValue = ResolveSourceValue(context);
+
+            if (leftValue == null)
+            {
+                if (OnConvertFail == OnConvertFailBehavior.Failure)
+                    return NodeResult.Failure(
+                        NodeErrorCodes.DataMissing,
+                        $"IfNode: source '{Source}' returned null or empty.",
+                        nodeId: Id, nodeName: Name);
+
+                return Else != null
+                    ? await ExecuteChild(Else, context)
+                    : NodeResult.SuccessResult();
+            }
+
+            bool result = EvaluateOperator(leftValue);
 
             if (result && Then != null)
-            {
-                var thenResult = await Then.ExecuteAsync(context);
-                if (!thenResult.Success)
-                {
-                    thenResult.NodeId ??= Id;
-                    thenResult.NodeName ??= Name;
-                }
-                return thenResult;
-            }
-            else if (!result && Else != null)
-            {
-                var elseResult = await Else.ExecuteAsync(context);
-                if (!elseResult.Success)
-                {
-                    elseResult.NodeId ??= Id;
-                    elseResult.NodeName ??= Name;
-                }
-                return elseResult;
-            }
+                return await ExecuteChild(Then, context);
+            if (!result && Else != null)
+                return await ExecuteChild(Else, context);
 
             return NodeResult.SuccessResult();
         }
 
-        private bool EvaluateCondition(NodeExecutionContext context)
+        private string? ResolveSourceValue(NodeExecutionContext context)
         {
-            if (string.IsNullOrWhiteSpace(Condition))
-                return false;
-
-            // 简单条件解析: SharedState['key'] == "value"
-            var cond = Condition.Trim();
-            var eqIdx = cond.IndexOf("==", StringComparison.Ordinal);
-            if (eqIdx < 0)
+            return Source switch
             {
-                // 尝试 !=
-                eqIdx = cond.IndexOf("!=", StringComparison.Ordinal);
-                if (eqIdx < 0) return false;
-                var leftNe = ParseKey(cond[..eqIdx].Trim());
-                var rightNe = ParseValue(cond[(eqIdx + 2)..].Trim());
-                var valNe = context.Env.Transient.SharedState.TryGetValue(leftNe, out var v) ? v?.ToString() : null;
-                return !string.Equals(valNe, rightNe, StringComparison.OrdinalIgnoreCase);
-            }
+                ConditionSource.KVData =>
+                    context.Env.Persistent.KVData.Read(KVDataCollection, KVDataKey),
 
-            var left = ParseKey(cond[..eqIdx].Trim());
-            var right = ParseValue(cond[(eqIdx + 2)..].Trim());
-            var val = context.Env.Transient.SharedState.TryGetValue(left, out var sv) ? sv?.ToString() : null;
-            return string.Equals(val, right, StringComparison.OrdinalIgnoreCase);
+                ConditionSource.LastMessage =>
+                    context.Env.Transient.Fragments.LastOrDefault()?.Message.Content,
+
+                ConditionSource.AllMessages =>
+                    context.Env.Transient.Fragments.Count == 0 ? null
+                        : string.Join("\n", context.Env.Transient.Fragments.Select(f => f.Message.Content)),
+
+                ConditionSource.SharedState =>
+                    context.Env.Transient.SharedState.TryGetValue(SharedStateKey, out var sv)
+                        ? sv?.ToString() : null,
+
+                _ => null
+            };
         }
 
-        private static string ParseKey(string expr)
+        private bool EvaluateOperator(string leftValue)
         {
-            // SharedState['key'] → key
-            const string prefix = "SharedState[";
-            if (expr.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && expr.EndsWith("]"))
+            var right = Value ?? "";
+
+            // 优先尝试数值比较
+            if (double.TryParse(leftValue, out var l) && double.TryParse(right, out var r))
             {
-                var inner = expr[prefix.Length..^1].Trim();
-                return inner.Trim('\'', '"');
+                return Operator switch
+                {
+                    ConditionOperator.Is => l == r,
+                    ConditionOperator.IsNot => l != r,
+                    ConditionOperator.Contains => l == r,
+                    ConditionOperator.NotContains => l != r,
+                    _ => false
+                };
             }
-            return expr.Trim('\'', '"');
+
+            // 字符串比较
+            return Operator switch
+            {
+                ConditionOperator.Is =>
+                    leftValue.Equals(right, StringComparison.OrdinalIgnoreCase),
+                ConditionOperator.Contains =>
+                    leftValue.Contains(right, StringComparison.OrdinalIgnoreCase),
+                ConditionOperator.IsNot =>
+                    !leftValue.Equals(right, StringComparison.OrdinalIgnoreCase),
+                ConditionOperator.NotContains =>
+                    !leftValue.Contains(right, StringComparison.OrdinalIgnoreCase),
+                _ => false
+            };
         }
 
-        private static string ParseValue(string expr)
+        private async Task<NodeResult> ExecuteChild(IGenerationNode child, NodeExecutionContext context)
         {
-            return expr.Trim('\'', '"');
+            var result = await child.ExecuteAsync(context);
+            if (!result.Success)
+            {
+                result.NodeId ??= Id;
+                result.NodeName ??= Name;
+            }
+            return result;
         }
     }
 }

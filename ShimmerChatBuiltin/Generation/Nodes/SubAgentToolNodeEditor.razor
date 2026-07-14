@@ -51,6 +51,9 @@
 @code {
     [Parameter] public ShimmerChatLib.Generation.IGenerationNode Node { get; set; } = default!;
     [Parameter] public EventCallback<ShimmerChatLib.Generation.IGenerationNode> OnChanged { get; set; }
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public EventCallback OnTreeChanged { get; set; }
+    [Parameter] public Action<ShimmerChatLib.Generation.IGenerationNode>? CopyMe { get; set; }
 
     private SubAgentToolNode? _typedNode;
     private List<SubAgentConfig> _configs = [];

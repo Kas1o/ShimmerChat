@@ -154,6 +154,16 @@
 .ge-children { margin-top: 6px; }
 .ge-children-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 
+/* ── Custom editor error boundary ─────────────────── */
+.tn-custom-editor-error {
+    padding: 8px 10px; margin: 4px 0;
+    background: rgba(220, 60, 60, 0.12);
+    border-left: 3px solid #d44;
+    border-radius: 3px; font-size: 0.78em; line-height: 1.5;
+}
+.tn-custom-editor-error .tn-error-icon { margin-right: 6px; }
+.tn-custom-editor-error .tn-error-msg { color: var(--su-danger, #d44); word-break: break-word; }
+
 /* ── CallNodeEditor: call-* ───────────────────── */
 .call-node-editor { font-size: 0.82em; }
 .call-search {

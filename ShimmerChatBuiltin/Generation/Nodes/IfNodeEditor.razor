@@ -1,0 +1,143 @@
+@using ShimmerChatLib.Generation
+@using ShimmerChatLib.Components
+@inject ILocService LocService
+
+<div class="if-editor">
+    <div class="ge-field">
+        <label class="ge-label" title="@LocService["prop.if_node.source.hint"]">
+            @LocService["prop.if_node.source"]
+        </label>
+        <div class="ge-value">
+            <select class="ge-select" value="@Node.Source"
+                    @onchange="OnSourceChanged">
+                <option value="@ConditionSource.KVData">KVData</option>
+                <option value="@ConditionSource.LastMessage">@LocService["prop.if_node.source.last_message"]</option>
+                <option value="@ConditionSource.AllMessages">@LocService["prop.if_node.source.all_messages"]</option>
+                <option value="@ConditionSource.SharedState">SharedState</option>
+            </select>
+        </div>
+    </div>
+
+    @if (Node.Source == ConditionSource.KVData)
+    {
+        <div class="ge-field">
+            <label class="ge-label" title="@LocService["prop.if_node.kv_collection.hint"]">
+                @LocService["prop.if_node.kv_collection"]
+            </label>
+            <div class="ge-value">
+                <input class="ge-input" @bind="Node.KVDataCollection" @bind:event="oninput"
+                       placeholder="@LocService["prop.if_node.kv_collection.placeholder"]" />
+            </div>
+        </div>
+        <div class="ge-field">
+            <label class="ge-label" title="@LocService["prop.if_node.kv_key.hint"]">
+                @LocService["prop.if_node.kv_key"]
+            </label>
+            <div class="ge-value">
+                <input class="ge-input" @bind="Node.KVDataKey" @bind:event="oninput"
+                       placeholder="@LocService["prop.if_node.kv_key.placeholder"]" />
+            </div>
+        </div>
+    }
+    else if (Node.Source == ConditionSource.SharedState)
+    {
+        <div class="ge-field">
+            <label class="ge-label" title="@LocService["prop.if_node.ss_key.hint"]">
+                @LocService["prop.if_node.ss_key"]
+            </label>
+            <div class="ge-value">
+                <input class="ge-input" @bind="Node.SharedStateKey" @bind:event="oninput"
+                       placeholder="@LocService["prop.if_node.ss_key.placeholder"]" />
+            </div>
+        </div>
+    }
+
+    <div class="ge-field">
+        <label class="ge-label" title="@LocService["prop.if_node.operator.hint"]">
+            @LocService["prop.if_node.operator"]
+        </label>
+        <div class="ge-value">
+            <select class="ge-select" value="@Node.Operator"
+                    @onchange="OnOperatorChanged">
+                <option value="@ConditionOperator.Is">@LocService["prop.if_node.op.is"]</option>
+                <option value="@ConditionOperator.Contains">@LocService["prop.if_node.op.contains"]</option>
+                <option value="@ConditionOperator.IsNot">@LocService["prop.if_node.op.is_not"]</option>
+                <option value="@ConditionOperator.NotContains">@LocService["prop.if_node.op.not_contains"]</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="ge-field">
+        <label class="ge-label" title="@LocService["prop.if_node.value.hint"]">
+            @LocService["prop.if_node.value"]
+        </label>
+        <div class="ge-value">
+            <input class="ge-input" @bind="Node.Value" @bind:event="oninput"
+                   placeholder="@LocService["prop.if_node.value.placeholder"]" />
+        </div>
+    </div>
+
+    <div class="ge-field">
+        <label class="ge-label" title="@LocService["prop.if_node.on_convert_fail.hint"]">
+            @LocService["prop.if_node.on_convert_fail"]
+        </label>
+        <div class="ge-value">
+            <select class="ge-select" value="@Node.OnConvertFail"
+                    @onchange="OnConvertFailChanged">
+                <option value="@OnConvertFailBehavior.AsFalse">@LocService["prop.if_node.on_fail.as_false"]</option>
+                <option value="@OnConvertFailBehavior.Failure">@LocService["prop.if_node.on_fail.failure"]</option>
+            </select>
+        </div>
+    </div>
+
+    <SingleSlotEditor Label="@LocService["prop.if_node.then"]"
+                      SlotNode="Node.Then"
+                      Depth="Depth"
+                      OnTreeChanged="OnTreeChanged"
+                      OnSet="v => { Node.Then = v; Notify(); }"
+                      OnClear="() => { Node.Then = null; Notify(); }" />
+
+    <SingleSlotEditor Label="@LocService["prop.if_node.else"]"
+                      SlotNode="Node.Else"
+                      Depth="Depth"
+                      OnTreeChanged="OnTreeChanged"
+                      OnSet="v => { Node.Else = v; Notify(); }"
+                      OnClear="() => { Node.Else = null; Notify(); }" />
+</div>
+
+@code {
+    [Parameter] public IfNode Node { get; set; } = default!;
+    [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public EventCallback OnTreeChanged { get; set; }
+    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+
+    private void Notify() => OnChanged.InvokeAsync(Node);
+
+    private async Task OnSourceChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ConditionSource>(e.Value?.ToString(), out var val))
+        {
+            Node.Source = val;
+            await OnChanged.InvokeAsync(Node);
+        }
+    }
+
+    private async Task OnOperatorChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ConditionOperator>(e.Value?.ToString(), out var val))
+        {
+            Node.Operator = val;
+            await OnChanged.InvokeAsync(Node);
+        }
+    }
+
+    private async Task OnConvertFailChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<OnConvertFailBehavior>(e.Value?.ToString(), out var val))
+        {
+            Node.OnConvertFail = val;
+            await OnChanged.InvokeAsync(Node);
+        }
+    }
+}

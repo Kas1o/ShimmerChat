@@ -50,6 +50,9 @@
 @code {
     [Parameter] public APISelectNode Node { get; set; } = default!;
     [Parameter] public EventCallback<IGenerationNode> OnChanged { get; set; }
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public EventCallback OnTreeChanged { get; set; }
+    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
 
     private List<ApiConfig> _settings = [];
 

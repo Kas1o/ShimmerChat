@@ -70,7 +70,17 @@ else
                 @* Custom editor via [NodeEditor] *@
                 @if (_customEditorType != null)
                 {
-                    <DynamicComponent Type="_customEditorType" Parameters="@_editorParams" @key="@Node.Id" />
+                    <ErrorBoundary @key="@Node.Id">
+                        <ChildContent>
+                            <DynamicComponent Type="_customEditorType" Parameters="@_editorParams" @key="@Node.Id" />
+                        </ChildContent>
+                        <ErrorContent Context="ex">
+                            <div class="tn-custom-editor-error" title="@ex?.ToString()">
+                                <span class="tn-error-icon">⚠</span>
+                                <span class="tn-error-msg">Editor error: @_customEditorType.Name — @ex?.Message</span>
+                            </div>
+                        </ErrorContent>
+                    </ErrorBoundary>
                 }
                 else
                 {
@@ -121,7 +131,10 @@ else
         _editorParams = new Dictionary<string, object>
         {
             ["Node"] = Node,
-            ["OnChanged"] = EventCallback.Factory.Create<IGenerationNode>(this, _ => OnTreeChanged.InvokeAsync())
+            ["OnChanged"] = EventCallback.Factory.Create<IGenerationNode>(this, _ => OnTreeChanged.InvokeAsync()),
+            ["OnTreeChanged"] = OnTreeChanged,
+            ["Depth"] = Depth,
+            ["CopyMe"] = CopyMe
         };
     }
 
