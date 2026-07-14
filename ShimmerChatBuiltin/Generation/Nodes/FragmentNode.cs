@@ -15,7 +15,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// <summary>
         /// 片段内容
         /// </summary>
-        [NodeProperty("prop.fragment.content", HintKey = "prop.fragment.content.hint")]
+        [NodeProperty("prop.fragment.content", HintKey = "prop.fragment.content.hint", MultiLine = true)]
         public string Content { get; set; } = "";
 
         /// <summary>
