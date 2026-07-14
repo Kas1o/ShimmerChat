@@ -12,6 +12,7 @@ public class ToolInstantiateNodeTests : NodeTestBase
             ToolRegistry = registry,
             Serializer = SerializerMock.Object,
             LocService = LocMock.Object,
+            DebugOutput = DebugOutputMock.Object,
         };
     }
 

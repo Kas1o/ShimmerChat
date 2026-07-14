@@ -10,9 +10,10 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var output = context.Env.Persistent.DebugOutput;
             var fragments = context.Env.Transient.Fragments;
             if (fragments.Count > 0)
-                Console.WriteLine(fragments[^1].Message.Content);
+                output.Write(nameof(MessagePrintLatestNode), "info", fragments[^1].Message.Content ?? "");
             return Task.FromResult(NodeResult.SuccessResult());
         }
     }

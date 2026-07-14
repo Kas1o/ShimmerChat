@@ -13,8 +13,9 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var output = context.Env.Persistent.DebugOutput;
             var fragments = context.Env.Transient.Fragments;
-            Console.WriteLine(Template
+            output.Write(nameof(PrintNode), "info", Template
                 .Replace("{time}", DateTime.Now.ToString("g"))
                 .Replace("{total_len}", fragments.Select(s => s.Message.Content?.Length ?? 0).Sum().ToString()));
             return Task.FromResult(NodeResult.SuccessResult());

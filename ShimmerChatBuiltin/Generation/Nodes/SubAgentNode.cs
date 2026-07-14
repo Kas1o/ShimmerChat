@@ -48,7 +48,8 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 AgentGuid = context.Env.Persistent.AgentGuid,
                 ToolRegistry = context.Env.Persistent.ToolRegistry,
                 Serializer = context.Env.Persistent.Serializer,
-                LocService = context.Env.Persistent.LocService
+                LocService = context.Env.Persistent.LocService,
+                DebugOutput = context.Env.Persistent.DebugOutput
             };
 
             var subEnv = new GenerationEnv(persistent);

@@ -10,6 +10,7 @@ public class GenerationTreeExecutorTests
     private readonly Mock<IToolRegistry> _toolRegistryMock = new();
     private readonly Mock<IGenerationNodeSerializer> _serializerMock = new();
     private readonly Mock<ILocService> _locMock = new();
+    private readonly Mock<IDebugOutputService> _debugOutputMock = new();
 
     private PersistentEnv CreatePersistentEnv()
     {
@@ -21,6 +22,7 @@ public class GenerationTreeExecutorTests
             ToolRegistry = _toolRegistryMock.Object,
             Serializer = _serializerMock.Object,
             LocService = _locMock.Object,
+            DebugOutput = _debugOutputMock.Object,
         };
     }
 

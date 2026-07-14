@@ -17,11 +17,12 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var output = context.Env.Persistent.DebugOutput;
             var messages = context.Env.Transient.Fragments
                 .Select(s => (s.Message, s.From))
                 .ToArray();
             var json = JsonConvert.SerializeObject(messages, _settings);
-            Console.WriteLine(json);
+            output.Write(nameof(MessagePrintNode), "info", json);
             return Task.FromResult(NodeResult.SuccessResult());
         }
     }

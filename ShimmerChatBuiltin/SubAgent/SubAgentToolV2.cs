@@ -22,12 +22,14 @@ namespace ShimmerChatBuiltin.SubAgent
         private readonly Guid _agentGuid;
         private readonly IGenerationNodeSerializer _serializer;
         private readonly ILocService _locService;
+        private readonly IDebugOutputService _debugOutput;
 
         private readonly List<SubAgentEntry> _entries = new();
 
         public SubAgentToolV2(IKVDataService kvData, IChatCompletionClient? api,
             IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid,
-            IGenerationNodeSerializer serializer, ILocService locService)
+            IGenerationNodeSerializer serializer, ILocService locService,
+            IDebugOutputService debugOutput)
         {
             _kvData = kvData;
             _api = api;
@@ -36,6 +38,7 @@ namespace ShimmerChatBuiltin.SubAgent
             _agentGuid = agentGuid;
             _serializer = serializer;
             _locService = locService;
+            _debugOutput = debugOutput;
         }
 
         /// <summary>注册一个 SubAgent 配置。</summary>
@@ -96,7 +99,8 @@ namespace ShimmerChatBuiltin.SubAgent
                 AgentGuid = _agentGuid,
                 ToolRegistry = _toolRegistry,
                 Serializer = _serializer,
-                LocService = _locService
+                LocService = _locService,
+                DebugOutput = _debugOutput
             };
 
             var subEnv = new GenerationEnv(persistent);

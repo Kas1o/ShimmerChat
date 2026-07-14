@@ -27,12 +27,14 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
             var transient = context.Env.Transient;
+            var output = context.Env.Persistent.DebugOutput;
+            var source = nameof(TransientProbeNode);
 
-            Console.WriteLine("===== TransientProbe =====");
+            output.Write(source, "info", "===== TransientProbe =====");
 
             if (PrintFragments)
             {
-                Console.WriteLine("Fragments ({0}):", transient.Fragments.Count);
+                output.Write(source, "info", $"Fragments ({transient.Fragments.Count}):");
 
                 for (int i = 0; i < transient.Fragments.Count; i++)
                 {
@@ -45,27 +47,25 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     else
                         display = content;
 
-                    Console.WriteLine("  [{0}] From={1}, Source={2}", i, seg.From, seg.SourceType?.Name ?? "(none)");
+                    output.Write(source, "info", $"  [{i}] From={seg.From}, Source={seg.SourceType?.Name ?? "(none)"}");
 
                     if (seg.Metadata.Count > 0)
-                        Console.WriteLine("       Meta: {0}",
-                            string.Join("; ", seg.Metadata.Select(kv => $"{kv.Key}={kv.Value}")));
+                        output.Write(source, "info", $"       Meta: {string.Join("; ", seg.Metadata.Select(kv => $"{kv.Key}={kv.Value}"))}");
 
-                    Console.WriteLine("       Content: \"{0}\"", display);
+                    output.Write(source, "info", $"       Content: \"{display}\"");
                 }
             }
 
             if (PrintSharedState)
-                Console.WriteLine("SharedState keys: {0}", string.Join(", ", transient.SharedState.Keys));
+                output.Write(source, "info", $"SharedState keys: {string.Join(", ", transient.SharedState.Keys)}");
 
             if (PrintTools)
-                Console.WriteLine("Tools ({0}): {1}", transient.Tools.Count,
-                    string.Join(", ", transient.Tools.Select(t => t.GetType().Name)));
+                output.Write(source, "info", $"Tools ({transient.Tools.Count}): {string.Join(", ", transient.Tools.Select(t => t.GetType().Name))}");
 
             if (PrintAPI)
-                Console.WriteLine("API: {0}", transient.API != null ? "set" : "null");
+                output.Write(source, "info", $"API: {(transient.API != null ? "set" : "null")}");
 
-            Console.WriteLine("===== End TransientProbe =====");
+            output.Write(source, "info", "===== End TransientProbe =====");
 
             return Task.FromResult(NodeResult.SuccessResult());
         }

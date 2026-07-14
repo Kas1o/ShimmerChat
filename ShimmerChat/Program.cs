@@ -42,6 +42,7 @@ builder.Services.AddSingleton<IPopupService, PopupService>();
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
 builder.Services.AddSingleton<ILocService, LocService>();
+builder.Services.AddSingleton<IDebugOutputService, DebugOutputService>();
 
 var app = builder.Build();
 

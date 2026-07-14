@@ -42,10 +42,13 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
         {
+            var output = context.Env.Persistent.DebugOutput;
+            var source = nameof(MessagePrintV2Node);
+
             if (Sixel)
-                Console.WriteLine($"{WarningColor}[Warning] sixel support is not yet implemented.{Reset}");
+                output.Write(source, "warning", $"{WarningColor}[Warning] sixel support is not yet implemented.{Reset}");
             if (Kitty)
-                Console.WriteLine($"{WarningColor}[Warning] kitty graphics support is not yet implemented.{Reset}");
+                output.Write(source, "warning", $"{WarningColor}[Warning] kitty graphics support is not yet implemented.{Reset}");
 
             var sb = new StringBuilder();
             var messages = context.Env.Transient.Fragments
@@ -74,7 +77,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             AppendSeparator(sb, Colorize);
             AppendHeader(sb, $"Total: {messages.Length} messages", Colorize);
 
-            Console.WriteLine(sb.ToString());
+            output.Write(source, "info", sb.ToString());
             return Task.FromResult(NodeResult.SuccessResult());
         }
 

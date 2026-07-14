@@ -11,6 +11,7 @@ public abstract class NodeTestBase
     protected readonly Mock<IToolRegistry> ToolRegistryMock = new();
     protected readonly Mock<IGenerationNodeSerializer> SerializerMock = new();
     protected readonly Mock<ILocService> LocMock = new();
+    protected readonly Mock<IDebugOutputService> DebugOutputMock = new();
 
     protected PersistentEnv CreatePersistentEnv()
     {
@@ -22,6 +23,7 @@ public abstract class NodeTestBase
             ToolRegistry = ToolRegistryMock.Object,
             Serializer = SerializerMock.Object,
             LocService = LocMock.Object,
+            DebugOutput = DebugOutputMock.Object,
         };
     }
 

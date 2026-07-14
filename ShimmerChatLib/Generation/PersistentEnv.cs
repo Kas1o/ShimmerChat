@@ -14,6 +14,10 @@ namespace ShimmerChatLib.Generation
         public required IGenerationNodeSerializer Serializer { get; init; }
         public required ILocService LocService { get; init; }
         /// <summary>
+        /// 调试输出服务
+        /// </summary>
+        public required IDebugOutputService DebugOutput { get; init; }
+        /// <summary>
         /// 获取当前对话对象（惰性加载）
         /// </summary>
         public Chat GetChat() => Chat.Load(ChatGuid, KVData);

@@ -20,16 +20,19 @@ namespace ShimmerChat.Singletons
         private readonly IToolRegistry _toolRegistry;
         private readonly IGenerationNodeSerializer _serializer;
         private readonly ILocService _locService;
+        private readonly IDebugOutputService _debugOutput;
         private readonly GenerationTreeExecutor _executor = new();
         private readonly ToolCallLoop _loop = new();
 
         public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry,
-            IGenerationNodeSerializer serializer, ILocService locService)
+            IGenerationNodeSerializer serializer, ILocService locService,
+            IDebugOutputService debugOutput)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
             _serializer = serializer;
             _locService = locService;
+            _debugOutput = debugOutput;
             EnsureDefaultPreset();
         }
 
@@ -140,7 +143,8 @@ namespace ShimmerChat.Singletons
                 AgentGuid = agent.Guid,
                 ToolRegistry = _toolRegistry,
                 Serializer = _serializer,
-                LocService = _locService
+                LocService = _locService,
+                DebugOutput = _debugOutput
             };
 
             IGenerationNode rootNode;
