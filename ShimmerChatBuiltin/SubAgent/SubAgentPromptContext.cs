@@ -35,6 +35,22 @@ namespace ShimmerChatBuiltin.SubAgent
         public string? LastAssistantContent =>
             _messages.LastOrDefault(m => m.From == PromptBuilder.From.assistant).Message?.Content;
 
+        /// <summary>
+        /// 替换最后一条 assistant 消息的 Content。
+        /// 用于 Post-Generation 管线处理后的文本回写。
+        /// </summary>
+        public void UpdateLastAssistantContent(string newContent)
+        {
+            for (int i = _messages.Count - 1; i >= 0; i--)
+            {
+                if (_messages[i].From == PromptBuilder.From.assistant)
+                {
+                    _messages[i].Message.Content = newContent;
+                    return;
+                }
+            }
+        }
+
         PromptBuilder IPromptContext.BuildPromptBuilder(IReadOnlyList<Tool> toolDefinitions)
         {
             var pb = new PromptBuilder { Messages = _messages.ToArray() };

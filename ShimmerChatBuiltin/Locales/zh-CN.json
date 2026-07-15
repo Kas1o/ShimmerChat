@@ -357,6 +357,11 @@
   "panel_subagent.msg_saved": "保存成功",
   "panel_subagent.msg_save_failed": "保存失败: {0}",
   "panel_subagent.none_option_fallback": "—",
+  "panel_subagent.post_tree": "后生成树",
+  "panel_subagent.post_tree_hint": "在格式化输出前对子智能体的 LLM 响应执行后生成管线处理。",
+  "panel_subagent.post_tree_private_hint": "此子智能体有一个自定义后生成树。",
+  "panel_subagent.post_tree_minimal_hint": "无后处理：直接使用原始 LLM 响应。",
+  "panel_subagent.create_private_post_tree": "创建后生成树",
 
   "panel_toolmanager.title": "工具管理",
   "panel_toolmanager.loading": "加载中...",

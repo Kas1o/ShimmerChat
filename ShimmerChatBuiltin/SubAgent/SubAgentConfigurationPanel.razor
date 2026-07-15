@@ -9,6 +9,7 @@
 
 @inject IKVDataService pluginData
 @inject IPreGenerationNodeSerializer Serializer
+@inject IPostGenerationNodeSerializer PostSerializer
 @inject ILocService Loc
 
 
@@ -139,6 +140,41 @@
             </div>
 
             <div class="su-mt-4">
+                <h5>@Loc["panel_subagent.post_tree"]</h5>
+                <p class="su-text-sm su-text-2 su-mt-1">
+                    <em>@Loc["panel_subagent.post_tree_hint"]</em>
+                </p>
+
+                @if (_editingPostTree != null)
+                {
+                    <div class="gen-config-status mb-2">
+                        <span class="gen-config-badge private">@Loc["panel_subagent.private_tree"]</span>
+                        <span class="gen-config-hint">@Loc["panel_subagent.post_tree_private_hint"]</span>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-bottom: 12px;">
+                        <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="ClearPrivatePostTree">
+                            @Loc["panel_subagent.clear_private_tree"]
+                        </button>
+                    </div>
+                    <div class="tree-editor-container">
+                        <CascadingValue Value="_postDragContext">
+                            <TreeEditor Node="@_editingPostTree" />
+                        </CascadingValue>
+                    </div>
+                }
+                else
+                {
+                    <div class="gen-config-status mb-2">
+                        <span class="gen-config-badge private">@Loc["panel_subagent.minimal"]</span>
+                        <span class="gen-config-hint">@Loc["panel_subagent.post_tree_minimal_hint"]</span>
+                    </div>
+                    <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePrivatePostTree">
+                        <i class="bi bi-pencil"></i> @Loc["panel_subagent.create_private_post_tree"]
+                    </button>
+                }
+            </div>
+
+            <div class="su-mt-4">
                 <h5>@Loc["panel_subagent.plugins"]</h5>
                 <PluginPanelContainer
                     PanelDisplayPlace="PanelDisplayPlace.Agent"
@@ -169,7 +205,9 @@
     string statusMessage = "";
     string statusType = "success";
     IPreGenerationNode? _editingTree;
+    IPostGenerationNode? _editingPostTree;
     TreeDragContext _dragContext = new();
+    TreeDragContext _postDragContext = new();
 
     protected override void OnInitialized()
     {
@@ -242,6 +280,16 @@
         {
             _editingTree = null;
         }
+
+        if (selectedConfig != null && !string.IsNullOrEmpty(selectedConfig.PostGenerationTreeJson))
+        {
+            _editingPostTree = PostSerializer.Deserialize(selectedConfig.PostGenerationTreeJson)
+                as IPostGenerationNode;
+        }
+        else
+        {
+            _editingPostTree = null;
+        }
     }
 
     async Task DeleteConfig(SubAgentConfig config)
@@ -273,6 +321,10 @@
             if (_editingTree != null && selectedConfig != null)
             {
                 selectedConfig.ModifierTreeJson = Serializer.Serialize(_editingTree);
+            }
+            if (_editingPostTree != null && selectedConfig != null)
+            {
+                selectedConfig.PostGenerationTreeJson = PostSerializer.Serialize(_editingPostTree);
             }
             await SaveConfigsAsync();
             ShowStatus(Loc["panel_subagent.msg_saved"], "success");
@@ -349,5 +401,32 @@
         return string.IsNullOrEmpty(json)
             ? new()
             : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? new();
+    }
+
+    void CreatePrivatePostTree()
+    {
+        if (selectedConfig == null) return;
+        var root = new PostSequenceNode
+        {
+            Name = $"{selectedConfig.Name} Post Tree",
+            Children = new List<IPostGenerationNode>()
+        };
+        selectedConfig.PostGenerationTreeJson = PostSerializer.Serialize(root);
+        _editingPostTree = root;
+    }
+
+    void ClearPrivatePostTree()
+    {
+        if (selectedConfig == null) return;
+        selectedConfig.PostGenerationTreeJson = null;
+        _editingPostTree = null;
+    }
+
+    private List<PostGenerationPreset> GetPostPresets()
+    {
+        var json = pluginData.Read("PostGenerationManager", "post_generation_presets");
+        return string.IsNullOrEmpty(json)
+            ? new()
+            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PostGenerationPreset>>(json) ?? new();
     }
 }

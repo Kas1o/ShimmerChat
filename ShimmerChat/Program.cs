@@ -38,6 +38,7 @@ builder.Services.AddSingleton<IGenerationManagerV2, GenerationManagerV2>();
 
 // Post-Generation 管线
 builder.Services.AddSingleton<PostGenerationNodeSerializer>();
+builder.Services.AddSingleton<IPostGenerationNodeSerializer>(sp => sp.GetRequiredService<PostGenerationNodeSerializer>());
 builder.Services.AddSingleton<IPostGenerationManager, PostGenerationManager>();
 
 // Render Modifier 管线

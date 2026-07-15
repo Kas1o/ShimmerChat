@@ -9,7 +9,7 @@ namespace ShimmerChat.Singletons
     /// <summary>
     /// 后生成节点树序列化器。扫描所有 IPostGenerationNode 实现构建类型白名单。
     /// </summary>
-    public class PostGenerationNodeSerializer : ITreeNodeSerializer
+    public class PostGenerationNodeSerializer : IPostGenerationNodeSerializer
     {
         private readonly JsonSerializerSettings _settings;
         private readonly Dictionary<string, Type> _typeMap;
@@ -40,7 +40,24 @@ namespace ShimmerChat.Singletons
             return JsonConvert.SerializeObject(root, typeof(IPostGenerationNode), _settings);
         }
 
+        public string Serialize(IPostGenerationNode root)
+        {
+            return JsonConvert.SerializeObject(root, typeof(IPostGenerationNode), _settings);
+        }
+
         public ITreeNode? Deserialize(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json) || json.Trim() == "{}")
+                return null;
+            try { return JsonConvert.DeserializeObject<IPostGenerationNode>(json, _settings); }
+            catch (Exception ex)
+            {
+                _logger.LogError("[PostGenerationNodeSerializer] 反序列化失败: {Message}", ex.Message);
+                return null;
+            }
+        }
+
+        IPostGenerationNode? IPostGenerationNodeSerializer.Deserialize(string json)
         {
             if (string.IsNullOrWhiteSpace(json) || json.Trim() == "{}")
                 return null;

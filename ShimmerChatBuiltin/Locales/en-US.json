@@ -357,6 +357,11 @@
   "panel_subagent.msg_saved": "Saved successfully",
   "panel_subagent.msg_save_failed": "Save failed: {0}",
   "panel_subagent.none_option_fallback": "\u2014",
+  "panel_subagent.post_tree": "Post-Generation Tree",
+  "panel_subagent.post_tree_hint": "Execute post-generation pipeline on the sub-agent's LLM response before formatting output.",
+  "panel_subagent.post_tree_private_hint": "This sub-agent has a custom post-generation tree.",
+  "panel_subagent.post_tree_minimal_hint": "No post-processing: raw LLM response is used directly.",
+  "panel_subagent.create_private_post_tree": "Create Post Tree",
 
   "panel_toolmanager.title": "Tool Manager",
   "panel_toolmanager.loading": "Loading...",

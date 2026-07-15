@@ -150,7 +150,8 @@ namespace ShimmerChat.Singletons
                 ToolRegistry = _toolRegistry,
                 Serializer = _serializer,
                 LocService = _locService,
-                DebugOutput = _debugOutput
+                DebugOutput = _debugOutput,
+                PostGenerationManager = _postManager
             };
 
             IPreGenerationNode rootNode;

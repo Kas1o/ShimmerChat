@@ -18,6 +18,11 @@ namespace ShimmerChatLib.Generation
         /// </summary>
         public required IDebugOutputService DebugOutput { get; init; }
         /// <summary>
+        /// 后生成管线管理器，用于对 LLM 响应进行后处理变换。
+        /// 节点可通过此字段在执行完 ToolCallLoop 后调用 Post-Generation 管线。
+        /// </summary>
+        public IPostGenerationManager? PostGenerationManager { get; init; }
+        /// <summary>
         /// 获取当前对话对象（惰性加载）
         /// </summary>
         public Chat GetChat() => Chat.Load(ChatGuid, KVData);

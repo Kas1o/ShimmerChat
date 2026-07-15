@@ -49,7 +49,8 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 ToolRegistry = context.Env.Persistent.ToolRegistry,
                 Serializer = context.Env.Persistent.Serializer,
                 LocService = context.Env.Persistent.LocService,
-                DebugOutput = context.Env.Persistent.DebugOutput
+                DebugOutput = context.Env.Persistent.DebugOutput,
+                PostGenerationManager = context.Env.Persistent.PostGenerationManager
             };
 
             var subEnv = new PreGenerationEnv(persistent);
@@ -110,6 +111,30 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             {
                 return NodeResult.Failure(NodeErrorCodes.ServiceError,
                     $"[SubAgent Error: {ex.Message}]", nodeId: Id, nodeName: Name);
+            }
+
+            // 4.5 后生成管线：对原始响应文本进行过滤/转换/富化
+            if (!string.IsNullOrEmpty(config.PostGenerationTreeJson)
+                && persistent.PostGenerationManager != null
+                && promptCtx.LastAssistantContent is string rawContent)
+            {
+                try
+                {
+                    var postAgent = Agent.Create("__sub_post__", "");
+                    postAgent.PostGenerationTreeJson = config.PostGenerationTreeJson;
+                    var processed = await persistent.PostGenerationManager.ExecuteAsync(
+                        postAgent, rawContent,
+                        subEnv.Transient.Fragments, persistent,
+                        context.CancellationToken);
+                    promptCtx.UpdateLastAssistantContent(processed);
+                }
+                catch (Exception ex)
+                {
+                    context.Env.Persistent.DebugOutput.Write(
+                        "SubAgentNode", "PostGeneration",
+                        $"[SubAgentNode] Post-Generation failed for '{ConfigName}': {ex.Message}");
+                    // 失败时不阻断，继续使用原始文本
+                }
             }
 
             // 5. 输出格式化，注入父级上下文
