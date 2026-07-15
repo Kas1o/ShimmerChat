@@ -13,7 +13,7 @@
 ```
 你的插件 DLL（只引用 ShimmerChatLib + SharperLLM）
   ├─ 实现 IChatCompletionClient 或 ITextCompletionClient   ← 网络层
-  ├─ 自定义 IGenerationNode                                ← 选 API 节点
+  ├─ 自定义 IPreGenerationNode                                ← 选 API 节点
   ├─ 自定义 PluginPanel (@attribute PluginPanelAttribute)   ← 配置面板（可选）
   └─ 自定义 IPluginInitializer                             ← 写入默认配置（可选）
 ```
@@ -25,7 +25,7 @@
 | 程序集 | 包含 |
 |--------|------|
 | `SharperLLM` | `IChatCompletionClient`、`ITextCompletionClient`、`TextToChatAdapter`、`PromptBuilder`、`ResponseEx` |
-| `ShimmerChatLib` | `IGenerationNode`、`APISetting`、`NodeExecutionContext`、`NodeResult` |
+| `ShimmerChatLib` | `IPreGenerationNode`、`APISetting`、`PreNodeExecutionContext`、`NodeResult` |
 
 **核心原则**：管线只认识 `IChatCompletionClient`。如果你的 API 是文本补全接口，实现 `ITextCompletionClient`，再用 `TextToChatAdapter` 包装即可。
 
@@ -157,7 +157,7 @@ using SharperLLM.Util;
 
 [NodeInfo("node.my_api_select", Icon = "⚡", Color = "#60a0e0",
     CategoryKeys = ["category.config"])]
-public class MyApiSelectNode : IGenerationNode
+public class MyApiSelectNode : IPreGenerationNode
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Name { get; set; } = "My API";
@@ -334,7 +334,7 @@ if (context.Env.Transient.SharedState.TryGetValue("IsContinuation", out var v) &
 - [ ] 实现了 `IChatCompletionClient` 或 `ITextCompletionClient`
 - [ ] 流式方法的 `CancellationToken` 加了 `[EnumeratorCancellation]`
 - [ ] `FinishReason` 在流式输出末尾正确设置为 `Stop`
-- [ ] 创建了自定义 `IGenerationNode`，在 `ExecuteAsync` 中设置 `TransientEnv.API`
+- [ ] 创建了自定义 `IPreGenerationNode`，在 `ExecuteAsync` 中设置 `TransientEnv.API`
 - [ ] 能力标记如实设置（`SupportsStreaming`、`SupportsToolCalling`）
 - [ ] 如果用了 `ITextCompletionClient`，用 `TextToChatAdapter` 包装并选择合适的消息模板
 - [ ] 可选：添加了 `PluginPanel` 供用户配置 API 参数

@@ -1,5 +1,3 @@
-using System;
-
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
@@ -14,14 +12,5 @@ namespace ShimmerChatLib.Generation
         {
             Persistent = persistent;
         }
-    }
-
-    /// <summary>
-    /// 后向兼容：GenerationEnv 已重命名为 PreGenerationEnv。
-    /// </summary>
-    [Obsolete("Use PreGenerationEnv instead")]
-    public class GenerationEnv : PreGenerationEnv
-    {
-        public GenerationEnv(PersistentEnv persistent) : base(persistent) { }
     }
 }

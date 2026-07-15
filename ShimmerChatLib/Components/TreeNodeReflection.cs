@@ -6,7 +6,7 @@ namespace ShimmerChatLib.Components;
 
 /// <summary>
 /// ITreeNode 反射辅助方法，供所有节点编辑器组件使用。
-/// 处理泛型不变性问题：List&lt;IGenerationNode&gt; 不是 IList&lt;ITreeNode&gt;。
+/// 处理泛型不变性问题：List&lt;IPreGenerationNode&gt; 不是 IList&lt;ITreeNode&gt;。
 /// </summary>
 public static class TreeNodeReflection
 {

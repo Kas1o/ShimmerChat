@@ -57,21 +57,10 @@ namespace ShimmerChatLib
         /// </summary>
         public Guid? BackgroundGuid { get; set; }
         /// <summary>
-        /// 2.0 预生成树 JSON（生成相关定义）
+        /// 预生成树 JSON（生成管线定义）
         /// </summary>
         [Newtonsoft.Json.JsonProperty("ModifierTreeJson")]
         public string? PreGenerationTreeJson { get; set; }
-
-        /// <summary>
-        /// 后向兼容：ModifierTreeJson 已重命名为 PreGenerationTreeJson。
-        /// </summary>
-        [Obsolete("Use PreGenerationTreeJson instead")]
-        [Newtonsoft.Json.JsonIgnore]
-        public string? ModifierTreeJson
-        {
-            get => PreGenerationTreeJson;
-            set => PreGenerationTreeJson = value;
-        }
 
         /// <summary>
         /// 3.0 后生成树 JSON（LLM 响应后处理管线）

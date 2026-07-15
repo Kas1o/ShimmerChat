@@ -75,7 +75,7 @@ public class APISelectNodeTests : NodeTestBase
         KvMock.Setup(k => k.Read("ApiSettings", "apiSetting")).Returns(CreateApiSettingsJson());
         KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIIndex")).Returns("0");
         var node = new APISelectNode { APIIndex = -1 };
-        var env = new GenerationEnv(CreatePersistentEnv());
+        var env = new PreGenerationEnv(CreatePersistentEnv());
         var msg = new Message
         {
             sender = Sender.AI,
@@ -104,7 +104,7 @@ public class APISelectNodeTests : NodeTestBase
             .Returns(JsonConvert.SerializeObject(configs));
         KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIIndex")).Returns("0");
         var node = new APISelectNode { APIIndex = -1 };
-        var env = new GenerationEnv(CreatePersistentEnv());
+        var env = new PreGenerationEnv(CreatePersistentEnv());
         env.Transient.SharedState["IsContinuation"] = true;
         var ctx = CreateContext(env);
 

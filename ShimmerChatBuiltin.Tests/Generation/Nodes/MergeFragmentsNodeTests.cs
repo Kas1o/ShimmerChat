@@ -16,7 +16,7 @@ public class MergeFragmentsNodeTests : NodeTestBase
     public async Task MultipleFragments_MergesIntoOne()
     {
         var node = new MergeFragmentsNode { TargetRole = MergeTargetRole.System };
-        var env = new GenerationEnv(CreatePersistentEnv());
+        var env = new PreGenerationEnv(CreatePersistentEnv());
         env.Transient.Fragments.Add(new ContextSegment
             { Message = new ChatMessage { Content = "A" }, From = PromptBuilder.From.system });
         env.Transient.Fragments.Add(new ContextSegment
@@ -35,7 +35,7 @@ public class MergeFragmentsNodeTests : NodeTestBase
     public async Task TargetRole_User_UsesUserFrom()
     {
         var node = new MergeFragmentsNode { TargetRole = MergeTargetRole.User };
-        var env = new GenerationEnv(CreatePersistentEnv());
+        var env = new PreGenerationEnv(CreatePersistentEnv());
         env.Transient.Fragments.Add(new ContextSegment
             { Message = new ChatMessage { Content = "X" }, From = PromptBuilder.From.system });
         var ctx = CreateContext(env);

@@ -29,19 +29,4 @@ namespace ShimmerChatLib.Generation
             CancellationToken = ct;
         }
     }
-
-    /// <summary>
-    /// 后向兼容：IGenerationNode 已重命名为 IPreGenerationNode。
-    /// </summary>
-    [Obsolete("Use IPreGenerationNode instead")]
-    public interface IGenerationNode : IPreGenerationNode { }
-
-    /// <summary>
-    /// 后向兼容：NodeExecutionContext 已重命名为 PreNodeExecutionContext。
-    /// </summary>
-    [Obsolete("Use PreNodeExecutionContext instead")]
-    public class NodeExecutionContext : PreNodeExecutionContext
-    {
-        public NodeExecutionContext(PreGenerationEnv env, CancellationToken ct = default) : base(env, ct) { }
-    }
 }

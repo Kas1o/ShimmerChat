@@ -2,6 +2,7 @@ using System;
 
 namespace ShimmerChatLib.Interface
 {
+    [Obsolete("Replaced by IRenderModifierNode pipeline")]
     public interface IMessageRenderModifier
     {
         public MessageRenderModifierInfo Info { get; }

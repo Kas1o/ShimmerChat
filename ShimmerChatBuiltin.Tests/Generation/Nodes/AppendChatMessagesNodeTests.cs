@@ -20,7 +20,7 @@ public class AppendChatMessagesNodeTests : NodeTestBase
     public async Task UserMessage_MapsToFromUser()
     {
         var node = new AppendChatMessagesNode();
-        var env = new GenerationEnv(CreatePersistentEnv());
+        var env = new PreGenerationEnv(CreatePersistentEnv());
         env.Transient.SharedState["ChatMessages"] = new List<Message> { CreateMsg(Sender.User, "hello") };
         var ctx = CreateContext(env);
 
@@ -35,7 +35,7 @@ public class AppendChatMessagesNodeTests : NodeTestBase
     public async Task AIMessage_MapsToFromAssistant()
     {
         var node = new AppendChatMessagesNode();
-        var env = new GenerationEnv(CreatePersistentEnv());
+        var env = new PreGenerationEnv(CreatePersistentEnv());
         env.Transient.SharedState["ChatMessages"] = new List<Message> { CreateMsg(Sender.AI, "reply") };
         var ctx = CreateContext(env);
 
@@ -49,7 +49,7 @@ public class AppendChatMessagesNodeTests : NodeTestBase
     public async Task RegeneratingMessage_Skipped()
     {
         var node = new AppendChatMessagesNode();
-        var env = new GenerationEnv(CreatePersistentEnv());
+        var env = new PreGenerationEnv(CreatePersistentEnv());
         env.Transient.SharedState["ChatMessages"] = new List<Message>
         {
             CreateMsg(Sender.User, "skip", MessageGenerationState.Regenerating),
@@ -67,7 +67,7 @@ public class AppendChatMessagesNodeTests : NodeTestBase
     public async Task MultipleMessages_AllAppended()
     {
         var node = new AppendChatMessagesNode();
-        var env = new GenerationEnv(CreatePersistentEnv());
+        var env = new PreGenerationEnv(CreatePersistentEnv());
         env.Transient.SharedState["ChatMessages"] = new List<Message>
         {
             CreateMsg(Sender.System, "s"),

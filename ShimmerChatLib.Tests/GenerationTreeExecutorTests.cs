@@ -8,7 +8,7 @@ public class GenerationTreeExecutorTests
     private readonly GenerationTreeExecutor _executor = new();
     private readonly Mock<IKVDataService> _kvMock = new();
     private readonly Mock<IToolRegistry> _toolRegistryMock = new();
-    private readonly Mock<IGenerationNodeSerializer> _serializerMock = new();
+    private readonly Mock<IPreGenerationNodeSerializer> _serializerMock = new();
     private readonly Mock<ILocService> _locMock = new();
     private readonly Mock<IDebugOutputService> _debugOutputMock = new();
 
@@ -29,9 +29,9 @@ public class GenerationTreeExecutorTests
     [Fact]
     public async Task ExecuteAsync_NodeReturnsSuccess_ReturnsEnv()
     {
-        var node = new Mock<IGenerationNode>();
+        var node = new Mock<IPreGenerationNode>();
         node.Setup(n => n.Id).Returns("test-node");
-        node.Setup(n => n.ExecuteAsync(It.IsAny<NodeExecutionContext>()))
+        node.Setup(n => n.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()))
             .ReturnsAsync(NodeResult.SuccessResult());
 
         var result = await _executor.ExecuteAsync(node.Object, CreatePersistentEnv());
@@ -44,10 +44,10 @@ public class GenerationTreeExecutorTests
     [Fact]
     public async Task ExecuteAsync_NodeReturnsFailure_ThrowsInvalidOperationException()
     {
-        var node = new Mock<IGenerationNode>();
+        var node = new Mock<IPreGenerationNode>();
         node.Setup(n => n.Id).Returns("fail-node");
         node.Setup(n => n.Name).Returns("Failure Node");
-        node.Setup(n => n.ExecuteAsync(It.IsAny<NodeExecutionContext>()))
+        node.Setup(n => n.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()))
             .ReturnsAsync(NodeResult.Failure("TEST_ERROR", "Something went wrong"));
 
         var act = async () => await _executor.ExecuteAsync(node.Object, CreatePersistentEnv());
@@ -61,10 +61,10 @@ public class GenerationTreeExecutorTests
     [Fact]
     public async Task ExecuteAsync_NodeReturnsFailure_WithDetails_IncludesDetails()
     {
-        var node = new Mock<IGenerationNode>();
+        var node = new Mock<IPreGenerationNode>();
         node.Setup(n => n.Id).Returns("detail-node");
         node.Setup(n => n.Name).Returns("Detail Node");
-        node.Setup(n => n.ExecuteAsync(It.IsAny<NodeExecutionContext>()))
+        node.Setup(n => n.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()))
             .ReturnsAsync(NodeResult.Failure("ERR", "msg", details: "stack trace here"));
 
         var act = async () => await _executor.ExecuteAsync(node.Object, CreatePersistentEnv());
@@ -79,9 +79,9 @@ public class GenerationTreeExecutorTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var node = new Mock<IGenerationNode>();
-        node.Setup(n => n.ExecuteAsync(It.IsAny<NodeExecutionContext>()))
-            .Returns((NodeExecutionContext ctx) =>
+        var node = new Mock<IPreGenerationNode>();
+        node.Setup(n => n.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()))
+            .Returns((PreNodeExecutionContext ctx) =>
             {
                 ctx.CancellationToken.ThrowIfCancellationRequested();
                 return Task.FromResult(NodeResult.SuccessResult());

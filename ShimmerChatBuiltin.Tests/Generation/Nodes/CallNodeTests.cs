@@ -7,7 +7,7 @@ public class CallNodeTests : NodeTestBase
 {
     private static string CreatePresetsJson(string id, string? rootNodeJson)
     {
-        var presets = new List<GenerationPreset>
+        var presets = new List<PreGenerationPreset>
         {
             new() { Id = id, Name = "Test Preset", RootNodeJson = rootNodeJson ?? "" }
         };
@@ -58,8 +58,8 @@ public class CallNodeTests : NodeTestBase
     [Fact]
     public async Task ValidPreset_ExecutesChildNode()
     {
-        var childNode = new Mock<IGenerationNode>();
-        childNode.Setup(n => n.ExecuteAsync(It.IsAny<NodeExecutionContext>()))
+        var childNode = new Mock<IPreGenerationNode>();
+        childNode.Setup(n => n.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()))
             .ReturnsAsync(NodeResult.SuccessResult());
         var childJson = "{\"$type\":\"MockNode\"}";
         KvMock.Setup(k => k.Read("GenerationManager", "generation_presets"))
@@ -71,6 +71,6 @@ public class CallNodeTests : NodeTestBase
         var result = await node.ExecuteAsync(ctx);
 
         result.Success.Should().BeTrue();
-        childNode.Verify(n => n.ExecuteAsync(It.IsAny<NodeExecutionContext>()), Times.Once);
+        childNode.Verify(n => n.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()), Times.Once);
     }
 }

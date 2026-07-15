@@ -20,8 +20,8 @@ public class ToolInstantiateNodeTests : NodeTestBase
     public async Task EmptyTypeName_ReturnsFailure()
     {
         var node = new ToolInstantiateNode { ToolTypeName = "" };
-        var env = new GenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
-        var result = await node.ExecuteAsync(new NodeExecutionContext(env));
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
+        var result = await node.ExecuteAsync(new PreNodeExecutionContext(env));
         result.Success.Should().BeFalse();
         result.Code.Should().Be(NodeErrorCodes.ToolNotFound);
     }
@@ -33,8 +33,8 @@ public class ToolInstantiateNodeTests : NodeTestBase
         var registry = new StubToolRegistry()
             .SetInstance("Valid.Tool.Type", stubTool);
         var node = new ToolInstantiateNode { ToolTypeName = "Valid.Tool.Type" };
-        var env = new GenerationEnv(CreateEnvWithRegistry(registry));
-        var ctx = new NodeExecutionContext(env);
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(registry));
+        var ctx = new PreNodeExecutionContext(env);
 
         var result = await node.ExecuteAsync(ctx);
 
@@ -48,9 +48,9 @@ public class ToolInstantiateNodeTests : NodeTestBase
     {
         var registry = new StubToolRegistry();
         var node = new ToolInstantiateNode { ToolTypeName = "Bad.Type" };
-        var env = new GenerationEnv(CreateEnvWithRegistry(registry));
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(registry));
 
-        var result = await node.ExecuteAsync(new NodeExecutionContext(env));
+        var result = await node.ExecuteAsync(new PreNodeExecutionContext(env));
 
         result.Success.Should().BeFalse();
         result.Code.Should().Be(NodeErrorCodes.ToolNotFound);
@@ -61,9 +61,9 @@ public class ToolInstantiateNodeTests : NodeTestBase
     {
         var registry = new StubToolRegistry();
         var node = new ToolInstantiateNode { ToolTypeName = "Null.Type" };
-        var env = new GenerationEnv(CreateEnvWithRegistry(registry));
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(registry));
 
-        var result = await node.ExecuteAsync(new NodeExecutionContext(env));
+        var result = await node.ExecuteAsync(new PreNodeExecutionContext(env));
 
         result.Success.Should().BeFalse();
         result.Code.Should().Be(NodeErrorCodes.ToolNotFound);

@@ -336,7 +336,7 @@ if (string.IsNullOrEmpty(config))
 用于需要特殊构造参数或由 Agent 树中的专用节点手动实例化的工具。
 
 1. 实现 `IToolV2`（不需要 `IAutoCreateToolV2`）
-2. 编写对应的 `IGenerationNode`，在 `ExecuteAsync` 中创建工具实例并加入 `context.Env.Transient.Tools`
+2. 编写对应的 `IPreGenerationNode`，在 `ExecuteAsync` 中创建工具实例并加入 `context.Env.Transient.Tools`
 
 参见 `SubAgentToolV2` + `SubAgentToolNode` 的组合模式。
 
@@ -354,7 +354,7 @@ using SharperLLM.Util;
 
 [NodeInfo("node.my_fragment", Icon = "✦", Color = "#9060e0",
     CategoryKeys = ["category.content"])]
-public class MyFragmentNode : IGenerationNode
+public class MyFragmentNode : IPreGenerationNode
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Name { get; set; } = "My Fragment";
@@ -378,12 +378,12 @@ public class MyFragmentNode : IGenerationNode
 
 | 概念 | 说明 |
 |------|------|
-| `IGenerationNode` | 节点接口：`Id`、`Name`、`ExecuteAsync` |
+| `IPreGenerationNode` | 节点接口：`Id`、`Name`、`ExecuteAsync` |
 | `[NodeInfo]` | 类级元数据：标签 Key、图标、颜色、分类 |
 | `[NodeProperty]` | 属性级元数据：标签 Key、提示、排序。支持 string/int/float/bool/enum |
 | `[NodeEditor(typeof(...))]` | 指定自定义 Blazor 编辑器组件 |
-| `List<IGenerationNode>` | 标记 `[NodeProperty]` 后生成子节点列表 UI，支持拖拽排序 |
-| `IGenerationNode` (单个) | 标记 `[NodeProperty]` 后生成单节点槽 UI |
+| `List<IPreGenerationNode>` | 标记 `[NodeProperty]` 后生成子节点列表 UI，支持拖拽排序 |
+| `IPreGenerationNode` (单个) | 标记 `[NodeProperty]` 后生成单节点槽 UI |
 | `DropStrip` | 可复用放置条组件，自定义编辑器用它来支持拖放 |
 | `TreeDragContext` | 级联共享的拖拽状态，自动流入所有子组件 |
 
@@ -395,7 +395,7 @@ KVData        // IKVDataService  键值存储
 ChatGuid      // Guid            当前对话
 AgentGuid     // Guid            当前 Agent
 ToolRegistry  // IToolRegistry   工具注册表
-Serializer    // IGenerationNodeSerializer
+Serializer    // IPreGenerationNodeSerializer
 
 // context.Env.Transient — 每次生成重建
 Fragments     // List<ContextSegment>  要发送给 LLM 的上下文

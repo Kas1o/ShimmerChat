@@ -66,9 +66,9 @@
     [Parameter] public int Depth { get; set; }
     [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
 
-    private List<GenerationPreset> _presets = [];
-    private List<GenerationPreset> _filteredPresets = [];
-    private GenerationPreset? _selectedPreset;
+    private List<PreGenerationPreset> _presets = [];
+    private List<PreGenerationPreset> _filteredPresets = [];
+    private PreGenerationPreset? _selectedPreset;
     private string _selectedPresetId = "";
     private string _searchText = "";
     private bool _showPicker;
@@ -86,7 +86,7 @@
     protected override void OnInitialized()
     {
         var json = KVData.Read("GenerationManager", "generation_presets");
-        _presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json ?? "[]") ?? [];
+        _presets = JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json ?? "[]") ?? [];
         _selectedPresetId = Node.PresetId ?? "";
         _selectedPreset = _presets.FirstOrDefault(p => p.Id == _selectedPresetId);
 
@@ -112,7 +112,7 @@
         }
     }
 
-    private void SelectPreset(GenerationPreset preset)
+    private void SelectPreset(PreGenerationPreset preset)
     {
         _selectedPreset = preset;
         _selectedPresetId = preset.Id;

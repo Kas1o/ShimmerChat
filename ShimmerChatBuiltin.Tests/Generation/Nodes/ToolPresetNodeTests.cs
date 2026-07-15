@@ -61,8 +61,8 @@ public class ToolPresetNodeTests : NodeTestBase
     {
         KvMock.Setup(k => k.Read("ToolPresets", "__presets__")).Returns((string?)null);
         var node = new ToolPresetNode();
-        var env = new GenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
-        var result = await node.ExecuteAsync(new NodeExecutionContext(env));
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
+        var result = await node.ExecuteAsync(new PreNodeExecutionContext(env));
         result.Success.Should().BeFalse();
         result.Code.Should().Be(NodeErrorCodes.PresetNotFound);
     }
@@ -77,8 +77,8 @@ public class ToolPresetNodeTests : NodeTestBase
         KvMock.Setup(k => k.Read("ToolPresets", "__presets__"))
             .Returns(CreatePresetsJson("default_tools", "other_tools"));
         var node = new ToolPresetNode { PresetName = "" };
-        var env = new GenerationEnv(CreateEnvWithRegistry(registry));
-        var ctx = new NodeExecutionContext(env);
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(registry));
+        var ctx = new PreNodeExecutionContext(env);
 
         var result = await node.ExecuteAsync(ctx);
 
@@ -96,8 +96,8 @@ public class ToolPresetNodeTests : NodeTestBase
         KvMock.Setup(k => k.Read("ToolPresets", "__presets__"))
             .Returns(CreatePresetsJson("a", "target", "c"));
         var node = new ToolPresetNode { PresetName = "target" };
-        var env = new GenerationEnv(CreateEnvWithRegistry(registry));
-        var ctx = new NodeExecutionContext(env);
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(registry));
+        var ctx = new PreNodeExecutionContext(env);
 
         var result = await node.ExecuteAsync(ctx);
 
@@ -111,8 +111,8 @@ public class ToolPresetNodeTests : NodeTestBase
         KvMock.Setup(k => k.Read("ToolPresets", "__presets__"))
             .Returns(CreatePresetsJson("a", "b"));
         var node = new ToolPresetNode { PresetName = "nonexistent" };
-        var env = new GenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
-        var result = await node.ExecuteAsync(new NodeExecutionContext(env));
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
+        var result = await node.ExecuteAsync(new PreNodeExecutionContext(env));
         result.Success.Should().BeFalse();
         result.Code.Should().Be(NodeErrorCodes.PresetNotFound);
     }
@@ -123,8 +123,8 @@ public class ToolPresetNodeTests : NodeTestBase
         KvMock.Setup(k => k.Read("ToolPresets", "__presets__"))
             .Returns(CreatePresetsJson("default"));
         var node = new ToolPresetNode { PresetName = "" };
-        var env = new GenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
-        var ctx = new NodeExecutionContext(env);
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
+        var ctx = new PreNodeExecutionContext(env);
 
         var result = await node.ExecuteAsync(ctx);
 
@@ -142,8 +142,8 @@ public class ToolPresetNodeTests : NodeTestBase
         KvMock.Setup(k => k.Read("ToolPresets", "__presets__"))
             .Returns(JsonConvert.SerializeObject(presets));
         var node = new ToolPresetNode { PresetName = "" };
-        var env = new GenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
-        var ctx = new NodeExecutionContext(env);
+        var env = new PreGenerationEnv(CreateEnvWithRegistry(new StubToolRegistry()));
+        var ctx = new PreNodeExecutionContext(env);
 
         var result = await node.ExecuteAsync(ctx);
 
