@@ -37,7 +37,7 @@ public interface IGenerationNode
 ### 最小实现
 
 ```csharp
-[NodeInfo("node.my_fragment", Icon = "✦", Color = "#9060e0",
+[NodeInfo("node.my_fragment", Icon = "✦", Color = "var(--node-fragment)",
     CategoryKeys = ["category.content"])]
 public class MyFragmentNode : IGenerationNode
 {
@@ -79,7 +79,7 @@ public class NodeInfoAttribute : Attribute
 {
     public string LabelKey { get; }          // 必填，本地化 Key
     public string Icon { get; init; }        // 默认 "●"
-    public string Color { get; init; }       // CSS 颜色值，如 "#9060e0"
+    public string Color { get; init; }       // CSS 颜色值，推荐使用 CSS 变量（见下方"颜色变量"表）
     public string[] CategoryKeys { get; init; }  // 斜杠分层，如 ["category.flow", "sub.branch"]
     public string? DescriptionKey { get; init; }  // 可选描述
 }
@@ -87,7 +87,26 @@ public class NodeInfoAttribute : Attribute
 
 - `LabelKey`、`DescriptionKey` 均为本地化 Key，UI 通过 `ILocService` 翻译。
 - `CategoryKeys` 支持多级分类：`["category.flow", "branch"]` → 节点选择器中显示为 `Flow > Branch`。
-- `Color` 控制节点卡片左侧色条。
+- `Color` 控制节点卡片左侧色条。**推荐使用 CSS 变量**而非硬编码颜色值，以自动适配亮/暗主题。
+
+#### 颜色变量
+
+`Color` 属性接受任意 CSS 颜色值，但推荐使用 `theme.css` 中预定义的 `--node-*` 变量。这些变量在亮色和暗色主题下各有对应色值，无需手动处理主题切换。
+
+| 变量 | 语义 | 示例节点 |
+|------|------|---------|
+| `var(--node-flow)` | 流程控制 | SequenceNode |
+| `var(--node-branch)` | 分支/条件 | IfNode, AdvancedIfNode |
+| `var(--node-fragment)` | 内容片段 | FragmentNode, AppendChatMessagesNode |
+| `var(--node-prompt)` | 提示词/DynPrompt | DynPromptNode, FragmentTrimNode |
+| `var(--node-tool)` | 工具实例化 | ToolInstantiateNode |
+| `var(--node-link)` | 链接/预设引用 | CallNode, ToolPresetNode |
+| `var(--node-memory)` | 记忆检索 | MemoryRetrieveNode |
+| `var(--node-config)` | 配置/API | APISelectNode, FileSystemToolSetNode |
+| `var(--node-subagent)` | 子代理 | SubAgentNode, SubAgentToolNode |
+| `var(--node-debug)` | 调试/打印 | PrintNode, MessagePrintNode |
+
+如果现有变量语义不匹配，也可直接使用十六进制颜色值（如 `"#9060e0"`），但需注意该颜色在亮/暗主题下不会自动切换。
 
 ### NodePropertyAttribute — 属性级元数据
 
@@ -172,7 +191,7 @@ TreeEditor
 **步骤 1**: 标记节点
 
 ```csharp
-[NodeInfo("node.my_complex", Icon = "⚙", Color = "#d0a040")]
+[NodeInfo("node.my_complex", Icon = "⚙", Color = "var(--node-link)")]
 [NodeEditor(typeof(MyComplexNodeEditor))]   // ← 指定编辑器
 public class MyComplexNode : IGenerationNode
 {
@@ -242,11 +261,13 @@ public class MyComplexNode : IGenerationNode
 | `Depth` | `int` | 是 | 当前缩进层级 |
 | `CopyMe` | `Action<IGenerationNode>?` | 是 | 复制到剪贴板回调 |
 
-编辑器只需声明自己需要的参数。Blazor 的 `DynamicComponent` 会按名称匹配传入，未声明的参数会被忽略。修改直接作用在 `Node` 对象上，持久化由外部在保存时统一完成。拖拽的跨组件通信通过 `CascadingValue` 共享 `TreeDragContext` 实例实现，无需逐层传递回调。
+编辑器需要声明所有的参数。否则无法创建。
+
+修改直接作用在 `Node` 对象上，持久化由外部在保存时统一完成。拖拽的跨组件通信通过 `CascadingValue` 共享 `TreeDragContext` 实例实现，无需逐层传递回调。
 
 ### 样式参考
 
-自定义编辑器应使用 `node-editor.css` 中定义的全局类名保持风格一致：
+自定义编辑器应使用 `node-editor.css` 中定义的全局类名保持风格一致。颜色相关的样式应优先使用 `theme.css` 中定义的 CSS 变量（如 `var(--su-text)`、`var(--su-surface)` 等），避免硬编码颜色值，以确保亮/暗主题兼容。
 
 | 类名 | 用途 |
 |------|------|
@@ -271,7 +292,7 @@ public class MyComplexNode : IGenerationNode
 ### 声明子节点列表
 
 ```csharp
-[NodeInfo("node.my_sequence", Icon = "☰", Color = "#60c060",
+[NodeInfo("node.my_sequence", Icon = "☰", Color = "var(--node-flow)",
     CategoryKeys = ["category.flow"])]
 public class MySequenceNode : IGenerationNode
 {
