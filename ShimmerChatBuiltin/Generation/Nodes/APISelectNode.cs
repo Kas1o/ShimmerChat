@@ -12,7 +12,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// </summary>
     [NodeInfo("node.api_select", Icon = "⚡", Color = "var(--node-config)", CategoryKeys = ["category.config"], DescriptionKey = "node.api_select.desc")]
     [NodeEditor(typeof(APISelectNodeEditor))]
-    public class APISelectNode : IGenerationNode
+    public class APISelectNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Select API";
@@ -22,7 +22,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// </summary>
         public int APIIndex { get; set; } = -1;
 
-        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
             var kvData = context.Env.Persistent.KVData;

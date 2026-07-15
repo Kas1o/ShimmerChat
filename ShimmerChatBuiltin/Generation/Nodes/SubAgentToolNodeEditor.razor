@@ -51,7 +51,7 @@
 @code {
     [Parameter] public SubAgentToolNode Node { get; set; } = default!;
     [Parameter] public int Depth { get; set; }
-    [Parameter] public Action<ShimmerChatLib.Generation.IGenerationNode>? CopyMe { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
 
     private List<SubAgentConfig> _configs = [];
 

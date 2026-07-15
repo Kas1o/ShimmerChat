@@ -1,3 +1,4 @@
+@using System.Collections
 @using System.Reflection
 @using ShimmerChatLib.Generation
 @inject ILocService Loc
@@ -82,15 +83,15 @@ else
 }
 
 @code {
-    [Parameter] public IGenerationNode Node { get; set; } = default!;
+    [Parameter] public ITreeNode Node { get; set; } = default!;
     [Parameter] public int Depth { get; set; }
-    [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
-    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+    [Parameter] public Action<ITreeNode>? RemoveMe { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
 
     /// <summary>
-    /// The parent list this node belongs to. When set, the node becomes draggable.
+    /// The parent list this node belongs to (non-generic IList). When set, the node becomes draggable.
     /// </summary>
-    [Parameter] public IList<IGenerationNode>? ParentList { get; set; }
+    [Parameter] public IList? ParentList { get; set; }
 
     /// <summary>
     /// For single-node slots: called when this node is dragged away.
@@ -99,8 +100,7 @@ else
 
     /// <summary>
     /// When this node is the source of a drag-drop, invoked after the node is
-    /// removed from its parent list. The owning component (ChildListEditor /
-    /// SlotEditor) uses this to re-render its child list.
+    /// removed from its parent list.
     /// </summary>
     [Parameter] public EventCallback OnDragSourceChanged { get; set; }
 

@@ -17,12 +17,17 @@ public record NodeTypeMetadata(
 );
 
 /// <summary>
-/// 扫描所有 IGenerationNode 实现类型，提供统一的节点类型目录。
+/// 扫描所有 ITreeNode 实现类型，提供统一的节点类型目录。
+/// 支持按管线接口类型（IPreGenerationNode / IPostGenerationNode / IRenderModifierNode）过滤。
 /// 扫描委托给 <see cref="IPluginLoaderService"/>，确保插件加载的节点也能被发现。
 /// </summary>
 public interface INodeTypeCatalog
 {
+    /// <summary>获取所有已发现的节点类型（跨所有管线）</summary>
     IReadOnlyList<NodeTypeMetadata> GetAllNodeTypes();
+
+    /// <summary>获取实现指定节点接口的节点类型</summary>
+    IReadOnlyList<NodeTypeMetadata> GetNodeTypes(Type nodeInterfaceType);
 }
 
 public class NodeTypeCatalog : INodeTypeCatalog
@@ -38,9 +43,14 @@ public class NodeTypeCatalog : INodeTypeCatalog
 
     public IReadOnlyList<NodeTypeMetadata> GetAllNodeTypes() => _types.Value;
 
+    public IReadOnlyList<NodeTypeMetadata> GetNodeTypes(Type nodeInterfaceType)
+    {
+        return _types.Value.Where(t => nodeInterfaceType.IsAssignableFrom(t.Type)).ToList();
+    }
+
     private static List<NodeTypeMetadata> ScanAll(IPluginLoaderService pluginLoader, ILogger<NodeTypeCatalog> logger)
     {
-        var types = pluginLoader.GetImplementingTypes(typeof(IGenerationNode));
+        var types = pluginLoader.GetImplementingTypes(typeof(ITreeNode));
         var result = new List<NodeTypeMetadata>(types.Count);
 
         foreach (var type in types)

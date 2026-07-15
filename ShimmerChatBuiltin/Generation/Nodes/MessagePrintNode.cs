@@ -5,7 +5,7 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
     [NodeInfo("node.message_print", Icon = "🖨️", Color = "var(--node-debug)", CategoryKeys = ["category.debug"], DescriptionKey = "node.message_print.desc")]
-    public class MessagePrintNode : IGenerationNode
+    public class MessagePrintNode : IPreGenerationNode
     {
         private static readonly JsonSerializerSettings _settings = new()
         {
@@ -15,7 +15,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Message Print";
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var output = context.Env.Persistent.DebugOutput;
             var messages = context.Env.Transient.Fragments

@@ -1,10 +1,12 @@
 @page "/generationmanager"
 @using ShimmerChatLib.Generation
+@using ShimmerChatLib.Components
 @using ShimmerChatBuiltin.Generation.Nodes
 @inject NavigationManager Navigation
 @inject IKVDataService KVData
 @inject IGenerationManagerV2 GenManager
-@inject IGenerationNodeSerializer Serializer
+@inject IPreGenerationNodeSerializer Serializer
+@inject INodeTypeCatalog NodeTypeCatalog
 @inject IJSRuntime JS
 @inject ILocService Loc
 
@@ -83,7 +85,9 @@
         <div class="su-card">
             <div class="su-card-body">
                 <CascadingValue Value="_dragContext">
+                <CascadingValue Value="_editorContext">
                     <TreeEditor Node="@_editingRoot" />
+                </CascadingValue>
                 </CascadingValue>
             </div>
         </div>
@@ -104,7 +108,9 @@
                 else
                 {
                     <CascadingValue Value="_dragContext">
+                    <CascadingValue Value="_editorContext">
                         <TreeEditor Node="@_editingRoot" />
+                    </CascadingValue>
                     </CascadingValue>
                 }
             </div>
@@ -125,10 +131,11 @@
     private const string PresetStorageKey = "generation_presets";
     private const string DefaultPresetId = "__default__";
 
-    private List<GenerationPreset> _presets = new();
-    private GenerationPreset? _activePreset;
-    private IGenerationNode _editingRoot = new SequenceNode { Name = "Root" };
+    private List<PreGenerationPreset> _presets = new();
+    private PreGenerationPreset? _activePreset;
+    private ITreeNode _editingRoot = new SequenceNode { Name = "Root" };
     private TreeDragContext _dragContext = new();
+    private TreeEditorContext _editorContext = default!;
 
     private bool _isAgentMode;
     private string _agentName = "";
@@ -156,14 +163,16 @@
 
     protected override void OnInitialized()
     {
+        _editorContext = new TreeEditorContext(Serializer, NodeTypeCatalog, typeof(IPreGenerationNode));
+
         if (!string.IsNullOrEmpty(agent) && Guid.TryParse(agent, out _agentGuid))
         {
             _isAgentMode = true;
             var ag = Agent.Load(_agentGuid, KVData);
             _agentName = ag.Name;
-            _editingRoot = string.IsNullOrEmpty(ag.ModifierTreeJson)
+            _editingRoot = string.IsNullOrEmpty(ag.PreGenerationTreeJson)
                 ? new SequenceNode { Name = "Root" }
-                : Serializer.Deserialize(ag.ModifierTreeJson)
+                : Serializer.Deserialize(ag.PreGenerationTreeJson)
                     ?? new SequenceNode { Name = "Root" };
             return;
         }
@@ -171,8 +180,8 @@
         LoadPresets();
         if (_presets.Count == 0)
         {
-            // 极端情况：若 KVData 中没有任何预设，给一个空序列兜底
-            _presets.Add(new GenerationPreset { Id = DefaultPresetId, Name = "Default", RootNodeJson = Serializer.Serialize(new SequenceNode { Name = "Root" }) });
+            _presets.Add(new PreGenerationPreset { Id = DefaultPresetId, Name = "Default",
+                RootNodeJson = Serializer.Serialize(new SequenceNode { Name = "Root" }) });
         }
         _activePreset = _presets[0];
         _editingRoot = Serializer.Deserialize(_activePreset.RootNodeJson)
@@ -184,7 +193,7 @@
         var json = KVData.Read("GenerationManager", PresetStorageKey);
         _presets = string.IsNullOrEmpty(json)
             ? new()
-            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
+            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? new();
     }
 
     private void SavePresets()
@@ -220,11 +229,7 @@
             newName = Loc.Format("gen_manager.copy_suffix_counter", _activePreset.Name, counter);
             counter++;
         }
-        var clone = new GenerationPreset
-        {
-            Name = newName,
-            RootNodeJson = _activePreset.RootNodeJson
-        };
+        var clone = new PreGenerationPreset { Name = newName, RootNodeJson = _activePreset.RootNodeJson };
         _presets.Add(clone);
         _activePreset = clone;
         _editingRoot = Serializer.Deserialize(clone.RootNodeJson)
@@ -253,7 +258,7 @@
         }
         else
         {
-            var newPreset = new GenerationPreset { Name = _nameInput.Trim() };
+            var newPreset = new PreGenerationPreset { Name = _nameInput.Trim() };
             _presets.Add(newPreset);
             _activePreset = newPreset;
             _editingRoot = new SequenceNode { Name = "Root" };
@@ -271,7 +276,7 @@
         if (_isAgentMode)
         {
             var ag = Agent.Load(_agentGuid, KVData);
-            ag.ModifierTreeJson = Serializer.Serialize(_editingRoot);
+            ag.PreGenerationTreeJson = Serializer.Serialize(_editingRoot);
             ag.Save(KVData);
             return;
         }

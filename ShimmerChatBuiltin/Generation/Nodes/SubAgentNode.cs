@@ -7,7 +7,7 @@ using ShimmerChatLib.Interface;
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
     [NodeInfo("node.sub_agent", Icon = "🤖", Color = "var(--node-subagent)", CategoryKeys = ["category.flow", "category.sub_agent"])]
-    public class SubAgentNode : IGenerationNode
+    public class SubAgentNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent";
@@ -21,7 +21,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.sub_agent.max_iterations", HintKey = "prop.sub_agent.max_iterations.hint")]
         public int MaxIterations { get; set; } = 50;
 
-        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
 
@@ -40,7 +40,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     loc.Format("node_err.subagent_no_tree", ConfigName),
                     nodeId: Id, nodeName: Name);
 
-            // 1. 创建隔离的 GenerationEnv，将父级 Fragments 转为临时对话写入 SharedState
+            // 1. 创建隔离的 PreGenerationEnv，将父级 Fragments 转为临时对话写入 SharedState
             var persistent = new PersistentEnv
             {
                 KVData = kvData,
@@ -52,7 +52,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 DebugOutput = context.Env.Persistent.DebugOutput
             };
 
-            var subEnv = new GenerationEnv(persistent);
+            var subEnv = new PreGenerationEnv(persistent);
 
             var chatMessages = new List<Message>();
             foreach (var seg in context.Env.Transient.Fragments)
@@ -69,7 +69,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             // 2. 执行 SubAgent 修饰器树（树产物追加在历史之后）
             try
             {
-                var ctx = new NodeExecutionContext(subEnv, context.CancellationToken);
+                var ctx = new PreNodeExecutionContext(subEnv, context.CancellationToken);
                 var result = await rootNode.ExecuteAsync(ctx);
                 if (!result.Success)
                     return NodeResult.Failure(NodeErrorCodes.ServiceError,
@@ -136,7 +136,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             return NodeResult.SuccessResult();
         }
 
-        private static IGenerationNode? ResolveTree(SubAgent.SubAgentConfig config, IKVDataService kvData, IGenerationNodeSerializer serializer)
+        private static IPreGenerationNode? ResolveTree(SubAgent.SubAgentConfig config, IKVDataService kvData, IPreGenerationNodeSerializer serializer)
         {
             if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
                 return serializer.Deserialize(config.ModifierTreeJson);
@@ -144,7 +144,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
             {
                 var json = kvData.Read("GenerationManager", "generation_presets");
-                var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json ?? "[]") ?? [];
+                var presets = JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json ?? "[]") ?? [];
                 var preset = presets.FirstOrDefault(p => p.Id == config.ModifierPresetId);
                 if (preset != null)
                     return serializer.Deserialize(preset.RootNodeJson);

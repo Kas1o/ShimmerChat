@@ -93,20 +93,20 @@
     <SlotEditor Label="@LocService["prop.if_node.then"]"
                 SlotNode="Node.Then"
                 Depth="Depth"
-                OnSet="v => Node.Then = v"
+                OnSet="v => Node.Then = (IGenerationNode?)v"
                 OnClear="() => Node.Then = null" />
 
     <SlotEditor Label="@LocService["prop.if_node.else"]"
                 SlotNode="Node.Else"
                 Depth="Depth"
-                OnSet="v => Node.Else = v"
+                OnSet="v => Node.Else = (IGenerationNode?)v"
                 OnClear="() => Node.Else = null" />
 </div>
 
 @code {
     [Parameter] public IfNode Node { get; set; } = default!;
     [Parameter] public int Depth { get; set; }
-    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
 
     private void OnSourceChanged(ChangeEventArgs e)
     {

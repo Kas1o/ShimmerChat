@@ -47,7 +47,7 @@
 @code {
     [Parameter] public IGenerationNode Node { get; set; } = default!;
     [Parameter] public int Depth { get; set; }
-    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
 
     private ToolInstantiateNode? _typedNode;
     private bool _showPicker = true;

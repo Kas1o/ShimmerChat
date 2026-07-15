@@ -1,7 +1,6 @@
 @using System.Reflection
 @using ShimmerChatLib.Generation
 @inject ILocService Loc
-@inject IGenerationNodeSerializer Serializer
 
 <div class="ge-children @(_isDropTarget ? "tn-drop-inside" : "")"
      @ondragover="OnSlotDragOver" @ondragover:preventDefault
@@ -11,7 +10,7 @@
         @if (SlotNode == null)
         {
             <button class="tn-btn tn-btn-add" @onclick="ToggleAddPicker" title="@Loc["node_editor.add_node"]">+</button>
-            @if (NodeClipboard.HasContent)
+            @if (EditorContext?.HasClipboardContent == true)
             {
                 <button class="tn-btn tn-btn-paste" @onclick="PasteNode" title="@Loc["node_editor.paste"]">📋</button>
             }
@@ -43,13 +42,14 @@
 
 @code {
     [Parameter] public string Label { get; set; } = "";
-    [Parameter] public IGenerationNode? SlotNode { get; set; }
+    [Parameter] public ITreeNode? SlotNode { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public Action<IGenerationNode>? OnSet { get; set; }
+    [Parameter] public Action<ITreeNode>? OnSet { get; set; }
     [Parameter] public Action? OnClear { get; set; }
-    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
 
     [CascadingParameter] private TreeDragContext? DragContext { get; set; }
+    [CascadingParameter] private TreeEditorContext? EditorContext { get; set; }
 
     private bool _showAddPicker;
     private bool _isDropTarget;
@@ -69,15 +69,15 @@
     private void AddChild(Type type)
     {
         _showAddPicker = false;
-        var instance = (IGenerationNode)Activator.CreateInstance(type)!;
-        instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
-        OnSet?.Invoke(instance);
+        var instance = EditorContext?.CreateNode(type);
+        if (instance != null)
+            OnSet?.Invoke(instance);
         InvokeAsync(StateHasChanged);
     }
 
     private void PasteNode()
     {
-        var node = NodeClipboard.Paste(Serializer);
+        var node = EditorContext?.Paste();
         if (node != null)
         {
             OnSet?.Invoke(node);
@@ -85,7 +85,7 @@
         }
     }
 
-    private void RemoveSlot(IGenerationNode _)
+    private void RemoveSlot(ITreeNode _)
     {
         OnClear?.Invoke();
         InvokeAsync(StateHasChanged);

@@ -19,7 +19,8 @@ namespace ShimmerChat.Singletons
     {
         private readonly IKVDataService _kvData;
         private readonly IToolRegistry _toolRegistry;
-        private readonly IGenerationNodeSerializer _serializer;
+        private readonly IPreGenerationNodeSerializer _serializer;
+        private readonly IPostGenerationManager _postManager;
         private readonly ILocService _locService;
         private readonly IDebugOutputService _debugOutput;
         private readonly GenerationTreeExecutor _executor = new();
@@ -27,12 +28,14 @@ namespace ShimmerChat.Singletons
         private readonly ILogger<GenerationManagerV2> _logger;
 
         public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry,
-            IGenerationNodeSerializer serializer, ILocService locService,
-            IDebugOutputService debugOutput, ILogger<GenerationManagerV2> logger)
+            IPreGenerationNodeSerializer serializer, IPostGenerationManager postManager,
+            ILocService locService, IDebugOutputService debugOutput,
+            ILogger<GenerationManagerV2> logger)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
             _serializer = serializer;
+            _postManager = postManager;
             _locService = locService;
             _debugOutput = debugOutput;
             _logger = logger;
@@ -43,19 +46,19 @@ namespace ShimmerChat.Singletons
         {
             var json = _kvData.Read("GenerationManager", "generation_presets");
             var presets = string.IsNullOrEmpty(json)
-                ? new List<GenerationPreset>()
-                : (JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new List<GenerationPreset>());
+                ? new List<PreGenerationPreset>()
+                : (JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? new List<PreGenerationPreset>());
 
             presets.RemoveAll(p => p.Id == "__default__");
 
-            presets.Add(new GenerationPreset
+            presets.Add(new PreGenerationPreset
             {
                 Id = "__default__",
                 Name = "Default",
                 RootNodeJson = _serializer.Serialize(new SequenceNode
                 {
                     Name = "Default",
-                    Nodes = new List<IGenerationNode>
+                    Nodes = new List<IPreGenerationNode>
                     {
                         new FragmentNode
                         {
@@ -136,7 +139,7 @@ namespace ShimmerChat.Singletons
         /// <summary>
         /// 构建生成环境：执行修改器树 + 加载历史消息
         /// </summary>
-        public async Task<GenerationEnv> BuildEnvironment(
+        public async Task<PreGenerationEnv> BuildEnvironment(
             Agent agent, Chat chat, CancellationToken ct)
         {
             var persistent = new PersistentEnv
@@ -150,10 +153,10 @@ namespace ShimmerChat.Singletons
                 DebugOutput = _debugOutput
             };
 
-            IGenerationNode rootNode;
-            if (!string.IsNullOrEmpty(agent.ModifierTreeJson))
+            IPreGenerationNode rootNode;
+            if (!string.IsNullOrEmpty(agent.PreGenerationTreeJson))
             {
-                rootNode = _serializer.Deserialize(agent.ModifierTreeJson)
+                rootNode = _serializer.Deserialize(agent.PreGenerationTreeJson)
                     ?? CreateFallbackRoot(agent);
             }
             else
@@ -161,7 +164,7 @@ namespace ShimmerChat.Singletons
                 rootNode = CreateFallbackRoot(agent);
             }
 
-            var env = new GenerationEnv(persistent);
+            var env = new PreGenerationEnv(persistent);
             env.Transient.SharedState["ChatMessages"] = chat.Messages.ToList();
 
             // 续写检测：最后一条 AI 消息带 IsContinuation 标记
@@ -169,13 +172,22 @@ namespace ShimmerChat.Singletons
             if (lastMsg?.IsContinuation == true)
                 env.Transient.SharedState["IsContinuation"] = true;
 
-            var context = new NodeExecutionContext(env, ct);
+            var context = new PreNodeExecutionContext(env, ct);
             var result = await rootNode.ExecuteAsync(context);
             if (!result.Success)
                 throw new InvalidOperationException(
                     $"Generation tree execution failed. Node: '{result.NodeName}' ({result.NodeId}). {result.Message}");
 
             return env;
+        }
+
+        /// <summary>
+        /// 后生成处理：执行后生成管线对 LLM 响应进行变换。
+        /// </summary>
+        public async Task<string> PostProcessAsync(Agent agent, string responseText,
+            IReadOnlyList<ContextSegment> preFragments, PersistentEnv persistentEnv, CancellationToken ct)
+        {
+            return await _postManager.ExecuteAsync(agent, responseText, preFragments, persistentEnv, ct);
         }
 
         /// <summary>
@@ -186,7 +198,7 @@ namespace ShimmerChat.Singletons
             private readonly GenerationManagerV2 _manager;
             private readonly Agent _agent;
             private readonly Chat _chat;
-            private GenerationEnv _env;
+            private PreGenerationEnv _env;
             private readonly Func<ResponseEx, Task> _onStreamDelta;
             private readonly Func<ResponseEx, Task> _onAssistantComplete;
             private readonly Action<List<ToolCall>>? _onToolCall;
@@ -197,7 +209,7 @@ namespace ShimmerChat.Singletons
                 GenerationManagerV2 manager,
                 Agent agent,
                 Chat chat,
-                GenerationEnv env,
+                PreGenerationEnv env,
                 Func<ResponseEx, Task> onStreamDelta,
                 Func<ResponseEx, Task> onAssistantComplete,
                 Action<List<ToolCall>>? onToolCall,
@@ -260,7 +272,7 @@ namespace ShimmerChat.Singletons
             }
         }
 
-        private static IGenerationNode CreateFallbackRoot(Agent agent)
+        private static IPreGenerationNode CreateFallbackRoot(Agent agent)
         {
             var root = new SequenceNode { Name = agent.Name };
 

@@ -7,7 +7,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 消息内容只显示前 20 字符和后 20 字符，避免输出过长。
     /// </summary>
     [NodeInfo("node.transient_probe", Icon = "◉", Color = "var(--node-branch)", CategoryKeys = ["category.debug"])]
-    public class TransientProbeNode : IGenerationNode
+    public class TransientProbeNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Transient Probe";
@@ -24,7 +24,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.transient_probe.print_api", HintKey = "prop.transient_probe.print_api.hint")]
         public bool PrintAPI { get; set; } = true;
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var transient = context.Env.Transient;
             var output = context.Env.Persistent.DebugOutput;

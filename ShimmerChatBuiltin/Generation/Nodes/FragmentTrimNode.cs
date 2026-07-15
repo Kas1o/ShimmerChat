@@ -9,7 +9,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 合并了旧的 TokenLimit 和 LatestN 功能。
     /// </summary>
     [NodeInfo("node.fragment_trim", Icon = "✂", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.filter"])]
-    public class FragmentTrimNode : IGenerationNode
+    public class FragmentTrimNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Fragment Trim";
@@ -43,7 +43,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// </summary>
         public static Func<IKVDataService, Tokenizers.HuggingFace.Tokenizer.Tokenizer>? TokenizerFactory { get; set; }
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var fragments = context.Env.Transient.Fragments;
 
@@ -96,7 +96,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             fragments.AddRange(kept);
         }
 
-        private void TrimByTokens(NodeExecutionContext context, List<ContextSegment> fragments,
+        private void TrimByTokens(PreNodeExecutionContext context, List<ContextSegment> fragments,
             bool hasFirstSystem, ContextSegment? firstSystem)
         {
             var tokenizer = TokenizerFactory?.Invoke(context.Env.Persistent.KVData);

@@ -30,7 +30,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// </summary>
     [NodeInfo("node.condition", Icon = "◇", Color = "var(--node-branch)", CategoryKeys = ["category.flow", "category.branching"])]
     [NodeEditor(typeof(IfNodeEditor))]
-    public class IfNode : IGenerationNode
+    public class IfNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "If";
@@ -57,12 +57,12 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         public OnConvertFailBehavior OnConvertFail { get; set; } = OnConvertFailBehavior.AsFalse;
 
         [NodeProperty("prop.if_node.then", Order = 8)]
-        public IGenerationNode? Then { get; set; }
+        public IPreGenerationNode? Then { get; set; }
 
         [NodeProperty("prop.if_node.else", Order = 9)]
-        public IGenerationNode? Else { get; set; }
+        public IPreGenerationNode? Else { get; set; }
 
-        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             string? leftValue = ResolveSourceValue(context);
 
@@ -89,7 +89,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             return NodeResult.SuccessResult();
         }
 
-        private string? ResolveSourceValue(NodeExecutionContext context)
+        private string? ResolveSourceValue(PreNodeExecutionContext context)
         {
             return Source switch
             {
@@ -143,7 +143,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             };
         }
 
-        private async Task<NodeResult> ExecuteChild(IGenerationNode child, NodeExecutionContext context)
+        private async Task<NodeResult> ExecuteChild(IPreGenerationNode child, PreNodeExecutionContext context)
         {
             var result = await child.ExecuteAsync(context);
             if (!result.Success)

@@ -8,7 +8,7 @@
 @using Newtonsoft.Json
 
 @inject IKVDataService pluginData
-@inject IGenerationNodeSerializer Serializer
+@inject IPreGenerationNodeSerializer Serializer
 @inject ILocService Loc
 
 
@@ -168,7 +168,7 @@
     bool isLoading;
     string statusMessage = "";
     string statusType = "success";
-    IGenerationNode? _editingTree;
+    IPreGenerationNode? _editingTree;
     TreeDragContext _dragContext = new();
 
     protected override void OnInitialized()
@@ -309,7 +309,7 @@
         var root = new SequenceNode
         {
             Name = $"{selectedConfig.Name} Private Tree",
-            Nodes = new List<IGenerationNode>()
+            Nodes = new List<IPreGenerationNode>()
         };
 
         if (!string.IsNullOrEmpty(selectedConfig.ModifierPresetId))
@@ -343,11 +343,11 @@
         _editingTree = null;
     }
 
-    private List<GenerationPreset> GetPresets()
+    private List<PreGenerationPreset> GetPresets()
     {
         var json = pluginData.Read("GenerationManager", "generation_presets");
         return string.IsNullOrEmpty(json)
             ? new()
-            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
+            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? new();
     }
 }

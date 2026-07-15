@@ -10,7 +10,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 高级条件分支节点：接受 C# 布尔表达式，可访问 Fragments、SharedState、KVData。
     /// </summary>
     [NodeInfo("node.advanced_condition", Icon = "◆", Color = "var(--node-branch)", CategoryKeys = ["category.flow", "category.branching"])]
-    public class AdvancedIfNode : IGenerationNode
+    public class AdvancedIfNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Advanced If";
@@ -22,16 +22,16 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         public string Usings { get; set; } = "";
 
         [NodeProperty("prop.adv_if.then", Order = 3)]
-        public IGenerationNode? Then { get; set; }
+        public IPreGenerationNode? Then { get; set; }
 
         [NodeProperty("prop.adv_if.else", Order = 4)]
-        public IGenerationNode? Else { get; set; }
+        public IPreGenerationNode? Else { get; set; }
 
         private static readonly ScriptOptions DefaultScriptOptions = ScriptOptions.Default
             .WithImports("System.Linq", "SharperLLM.Util", "System.Collections.Generic")
             .WithReferences(typeof(Enumerable).Assembly, typeof(PromptBuilder).Assembly);
 
-        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var globals = new IfGlobals
             {
@@ -75,7 +75,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             return NodeResult.SuccessResult();
         }
 
-        private async Task<NodeResult> ExecuteChild(IGenerationNode child, NodeExecutionContext context)
+        private async Task<NodeResult> ExecuteChild(IPreGenerationNode child, PreNodeExecutionContext context)
         {
             var result = await child.ExecuteAsync(context);
             if (!result.Success)

@@ -16,13 +16,13 @@ namespace ShimmerChatLib.Generation
         /// <param name="ct">取消令牌</param>
         /// <returns>执行后的生成环境</returns>
         /// <exception cref="InvalidOperationException">节点执行失败时抛出，异常信息包含失败节点和错误详情</exception>
-        public async Task<GenerationEnv> ExecuteAsync(
-            IGenerationNode rootNode,
+        public async Task<PreGenerationEnv> ExecuteAsync(
+            IPreGenerationNode rootNode,
             PersistentEnv env,
             CancellationToken ct = default)
         {
-            var generationEnv = new GenerationEnv(env);
-            var context = new NodeExecutionContext(generationEnv, ct);
+            var generationEnv = new PreGenerationEnv(env);
+            var context = new PreNodeExecutionContext(generationEnv, ct);
 
             var result = await rootNode.ExecuteAsync(context);
 

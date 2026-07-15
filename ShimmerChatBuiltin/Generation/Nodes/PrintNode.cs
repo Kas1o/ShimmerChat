@@ -3,7 +3,7 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
     [NodeInfo("node.print", Icon = "🖨️", Color = "var(--node-debug)", CategoryKeys = ["category.debug"], DescriptionKey = "node.print.desc")]
-    public class PrintNode : IGenerationNode
+    public class PrintNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Print";
@@ -11,7 +11,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.print.template", HintKey = "prop.print.template.hint")]
         public string Template { get; set; } = "";
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var output = context.Env.Persistent.DebugOutput;
             var fragments = context.Env.Transient.Fragments;

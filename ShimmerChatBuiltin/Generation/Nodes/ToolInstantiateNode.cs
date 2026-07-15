@@ -8,7 +8,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// </summary>
     [NodeInfo("node.instantiate_tool", Icon = "⚙", Color = "var(--node-tool)", CategoryKeys = ["category.tool"])]
     [NodeEditor(typeof(ToolInstantiateNodeEditor))]
-    public class ToolInstantiateNode : IGenerationNode
+    public class ToolInstantiateNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Instantiate Tool";
@@ -18,7 +18,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         /// </summary>
         public string ToolTypeName { get; set; } = "";
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
 

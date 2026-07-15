@@ -10,7 +10,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// </summary>
     [NodeInfo("node.sub_agent_tool", Icon = "🔧", Color = "var(--node-subagent)", CategoryKeys = ["category.tool", "category.sub_agent"])]
     [NodeEditor(typeof(SubAgentToolNodeEditor))]
-    public class SubAgentToolNode : IGenerationNode
+    public class SubAgentToolNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent Tool";
@@ -18,7 +18,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.sub_agent_tool.config_name", HintKey = "prop.sub_agent_tool.config_name.hint")]
         public string ConfigName { get; set; } = "";
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
 

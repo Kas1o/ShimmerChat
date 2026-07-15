@@ -6,15 +6,15 @@ namespace ShimmerChatLib.Components;
 
 /// <summary>
 /// Non-generic bridge that instantiates <see cref="GenericNodeEditor{TNode}"/>
-/// from an <see cref="IGenerationNode"/> parameter.
+/// from an <see cref="ITreeNode"/> parameter.
 /// Custom editor resolution is handled by <see cref="TreeEditor"/>.
 /// </summary>
 public class NodeBodyRenderer : ComponentBase
 {
-    [Parameter] public required IGenerationNode Node { get; set; }
+    [Parameter] public required ITreeNode Node { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
-    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+    [Parameter] public Action<ITreeNode>? RemoveMe { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {

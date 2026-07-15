@@ -8,7 +8,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// </summary>
     [NodeInfo("node.call_preset", Icon = "↗", Color = "var(--node-link)", CategoryKeys = ["category.flow", "category.link"], DescriptionKey = "node.call_preset.desc")]
     [NodeEditor(typeof(CallNodeEditor))]
-    public class CallNode : IGenerationNode
+    public class CallNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Call Preset";
@@ -16,7 +16,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint")]
         public string PresetId { get; set; } = "";
 
-        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
 
@@ -34,7 +34,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     loc["node_err.call_no_presets"],
                     nodeId: Id, nodeName: Name);
 
-            var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
+            var presets = JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? new();
             var preset = presets.FirstOrDefault(p => p.Id == PresetId);
             if (preset == null)
                 return NodeResult.Failure(

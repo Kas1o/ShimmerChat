@@ -1,8 +1,8 @@
+@using System.Collections
 @using System.Reflection
 @using ShimmerChatLib.Generation
-@typeparam TNode where TNode : IGenerationNode
+@typeparam TNode where TNode : ITreeNode
 @inject ILocService Loc
-@inject IGenerationNodeSerializer Serializer
 
 <div class="generic-editor">
     @foreach (var prop in _properties.OrderBy(p => p.Order))
@@ -23,7 +23,7 @@
     }
     @foreach (var sp in _singleNodeProps)
     {
-        var slotNode = sp.GetValue(Node) as IGenerationNode;
+        var slotNode = sp.GetValue(Node) as ITreeNode;
         <SlotEditor Label="@Loc[sp.LabelKey]"
                     SlotNode="@slotNode"
                     Depth="@Depth"
@@ -36,13 +36,15 @@
 @code {
     [Parameter] public TNode Node { get; set; } = default!;
     [Parameter] public int Depth { get; set; }
-    [Parameter] public Action<IGenerationNode>? RemoveMe { get; set; }
-    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+    [Parameter] public Action<ITreeNode>? RemoveMe { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
+
+    [CascadingParameter] public TreeEditorContext? EditorContext { get; set; }
 
     private List<PropInfo> _properties = new();
     private List<PropInfo> _singleNodeProps = new();
     private PropInfo? _childNodesProp;
-    private IList<IGenerationNode> _childNodes = new List<IGenerationNode>();
+    private IList _childNodes = new List<ITreeNode>();
 
     protected override void OnParametersSet()
     {
@@ -54,7 +56,7 @@
         _properties.Clear();
         _singleNodeProps.Clear();
         _childNodesProp = null;
-        _childNodes = new List<IGenerationNode>();
+        _childNodes = new List<ITreeNode>();
 
         var nodeType = Node.GetType();
         var props = nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -65,14 +67,12 @@
             if (prop.GetCustomAttribute<NodePropertyAttribute>() == null)
                 continue;
 
-            if (typeof(IList<IGenerationNode>).IsAssignableFrom(prop.PropertyType) ||
-                (prop.PropertyType.IsGenericType && prop.PropertyType.GetGenericTypeDefinition() == typeof(List<>)
-                 && typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType.GenericTypeArguments[0])))
+            if (TreeNodeReflection.IsListOfTreeNode(prop))
             {
                 _childNodesProp = new PropInfo(prop);
-                _childNodes = (IList<IGenerationNode>)prop.GetValue(Node)! ?? new List<IGenerationNode>();
+                _childNodes = (IList?)prop.GetValue(Node) ?? new List<ITreeNode>();
             }
-            else if (typeof(IGenerationNode).IsAssignableFrom(prop.PropertyType))
+            else if (TreeNodeReflection.IsSingleTreeNode(prop))
             {
                 _singleNodeProps.Add(new PropInfo(prop));
             }
@@ -83,9 +83,10 @@
         }
     }
 
-    private void CopyNode(IGenerationNode node)
+    private void CopyNode(ITreeNode node)
     {
-        NodeClipboard.Copy(Serializer, node);
+        if (EditorContext != null)
+            EditorContext.Copy(node);
     }
 
     private RenderFragment RenderProperty(PropInfo prop) => builder =>

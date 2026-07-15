@@ -1,9 +1,12 @@
 using System.Reflection;
+using ShimmerChatLib.Components;
 
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
     /// 跨树的节点剪贴板，基于节点 JSON 序列化实现复制/粘贴。
+    /// 全局静态剪贴板，用于跨管线编辑器页面的复制。
+    /// 每个管线编辑器页面也可以通过 <see cref="Components.TreeEditorContext"/> 使用自己的剪贴板。
     /// </summary>
     public static class NodeClipboard
     {
@@ -11,47 +14,22 @@ namespace ShimmerChatLib.Generation
 
         public static bool HasContent => _json != null;
 
-        public static void Copy(IGenerationNodeSerializer serializer, IGenerationNode node)
+        public static void Copy(ITreeNodeSerializer serializer, ITreeNode node)
         {
             _json = serializer.Serialize(node);
         }
 
-        public static IGenerationNode? Paste(IGenerationNodeSerializer serializer)
+        public static ITreeNode? Paste(ITreeNodeSerializer serializer)
         {
             if (_json == null) return null;
             var node = serializer.Deserialize(_json);
-            if (node != null) RegenerateIds(node);
+            if (node != null) TreeNodeReflection.RegenerateIds(node);
             return node;
         }
 
         public static void Clear()
         {
             _json = null;
-        }
-
-        private static void RegenerateIds(IGenerationNode node)
-        {
-            var idProp = node.GetType().GetProperty("Id");
-            if (idProp != null && idProp.CanWrite && idProp.PropertyType == typeof(string))
-            {
-                idProp.SetValue(node, Guid.NewGuid().ToString());
-            }
-
-            // Recursively regenerate IDs in child lists
-            foreach (var prop in node.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (!prop.CanRead) continue;
-                var value = prop.GetValue(node);
-                if (value is IList<IGenerationNode> children)
-                {
-                    foreach (var child in children)
-                        RegenerateIds(child);
-                }
-                else if (value is IGenerationNode singleChild)
-                {
-                    RegenerateIds(singleChild);
-                }
-            }
         }
     }
 }

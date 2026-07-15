@@ -2,9 +2,9 @@
 
 ## 1. 项目简介
 
-ShimmerChat 是一个功能丰富的 AI 聊天应用，基于 **.NET 10 + Blazor Server**，支持多种 LLM API（OpenAI、Ollama、Kobold）接入。核心架构围绕 **可编辑的生成节点树（GenerationNode Tree）** 重构。
+ShimmerChat 是一个功能丰富的 AI 聊天应用，基于 **.NET 10 + Blazor Server**，支持多种 LLM API（OpenAI、Ollama、Kobold）接入。核心架构围绕 **三管线可编辑节点树（Pre / Post / Render）** 重构。
 
-**目标用户：** 需要高度自定义 AI 生成管线的用户，可以通过可视化节点编辑器自由编排 system prompt、聊天历史注入、工具调用、子代理等生成流程。
+**目标用户：** 需要高度自定义 AI 生成管线的用户，可以通过可视化节点编辑器自由编排 system prompt、聊天历史注入、工具调用、子代理、后处理、渲染修改等全链路流程。
 
 ---
 
@@ -40,6 +40,14 @@ ShimmerChat/
 ├── ShimmerChat.Tests/        # 主项目单元测试
 ├── ShimmerChatBuiltin.Tests/ # 内置插件测试
 └── Docs/                     # 开发文档
+    ├── PipelineArchitecture.md   # 三管线架构总览
+    ├── PreGenerationPipeline.md  # 前生成管线
+    ├── PostRenderPipelines.md    # 后生成 + 渲染修改管线
+    ├── NodeEditorSystem.md       # 节点编辑器系统
+    ├── PluginDevelopment.md      # 插件开发
+    ├── ThemeSystem.md            # 主题系统
+    ├── CustomAPI.md              # 自定义 API
+    └── KVDataStorage.md          # KV 存储
 ```
 
 ### 3.1 SharperLLM — LLM 连接库
@@ -62,12 +70,12 @@ ShimmerChat/
 |-----------|------|
 | `Models/` | UI 模型（`Theme`、`PopupOptions` 等） |
 | `Interface/` | 所有服务接口（`IGenerationManagerV2`、`IPluginLoaderService`、`IKVDataService` 等） |
-| `Generation/` | **生成管线核心**：`IGenerationNode`、`GenerationEnv`、`GenerationTreeExecutor`、`ToolCallLoop`、`IToolV2`、`IToolRegistry`、节点元数据 Attribute 等 |
+| `Generation/` | **生成管线核心**：`IPreGenerationNode`、`IPostGenerationNode`、`IRenderModifierNode`、`ITreeNode`、`PreGenerationEnv`、`GenerationTreeExecutor`、`ToolCallLoop`、`IToolV2`、`IToolRegistry`、节点元数据 Attribute 等 |
 | `Components/` | 跨项目共享的 Blazor 组件 |
 | `Panel/` | 插件面板基础设施 |
 | `Context/` | 共享上下文 |
 | `Chat.cs` | 聊天对象模型 |
-| `Agent.cs` | 代理对象模型（含 `ModifierTreeJson`） |
+| `Agent.cs` | 代理对象模型（含 `PreGenerationTreeJson`、`PostGenerationTreeJson`、`RenderModifierTreeJson`） |
 | `Message.cs` | 消息模型（多版本支持） |
 | `Sender.cs` | 发送者枚举 |
 
@@ -105,55 +113,51 @@ Tauri v2 桌面壳，将 Blazor Server 包装为桌面应用。通过 `SHIMMER_R
 
 ---
 
-## 4. 核心概念：GenerationNode 系统
+## 4. 核心概念：三管线节点树
+
+ShimmerChat 3.0 采用三管线架构。参见 [管线架构总览](Docs/PipelineArchitecture.md)。
 
 ### 4.1 概述
 
-ShimmerChat 2.0 的核心创新是 **可编辑的生成节点树**。每次 AI 生成不再是简单的 "发消息 → 等回复"，而是执行一个用户可配置的节点树来构建完整的生成管线。
-
-### 4.2 架构流程
+每次 AI 生成分为三个阶段执行，每个阶段由用户可配置的节点树驱动：
 
 ```
-Agent.ModifierTreeJson (节点树 JSON)
-    │
-    ▼
-GenerationNodeSerializer.Deserialize()
-    │
-    ▼
-IGenerationNode (根节点)
-    │
-    ▼  node.ExecuteAsync(context)
-    │   节点修改 GenerationEnv
-    │   ├── TransientEnv.Fragments  (上下文片段列表)
-    │   ├── TransientEnv.Tools     (可用工具实例)
-    │   └── TransientEnv.API       (选中的 API 配置)
-    │
-    ▼
-Fragments → PromptBuilder.Messages
-    │
-    ▼
-IChatCompletionClient.GenerateStreamAsync()  ← ToolCallLoop 循环
+Pre-Generation Tree ──→ LLM 生成 ──→ Post-Generation Tree ──→ Render Modifier Tree ──→ 显示
 ```
 
-### 4.3 核心类型
+- **Pre**: 构建上下文（Fragments, Tools, API）→ [文档](Docs/PreGenerationPipeline.md)
+- **Post**: 处理 LLM 原始响应 → [文档](Docs/PostRenderPipelines.md)
+- **Render**: Markdown→HTML 渲染管线 → [文档](Docs/PostRenderPipelines.md)
 
-#### IGenerationNode — 节点接口
+三个管线共享节点编辑器系统 → [文档](Docs/NodeEditorSystem.md)
+
+### 4.2 核心类型
+
+#### ITreeNode — 最小节点接口
 
 ```csharp
-public interface IGenerationNode
+public interface ITreeNode
 {
-    string Id { get; }                                    // 唯一标识（GUID）
-    string Name { get; set; }                             // 用户可编辑名称
-    Task<NodeResult> ExecuteAsync(NodeExecutionContext context);  // 执行逻辑
+    string Id { get; }            // 唯一标识（GUID）
+    string Name { get; set; }     // 用户可编辑名称
 }
 ```
 
-每个节点通过 `ExecuteAsync` 修改 `context.Env`（`GenerationEnv`），返回 `NodeResult`。
+#### IPreGenerationNode — 前生成节点
 
-#### GenerationEnv — 生成环境
+```csharp
+public interface IPreGenerationNode : ITreeNode
+{
+    Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context);
+}
+```
+
+每个节点通过 `ExecuteAsync` 修改 `context.Env`（`PreGenerationEnv`），返回 `NodeResult`。
+
+#### PreGenerationEnv — 生成环境
 
 - **`TransientEnv`**（临时）：每次生成重新构建。
-  - `Fragments` — `List<ContextSegment>`，最终转换为 PromptBuilder 的消息列表。
+  - `Fragments` — `List<ContextSegment>`，最终转换为 LLM 消息列表。
   - `Tools` — `List<IToolV2>`，本次生成可用的工具。
   - `API` — 当前使用的 `APISetting`（IChatCompletionClient + 能力标记）。
   - `SharedState` — `Dictionary<string, object>`，节点间共享状态。
@@ -198,7 +202,7 @@ public class ContextSegment
 | `[NodeProperty]` | 属性 | 属性标签、提示、排序、多行编辑 |
 | `[NodeEditor]` | 类 | 指定自定义编辑器组件（可选，默认使用 `GenericNodeEditor`） |
 
-只要实现了 `IGenerationNode` 并标记了 `[NodeInfo]`，节点即自动出现在编辑器的添加菜单中。
+只要实现了 `IPreGenerationNode`（或其他管线接口）并标记了 `[NodeInfo]`，节点即自动出现在对应管线编辑器的添加菜单中。
 
 ### 4.5 关键内置节点
 
@@ -231,7 +235,7 @@ public class ContextSegment
 **生成管线总控。** 注册为 Singleton。
 
 流程：
-1. `BuildEnvironment` — 解析 Agent 的 `ModifierTreeJson`（或创建默认回退树），执行完整节点树，构建 `GenerationEnv`。
+1. `BuildEnvironment` — 解析 Agent 的 `PreGenerationTreeJson`（或创建默认回退树），执行完整节点树，构建 `PreGenerationEnv`。
 2. `GenerateStreamAsync` — 取出 Fragments 构建 `PromptBuilder`，通过 `ToolCallLoop` 执行流式 Tool Call 循环。
 3. `MainLoopHost`（内部类）— 实现 `IToolCallLoopHost`，桥接 `ToolCallLoop` 和 ShimmerChat 的 UI 回调。
 
@@ -244,13 +248,13 @@ public class ContextSegment
 - `GetImplementingTypes(Type)` — 获取接口的所有具体实现。
 - `InitializePluginsAsync()` — 执行所有 `IPluginInitializer`。
 
-### 5.3 IGenerationNodeSerializer / GenerationNodeSerializer
+### 5.3 IPreGenerationNodeSerializer / ITreeNodeSerializer
 
-**节点树序列化/反序列化。** 使用 Newtonsoft.Json + `TypeNameHandling.Objects`，通过 `SerializationBinder` 白名单类型解析（防止反序列化攻击）。
+**节点树序列化/反序列化。** 使用 Newtonsoft.Json + `TypeNameHandling.Objects`，通过 `SerializationBinder` 白名单类型解析（防止反序列化攻击）。每个管线有独立的序列化器实现 `ITreeNodeSerializer` 接口。
 
 ### 5.4 INodeTypeCatalog / NodeTypeCatalog
 
-**节点类型目录。** 扫描所有 `IGenerationNode` 实现，提取 `[NodeInfo]` 元数据，供添加节点菜单使用。
+**节点类型目录。** 扫描所有 `ITreeNode` 实现，提取 `[NodeInfo]` 元数据，供添加节点菜单使用。通过 `GetNodeTypes(Type)` 按管线接口过滤。
 
 ### 5.5 IToolRegistry / ToolRegistry
 
@@ -266,7 +270,7 @@ public class ContextSegment
 
 ### 5.8 IMessageDisplayService / MessageDisplayServiceV1
 
-**消息渲染服务。** 共享的 Markdig `MarkdownPipeline`，支持可插拔的 `IMessageRenderModifier` 链（正则替换、格式化等）。调试模式下可返回完整渲染流程中间结果。
+**消息渲染服务。** 通过 `IRenderModifierManager` 执行 Agent 的 `RenderModifierTreeJson` 节点树（Markdown→HTML、正则替换等）。失败时通过 `BuildErrorHtml` 输出完整变更记录。
 
 ### 5.9 IThemeService / ThemeServiceV2
 
@@ -306,7 +310,7 @@ public class ContextSegment
 
 ### 5.16 IAgentMigrationService
 
-**Agent 格式迁移。** 将 1.0 版本的 Agent 数据（旧格式的 Description、API 配置等）迁移到 2.0 格式（`ModifierTreeJson` 节点树）。启动时自动执行。
+**Agent 格式迁移。** 将 1.0 版本的 Agent 数据迁移到 3.0 格式（`PreGenerationTreeJson` 节点树）。启动时自动执行。
 
 ---
 
@@ -314,23 +318,27 @@ public class ContextSegment
 
 ### 添加新节点的步骤
 
-1. 创建类，实现 `IGenerationNode`。
+1. 创建类，实现 `IPreGenerationNode`、`IPostGenerationNode` 或 `IRenderModifierNode`。
 2. 标记 `[NodeInfo("node.xxx", Icon = "✦", Color = "...", CategoryKeys = [...])]`。
 3. 为可编辑属性标记 `[NodeProperty("prop.xxx")]`。
-4. 实现 `ExecuteAsync` → 修改 `context.Env.Transient` → 返回 `NodeResult`。
+4. 实现 `ExecuteAsync` / `Modify` → 返回 `NodeResult` / `PostNodeResult` / `string`。
 5. （可选）在 `Locales/` 中添加对应的本地化条目。
-6. 节点自动出现在编辑器菜单中，无需手动注册。
+6. 节点自动出现在对应管线编辑器的添加菜单中，无需手动注册。
 
 ### 关键接口总览
 
 | 接口 | 所在库 | 注册方式 |
 |------|--------|----------|
-| `IGenerationNode` | ShimmerChatLib | 自动发现 |
+| `IPreGenerationNode` | ShimmerChatLib | 自动发现 |
+| `IPostGenerationNode` | ShimmerChatLib | 自动发现 |
+| `IRenderModifierNode` | ShimmerChatLib | 自动发现 |
 | `IAutoCreateToolV2` | ShimmerChatLib | 自动发现 |
 | `IPluginInitializer` | ShimmerChatLib | 自动发现 |
 | `IMessageRenderModifier` | ShimmerChatLib | 自动发现 |
 | `IPluginLoaderService` | ShimmerChatLib | Singleton |
 | `IGenerationManagerV2` | ShimmerChatLib | Singleton |
+| `IPostGenerationManager` | ShimmerChatLib | Singleton |
+| `IRenderModifierManager` | ShimmerChatLib | Singleton |
 | `IKVDataService` | ShimmerChatLib | Singleton（按配置选实现） |
 | `IMessageStoreService` | ShimmerChatLib | Singleton（按配置选实现） |
 | `IThemeService` | ShimmerChatLib | Scoped |

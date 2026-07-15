@@ -9,7 +9,9 @@
 @inject IPopupService PopupService
 @inject IJSRuntime JS
 @inject IMessageStoreService messageStore
-@inject IGenerationNodeSerializer Serializer
+@inject IPreGenerationNodeSerializer Serializer
+@inject PostGenerationNodeSerializer PostSerializer
+@inject RenderModifierNodeSerializer RenderSerializer
 @inject ILocService Loc
 @inject ILogger<AgentPage> logger
 
@@ -274,7 +276,7 @@
                         <h4><i class="bi bi-diagram-3"></i> @Loc["agent.section_gen_config"]</h4>
                         <div class="settings-field">
                             <label>@Loc["agent.label_modifier_tree"]</label>
-                            @if (!string.IsNullOrEmpty(agent?.ModifierTreeJson))
+                            @if (!string.IsNullOrEmpty(agent?.PreGenerationTreeJson))
                             {
                                 <div class="gen-config-status">
                                     <span class="gen-config-badge private">@Loc["agent.badge_private_tree"]</span>
@@ -304,6 +306,84 @@
                                         }
                                     </select>
                                     <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePrivateTree">
+                                        <i class="bi bi-pencil"></i> @Loc["agent.create_private_tree"]
+                                    </button>
+                                </div>
+                            }
+                        </div>
+
+                        @* Post-Generation Pipeline *@
+                        <div class="settings-field" style="margin-top:12px;">
+                            <label>@Loc["agent.post_gen_pipeline"]</label>
+                            @if (!string.IsNullOrEmpty(agent?.PostGenerationTreeJson))
+                            {
+                                <div class="gen-config-status">
+                                    <span class="gen-config-badge private">@Loc["agent.post_gen_private"]</span>
+                                    <span class="gen-config-hint">@Loc["agent.post_gen_private_hint"]</span>
+                                </div>
+                                <div style="margin-top:8px; display:flex; gap:8px;">
+                                    <button class="su-btn su-btn-primary su-btn-sm" @onclick='() => EditPostPrivateTree()'>
+                                        <i class="bi bi-pencil"></i> @Loc["agent.post_gen_edit"]
+                                    </button>
+                                    <button class="su-btn su-btn-outline su-btn-sm" @onclick="RevertPostToDefault">
+                                        <i class="bi bi-arrow-counterclockwise"></i> @Loc["agent.revert_to_preset"]
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="gen-config-status">
+                                    <span class="gen-config-badge preset">@Loc["agent.post_gen_default"]</span>
+                                    <span class="gen-config-hint">@Loc["agent.post_gen_default_hint"]</span>
+                                </div>
+                                <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+                                    <select class="shimmer-input" style="flex:1;max-width:300px;" @bind="_postSelectedPresetId">
+                                        <option value="">@Loc["agent.no_preset"]</option>
+                                        @foreach (var p in _postPresets)
+                                        {
+                                            <option value="@p.Id">@p.Name</option>
+                                        }
+                                    </select>
+                                    <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePostPrivateTree">
+                                        <i class="bi bi-pencil"></i> @Loc["agent.create_private_tree"]
+                                    </button>
+                                </div>
+                            }
+                        </div>
+
+                        @* Render Modifier Pipeline *@
+                        <div class="settings-field" style="margin-top:12px;">
+                            <label>@Loc["agent.render_mod_pipeline"]</label>
+                            @if (!string.IsNullOrEmpty(agent?.RenderModifierTreeJson))
+                            {
+                                <div class="gen-config-status">
+                                    <span class="gen-config-badge private">@Loc["agent.render_mod_private"]</span>
+                                    <span class="gen-config-hint">@Loc["agent.render_mod_private_hint"]</span>
+                                </div>
+                                <div style="margin-top:8px; display:flex; gap:8px;">
+                                    <button class="su-btn su-btn-primary su-btn-sm" @onclick='() => EditRenderPrivateTree()'>
+                                        <i class="bi bi-pencil"></i> @Loc["agent.render_mod_edit"]
+                                    </button>
+                                    <button class="su-btn su-btn-outline su-btn-sm" @onclick="RevertRenderToDefault">
+                                        <i class="bi bi-arrow-counterclockwise"></i> @Loc["agent.revert_to_preset"]
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="gen-config-status">
+                                    <span class="gen-config-badge preset">@Loc["agent.render_mod_default"]</span>
+                                    <span class="gen-config-hint">@Loc["agent.render_mod_default_hint"]</span>
+                                </div>
+                                <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+                                    <select class="shimmer-input" style="flex:1;max-width:300px;" @bind="_renderSelectedPresetId">
+                                        <option value="">@Loc["agent.no_preset"]</option>
+                                        @foreach (var p in _renderPresets)
+                                        {
+                                            <option value="@p.Id">@p.Name</option>
+                                        }
+                                    </select>
+                                    <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreateRenderPrivateTree">
                                         <i class="bi bi-pencil"></i> @Loc["agent.create_private_tree"]
                                     </button>
                                 </div>
@@ -1089,16 +1169,29 @@
 
     #endregion
 
-    private List<GenerationPreset> _availablePresets = new();
+    private List<PreGenerationPreset> _availablePresets = new();
+    private List<PostGenerationPreset> _postPresets = new();
+    private List<RenderModifierPreset> _renderPresets = new();
     private string _selectedPresetId = "";
+    private string _postSelectedPresetId = "";
+    private string _renderSelectedPresetId = "";
 
     private void LoadPresets()
     {
         var json = kvDataService.Read("GenerationManager", "generation_presets");
-        if (!string.IsNullOrEmpty(json))
-            _availablePresets = Newtonsoft.Json.JsonConvert.DeserializeObject<List<GenerationPreset>>(json) ?? new();
-        else
-            _availablePresets = new();
+        _availablePresets = string.IsNullOrEmpty(json)
+            ? new()
+            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? new();
+
+        var postJson = kvDataService.Read("PostGenerationManager", "post_generation_presets");
+        _postPresets = string.IsNullOrEmpty(postJson)
+            ? new()
+            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PostGenerationPreset>>(postJson) ?? new();
+
+        var renderJson = kvDataService.Read("RenderModifierManager", "render_modifier_presets");
+        _renderPresets = string.IsNullOrEmpty(renderJson)
+            ? new()
+            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<RenderModifierPreset>>(renderJson) ?? new();
     }
 
     private void CreatePrivateTree()
@@ -1107,7 +1200,7 @@
         var root = new SequenceNode
         {
             Name = "Agent Private Tree",
-            Nodes = new List<IGenerationNode>()
+            Nodes = new List<IPreGenerationNode>()
         };
 
         if (!string.IsNullOrEmpty(_selectedPresetId))
@@ -1120,7 +1213,45 @@
             });
         }
 
-        agent.ModifierTreeJson = Serializer.Serialize(root);
+        agent.PreGenerationTreeJson = Serializer.Serialize(root);
+        agent.Save(kvDataService);
+    }
+
+    private void CreatePostPrivateTree()
+    {
+        if (agent == null) return;
+        var root = new PostSequenceNode { Name = "Agent Post Tree", Children = new() };
+
+        if (!string.IsNullOrEmpty(_postSelectedPresetId))
+        {
+            var preset = _postPresets.FirstOrDefault(p => p.Id == _postSelectedPresetId);
+            root.Children.Add(new PostCallNode
+            {
+                Name = preset?.Name ?? "Preset",
+                PresetId = _postSelectedPresetId
+            });
+        }
+
+        agent.PostGenerationTreeJson = PostSerializer.Serialize(root);
+        agent.Save(kvDataService);
+    }
+
+    private void CreateRenderPrivateTree()
+    {
+        if (agent == null) return;
+        var root = new RenderSequenceNode { Name = "Agent Render Tree", Children = new() };
+
+        if (!string.IsNullOrEmpty(_renderSelectedPresetId))
+        {
+            var preset = _renderPresets.FirstOrDefault(p => p.Id == _renderSelectedPresetId);
+            root.Children.Add(new RenderCallNode
+            {
+                Name = preset?.Name ?? "Preset",
+                PresetId = _renderSelectedPresetId
+            });
+        }
+
+        agent.RenderModifierTreeJson = RenderSerializer.Serialize(root);
         agent.Save(kvDataService);
     }
 
@@ -1129,10 +1260,34 @@
         navigation.NavigateTo($"/generationmanager?agent={agent?.Guid}");
     }
 
+    private void EditPostPrivateTree()
+    {
+        navigation.NavigateTo($"/postgeneration?agent={agent?.Guid}");
+    }
+
+    private void EditRenderPrivateTree()
+    {
+        navigation.NavigateTo($"/messagerender?agent={agent?.Guid}");
+    }
+
     private void RevertToPreset()
     {
         if (agent == null) return;
-        agent.ModifierTreeJson = null;
+        agent.PreGenerationTreeJson = null;
+        agent.Save(kvDataService);
+    }
+
+    private void RevertPostToDefault()
+    {
+        if (agent == null) return;
+        agent.PostGenerationTreeJson = null;
+        agent.Save(kvDataService);
+    }
+
+    private void RevertRenderToDefault()
+    {
+        if (agent == null) return;
+        agent.RenderModifierTreeJson = null;
         agent.Save(kvDataService);
     }
 }

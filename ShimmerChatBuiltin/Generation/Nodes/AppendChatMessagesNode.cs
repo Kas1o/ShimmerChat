@@ -9,12 +9,12 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 替代 GenerationManagerV2 中硬编码的 AppendChatHistory，让消息注入逻辑可配置。
     /// </summary>
     [NodeInfo("node.append_chat_messages", Icon = "💬", Color = "var(--node-fragment)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.append_chat_messages.desc")]
-    public class AppendChatMessagesNode : IGenerationNode
+    public class AppendChatMessagesNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Append Chat Messages";
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var sharedState = context.Env.Transient.SharedState;
             if (!sharedState.TryGetValue("ChatMessages", out var obj) || obj is not List<Message> messages)

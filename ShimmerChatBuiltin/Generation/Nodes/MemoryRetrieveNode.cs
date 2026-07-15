@@ -11,7 +11,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// Qdrant 记忆检索注入节点：基于最近的 N 条消息检索相关记忆并注入到上下文
     /// </summary>
     [NodeInfo("node.memory_retrieve", Icon = "🔍", Color = "var(--node-memory)", CategoryKeys = ["category.content", "category.memory_node"])]
-    public class MemoryRetrieveNode : IGenerationNode
+    public class MemoryRetrieveNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Memory Retrieve";
@@ -36,7 +36,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         private static Dictionary<string, List<float>>? _vectorCache;
 
-        public async Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
             var kvData = context.Env.Persistent.KVData;

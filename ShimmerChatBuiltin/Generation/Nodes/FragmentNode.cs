@@ -7,7 +7,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 向 TransientEnv.Fragments 末尾追加 ContextSegment
     /// </summary>
     [NodeInfo("node.fragment", Icon = "▤", Color = "var(--node-fragment)", CategoryKeys = ["category.content", "category.fragment"])]
-    public class FragmentNode : IGenerationNode
+    public class FragmentNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Fragment";
@@ -24,7 +24,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.fragment.role", HintKey = "prop.fragment.role.hint")]
         public PromptBuilder.From From { get; set; } = PromptBuilder.From.system;
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             context.Env.Transient.Fragments.Add(new ContextSegment
             {

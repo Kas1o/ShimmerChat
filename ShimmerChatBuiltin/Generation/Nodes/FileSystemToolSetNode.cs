@@ -24,7 +24,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     [NodeInfo("node.file_system_tool_set", Icon = "📁", Color = "var(--node-config)",
         CategoryKeys = ["category.tool", "category.preset"],
         DescriptionKey = "node.file_system_tool_set.desc")]
-    public class FileSystemToolSetNode : IGenerationNode
+    public class FileSystemToolSetNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "FileSystem Tools";
@@ -57,7 +57,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.fs_tool_set.scope_mode", Order = 8)]
         public FileScopeMergeMode ScopeMode { get; set; } = FileScopeMergeMode.Override;
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var registry = context.Env.Persistent.ToolRegistry;
             var persistent = context.Env.Persistent;
@@ -78,7 +78,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         }
 
         private void AddScopedTool(IToolRegistry registry, string nameKey, PersistentEnv persistent,
-            FileSystemConfig nodeConfig, NodeExecutionContext context)
+            FileSystemConfig nodeConfig, PreNodeExecutionContext context)
         {
             var meta = registry.FindByName(nameKey);
             if (meta == null) return;

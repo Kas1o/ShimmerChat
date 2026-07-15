@@ -20,7 +20,7 @@ namespace ShimmerChatBuiltin.SubAgent
         private readonly IToolRegistry _toolRegistry;
         private readonly Guid _chatGuid;
         private readonly Guid _agentGuid;
-        private readonly IGenerationNodeSerializer _serializer;
+        private readonly IPreGenerationNodeSerializer _serializer;
         private readonly ILocService _locService;
         private readonly IDebugOutputService _debugOutput;
 
@@ -28,7 +28,7 @@ namespace ShimmerChatBuiltin.SubAgent
 
         public SubAgentToolV2(IKVDataService kvData, IChatCompletionClient? api,
             IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid,
-            IGenerationNodeSerializer serializer, ILocService locService,
+            IPreGenerationNodeSerializer serializer, ILocService locService,
             IDebugOutputService debugOutput)
         {
             _kvData = kvData;
@@ -103,7 +103,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 DebugOutput = _debugOutput
             };
 
-            var subEnv = new GenerationEnv(persistent);
+            var subEnv = new PreGenerationEnv(persistent);
             subEnv.Transient.SharedState["ChatMessages"] = new List<Message>
             {
                 new Message
@@ -116,7 +116,7 @@ namespace ShimmerChatBuiltin.SubAgent
 
             try
             {
-                var ctx = new NodeExecutionContext(subEnv, CancellationToken.None);
+                var ctx = new PreNodeExecutionContext(subEnv, CancellationToken.None);
                 var result = await rootNode.ExecuteAsync(ctx);
                 if (!result.Success)
                     return $"[SubAgent Tree Error: {result.Message}]";
@@ -140,7 +140,7 @@ namespace ShimmerChatBuiltin.SubAgent
             return SubAgentFormatter.Format(config.OutputMode, promptCtx);
         }
 
-        private IGenerationNode ResolveTree(SubAgentConfig config, IKVDataService kvData)
+        private IPreGenerationNode ResolveTree(SubAgentConfig config, IKVDataService kvData)
         {
             if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
                 return _serializer.Deserialize(config.ModifierTreeJson)
@@ -149,7 +149,7 @@ namespace ShimmerChatBuiltin.SubAgent
             if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
             {
                 var json = kvData.Read("GenerationManager", "generation_presets");
-                var presets = JsonConvert.DeserializeObject<List<GenerationPreset>>(json ?? "[]") ?? [];
+                var presets = JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json ?? "[]") ?? [];
                 var preset = presets.FirstOrDefault(p => p.Id == config.ModifierPresetId);
                 if (preset != null)
                     return _serializer.Deserialize(preset.RootNodeJson)

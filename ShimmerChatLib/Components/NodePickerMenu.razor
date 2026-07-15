@@ -1,6 +1,5 @@
 @using ShimmerChatLib.Generation
 @inject ILocService Loc
-@inject INodeTypeCatalog Catalog
 
 <div class="tn-add-menu">
     <input class="tn-add-search" placeholder="@Loc["node_editor.filter_placeholder"]" @bind="_filter" @bind:event="oninput"
@@ -86,6 +85,8 @@
     [Parameter] public EventCallback<Type> OnSelect { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
 
+    [CascadingParameter] public TreeEditorContext? EditorContext { get; set; }
+
     private string _filter = "";
     private List<CategoryTreeNode> _categoryTree = new();
     private List<CategoryTreeNode> _navPath = new();
@@ -93,7 +94,7 @@
 
     protected override void OnInitialized()
     {
-        _allNodes = Catalog.GetAllNodeTypes();
+        _allNodes = EditorContext?.GetAvailableNodeTypes() ?? Array.Empty<NodeTypeMetadata>();
 
         var root = new Dictionary<string, CategoryTreeNode>(StringComparer.OrdinalIgnoreCase);
 

@@ -1,12 +1,12 @@
 @* Reusable drop-zone strip for tree node lists.
    Place between child nodes to allow drag-and-drop insertion at a specific index.
    Usage in custom editors:
-     <DropStrip TargetList="@myChildList" InsertIndex="0" OnDropped="HandleDrop" />
+     <DropStrip TargetList="@myChildList" InsertIndex="0" />
      <TreeEditor Node="@child0" ParentList="@myChildList" ... />
-     <DropStrip TargetList="@myChildList" InsertIndex="1" OnDropped="HandleDrop" />
+     <DropStrip TargetList="@myChildList" InsertIndex="1" />
      ...
 *@
-@using ShimmerChatLib.Generation
+@using System.Collections
 
 <div class="tn-drop-strip @(_active ? "tn-drop-strip-active" : "")"
      @ondragover="OnDragOver" @ondragover:preventDefault
@@ -14,8 +14,8 @@
 </div>
 
 @code {
-    /// <summary>The list to insert into on drop.</summary>
-    [Parameter] public required IList<IGenerationNode> TargetList { get; set; }
+    /// <summary>The list to insert into on drop (non-generic IList to support any ITreeNode list type).</summary>
+    [Parameter] public required IList TargetList { get; set; }
 
     /// <summary>The index at which to insert the dragged node.</summary>
     [Parameter] public int InsertIndex { get; set; }

@@ -7,7 +7,7 @@ using System.Text;
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
     [NodeInfo("node.message_print_v2", Icon = "🌈", Color = "var(--node-debug)", CategoryKeys = ["category.debug"], DescriptionKey = "node.message_print_v2.desc")]
-    public class MessagePrintV2Node : IGenerationNode
+    public class MessagePrintV2Node : IPreGenerationNode
     {
         private const string Reset = "\x1b[0m";
         private const string HeaderColor = "\x1b[1;36m";
@@ -40,7 +40,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.message_print_v2.kitty", HintKey = "prop.message_print_v2.kitty.hint")]
         public bool Kitty { get; set; }
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var output = context.Env.Persistent.DebugOutput;
             var source = nameof(MessagePrintV2Node);

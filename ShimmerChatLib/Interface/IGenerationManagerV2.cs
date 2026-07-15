@@ -38,7 +38,15 @@ namespace ShimmerChatLib.Interface
         /// <summary>
         /// 构建生成环境：执行修改器树 + 加载历史消息
         /// </summary>
-        Task<GenerationEnv> BuildEnvironment(
+        Task<PreGenerationEnv> BuildEnvironment(
             Agent agent, Chat chat, CancellationToken ct);
+
+        /// <summary>
+        /// 后生成处理：执行后生成管线对 LLM 响应进行变换
+        /// </summary>
+        Task<string> PostProcessAsync(
+            Agent agent, string responseText,
+            IReadOnlyList<ContextSegment> preFragments,
+            PersistentEnv persistentEnv, CancellationToken ct);
     }
 }

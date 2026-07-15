@@ -9,7 +9,7 @@ public abstract class NodeTestBase
 {
     protected readonly Mock<IKVDataService> KvMock = new();
     protected readonly Mock<IToolRegistry> ToolRegistryMock = new();
-    protected readonly Mock<IGenerationNodeSerializer> SerializerMock = new();
+    protected readonly Mock<IPreGenerationNodeSerializer> SerializerMock = new();
     protected readonly Mock<ILocService> LocMock = new();
     protected readonly Mock<IDebugOutputService> DebugOutputMock = new();
 
@@ -27,14 +27,14 @@ public abstract class NodeTestBase
         };
     }
 
-    protected NodeExecutionContext CreateContext()
+    protected PreNodeExecutionContext CreateContext()
     {
-        var env = new GenerationEnv(CreatePersistentEnv());
-        return new NodeExecutionContext(env);
+        var env = new PreGenerationEnv(CreatePersistentEnv());
+        return new PreNodeExecutionContext(env);
     }
 
-    protected NodeExecutionContext CreateContext(GenerationEnv env)
+    protected PreNodeExecutionContext CreateContext(PreGenerationEnv env)
     {
-        return new NodeExecutionContext(env);
+        return new PreNodeExecutionContext(env);
     }
 }

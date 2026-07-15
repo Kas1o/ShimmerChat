@@ -14,10 +14,10 @@ namespace ShimmerChat.Singletons
     public class AgentMigrationService : IAgentMigrationService
     {
         private readonly IKVDataService _kvData;
-        private readonly IGenerationNodeSerializer _serializer;
+        private readonly IPreGenerationNodeSerializer _serializer;
         private readonly ILogger<AgentMigrationService> _logger;
 
-        public AgentMigrationService(IKVDataService kvData, IGenerationNodeSerializer serializer, ILogger<AgentMigrationService> logger)
+        public AgentMigrationService(IKVDataService kvData, IPreGenerationNodeSerializer serializer, ILogger<AgentMigrationService> logger)
         {
             _kvData = kvData;
             _serializer = serializer;
@@ -54,13 +54,13 @@ namespace ShimmerChat.Singletons
             var agent = Agent.Load(agentGuid, _kvData);
 
             // 已经有 ModifierTreeJson，不需要迁移
-            if (!string.IsNullOrEmpty(agent.ModifierTreeJson))
+            if (!string.IsNullOrEmpty(agent.PreGenerationTreeJson))
                 return false;
 
             var root = new SequenceNode
             {
                 Name = agent.Name,
-                Nodes = new List<IGenerationNode>()
+                Nodes = new List<IPreGenerationNode>()
             };
 
 
@@ -88,7 +88,7 @@ namespace ShimmerChat.Singletons
             // via ToolManager presets and loaded by ToolPresetNode in the tree.
             // The migration only converts the Description.
 
-            agent.ModifierTreeJson = _serializer.Serialize(root);
+            agent.PreGenerationTreeJson = _serializer.Serialize(root);
             agent.Save(_kvData);
             return true;
         }

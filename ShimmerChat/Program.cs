@@ -30,11 +30,20 @@ builder.Services.AddRazorComponents()
 // 配置 KV 数据存储
 ConfigureKVDataStorage(builder);
 
-// ShimmerChat 2.0 服务
+// ShimmerChat 3.0 服务
 builder.Services.AddSingleton<IToolRegistry, ToolRegistry>();
-builder.Services.AddSingleton<IGenerationNodeSerializer, GenerationNodeSerializer>();
+builder.Services.AddSingleton<IPreGenerationNodeSerializer, PreGenerationNodeSerializer>();
 builder.Services.AddSingleton<INodeTypeCatalog, NodeTypeCatalog>();
 builder.Services.AddSingleton<IGenerationManagerV2, GenerationManagerV2>();
+
+// Post-Generation 管线
+builder.Services.AddSingleton<PostGenerationNodeSerializer>();
+builder.Services.AddSingleton<IPostGenerationManager, PostGenerationManager>();
+
+// Render Modifier 管线
+builder.Services.AddSingleton<RenderModifierNodeSerializer>();
+builder.Services.AddSingleton<IRenderModifierManager, RenderModifierManager>();
+
 builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();

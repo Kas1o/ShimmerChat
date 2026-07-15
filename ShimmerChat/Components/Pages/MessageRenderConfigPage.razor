@@ -1,195 +1,297 @@
 @page "/messagerender"
-@using ShimmerChat.Components.SubComponents
-@using ShimmerChatLib.Interface
+@using ShimmerChatLib.Generation
+@using ShimmerChatLib.Components
+@using ShimmerChatBuiltin.Generation.Nodes
 @inject NavigationManager Navigation
-@inject IMessageDisplayService messageDisplayService
+@inject IKVDataService KVData
+@inject RenderModifierNodeSerializer Serializer
+@inject INodeTypeCatalog NodeTypeCatalog
+@inject IJSRuntime JS
 @inject ILocService Loc
 
-<h3>@Loc["msg_render.title"]</h3>
+<h3>@Loc["render_mod.title"]</h3>
 
-<div class="su-group" style="margin-bottom: 16px;">
-    <div class="su-switch">
-        <input type="checkbox" role="switch"
-               id="debugModeSwitch"
-               @bind="messageDisplayService.DebugModeEnabled"
-               @bind:after="SaveDebugModeSetting">
-        <label for="debugModeSwitch">
-            <strong>@Loc["msg_render.debug_mode"]</strong>
-        </label>
+@if (_isAgentMode)
+{
+    <div class="su-alert su-alert-warning" style="margin-top:16px;">
+        <strong>@Loc.Format("render_mod.editing_private_tree", _agentName)</strong>
+        <button class="su-btn su-btn-sm su-btn-outline" style="margin-left:12px;" @onclick="BackToAgent">@Loc["render_mod.back_to_agent"]</button>
     </div>
-    <small class="su-text-2 su-d-block">
-        @Loc["msg_render.debug_mode_desc"]
-    </small>
-</div>
+}
 
-<button class="su-btn su-btn-primary" style="margin:5px" @onclick="ShowAddModifierPopup">@Loc["msg_render.add_modifier"]</button>
-
-<div class="su-group" style="margin-top:16px;">
-    <h5>@Loc["msg_render.active_modifiers"]</h5>
-    @if (messageDisplayService.ActivatedModifiers.Any())
-    {
-        <div class="su-list" ondragover="event.preventDefault();" @ondrop="() => HandleDrop()">
-            @foreach (var modifier in messageDisplayService.ActivatedModifiers)
+@if (!_isAgentMode)
+{
+    <div class="su-group" style="margin-top:16px;">
+        <h5>@Loc["render_mod.preset_management"]</h5>
+        <select @bind="_selectedPresetId" class="su-select" style="max-width: 400px;">
+            @foreach (var preset in _presets)
             {
-                <div class="su-list-item su-flex su-justify-between su-items-center" 
-                     draggable="true" 
-                     @ondragstart="() => HandleDragStart(messageDisplayService.ActivatedModifiers.IndexOf(modifier))"
-                     @ondragover="() => HandleDragOver(messageDisplayService.ActivatedModifiers.IndexOf(modifier))"
-                     data-index="@messageDisplayService.ActivatedModifiers.IndexOf(modifier)">
-                    <div class="su-flex su-items-center">
-                        <i class="bi bi-grip-vertical" style="margin-right: 10px; cursor: move; color: #6c757d;"></i>
-                        <div class="su-me-2">
-                            <div class="su-switch">
-                                <input type="checkbox" role="switch" 
-                                       id="enableSwitch_@messageDisplayService.ActivatedModifiers.IndexOf(modifier)" 
-                                       @bind="modifier.IsEnabled">
-                                <label for="enableSwitch_@messageDisplayService.ActivatedModifiers.IndexOf(modifier)">
-                                    <strong>@modifier.Name</strong>
-                                </label>
-                            </div>
-                            @if (!string.IsNullOrEmpty(modifier.Value))
-                            {
-                                <small class="su-d-block su-text-2">@modifier.Value</small>
-                            }
-                        </div>
-                    </div>
-                    <div>
-                        <button class="su-btn su-btn-outline-primary su-btn-sm su-me-2" @onclick="() => ShowEditModifierPopup(messageDisplayService.ActivatedModifiers.IndexOf(modifier))">@Loc["msg_render.edit"]</button>
-                        <button class="su-btn su-btn-danger su-btn-sm" @onclick="() => RemoveModifier(messageDisplayService.ActivatedModifiers.IndexOf(modifier))">@Loc["msg_render.remove"]</button>
-                    </div>
-                </div>
+                <option value="@preset.Id">@preset.Name @(preset.Id == DefaultPresetId ? Loc["render_mod.default_badge"] : "")</option>
             }
+        </select>
+        @if (_activePreset != null)
+        {
+            <div class="preset-id-row" style="margin-top: 6px; display: flex; align-items: center; gap: 6px; max-width: 400px;">
+                <span style="font-size: 0.72em; color: #777; white-space: nowrap;">@Loc["render_mod.label_id"]</span>
+                <code style="font-size: 0.72em; color: #999; font-family: monospace; overflow: hidden; text-overflow: ellipsis; flex: 1; cursor: pointer; user-select: all; padding: 2px 4px; background: rgba(255,255,255,0.03); border-radius: 3px;">
+                    @_activePreset.Id
+                </code>
+                <button class="su-btn su-btn-sm su-btn-outline" style="font-size: 0.65em; padding: 1px 6px;" @onclick="CopyPresetId">@Loc["render_mod.copy_id"]</button>
+            </div>
+        }
+        <div style="margin-top: 8px;">
+            <button class="su-btn su-btn-primary su-btn-sm" @onclick="CreateNewPreset">@Loc["render_mod.new_preset"]</button>
+            <button class="su-btn su-btn-secondary su-btn-sm" style="margin-left: 5px;" @onclick="StartRename"
+                    disabled="@(_activePreset?.Id == DefaultPresetId)">@Loc["render_mod.rename"]</button>
+            <button class="su-btn su-btn-secondary su-btn-sm" style="margin-left: 5px;" @onclick="CloneCurrentPreset">@Loc["render_mod.clone"]</button>
+            <button class="su-btn su-btn-danger su-btn-sm" style="margin-left: 5px;" @onclick="DeleteCurrentPreset"
+                    disabled="@(_presets.Count <= 1 || _activePreset?.Id == DefaultPresetId)">@Loc["Delete"]</button>
+        </div>
+    </div>
+}
+
+@if (_showNameDialog)
+{
+    <div class="su-modal-mask" @onclick="() => _showNameDialog = false">
+        <div class="su-modal su-modal-sm" @onclick:stopPropagation="true">
+            <div class="su-modal-header">
+                @_nameDialogTitle
+                <button class="su-btn-close" @onclick="() => _showNameDialog = false">&times;</button>
+            </div>
+            <div class="su-modal-body">
+                <input type="text" class="su-input" @bind="_nameInput" @bind:event="oninput"
+                       placeholder="@Loc["render_mod.preset_name_placeholder"]" />
+            </div>
+            <div class="su-modal-footer">
+                <button class="su-btn su-btn-secondary" @onclick="() => _showNameDialog = false">@Loc["Cancel"]</button>
+                <button class="su-btn su-btn-primary" @onclick="ConfirmName"
+                        disabled="@string.IsNullOrWhiteSpace(_nameInput)">@Loc["render_mod.confirm"]</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div style="margin-top:16px;">
+    <h4>@Loc["render_mod.modifier_tree"]</h4>
+    @if (_isAgentMode)
+    {
+        <div class="su-card">
+            <div class="su-card-body">
+                <CascadingValue Value="_dragContext">
+                <CascadingValue Value="_editorContext">
+                    <TreeEditor Node="@_editingRoot" />
+                </CascadingValue>
+                </CascadingValue>
+            </div>
+        </div>
+    }
+    else if (_activePreset != null)
+    {
+        <div class="su-card">
+            <div class="su-card-body">
+                @if (_activePreset.Id == DefaultPresetId)
+                {
+                    <div class="su-alert su-alert-warning" style="margin-bottom: 12px;">
+                        <strong>@Loc["render_mod.default_readonly"]</strong> @Loc["render_mod.default_readonly_hint"]
+                    </div>
+                    <div style="pointer-events: none; opacity: 0.7;">
+                        <TreeEditor Node="@_editingRoot" />
+                    </div>
+                }
+                else
+                {
+                    <CascadingValue Value="_dragContext">
+                    <CascadingValue Value="_editorContext">
+                        <TreeEditor Node="@_editingRoot" />
+                    </CascadingValue>
+                    </CascadingValue>
+                }
+            </div>
         </div>
     }
     else
     {
-        <p class="su-text-2">@Loc["msg_render.no_active_modifiers"]</p>
+        <p>@Loc["render_mod.select_preset_first"]</p>
     }
 </div>
 
-<button class="su-btn su-btn-primary" style="margin:5px" @onclick="SaveAll">@Loc["msg_render.save_config"]</button>
-
-@if (_showAddModifierPopup)
-{
-    <AddMessageRenderModifierPopup @ref="_addModifierPopup" OnConfirm="(result) => OnAddModifierConfirmed(result)" OnClose="() => HideAddModifierPopup()" />
-}
-
-@if (_showEditModifierPopup)
-{
-    <EditMessageRenderModifierPopup @ref="_editModifierPopup" 
-                              ModifierName="@_editingModifierName" 
-                              ModifierValue="@_editingModifierValue"
-                              OnConfirm="(result) => OnEditModifierConfirmed(result)" 
-                              OnClose="() => HideEditModifierPopup()" />
-}
+<button class="su-btn su-btn-primary" style="margin:16px 5px;" @onclick="SaveAll"
+        disabled="@(!_isAgentMode && _activePreset?.Id == DefaultPresetId)">@Loc["Save"]</button>
 
 @code {
-    private AddMessageRenderModifierPopup? _addModifierPopup;
-    private EditMessageRenderModifierPopup? _editModifierPopup;
+    [Parameter] [SupplyParameterFromQuery] public string? agent { get; set; }
 
-    private bool _showAddModifierPopup = false;
-    private bool _showEditModifierPopup = false;
-    private string? _editingModifierName;
-    private string _editingModifierValue = string.Empty;
-    private int _editingModifierIndex = -1;
+    private const string PresetStorageKey = "render_modifier_presets";
+    private const string DefaultPresetId = "__default__";
 
-    // 拖拽排序相关变量
-    private int _dragIndex = -1;
-    private int _dropTargetIndex = -1;
+    private List<RenderModifierPreset> _presets = new();
+    private RenderModifierPreset? _activePreset;
+    private ITreeNode _editingRoot = new RenderSequenceNode { Name = "Root" };
+    private TreeDragContext _dragContext = new();
+    private TreeEditorContext _editorContext = default!;
+
+    private bool _isAgentMode;
+    private string _agentName = "";
+    private Guid _agentGuid;
+
+    private bool _showNameDialog;
+    private string _nameDialogTitle = "";
+    private string _nameInput = "";
+    private string? _renameTargetId;
+
+    private string _selectedPresetId
+    {
+        get => _activePreset?.Id ?? "";
+        set
+        {
+            var preset = _presets.FirstOrDefault(p => p.Id == value);
+            if (preset != null)
+            {
+                _activePreset = preset;
+                _editingRoot = Serializer.Deserialize(preset.RootNodeJson)
+                    ?? new RenderSequenceNode { Name = "Root" };
+            }
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        _editorContext = new TreeEditorContext(Serializer, NodeTypeCatalog, typeof(IRenderModifierNode));
+
+        if (!string.IsNullOrEmpty(agent) && Guid.TryParse(agent, out _agentGuid))
+        {
+            _isAgentMode = true;
+            var ag = Agent.Load(_agentGuid, KVData);
+            _agentName = ag.Name;
+            _editingRoot = string.IsNullOrEmpty(ag.RenderModifierTreeJson)
+                ? new RenderSequenceNode { Name = "Root" }
+                : Serializer.Deserialize(ag.RenderModifierTreeJson)
+                    ?? new RenderSequenceNode { Name = "Root" };
+            return;
+        }
+
+        LoadPresets();
+        if (_presets.Count == 0)
+        {
+            var defaultRoot = new RenderSequenceNode { Name = "Root" };
+            _presets.Add(new RenderModifierPreset { Id = DefaultPresetId, Name = "Default",
+                RootNodeJson = Serializer.Serialize(defaultRoot) });
+        }
+        _activePreset = _presets[0];
+        _editingRoot = Serializer.Deserialize(_activePreset.RootNodeJson)
+            ?? new RenderSequenceNode { Name = "Root" };
+    }
+
+    private void LoadPresets()
+    {
+        var json = KVData.Read("RenderModifierManager", PresetStorageKey);
+        _presets = string.IsNullOrEmpty(json)
+            ? new()
+            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<RenderModifierPreset>>(json) ?? new();
+    }
+
+    private void SavePresets()
+    {
+        KVData.Write("RenderModifierManager", PresetStorageKey,
+            Newtonsoft.Json.JsonConvert.SerializeObject(_presets));
+    }
+
+    private void CreateNewPreset()
+    {
+        _renameTargetId = null;
+        _nameInput = "";
+        _nameDialogTitle = Loc["render_mod.dialog_new_preset"];
+        _showNameDialog = true;
+    }
+
+    private void StartRename()
+    {
+        if (_activePreset == null || _activePreset.Id == DefaultPresetId) return;
+        _renameTargetId = _activePreset.Id;
+        _nameInput = _activePreset.Name;
+        _nameDialogTitle = Loc["render_mod.dialog_rename_preset"];
+        _showNameDialog = true;
+    }
+
+    private void CloneCurrentPreset()
+    {
+        if (_activePreset == null) return;
+        var newName = _activePreset.Name + " (Copy)";
+        var counter = 2;
+        while (_presets.Any(p => p.Name == newName))
+        {
+            newName = $"{_activePreset.Name} (Copy {counter})";
+            counter++;
+        }
+        var clone = new RenderModifierPreset { Name = newName, RootNodeJson = _activePreset.RootNodeJson };
+        _presets.Add(clone);
+        _activePreset = clone;
+        _editingRoot = Serializer.Deserialize(clone.RootNodeJson)
+            ?? new RenderSequenceNode { Name = "Root" };
+    }
+
+    private void DeleteCurrentPreset()
+    {
+        if (_presets.Count <= 1 || _activePreset == null || _activePreset.Id == DefaultPresetId)
+            return;
+        _presets.Remove(_activePreset);
+        _activePreset = _presets[0];
+        _editingRoot = Serializer.Deserialize(_activePreset.RootNodeJson)
+            ?? new RenderSequenceNode { Name = "Root" };
+        SavePresets();
+    }
+
+    private void ConfirmName()
+    {
+        if (string.IsNullOrWhiteSpace(_nameInput)) return;
+
+        if (_renameTargetId != null)
+        {
+            var target = _presets.FirstOrDefault(p => p.Id == _renameTargetId);
+            if (target != null) target.Name = _nameInput.Trim();
+        }
+        else
+        {
+            var newPreset = new RenderModifierPreset { Name = _nameInput.Trim() };
+            _presets.Add(newPreset);
+            _activePreset = newPreset;
+            _editingRoot = new RenderSequenceNode { Name = "Root" };
+        }
+
+        _showNameDialog = false;
+        _renameTargetId = null;
+        SavePresets();
+    }
 
     private void SaveAll()
     {
-        messageDisplayService.SaveActivatedModifiers();
-        Navigation.NavigateTo(Navigation.Uri, true);
-    }
+        if (_editingRoot == null) return;
 
-    private void ShowAddModifierPopup()
-    {
-        _showAddModifierPopup = true;
-    }
-
-    private void HideAddModifierPopup()
-    {
-        _showAddModifierPopup = false;
-    }
-
-    private void OnAddModifierConfirmed(object result)
-    {
-        var modifierInfo = result as dynamic;
-        if (modifierInfo != null)
+        if (_isAgentMode)
         {
-            string modifierName = modifierInfo.ModifierName;
-            string inputValue = modifierInfo.InputValue;
-            messageDisplayService.ActivateModifier(modifierName, inputValue);
-        }
-        HideAddModifierPopup();
-    }
-
-    private void ShowEditModifierPopup(int index)
-    {
-        if (index >= 0 && index < messageDisplayService.ActivatedModifiers.Count)
-        {
-            _editingModifierIndex = index;
-            var modifier = messageDisplayService.ActivatedModifiers[index];
-            _editingModifierName = modifier.Name;
-            _editingModifierValue = modifier.Value;
-            _showEditModifierPopup = true;
-        }
-    }
-
-    private void HideEditModifierPopup()
-    {
-        _showEditModifierPopup = false;
-        _editingModifierIndex = -1;
-        _editingModifierName = null;
-        _editingModifierValue = string.Empty;
-    }
-
-    private void OnEditModifierConfirmed(object result)
-    {
-        var modifierInfo = result as dynamic;
-        if (modifierInfo != null && _editingModifierIndex >= 0)
-        {
-            string modifierName = modifierInfo!.ModifierName;
-            string inputValue = modifierInfo.InputValue;
-            
-            if (_editingModifierIndex < messageDisplayService.ActivatedModifiers.Count && 
-                messageDisplayService.ActivatedModifiers[_editingModifierIndex].Name == modifierName)
-            {
-                messageDisplayService.ActivatedModifiers[_editingModifierIndex].Value = inputValue;
-                messageDisplayService.SaveActivatedModifiers();
-            }
-        }
-        HideEditModifierPopup();
-    }
-
-    private void HandleDragStart(int index)
-    {
-        _dragIndex = index;
-    }
-
-    private void HandleDragOver(int index)
-    {
-        _dropTargetIndex = index;
-    }
-
-    private void HandleDrop()
-    {
-        if (_dragIndex == -1 || _dropTargetIndex == -1 || _dragIndex == _dropTargetIndex)
+            var ag = Agent.Load(_agentGuid, KVData);
+            ag.RenderModifierTreeJson = Serializer.Serialize(_editingRoot);
+            ag.Save(KVData);
             return;
+        }
 
-        messageDisplayService.ReorderActivatedModifier(_dragIndex, _dropTargetIndex);
-        _dragIndex = -1;
-        _dropTargetIndex = -1;
+        if (_activePreset != null && _activePreset.Id != DefaultPresetId)
+        {
+            _activePreset.RootNodeJson = Serializer.Serialize(_editingRoot);
+            SavePresets();
+        }
     }
 
-    private void RemoveModifier(int modifierIdx)
+    private void BackToAgent()
     {
-        messageDisplayService.RemoveActivatedModifier(modifierIdx);
+        Navigation.NavigateTo($"/agent/{_agentGuid}");
     }
 
-    private void SaveDebugModeSetting()
+    private async Task CopyPresetId()
     {
-        messageDisplayService.SaveDebugModeSetting();
+        if (_activePreset != null)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _activePreset.Id);
+        }
     }
 }

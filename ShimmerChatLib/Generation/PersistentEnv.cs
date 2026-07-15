@@ -11,7 +11,7 @@ namespace ShimmerChatLib.Generation
         public required Guid ChatGuid { get; init; }
         public required Guid AgentGuid { get; init; }
         public required IToolRegistry ToolRegistry { get; init; }
-        public required IGenerationNodeSerializer Serializer { get; init; }
+        public required IPreGenerationNodeSerializer Serializer { get; init; }
         public required ILocService LocService { get; init; }
         /// <summary>
         /// 调试输出服务

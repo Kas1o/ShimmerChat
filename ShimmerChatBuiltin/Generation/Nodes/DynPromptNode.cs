@@ -11,7 +11,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     /// 从 KVData 中读取 DynPromptSet，评估触发规则，将匹配的提示词注入到 TransientEnv.Fragments。
     /// </summary>
     [NodeInfo("node.dyn_prompt", Icon = "📝", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.dyn_prompt.desc")]
-    public class DynPromptNode : IGenerationNode
+    public class DynPromptNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "DynPrompt";
@@ -28,7 +28,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.dyn_prompt.role", HintKey = "prop.dyn_prompt.role.hint", Order = 2)]
         public PromptBuilder.From From { get; set; } = PromptBuilder.From.system;
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
             var kvData = context.Env.Persistent.KVData;

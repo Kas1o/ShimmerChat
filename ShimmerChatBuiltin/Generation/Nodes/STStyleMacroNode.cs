@@ -4,12 +4,12 @@ using System.Text.RegularExpressions;
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
     [NodeInfo("node.st_style_macro", Icon = "🔤", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.st_style_macro.desc")]
-    public class STStyleMacroNode : IGenerationNode
+    public class STStyleMacroNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "ST Style Macro";
 
-        public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var persistent = context.Env.Persistent;
             var username = persistent.KVData.Read("User", "username") ?? "User";

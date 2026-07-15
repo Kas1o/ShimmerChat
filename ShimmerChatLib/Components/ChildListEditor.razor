@@ -1,14 +1,14 @@
+@using System.Collections
 @using System.Reflection
 @using ShimmerChatLib.Generation
 @inject ILocService Loc
-@inject IGenerationNodeSerializer Serializer
 
 <div class="ge-children">
     <div class="ge-children-header">
         <span class="ge-label">@Label</span>
         <span class="tn-count">(@ChildNodes.Count)</span>
         <button class="tn-btn tn-btn-add" @onclick="ToggleAddMenu" title="@Loc["node_editor.add_child"]">+</button>
-        @if (NodeClipboard.HasContent)
+        @if (EditorContext?.HasClipboardContent == true)
         {
             <button class="tn-btn tn-btn-paste" @onclick="PasteNode" title="@Loc["node_editor.paste_copied"]">📋</button>
         }
@@ -25,7 +25,7 @@
     {
         var index = i;
         var child = ChildNodes[i];
-        <div class="tn-child-row" @key="child.Id">
+        <div class="tn-child-row" @key="((ITreeNode)child).Id">
             <div class="tn-child-actions">
                 <button class="tn-btn tn-btn-move"
                         @onclick="() => MoveChildUp(index)"
@@ -37,7 +37,7 @@
                         disabled="@(index == ChildNodes.Count - 1)" title="@Loc["node_editor.move_down"]">⇩</button>
             </div>
             <div class="tn-child-tree">
-                <TreeEditor Node="@child" Depth="@(Depth + 1)"
+                <TreeEditor Node="@((ITreeNode)child)" Depth="@(Depth + 1)"
                             ParentList="@ChildNodes"
                             OnDragSourceChanged="HandleDragSourceChanged"
                             RemoveMe="RemoveChild"
@@ -55,9 +55,11 @@
 
 @code {
     [Parameter] public string Label { get; set; } = "";
-    [Parameter] public required IList<IGenerationNode> ChildNodes { get; set; }
+    [Parameter] public required IList ChildNodes { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public Action<IGenerationNode>? CopyMe { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
+
+    [CascadingParameter] public TreeEditorContext? EditorContext { get; set; }
 
     private bool _showAddMenu;
 
@@ -76,15 +78,15 @@
     private void AddChild(Type type)
     {
         _showAddMenu = false;
-        var instance = (IGenerationNode)Activator.CreateInstance(type)!;
-        instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
-        ChildNodes.Add(instance);
+        var instance = EditorContext?.CreateNode(type);
+        if (instance != null)
+            ChildNodes.Add(instance);
         InvokeAsync(StateHasChanged);
     }
 
     private void PasteNode()
     {
-        var node = NodeClipboard.Paste(Serializer);
+        var node = EditorContext?.Paste();
         if (node != null)
         {
             ChildNodes.Add(node);
@@ -92,7 +94,7 @@
         }
     }
 
-    private void RemoveChild(IGenerationNode node)
+    private void RemoveChild(ITreeNode node)
     {
         ChildNodes.Remove(node);
         InvokeAsync(StateHasChanged);
@@ -101,14 +103,18 @@
     private void MoveChildUp(int index)
     {
         if (index <= 0 || index >= ChildNodes.Count) return;
-        (ChildNodes[index], ChildNodes[index - 1]) = (ChildNodes[index - 1], ChildNodes[index]);
+        var temp = ChildNodes[index];
+        ChildNodes[index] = ChildNodes[index - 1];
+        ChildNodes[index - 1] = temp;
         InvokeAsync(StateHasChanged);
     }
 
     private void MoveChildDown(int index)
     {
         if (index < 0 || index >= ChildNodes.Count - 1) return;
-        (ChildNodes[index], ChildNodes[index + 1]) = (ChildNodes[index + 1], ChildNodes[index]);
+        var temp = ChildNodes[index];
+        ChildNodes[index] = ChildNodes[index + 1];
+        ChildNodes[index + 1] = temp;
         InvokeAsync(StateHasChanged);
     }
 }

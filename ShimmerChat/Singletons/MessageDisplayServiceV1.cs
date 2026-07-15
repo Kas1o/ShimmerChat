@@ -6,6 +6,7 @@ using ShimmerChatLib.Interface;
 using Newtonsoft.Json;
 using System.Text;
 using ShimmerChatLib;
+using ShimmerChatLib.Generation;
 
 namespace ShimmerChat.Singletons
 {
@@ -47,6 +48,7 @@ namespace ShimmerChat.Singletons
 
         private readonly IPluginLoaderService _pluginLoaderService;
         private readonly IKVDataService _pluginDataService;
+        private readonly IRenderModifierManager _renderModifierManager;
         private readonly ILogger<MessageDisplayServiceV1> _logger;
 
         public List<IMessageRenderModifier> LoadedModifiers { get; private set; } = new();
@@ -61,19 +63,18 @@ namespace ShimmerChat.Singletons
         /// 构造函数
         /// 初始化Markdown渲染管道，配置所需的扩展
         /// </summary>
-        public MessageDisplayServiceV1(IPluginLoaderService pluginLoaderService, IKVDataService pluginDataService, ILogger<MessageDisplayServiceV1> logger)
+        public MessageDisplayServiceV1(IPluginLoaderService pluginLoaderService, IKVDataService pluginDataService,
+            IRenderModifierManager renderModifierManager, ILogger<MessageDisplayServiceV1> logger)
         {
             _pluginLoaderService = pluginLoaderService;
             _pluginDataService = pluginDataService;
+            _renderModifierManager = renderModifierManager;
             _logger = logger;
 
-            // 创建并配置MarkdownPipeline
-            // 只在服务初始化时创建一次，所有消息组件共享使用
+            // 保留 MarkdownPipeline 作为回退
             _markdownPipeline = new MarkdownPipelineBuilder()
-                .UsePipeTables() // 启用表格支持
-				//.UseBootstrap()
-				//.UseAdvancedExtensions()
-				.Build();
+                .UsePipeTables()
+                .Build();
 
             LoadAllModifiers();
             LoadActivatedModifiers();
@@ -200,121 +201,43 @@ namespace ShimmerChat.Singletons
             return result.Html;
         }
 
-        /// <summary>
-        /// 渲染消息并返回详细的渲染结果，包括中间步骤和错误信息
-        /// </summary>
-        /// <param name="markdownText">要渲染的Markdown文本</param>
-        /// <param name="chat">当前的Chat对象</param>
-        /// <param name="agent">当前的Agent对象</param>
-        /// <returns>包含详细信息的渲染结果</returns>
         public RenderResult RenderWithDetails(string markdownText, Chat? chat = null, Agent? agent = null)
         {
-            string processedText = markdownText ?? "";
+            var processedText = markdownText ?? "";
             var intermediateResults = new List<RenderStepResult>();
-            var result = new RenderResult
-            {
-                IntermediateResults = intermediateResults
-            };
+            var result = new RenderResult { IntermediateResults = intermediateResults };
 
-            // 记录初始状态
-            if (DebugModeEnabled)
+            intermediateResults.Add(new RenderStepResult
+            {
+                StepName = "Initial",
+                Content = processedText
+            });
+
+            var (nodeResult, changeLog) = _renderModifierManager.RenderWithLog(
+                agent, processedText, chat);
+
+            foreach (var change in changeLog)
             {
                 intermediateResults.Add(new RenderStepResult
                 {
-                    StepName = "Initial",
-                    Content = processedText
+                    StepName = $"{change.NodeType}: {change.NodeName}",
+                    Content = change.After
                 });
             }
 
-            // 应用激活的修改器
-            foreach (var activatedModifier in ActivatedModifiers)
+            if (!nodeResult.Success)
             {
-                if (!activatedModifier.IsEnabled) continue;
-
-                var modifier = LoadedModifiers.FirstOrDefault(m => m.Info.Name == activatedModifier.Name);
-                if (modifier != null)
-                {
-                    try
-                    {
-                        processedText = modifier.Modify(processedText, activatedModifier.Value, chat, agent);
-
-                        if (DebugModeEnabled)
-                        {
-                            intermediateResults.Add(new RenderStepResult
-                            {
-                                StepName = $"Modifier: {activatedModifier.Name}",
-                                Content = processedText
-                            });
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        var errorMsg = $"Error applying modifier '{activatedModifier.Name}': {ex.Message}";
-                        _logger.LogError("Error applying modifier '{Name}': {Message}", activatedModifier.Name, ex.Message);
-
-                        if (DebugModeEnabled)
-                        {
-                            intermediateResults.Add(new RenderStepResult
-                            {
-                                StepName = $"Modifier: {activatedModifier.Name}",
-                                Content = processedText,
-                                IsError = true,
-                                ErrorMessage = ex.Message
-                            });
-                        }
-
-                        // 构建错误信息HTML
-                        var errorHtml = BuildErrorHtml(processedText, intermediateResults, errorMsg, activatedModifier.Name);
-                        result.Html = (MarkupString)errorHtml;
-                        result.HasError = true;
-                        result.ErrorMessage = errorMsg;
-                        result.FailedStepName = activatedModifier.Name;
-                        return result;
-                    }
-                }
-            }
-
-            // 使用共享的MarkdownPipeline实例进行渲染
-            try
-            {
-                var html = Markdig.Markdown.ToHtml(processedText, _markdownPipeline);
-
-                if (DebugModeEnabled)
-                {
-                    intermediateResults.Add(new RenderStepResult
-                    {
-                        StepName = "Markdown Rendering",
-                        Content = html
-                    });
-                }
-
-                result.Html = (MarkupString)html;
-            }
-            catch (Exception ex)
-            {
-                var errorMsg = $"Error during Markdown rendering: {ex.Message}";
-                _logger.LogError("Error during Markdown rendering: {Message}", ex.Message);
-
-                if (DebugModeEnabled)
-                {
-                    intermediateResults.Add(new RenderStepResult
-                    {
-                        StepName = "Markdown Rendering",
-                        Content = processedText,
-                        IsError = true,
-                        ErrorMessage = ex.Message
-                    });
-                }
-
-                // 构建错误信息HTML
-                var errorHtml = BuildErrorHtml(processedText, intermediateResults, errorMsg, "Markdown Rendering");
+                var errorMsg = $"{nodeResult.Code}: {nodeResult.Message}";
+                var errorHtml = BuildErrorHtml(processedText, intermediateResults,
+                    errorMsg, nodeResult.NodeName ?? "Unknown");
                 result.Html = (MarkupString)errorHtml;
                 result.HasError = true;
                 result.ErrorMessage = errorMsg;
-                result.FailedStepName = "Markdown Rendering";
+                result.FailedStepName = nodeResult.NodeName;
                 return result;
             }
 
+            result.Html = (MarkupString)nodeResult.Content;
             return result;
         }
 
@@ -338,8 +261,8 @@ namespace ShimmerChat.Singletons
             sb.AppendLine("</div>");
             sb.AppendLine("</div>");
 
-            // 如果启用了调试模式，显示所有中间步骤
-            if (DebugModeEnabled && intermediateResults.Count > 0)
+            // 显示所有中间步骤
+            if (intermediateResults.Count > 0)
             {
                 sb.AppendLine("<div style='margin-top: 16px;'>");
                 sb.AppendLine("<h5 style='color: #721c24;'>渲染流程中间结果:</h5>");
