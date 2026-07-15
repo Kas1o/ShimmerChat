@@ -92,7 +92,7 @@
 
 @code
 {
-    [Parameter] public JToken Token { get; set; }
+    [Parameter] public JToken Token { get; set; } = default!;
     [Parameter] public int CurrentLevel { get; set; } = 0;
     [Parameter] public int DefaultExpandLevel { get; set; } = 2;
 

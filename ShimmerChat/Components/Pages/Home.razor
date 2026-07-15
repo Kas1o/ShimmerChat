@@ -18,14 +18,14 @@
 
 @code {
 	private string currentTime = DateTime.Now.ToString("T");
-	private Timer timer;
+	private Timer? timer;
 	private string BackgroundImagePath => ThemeService.CurrentTheme.IsDarkMode ? "/shimmer-chat-bg.png" : "/shimmer-chat-bg-light-theme.png";
 
 	protected override void OnInitialized()
 	{
 		// 每隔一秒更新一次时间
 		timer = new Timer(1000);
-		timer.Elapsed += UpdateTime;
+		timer.Elapsed += UpdateTime!;
 		timer.AutoReset = true;
 		timer.Enabled = true;
 		

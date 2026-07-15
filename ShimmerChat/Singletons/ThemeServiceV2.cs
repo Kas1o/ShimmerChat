@@ -6,7 +6,7 @@ namespace ShimmerChat.Singletons
     public class ThemeServiceV2 : IThemeService
     {
         private readonly IKVDataService _kvDataService;
-        private Theme _currentTheme;
+        private Theme? _currentTheme;
         private bool _isInitialized;
         private readonly object _lock = new();
         private const string THEME_STORAGE_KEY = "shimmerchat_current_theme_id";
@@ -16,7 +16,7 @@ namespace ShimmerChat.Singletons
 
         public Theme CurrentTheme
         {
-            get { EnsureInitialized(); return _currentTheme; }
+            get { EnsureInitialized(); return _currentTheme!; }
         }
 
         public List<Theme> AvailableThemes
@@ -130,7 +130,7 @@ namespace ShimmerChat.Singletons
             var theme = _availableThemes.FirstOrDefault(t => t.Id == themeId);
             if (theme == null || theme.IsBuiltIn) return;
             _availableThemes.Remove(theme);
-            if (_currentTheme.Id == themeId)
+            if (_currentTheme!.Id == themeId)
             {
                 var fallback = _availableThemes.FirstOrDefault(t => t.IsDefault)
                     ?? _availableThemes.FirstOrDefault()

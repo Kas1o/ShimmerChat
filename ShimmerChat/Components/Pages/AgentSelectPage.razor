@@ -1,5 +1,4 @@
 @page "/agentselect"
-@using System.Collections.ObjectModel;
 @inject NavigationManager navigation
 @inject ILocService Loc
 @inject IKVDataService kvDataService
@@ -377,7 +376,7 @@ else
 		}
 	}
 
-	IBrowserFile File { get; set; }
+	IBrowserFile? File { get; set; }
 	async Task InputFileChanged(InputFileChangeEventArgs e)
 	{
 		File = e.File;

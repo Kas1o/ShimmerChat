@@ -35,16 +35,18 @@
 	[Parameter]
 	public Guid AgentGuid { get; set; }
 
+	#pragma warning disable CS8974
 	private Dictionary<string, object> Parameters => new Dictionary<string, object>
 	{
 		["ChatGuid"] = ChatGuid,
 		["AgentGuid"] = AgentGuid,
 		["EventHandlerReg"] = RegisterEventHandler
 	};
+	#pragma warning restore CS8974
 
 	private bool _isExpanded = false;
 
-	List<PluginPanelInfo> PluginPanelInfos;
+	List<PluginPanelInfo> PluginPanelInfos = default!; // 由 OnInitialized 初始化
 
 	protected override void OnInitialized()
 	{

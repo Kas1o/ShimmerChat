@@ -1,9 +1,7 @@
 @page "/agent/{AgentGuid}/{ChatGuid}"
 @using ShimmerChatLib
-@using SharperLLM.API
 @using System.Collections.ObjectModel
 @using System.Threading
-@using ShimmerChat.Singletons
 @using Microsoft.JSInterop
 
 @inject IGenerationManagerV2 generationManager
@@ -28,14 +26,14 @@
 				@if (virtualize)
 				{
 					<Virtualize Items="messages" Context="message">
-						<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" DeleteFrom="() => DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
+						<ShimmerChat.Components.SubComponents.Message Delete="async () => await DeleteMessage(message)" RegenerateFrom="async () => await RegenerateFromMessage(message)" ContinueFrom="async () => await ContinueFromMessage(message)" DeleteFrom="async () => await DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
 					</Virtualize>
 				}
 				else
 				{
 					@foreach (var message in messages)
 					{
-						<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" DeleteFrom="() => DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
+						<ShimmerChat.Components.SubComponents.Message Delete="async () => await DeleteMessage(message)" RegenerateFrom="async () => await RegenerateFromMessage(message)" ContinueFrom="async () => await ContinueFromMessage(message)" DeleteFrom="async () => await DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
 					}
 				}
 			</div>
@@ -395,7 +393,7 @@
 			}
 			else
 			{
-				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", Loc.Format("chat.gen_error", ex.Source));
+				await popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", Loc.Format("chat.gen_error", ex.Source ?? "[NULL]"));
 			}
 		}
 		finally
@@ -487,7 +485,7 @@
 			}
 			else
 			{
-				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", Loc.Format("chat.gen_error", ex.Source));
+				await popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", Loc.Format("chat.gen_error", ex.Source ?? "[NULL]"));
 			}
 		}
 		finally
@@ -715,7 +713,7 @@
 				};
 
 				// 调用JavaScript中的通知函数
-				await JS.InvokeVoidAsync("showNotification", Loc.Format("chat.new_message_notification", agent?.Name), notificationOptions);
+				await JS.InvokeVoidAsync("showNotification", Loc.Format("chat.new_message_notification", agent?.Name ?? "No Name"), notificationOptions);
 			}
 		}
 		catch (Exception ex)

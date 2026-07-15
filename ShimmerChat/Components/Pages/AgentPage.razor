@@ -154,7 +154,7 @@
                     <div class="su-modal-mask" @onclick="() => DeleteChatPopupVisible=false">
                         <div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
                             <h5>@Loc["agent.delete_chat_title"]</h5>
-                            <p>@Loc.Format("agent.delete_chat_msg", ChatToDelete?.Name)</p>
+                            <p>@Loc.Format("agent.delete_chat_msg", ChatToDelete?.Name ?? "No Name")</p>
                             <div class="su-modal-footer">
                                 <button class="su-btn su-btn-secondary" @onclick="() => DeleteChatPopupVisible=false">Cancel</button>
                                 <button class="su-btn su-btn-danger" @onclick="DeleteChatConfirmed">Delete</button>
@@ -251,7 +251,7 @@
                         <h4><i class="bi bi-image"></i> @Loc["agent.section_avatar_bg"]</h4>
                         <div class="media-upload-row">
                             <div class="media-upload-item">
-                                @if (agent.AvatarGuid != null)
+                                @if (agent!.AvatarGuid != null)
                                 {
                                     <img id="avatar-preview" src="@AvatarPath" alt="avatar"/>
                                 }
@@ -536,8 +536,8 @@
         agent?.Save(kvDataService);
     }
 
-    string AvatarPath => $"/userimages/{agent.AvatarGuid}.png";
-    string BackgroudPath => $"/userimages/{agent.BackgroundGuid}.png";
+    string AvatarPath => $"/userimages/{agent!.AvatarGuid}.png";
+    string BackgroudPath => $"/userimages/{agent!.BackgroundGuid}.png";
 
     static readonly string[] _avatarColors = new[]
     {
@@ -838,8 +838,8 @@
             await stream.CopyToAsync(localFile);
         }
 
-        agent.AvatarGuid = guid;
-        agent.Save(kvDataService);
+        agent!.AvatarGuid = guid;
+        agent!.Save(kvDataService);
         StateHasChanged();
     }
     private async void InputBackground(InputFileChangeEventArgs e)
@@ -863,8 +863,8 @@
             await stream.CopyToAsync(localFile);
         }
 
-        agent.BackgroundGuid = guid;
-        agent.Save(kvDataService);
+        agent!.BackgroundGuid = guid;
+        agent!.Save(kvDataService);
         StateHasChanged();
     }
 

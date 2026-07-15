@@ -150,7 +150,7 @@
         var modifierInfo = result as dynamic;
         if (modifierInfo != null && _editingModifierIndex >= 0)
         {
-            string modifierName = modifierInfo.ModifierName;
+            string modifierName = modifierInfo!.ModifierName;
             string inputValue = modifierInfo.InputValue;
             
             if (_editingModifierIndex < messageDisplayService.ActivatedModifiers.Count && 

@@ -1,5 +1,3 @@
-@using Markdig
-@using Markdig.Extensions.Tables
 @using ShimmerChatLib
 @using SharperLLM.Util
 
@@ -98,7 +96,7 @@
 		_ => "chat-msg-ai"
 	};
 
-	[Parameter] public Action Delete { get; set; } = null;
+	[Parameter] public Action Delete { get; set; } = null!;
 	[Parameter] public Action MakeDirty { get; set; } = null!;
 	[Parameter] public Action RegenerateFrom { get; set; } = null!;
 	[Parameter] public Action ContinueFrom { get; set; } = null!;

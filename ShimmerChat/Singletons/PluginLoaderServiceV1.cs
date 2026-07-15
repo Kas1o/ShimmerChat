@@ -83,7 +83,7 @@ namespace ShimmerChat.Singletons
                 {
                     _logger.LogError(ex, "从程序集 {AssemblyName} 加载类型时出错: {Message}", assembly.FullName, ex.Message);
                     foreach (var loaderException in ex.LoaderExceptions)
-                        _logger.LogError("加载异常: {Message}", loaderException.Message);
+                        _logger.LogError("加载异常: {Message}", loaderException?.Message ?? "Unknown");
                 }
                 catch (Exception ex)
                 {
@@ -135,7 +135,7 @@ namespace ShimmerChat.Singletons
             {
                 _logger.LogError(ex, "从程序集 {AssemblyName} 加载类型时出错: {Message}", assembly.FullName, ex.Message);
                 foreach (var loaderException in ex.LoaderExceptions)
-                    _logger.LogError("加载异常: {Message}", loaderException.Message);
+                    _logger.LogError("加载异常: {Message}", loaderException?.Message ?? "Unknown");
             }
             catch (Exception ex)
             {
@@ -158,7 +158,7 @@ namespace ShimmerChat.Singletons
             {
                 _logger.LogError(ex, "从程序集 {AssemblyName} 获取标记类型时出错: {Message}", assembly.FullName, ex.Message);
                 foreach (var loaderException in ex.LoaderExceptions)
-                    _logger.LogError("加载异常: {Message}", loaderException.Message);
+                    _logger.LogError("加载异常: {Message}", loaderException?.Message ?? "Unknown");
             }
             catch (Exception ex)
             {

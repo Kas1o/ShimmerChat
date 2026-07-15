@@ -1,5 +1,4 @@
 @using Microsoft.AspNetCore.Components.Routing
-@using ShimmerChat.Components.SubComponents
 @using ShimmerChatLib.Interface
 @using System.Reflection
 @inject IPluginPanelService PluginPanelService
@@ -114,7 +113,7 @@
     [Inject]
     public required IThemeService ThemeService { get; set; }
 
-    public string Version { get; set; }
+    public string? Version { get; set; } = default!; // 由 OnInitialized 设置
 
     private List<PluginPanelInfo> _pluginPanels = new();
     private string _selectedCulture = "zh-CN";
