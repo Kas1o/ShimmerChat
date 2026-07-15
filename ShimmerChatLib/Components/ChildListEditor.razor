@@ -79,6 +79,7 @@
         var instance = (IGenerationNode)Activator.CreateInstance(type)!;
         instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
         ChildNodes.Add(instance);
+        InvokeAsync(StateHasChanged);
     }
 
     private void PasteNode()
@@ -87,23 +88,27 @@
         if (node != null)
         {
             ChildNodes.Add(node);
+            InvokeAsync(StateHasChanged);
         }
     }
 
     private void RemoveChild(IGenerationNode node)
     {
         ChildNodes.Remove(node);
+        InvokeAsync(StateHasChanged);
     }
 
     private void MoveChildUp(int index)
     {
         if (index <= 0 || index >= ChildNodes.Count) return;
         (ChildNodes[index], ChildNodes[index - 1]) = (ChildNodes[index - 1], ChildNodes[index]);
+        InvokeAsync(StateHasChanged);
     }
 
     private void MoveChildDown(int index)
     {
         if (index < 0 || index >= ChildNodes.Count - 1) return;
         (ChildNodes[index], ChildNodes[index + 1]) = (ChildNodes[index + 1], ChildNodes[index]);
+        InvokeAsync(StateHasChanged);
     }
 }

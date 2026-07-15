@@ -72,6 +72,7 @@
         var instance = (IGenerationNode)Activator.CreateInstance(type)!;
         instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
         OnSet?.Invoke(instance);
+        InvokeAsync(StateHasChanged);
     }
 
     private void PasteNode()
@@ -80,18 +81,20 @@
         if (node != null)
         {
             OnSet?.Invoke(node);
+            InvokeAsync(StateHasChanged);
         }
     }
 
     private void RemoveSlot(IGenerationNode _)
     {
         OnClear?.Invoke();
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task RemoveSlotAsync()
     {
         OnClear?.Invoke();
-        await Task.CompletedTask;
+        await InvokeAsync(StateHasChanged);
     }
 
     // ── Drop target ──────────────────────────────────
