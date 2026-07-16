@@ -6,6 +6,9 @@
 		<label class="su-label">@Loc["api_config.qdrant_host"]</label>
 		<input class="su-input" type="text" @bind="Host" placeholder="@Loc["api_config.qdrant_host_placeholder"]"/>
 	</div>
+	<div style="font-size: 0.72em; color: var(--su-text-1); margin-top: 8px; padding: 6px 8px; background: var(--su-surface-3); border-left: 3px solid var(--su-border-0); border-radius: 2px; line-height: 1.5;">
+        @Loc["api_config.qdrant_host_warning"]
+    </div>
 	<div class="su-form-group">
 		<label class="su-label">@Loc["api_config.qdrant_port"]</label>
 		<input class="su-input" type="text" @bind="Port" placeholder="@Loc["api_config.qdrant_port_placeholder"]" />

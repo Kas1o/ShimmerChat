@@ -414,12 +414,14 @@
   "api_config.embedding_model_placeholder": "openai/text-embedding-3-small",
   "api_config.qdrant_host": "gRPC Host",
   "api_config.qdrant_host_placeholder": "localhost",
+  "api_config.qdrant_host_warning": "Warning: Use *Grpc* port.",
   "api_config.qdrant_port": "Port",
   "api_config.qdrant_port_placeholder": "6334",
   "api_config.qdrant_apikey": "APIKEY",
   "api_config.qdrant_apikey_placeholder": "your apikey",
   "api_config.qdrant_dim": "DIM",
   "api_config.qdrant_dim_placeholder": "1024",
+  
   "api_config.tokenizer_model": "Model",
   "api_config.tokenizer_model_placeholder": "./tokenizer.json",
 
