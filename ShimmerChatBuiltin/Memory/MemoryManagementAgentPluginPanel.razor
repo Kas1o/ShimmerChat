@@ -1,0 +1,88 @@
+@using Microsoft.Extensions.Logging
+@using Qdrant.Client
+@using Qdrant.Client.Grpc
+@attribute [PluginPanelAttribute("panel.memory_management_agent_plugin_panel", "panel.memory_management_agent_plugin_panel.desc", PanelDisplayPlace.Agent)]
+
+@inject ILogger<MemoryManagementAgentPluginPanel> logger
+@inject IKVDataService kvdata
+@inject ILocService loc
+
+
+<button class="su-btn su-btn-primary" @onclick="QueryInfo">@loc["panel.memory_management_agent_plugin_panel.query_info"]</button>
+
+@if(queryFinished){
+    @if(!exists){
+        <p class="--su-text-0"> @loc["panel.memory_management_agent_plugin_panel.query_info.collection_not_exists_text"] </p>
+    }
+
+    @if(exists){
+        <p>@infoText</p>
+
+        <button class="su-btn su-btn-danger" @onclick="DeleteCollection">@loc["panel.memory_management_agent_plugin_panel.delete_collection"]</button>
+    }
+}
+
+
+
+@code {
+    [Parameter] public Guid AgentGuid { get; set; }
+    [Parameter] public Action<IChatPanelEventHandler> EventHandlerReg { get; set; } = null!;
+
+    bool queryFinished;
+    bool exists;
+
+    string infoText = "";
+
+    QdrantClient? qClient = null;
+
+    async Task QueryInfo(){
+        try
+        {
+            var qHost = kvdata.Read("QdrantAPI", "host") ?? throw new InvalidDataException("Qdrant API host not set.");
+            var qPort = kvdata.Read("QdrantAPI", "port") ?? throw new InvalidDataException("Qdrant API port not set.");
+            var qApiKey = kvdata.Read("QdrantAPI", "apikey");
+            var vectorSize = ulong.Parse(kvdata.Read("QdrantAPI", "dim") ?? "1024");
+
+            qClient = new QdrantClient(qHost, int.Parse(qPort));
+            if (!string.IsNullOrEmpty(qApiKey))
+            {
+                var chnl = QdrantChannel.ForAddress(new Uri($"http://{qHost}:{qPort}"), new ClientConfiguration { ApiKey = qApiKey });
+                qClient = new QdrantClient(new QdrantGrpcClient(chnl));
+            }
+
+            exists = await qClient.CollectionExistsAsync($"{AgentGuid}");
+            if(!exists){
+                queryFinished = true;
+                StateHasChanged();
+                return;
+            }
+
+            var info = await qClient.GetCollectionInfoAsync($"{AgentGuid}");
+
+            var pointsCount = info.PointsCount;
+            var dim = info.Config.Params.VectorsConfig.Params.Size;
+
+            infoText = $"pointsCount = {pointsCount}, dim = {dim}";
+            queryFinished = true;
+            StateHasChanged();
+        }
+        catch(Exception ex)
+        {
+            infoText = ex.Message;
+        }
+    }
+
+    async Task DeleteCollection()
+    {
+        if(qClient == null)
+        {
+            // ???
+            return;
+        }
+
+        await qClient.DeleteCollectionAsync($"{AgentGuid}");
+        exists = false;
+        queryFinished = false;
+        StateHasChanged();
+    }
+}

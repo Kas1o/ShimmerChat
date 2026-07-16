@@ -407,7 +407,7 @@
   "panel_regex.default_set_name": "New Set {0}",
 
   "api_config.embedding_uri": "URI",
-  "api_config.embedding_uri_placeholder": "localhost",
+  "api_config.embedding_uri_placeholder": "http://localhost:5001/v1",
   "api_config.embedding_apikey": "APIKEY",
   "api_config.embedding_apikey_placeholder": "your apikey",
   "api_config.embedding_model": "MODELNAME",
@@ -474,5 +474,11 @@
   "editor_tool_instantiate.choose_tool": "Choose Tool...",
 
   "builtin.regex_render_modifier.name": "Regex Replacement",
-  "builtin.regex_render_modifier.desc": "Applies a set of Regex replacement rules to the message content. Input: Name of the Regex Set to apply."
+  "builtin.regex_render_modifier.desc": "Applies a set of Regex replacement rules to the message content. Input: Name of the Regex Set to apply.",
+
+  "panel.memory_management_agent_plugin_panel.delete_collection" : "Delete Collection",
+  "panel.memory_management_agent_plugin_panel.query_info.collection_not_exists_text" : "Collection Not Exists.",
+  "panel.memory_management_agent_plugin_panel.query_info" : "Query Info",
+  "panel.memory_management_agent_plugin_panel.desc" : "manage agent memory",
+  "panel.memory_management_agent_plugin_panel" : "Memory Manage"
 }

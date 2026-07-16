@@ -407,7 +407,7 @@
   "panel_regex.default_set_name": "新集合 {0}",
 
   "api_config.embedding_uri": "URI",
-  "api_config.embedding_uri_placeholder": "localhost",
+  "api_config.embedding_uri_placeholder": "http://localhost:5001/v1",
   "api_config.embedding_apikey": "APIKEY",
   "api_config.embedding_apikey_placeholder": "your apikey",
   "api_config.embedding_model": "MODELNAME",
@@ -474,5 +474,11 @@
   "editor_tool_instantiate.choose_tool": "选择工具...",
 
   "builtin.regex_render_modifier.name": "正则替换",
-  "builtin.regex_render_modifier.desc": "对消息内容应用一组正则替换规则。输入: 要应用的 Regex 集合名称。"
+  "builtin.regex_render_modifier.desc": "对消息内容应用一组正则替换规则。输入: 要应用的 Regex 集合名称。",
+
+  "panel.memory_management_agent_plugin_panel.delete_collection" : "删除数据",
+  "panel.memory_management_agent_plugin_panel.query_info.collection_not_exists_text" : "数据不存在",
+  "panel.memory_management_agent_plugin_panel.query_info" : "查询信息",
+  "panel.memory_management_agent_plugin_panel.desc" : "管理Agent的记忆",
+  "panel.memory_management_agent_plugin_panel" : "记忆管理"
 }
