@@ -23,10 +23,10 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             HintKey = "prop.debug_output.category_hint")]
         public string Category { get; set; } = "RawResponse";
 
-        public Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
+        public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
         {
             context.Env.Persistent.DebugOutput.Write(Source, Category, JsonConvert.SerializeObject(context.Env.ResponseMessage));
-            return Task.FromResult(PostNodeResult.SuccessResult());
+            return PostNodeResult.SuccessResult();
         }
     }
 }

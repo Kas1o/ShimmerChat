@@ -19,6 +19,24 @@
 	<div class="chat-page">
 		<div class="chat-topbar">
 			<button class="chat-back" @onclick="BackToAgentPage">← @agent!.Name</button>
+			@if (generationPhase != null)
+			{
+				<span class="generation-phase @($"phase-{generationPhase}")">
+					<span class="phase-dot"></span>
+					@switch (generationPhase)
+					{
+						case "pre":
+							@Loc["chat.phase_pre"]
+							break;
+						case "gen":
+							@Loc["chat.phase_gen"]
+							break;
+						case "post":
+							@Loc["chat.phase_post"]
+							break;
+					}
+				</span>
+			}
 		</div>
 
 		<div class="chat-messages" @ref="ChatMainElement" @onscroll="OnChatScroll">
@@ -94,6 +112,7 @@
 	ElementReference inputArea;
 
 	bool generating = false; // 表示当前是否在生成中
+	string? generationPhase = null; // 当前生成阶段：pre / gen / post
 	CancellationTokenSource? cts; // 用于取消生成任务的令牌源
 	private Agent? agent; // 当前对话所属的Agent引用
 	private Chat? chat; // 当前对话的引用
@@ -131,6 +150,14 @@
 	}
 	async Task OnClickStopGenerationButton()
 	{
+		var postProcessing = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.PostProcessing);
+		if (postProcessing != null)
+		{
+			var confirmed = await popupService.ShowAsync(
+				Loc["chat.stop_post_processing_warn"],
+				Loc["chat.stop_warn_title"], showCancel: true);
+			if (!confirmed) return;
+		}
 		StopGeneration();
 	}
 	async Task OnClickSendButton()
@@ -223,6 +250,7 @@
 				cts.Cancel();
 				cts.Dispose();
 				cts = null;
+				generationPhase = null;
 
 				// 标记当前AI消息为完成状态
 				var generatingMessage = GetGeneratingMessage();
@@ -253,6 +281,7 @@
 			return;
 
 		generating = true;
+		generationPhase = "pre";
 
 		// 创建新的CancellationTokenSource
 		cts = new CancellationTokenSource();
@@ -264,6 +293,7 @@
 				agent, chat,
 				onStreamDelta: async (accumulated) =>
 				{
+					generationPhase = "gen";
 					// 在第一个 delta 时创建消息
 					var regeneratingMessage = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Regenerating);
 					Message generatingMessage;
@@ -335,9 +365,13 @@
 				},
 				onAssistantComplete: async (accumulated) =>
 				{
-					var generatingMessage = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Generating);
+					generationPhase = null;
+					var generatingMessage = messages.FirstOrDefault(m => m.IsGenerating);
 					if (generatingMessage != null)
 					{
+						// 同步后生成管线修改过的内容（流式阶段复制的是原始内容）
+						if (generatingMessage.CurrentVersion != null)
+							generatingMessage.CurrentVersion.Content = accumulated.Body.Content;
 						generatingMessage.GenerationState = MessageGenerationState.Completed;
 						chat.SaveMessage(messageStore, generatingMessage);
 						ChatPluginPanelContainer?.OnAgentMessage(generatingMessage);
@@ -372,15 +406,24 @@
 					// 触发UI刷新
 					InvokeAsync(StateHasChanged);
 				},
+				onPostGenerationStarted: async () =>
+				{
+					generationPhase = "post";
+					var msg = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Generating);
+					if (msg != null) msg.GenerationState = MessageGenerationState.PostProcessing;
+					await InvokeAsync(StateHasChanged);
+				},
 				cancellationToken
 			);
 		}
 		catch (OperationCanceledException)
 		{
+			generationPhase = null;
 			// 操作被用户取消，这是预期行为，不需要显示错误
 		}
 		catch (Exception ex)
 		{
+			generationPhase = null;
 			// 发生错误时，标记所有生成中的消息为完成状态
 			foreach (var msg in messages.Where(m => m.IsGenerating))
 			{
@@ -418,6 +461,7 @@
 			return;
 
 		generating = true;
+		generationPhase = "pre";
 
 		// 创建新的CancellationTokenSource
 		cts = new CancellationTokenSource();
@@ -432,6 +476,7 @@
 				agent, chat,
 				onStreamDelta: async (accumulated) =>
 				{
+					generationPhase = "gen";
 					// 将新内容追加到原始内容后面
 					if (!string.IsNullOrEmpty(accumulated.Body.Content))
 					{
@@ -454,6 +499,10 @@
 				},
 				onAssistantComplete: async (accumulated) =>
 				{
+					generationPhase = null;
+					// 同步后生成管线修改过的内容（需保留原始前缀）
+					if (continuationMessage.CurrentVersion != null)
+						continuationMessage.CurrentVersion.Content = originalContent + accumulated.Body.Content;
 					continuationMessage.GenerationState = MessageGenerationState.Completed;
 					continuationMessage.IsContinuation = false;
 					chat.SaveMessage(messageStore, continuationMessage);
@@ -462,16 +511,24 @@
 				},
 				onToolCall: null!,
 				onToolResult: null!,
+				onPostGenerationStarted: async () =>
+				{
+					generationPhase = "post";
+					continuationMessage.GenerationState = MessageGenerationState.PostProcessing;
+					await InvokeAsync(StateHasChanged);
+				},
 				cancellationToken
 			);
 		}
 		catch (OperationCanceledException)
 		{
+			generationPhase = null;
 			continuationMessage.IsContinuation = false;
 			// 操作被用户取消，这是预期行为，不需要显示错误
 		}
 		catch (Exception ex)
 		{
+			generationPhase = null;
 			continuationMessage.IsContinuation = false;
 			// 发生错误时，标记所有生成中的消息为完成状态
 			foreach (var msg in messages.Where(m => m.IsGenerating))

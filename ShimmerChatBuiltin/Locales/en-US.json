@@ -163,6 +163,8 @@
   "prop.sub_agent.output_mode.hint": "LastMessage, FullJson, or None. Overrides config if set",
   "prop.sub_agent.max_iterations": "Max Iterations",
   "prop.sub_agent.max_iterations.hint": "Maximum tool-call loop iterations",
+  "prop.sub_agent.shared_guid": "Shared GUID",
+  "prop.sub_agent.shared_guid.hint": "When enabled, the sub-agent inherits the parent AgentGuid. When disabled, uses the config GUID as an independent identity.",
   "prop.sub_agent_tool.config_name": "Config Name",
   "prop.sub_agent_tool.config_name.hint": "SubAgent configuration name (selected from dropdown)",
   "prop.tool_preset.preset_name": "Preset Name",

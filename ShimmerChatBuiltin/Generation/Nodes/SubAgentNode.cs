@@ -21,6 +21,9 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.sub_agent.max_iterations", HintKey = "prop.sub_agent.max_iterations.hint")]
         public int MaxIterations { get; set; } = 50;
 
+        [NodeProperty("prop.sub_agent.shared_guid", HintKey = "prop.sub_agent.shared_guid.hint")]
+        public bool SharedGuid { get; set; } = false;
+
         public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
@@ -45,7 +48,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             {
                 KVData = kvData,
                 ChatGuid = context.Env.Persistent.ChatGuid,
-                AgentGuid = context.Env.Persistent.AgentGuid,
+                AgentGuid = SharedGuid ? context.Env.Persistent.AgentGuid : config.Guid,
                 ToolRegistry = context.Env.Persistent.ToolRegistry,
                 Serializer = context.Env.Persistent.Serializer,
                 LocService = context.Env.Persistent.LocService,

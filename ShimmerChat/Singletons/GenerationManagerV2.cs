@@ -87,13 +87,14 @@ namespace ShimmerChat.Singletons
             Func<ResponseEx, Task> onAssistantComplete,
             Action<List<ToolCall>> onToolCall,
             Action<(string name, string resp, string id)> onToolResult,
-            CancellationToken cancellationToken)
+            Func<Task>? onPostGenerationStarted = null,
+            CancellationToken cancellationToken = default)
         {
             var env = await BuildEnvironment(agent, chat, cancellationToken);
 
             var host = new MainLoopHost(this, agent, chat, env,
                 onStreamDelta, onAssistantComplete, onToolCall, onToolResult,
-                cancellationToken);
+                onPostGenerationStarted, cancellationToken);
 
             var apiSetting = env.Transient.API
                 ?? throw new InvalidOperationException("No API configured.");
@@ -205,6 +206,7 @@ namespace ShimmerChat.Singletons
             private readonly Func<ResponseEx, Task> _onAssistantComplete;
             private readonly Action<List<ToolCall>>? _onToolCall;
             private readonly Action<(string, string, string)>? _onToolResult;
+            private readonly Func<Task>? _onPostGenerationStarted;
             private readonly CancellationToken _ct;
 
             public MainLoopHost(
@@ -216,6 +218,7 @@ namespace ShimmerChat.Singletons
                 Func<ResponseEx, Task> onAssistantComplete,
                 Action<List<ToolCall>>? onToolCall,
                 Action<(string, string, string)>? onToolResult,
+                Func<Task>? onPostGenerationStarted,
                 CancellationToken ct)
             {
                 _manager = manager;
@@ -226,6 +229,7 @@ namespace ShimmerChat.Singletons
                 _onAssistantComplete = onAssistantComplete;
                 _onToolCall = onToolCall;
                 _onToolResult = onToolResult;
+                _onPostGenerationStarted = onPostGenerationStarted;
                 _ct = ct;
             }
 
@@ -264,6 +268,8 @@ namespace ShimmerChat.Singletons
                 // 对每次 assistant 响应执行后生成管线（含 FunctionCall 和 Stop）
                 try
                 {
+                    if (_onPostGenerationStarted != null)
+                        await _onPostGenerationStarted();
                     var processed = await _manager.PostProcessAsync(
                         _agent, fullResponse.Body,
                         _env.Transient.Fragments, _env.Persistent, ct);

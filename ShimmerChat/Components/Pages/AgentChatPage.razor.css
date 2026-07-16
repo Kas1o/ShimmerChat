@@ -25,6 +25,33 @@
 }
 .chat-back:hover { background: var(--su-surface-3); }
 
+/* ── Generation phase indicator ────────────────── */
+.generation-phase {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-left: auto;
+    padding: 2px 10px;
+    border-radius: var(--su-radius-full);
+    font-size: var(--su-font-sm); font-weight: 500;
+    color: var(--su-text-1);
+    background: var(--su-surface-2);
+    border: var(--su-border-size) solid var(--su-border-0);
+}
+.phase-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--su-accent);
+    animation: phase-pulse 1.4s ease-in-out infinite;
+}
+.phase-post .phase-dot {
+    background: var(--su-warning, #f0a030);
+}
+.phase-pre .phase-dot {
+    background: var(--su-text-2);
+}
+@keyframes phase-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
 /* ── Messages area ────────────────────────────── */
 .chat-messages {
     flex: 1; overflow-y: auto; overflow-x: hidden;

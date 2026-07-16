@@ -163,6 +163,8 @@
   "prop.sub_agent.output_mode.hint": "LastMessage、FullJson 或 None。设置后将覆盖配置中的值",
   "prop.sub_agent.max_iterations": "最大迭代次数",
   "prop.sub_agent.max_iterations.hint": "工具调用循环的最大迭代次数",
+  "prop.sub_agent.shared_guid": "共享 GUID",
+  "prop.sub_agent.shared_guid.hint": "开启后子代理继承父级 AgentGuid；关闭则使用配置 GUID 作为独立身份。",
   "prop.sub_agent_tool.config_name": "配置名称",
   "prop.sub_agent_tool.config_name.hint": "子智能体配置名称（从下拉菜单选择）",
   "prop.tool_preset.preset_name": "预设名称",

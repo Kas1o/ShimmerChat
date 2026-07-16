@@ -25,7 +25,8 @@ namespace ShimmerChatLib.Interface
             Func<ResponseEx, Task> onAssistantComplete,
             Action<List<ToolCall>> onToolCall,
             Action<(string name, string resp, string id)> onToolResult,
-            CancellationToken cancellationToken);
+            Func<Task>? onPostGenerationStarted = null,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// 非流式生成 AI 响应
