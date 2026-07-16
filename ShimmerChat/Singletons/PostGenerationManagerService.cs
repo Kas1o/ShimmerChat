@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using SharperLLM.Util;
 using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
@@ -26,7 +27,7 @@ namespace ShimmerChat.Singletons
             EnsureDefaultPostPreset();
         }
 
-        public async Task<string> ExecuteAsync(Agent agent, string responseText,
+        public async Task<ChatMessage> ExecuteAsync(Agent agent, ChatMessage responseMessage,
             IReadOnlyList<ContextSegment> preFragments,
             PersistentEnv persistentEnv, CancellationToken ct = default)
         {
@@ -41,7 +42,7 @@ namespace ShimmerChat.Singletons
                 root = CreateFallbackRoot();
             }
 
-            var env = new PostGenerationEnv(responseText, preFragments, persistentEnv)
+            var env = new PostGenerationEnv(responseMessage, preFragments, persistentEnv)
             {
                 Serializer = _serializer
             };
@@ -55,12 +56,13 @@ namespace ShimmerChat.Singletons
                     _logger.LogWarning("[PostGeneration] 节点执行失败: {Code} {Message} (Node: {NodeName})",
                         result.Code, result.Message, result.NodeName);
                 }
-                return env.ResponseText;
+                responseMessage.Content = env.ResponseText;
+                return responseMessage;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[PostGeneration] 执行异常");
-                return responseText;
+                return responseMessage;
             }
         }
 

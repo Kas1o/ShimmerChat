@@ -2,6 +2,7 @@ using SharperLLM.Agents;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using SharperLLM.Util;
+using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.SubAgent;
@@ -14,11 +15,14 @@ public class SubAgentLoopHost : IToolCallLoopHost
 {
     private readonly IPromptContext _promptContext;
     private readonly IToolExecutor _toolExecutor;
+    private readonly Func<ChatMessage, Task<ChatMessage>>? _postProcessor;
 
-    public SubAgentLoopHost(IPromptContext promptContext, IToolExecutor toolExecutor)
+    public SubAgentLoopHost(IPromptContext promptContext, IToolExecutor toolExecutor,
+        Func<ChatMessage, Task<ChatMessage>>? postProcessor = null)
     {
         _promptContext = promptContext;
         _toolExecutor = toolExecutor;
+        _postProcessor = postProcessor;
     }
 
     public PromptBuilder BuildPromptBuilder(IReadOnlyList<Tool> toolDefinitions)
@@ -30,10 +34,16 @@ public class SubAgentLoopHost : IToolCallLoopHost
     public Task OnStreamDeltaAsync(ResponseEx accumulated, CancellationToken ct)
         => Task.CompletedTask;
 
-    public Task<bool> OnAssistantCompleteAsync(ResponseEx fullResponse, CancellationToken ct)
+    public async Task<bool> OnAssistantCompleteAsync(ResponseEx fullResponse, CancellationToken ct)
     {
-        _promptContext.AppendAssistantMessage(fullResponse.Body);
-        return Task.FromResult(true);
+        var body = fullResponse.Body;
+        if (_postProcessor != null)
+        {
+            try { body = await _postProcessor(body); }
+            catch { /* 失败时保留原始消息 */ }
+        }
+        _promptContext.AppendAssistantMessage(body);
+        return true;
     }
 
     public Task OnToolCompleteAsync(ToolCall toolCall, string result, CancellationToken ct)

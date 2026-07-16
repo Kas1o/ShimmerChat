@@ -1,3 +1,5 @@
+using SharperLLM.Util;
+
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
@@ -35,6 +37,9 @@ namespace ShimmerChatLib.Generation
         /// <summary>LLM 原始响应文本（节点可修改）</summary>
         public string ResponseText { get; set; }
 
+        /// <summary>LLM 完整响应消息（含 tool calls、thinking 等）。ResponseText 是此消息 Content 的初始副本。</summary>
+        public ChatMessage ResponseMessage { get; }
+
         /// <summary>前生成管线构建的 Fragments（只读参考）</summary>
         public IReadOnlyList<ContextSegment> PreFragments { get; }
 
@@ -47,9 +52,10 @@ namespace ShimmerChatLib.Generation
         /// <summary>当前管线的序列化器（CallNode 加载预设时使用）</summary>
         public ITreeNodeSerializer Serializer { get; set; } = default!;
 
-        public PostGenerationEnv(string responseText, IReadOnlyList<ContextSegment> preFragments, PersistentEnv persistent)
+        public PostGenerationEnv(ChatMessage responseMessage, IReadOnlyList<ContextSegment> preFragments, PersistentEnv persistent)
         {
-            ResponseText = responseText;
+            ResponseMessage = responseMessage;
+            ResponseText = responseMessage.Content ?? "";
             PreFragments = preFragments;
             Persistent = persistent;
         }

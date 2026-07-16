@@ -107,14 +107,15 @@ namespace ShimmerChat.Singletons
                 var response = await apiSetting.ChatClient.GenerateAsync(pb);
                 await host.OnStreamDeltaAsync(response, cancellationToken);
                 await host.OnAssistantCompleteAsync(response, cancellationToken);
-                return;
             }
-
-            await _loop.RunAsync(
-                apiSetting.ChatClient,
-                env.Transient.Tools.Select(t => t.GetDefinition()).ToList(),
-                host,
-                ct: cancellationToken);
+            else
+            {
+                await _loop.RunAsync(
+                    apiSetting.ChatClient,
+                    env.Transient.Tools.Select(t => t.GetDefinition()).ToList(),
+                    host,
+                    ct: cancellationToken);
+            }
         }
 
         /// <summary>
@@ -183,12 +184,12 @@ namespace ShimmerChat.Singletons
         }
 
         /// <summary>
-        /// 后生成处理：执行后生成管线对 LLM 响应进行变换。
+        /// 后生成处理：执行后生成管线对 LLM 响应消息进行变换。
         /// </summary>
-        public async Task<string> PostProcessAsync(Agent agent, string responseText,
+        public async Task<ChatMessage> PostProcessAsync(Agent agent, ChatMessage responseMessage,
             IReadOnlyList<ContextSegment> preFragments, PersistentEnv persistentEnv, CancellationToken ct)
         {
-            return await _postManager.ExecuteAsync(agent, responseText, preFragments, persistentEnv, ct);
+            return await _postManager.ExecuteAsync(agent, responseMessage, preFragments, persistentEnv, ct);
         }
 
         /// <summary>
@@ -260,6 +261,20 @@ namespace ShimmerChat.Singletons
 
             public async Task<bool> OnAssistantCompleteAsync(ResponseEx fullResponse, CancellationToken ct)
             {
+                // 对每次 assistant 响应执行后生成管线（含 FunctionCall 和 Stop）
+                try
+                {
+                    var processed = await _manager.PostProcessAsync(
+                        _agent, fullResponse.Body,
+                        _env.Transient.Fragments, _env.Persistent, ct);
+                    fullResponse.Body = processed;
+                }
+                catch (Exception ex)
+                {
+                    _manager._logger.LogWarning(ex,
+                        "[GenerationManagerV2] Post-Generation failed, using raw response.");
+                }
+
                 await _onAssistantComplete(fullResponse);
                 return true;
             }

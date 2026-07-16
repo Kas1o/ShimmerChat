@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
+using SharperLLM.Util;
 using ShimmerChatLib.Generation;
 
 namespace ShimmerChatLib.Interface
@@ -42,10 +43,11 @@ namespace ShimmerChatLib.Interface
             Agent agent, Chat chat, CancellationToken ct);
 
         /// <summary>
-        /// 后生成处理：执行后生成管线对 LLM 响应进行变换
+        /// 后生成处理：执行后生成管线对 LLM 响应消息进行变换。
+        /// 应在每次 assistant 完成时调用（含 FunctionCall 和 Stop）。
         /// </summary>
-        Task<string> PostProcessAsync(
-            Agent agent, string responseText,
+        Task<ChatMessage> PostProcessAsync(
+            Agent agent, ChatMessage responseMessage,
             IReadOnlyList<ContextSegment> preFragments,
             PersistentEnv persistentEnv, CancellationToken ct);
     }
