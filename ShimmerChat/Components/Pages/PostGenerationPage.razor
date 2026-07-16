@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject IKVDataService KVData
 @inject PostGenerationNodeSerializerService Serializer
+@inject IPostGenerationManagerService PostManager
 @inject INodeTypeCatalog NodeTypeCatalog
 @inject IJSRuntime JS
 @inject ILocService Loc
@@ -171,12 +172,7 @@
         }
 
         LoadPresets();
-        if (_presets.Count == 0)
-        {
-            _presets.Add(new PostGenerationPreset { Id = DefaultPresetId, Name = "Default",
-                RootNodeJson = Serializer.Serialize(new PostSequenceNode { Name = "Root" }) });
-        }
-        _activePreset = _presets[0];
+        _activePreset = _presets.FirstOrDefault(p => p.Id == DefaultPresetId) ?? _presets[0];
         _editingRoot = Serializer.Deserialize(_activePreset.RootNodeJson)
             ?? new PostSequenceNode { Name = "Root" };
     }

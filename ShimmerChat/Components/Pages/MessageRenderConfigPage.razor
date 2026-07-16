@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject IKVDataService KVData
 @inject RenderModifierNodeSerializer Serializer
+@inject IRenderModifierManager RenderModifierManager
 @inject INodeTypeCatalog NodeTypeCatalog
 @inject IJSRuntime JS
 @inject ILocService Loc
@@ -171,13 +172,7 @@
         }
 
         LoadPresets();
-        if (_presets.Count == 0)
-        {
-            var defaultRoot = new RenderSequenceNode { Name = "Root" };
-            _presets.Add(new RenderModifierPreset { Id = DefaultPresetId, Name = "Default",
-                RootNodeJson = Serializer.Serialize(defaultRoot) });
-        }
-        _activePreset = _presets[0];
+        _activePreset = _presets.FirstOrDefault(p => p.Id == DefaultPresetId) ?? _presets[0];
         _editingRoot = Serializer.Deserialize(_activePreset.RootNodeJson)
             ?? new RenderSequenceNode { Name = "Root" };
     }
