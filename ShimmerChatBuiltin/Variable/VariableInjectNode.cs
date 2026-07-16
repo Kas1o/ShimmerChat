@@ -8,6 +8,9 @@ public class VariableInjectNode : IPreGenerationNode
 
     public string Name {get; set;}
 
+    [NodeProperty("node.variableinject.template", MultiLine =true)]
+    public string template {get;set;} = "<inject_variables>{0}</inject_variables>";
+
     // TODO: 添加属性、分别管理添加对话变量 or 添加Agent变量。
     
     public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
@@ -27,7 +30,7 @@ public class VariableInjectNode : IPreGenerationNode
 
         // 添加消息
         context.Env.Transient.Fragments.Add(new ContextSegment {
-            Message =  String.Join("\n", strings),
+            Message =  string.Format(template, String.Join("\n", strings)),
             From = SharperLLM.Util.PromptBuilder.From.system,
             SourceType = typeof(VariableInjectNode)
         });
