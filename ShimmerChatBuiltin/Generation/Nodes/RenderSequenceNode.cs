@@ -17,16 +17,12 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.sequence.children", Order = 100)]
         public List<IRenderModifierNode> Children { get; set; } = new();
 
-        public async Task<RenderNodeResult> ExecuteAsync(RenderNodeExecutionContext context)
+        public void Execute(RenderNodeExecutionContext context)
         {
             foreach (var child in Children)
             {
-                var result = await child.ExecuteAsync(context);
-                if (!result.Success)
-                    return result;
-                context.Env.UpdateContent(result.Content, child.Name, child.GetType().Name);
+                child.Execute(context);
             }
-            return RenderNodeResult.SuccessResult(context.Env.GetContent());
         }
     }
 }

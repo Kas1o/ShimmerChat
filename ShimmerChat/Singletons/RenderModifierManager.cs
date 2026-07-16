@@ -25,34 +25,36 @@ namespace ShimmerChat.Singletons
         public string Render(Agent? agent, string content, Chat? chat = null)
         {
             var (result, _) = RenderWithLog(agent, content, chat);
-            return result.Content;
+            return result;
         }
 
-        public (RenderNodeResult Result, List<RenderChangeRecord> ChangeLog) RenderWithLog(
+        public (string Content, List<RenderChangeRecord> ChangeLog) RenderWithLog(
             Agent? agent, string content, Chat? chat = null)
         {
             if (string.IsNullOrEmpty(content))
-                return (RenderNodeResult.SuccessResult(content), new List<RenderChangeRecord>());
+                return (content, new List<RenderChangeRecord>());
 
             IRenderModifierNode? root = ResolveRoot(agent);
 
             if (root == null)
-                return (RenderNodeResult.SuccessResult(content), new List<RenderChangeRecord>());
+                return (content, new List<RenderChangeRecord>());
 
             var env = new RenderEnv(content, _serializer, _kvData, chat, agent);
             var context = new RenderNodeExecutionContext(env);
 
             try
             {
-                var task = root.ExecuteAsync(context);
-                task.Wait();
-                return (task.Result, env.ChangeLog);
+                root.Execute(context);
+                return (env.GetContent(), env.ChangeLog);
+            }
+            catch (RenderNodeException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[RenderModifier] Pipeline execution error");
-                return (RenderNodeResult.Failure(NodeErrorCodes.ServiceError, ex.Message),
-                    env.ChangeLog);
+                throw new RenderNodeException(NodeErrorCodes.ServiceError, ex.Message);
             }
         }
 

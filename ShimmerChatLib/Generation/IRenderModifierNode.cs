@@ -3,12 +3,30 @@ using ShimmerChatLib.Interface;
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
-    /// 渲染修改节点接口。对标 IPreGenerationNode 的设计。
-    /// 通过 RenderNodeExecutionContext 携带所有依赖，返回 RenderNodeResult。
+    /// 渲染修改节点接口。节点通过 <see cref="RenderEnv.UpdateContent"/> 修改内容，
+    /// 失败时抛出 <see cref="RenderNodeException"/>。
     /// </summary>
     public interface IRenderModifierNode : ITreeNode
     {
-        Task<RenderNodeResult> ExecuteAsync(RenderNodeExecutionContext context);
+        void Execute(RenderNodeExecutionContext context);
+    }
+
+    /// <summary>
+    /// 渲染节点执行异常。携带错误码、节点信息供上层构建错误 UI。
+    /// </summary>
+    public class RenderNodeException : Exception
+    {
+        public string Code { get; }
+        public string? NodeId { get; }
+        public string? NodeName { get; }
+
+        public RenderNodeException(string code, string message, string? nodeId = null, string? nodeName = null)
+            : base(message)
+        {
+            Code = code;
+            NodeId = nodeId;
+            NodeName = nodeName;
+        }
     }
 
     /// <summary>
@@ -71,26 +89,5 @@ namespace ShimmerChatLib.Generation
         public string NodeType { get; init; } = "";
         public string Before { get; init; } = "";
         public string After { get; init; } = "";
-    }
-
-    /// <summary>
-    /// 渲染节点执行结果
-    /// </summary>
-    public class RenderNodeResult
-    {
-        public bool Success { get; set; }
-        public string? Code { get; set; }
-        public string? Message { get; set; }
-        public string? NodeId { get; set; }
-        public string? NodeName { get; set; }
-
-        public string Content { get; set; } = "";
-
-        public static RenderNodeResult SuccessResult(string content)
-            => new() { Success = true, Content = content };
-
-        public static RenderNodeResult Failure(string code, string message,
-            string? nodeId = null, string? nodeName = null)
-            => new() { Success = false, Code = code, Message = message, NodeId = nodeId, NodeName = nodeName };
     }
 }

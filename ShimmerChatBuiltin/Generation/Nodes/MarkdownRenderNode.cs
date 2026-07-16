@@ -25,18 +25,18 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.markdown.pipe_tables", HintKey = "prop.markdown.pipe_tables_hint", Order = 10)]
         public bool EnablePipeTables { get; set; } = true;
 
-        public Task<RenderNodeResult> ExecuteAsync(RenderNodeExecutionContext context)
+        public void Execute(RenderNodeExecutionContext context)
         {
             var content = context.Env.GetContent();
             if (string.IsNullOrEmpty(content))
-                return Task.FromResult(RenderNodeResult.SuccessResult(content));
+                return;
 
             var pipeline = EnablePipeTables
                 ? DefaultPipeline
                 : new MarkdownPipelineBuilder().Build();
 
             var html = Markdown.ToHtml(content, pipeline);
-            return Task.FromResult(RenderNodeResult.SuccessResult(html));
+            context.Env.UpdateContent(html, Name, GetType().Name);
         }
     }
 }

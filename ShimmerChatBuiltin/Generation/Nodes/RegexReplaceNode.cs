@@ -34,10 +34,10 @@ namespace ShimmerChatBuiltin.Generation.Nodes
         [NodeProperty("prop.regex.singleline", Order = 50)]
         public bool Singleline { get; set; }
 
-        public Task<RenderNodeResult> ExecuteAsync(RenderNodeExecutionContext context)
+        public void Execute(RenderNodeExecutionContext context)
         {
             if (string.IsNullOrEmpty(Pattern))
-                return Task.FromResult(RenderNodeResult.SuccessResult(context.Env.GetContent()));
+                return;
 
             try
             {
@@ -47,11 +47,11 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 if (Singleline) options |= RegexOptions.Singleline;
 
                 var result = Regex.Replace(context.Env.GetContent(), Pattern, Replacement ?? "", options);
-                return Task.FromResult(RenderNodeResult.SuccessResult(result));
+                context.Env.UpdateContent(result, Name, GetType().Name);
             }
             catch (RegexParseException)
             {
-                return Task.FromResult(RenderNodeResult.SuccessResult(context.Env.GetContent()));
+                // 正则无效时跳过，不做修改
             }
         }
     }

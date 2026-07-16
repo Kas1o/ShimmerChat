@@ -74,31 +74,32 @@ namespace ShimmerChat.Singletons
                 Content = processedText
             });
 
-            var (nodeResult, changeLog) = _renderModifierManager.RenderWithLog(
-                agent, processedText, chat);
-
-            foreach (var change in changeLog)
+            try
             {
-                intermediateResults.Add(new RenderStepResult
+                var (content, changeLog) = _renderModifierManager.RenderWithLog(
+                    agent, processedText, chat);
+
+                foreach (var change in changeLog)
                 {
-                    StepName = $"{change.NodeType}: {change.NodeName}",
-                    Content = change.After
-                });
-            }
+                    intermediateResults.Add(new RenderStepResult
+                    {
+                        StepName = $"{change.NodeType}: {change.NodeName}",
+                        Content = change.After
+                    });
+                }
 
-            if (!nodeResult.Success)
+                result.Html = (MarkupString)content;
+            }
+            catch (RenderNodeException ex)
             {
-                var errorMsg = $"{nodeResult.Code}: {nodeResult.Message}";
+                var errorMsg = $"{ex.Code}: {ex.Message}";
                 var errorHtml = BuildErrorHtml(processedText, intermediateResults,
-                    errorMsg, nodeResult.NodeName ?? "Unknown");
+                    errorMsg, ex.NodeName ?? "Unknown");
                 result.Html = (MarkupString)errorHtml;
                 result.HasError = true;
                 result.ErrorMessage = errorMsg;
-                result.FailedStepName = nodeResult.NodeName;
-                return result;
+                result.FailedStepName = ex.NodeName;
             }
-
-            result.Html = (MarkupString)nodeResult.Content;
             return result;
         }
 
