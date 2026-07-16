@@ -22,7 +22,6 @@ public class MyFragmentNode : IPreGenerationNode
 {
     public string Id { get; } = Guid.NewGuid().ToString();
 
-    [NodeProperty("prop.node.name", Order = -100)]
     public string Name { get; set; } = "My Fragment";
 
     [NodeProperty("prop.my_fragment.text", Order = 0)]

@@ -10,7 +10,6 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     {
         public string Id { get; } = Guid.NewGuid().ToString();
 
-        [NodeProperty("prop.node.name", Order = -100)]
         public string Name { get; set; } = "Call Preset";
 
         [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint")]

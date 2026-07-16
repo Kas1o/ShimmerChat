@@ -11,7 +11,6 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     {
         public string Id { get; } = Guid.NewGuid().ToString();
 
-        [NodeProperty("prop.node.name", Order = -100)]
         public string Name { get; set; } = "";
 
         [NodeProperty("prop.sequence.repeat", HintKey = "prop.sequence.repeat_hint", Order = 50)]

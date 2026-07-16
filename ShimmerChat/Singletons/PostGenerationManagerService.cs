@@ -77,7 +77,14 @@ namespace ShimmerChat.Singletons
             {
                 Id = "__default__",
                 Name = "Default",
-                RootNodeJson = _serializer.Serialize(new PostSequenceNode { Name = "Default" })
+                RootNodeJson = _serializer.Serialize(new PostSequenceNode
+                {
+                    Name = "Default",
+                    Children = new List<IPostGenerationNode>
+                    {
+                        new PostDebugOutputNode { Name = "Debug Output" }
+                    }
+                })
             });
 
             _kvData.Write("PostGenerationManager", "post_generation_presets",
