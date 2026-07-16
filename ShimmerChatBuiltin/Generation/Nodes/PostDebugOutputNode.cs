@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 
@@ -24,7 +25,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
         {
-            context.Env.Persistent.DebugOutput.Write(Source, Category, context.Env.ResponseText);
+            context.Env.Persistent.DebugOutput.Write(Source, Category, JsonConvert.SerializeObject(context.Env.ResponseMessage));
             return Task.FromResult(PostNodeResult.SuccessResult());
         }
     }
