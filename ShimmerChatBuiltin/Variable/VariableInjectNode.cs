@@ -2,6 +2,7 @@ using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.Variable;
 
+[NodeInfo("node.variableinject", Icon = "💉", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.variableinject.desc")]
 public class VariableInjectNode : IPreGenerationNode
 {
     public string Id {get;set;} = Guid.NewGuid().ToString();
