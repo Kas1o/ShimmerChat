@@ -117,7 +117,7 @@ namespace ShimmerChatBuiltin.Variable
             var variables = GetChatVariables(kvData, chatGuid);
             variables.RemoveVariable(variableName);
             var json = SerializeVariables(variables);
-            kvData.Write(AgentSpacePrefix, chatGuid.ToString(), json);
+            kvData.Write(ChatSpacePrefix, chatGuid.ToString(), json);
         }
 
         public static Variable? GetAgentVariable(IKVDataService kvData, Guid agentGuid, string variableName)
