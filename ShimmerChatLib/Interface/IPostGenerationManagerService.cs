@@ -5,7 +5,7 @@ namespace ShimmerChatLib.Interface
     /// <summary>
     /// 后生成管线管理器。负责执行 Agent 的 PostGenerationTreeJson 节点树。
     /// </summary>
-    public interface IPostGenerationManager
+    public interface IPostGenerationManagerService
     {
         /// <summary>
         /// 执行后生成节点树，对 LLM 响应文本进行变换处理。

@@ -37,9 +37,9 @@ builder.Services.AddSingleton<INodeTypeCatalog, NodeTypeCatalog>();
 builder.Services.AddSingleton<IGenerationManagerV2, GenerationManagerV2>();
 
 // Post-Generation 管线
-builder.Services.AddSingleton<PostGenerationNodeSerializer>();
-builder.Services.AddSingleton<IPostGenerationNodeSerializer>(sp => sp.GetRequiredService<PostGenerationNodeSerializer>());
-builder.Services.AddSingleton<IPostGenerationManager, PostGenerationManager>();
+builder.Services.AddSingleton<PostGenerationNodeSerializerService>();
+builder.Services.AddSingleton<IPostGenerationNodeSerializerService>(sp => sp.GetRequiredService<PostGenerationNodeSerializerService>());
+builder.Services.AddSingleton<IPostGenerationManagerService, PostGenerationManagerService>();
 
 // Render Modifier 管线
 builder.Services.AddSingleton<RenderModifierNodeSerializer>();

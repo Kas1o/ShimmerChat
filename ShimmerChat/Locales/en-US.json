@@ -4,6 +4,8 @@
   "Context Manager": "Context Manager",
   "Home": "Home",
   "ShimmerChat": "ShimmerChat",
+  "page.pre_generation": "Pre-Generation Presets",
+  "page.post_generation": "Post-Generation Presets",
 
   "AgentSelectPage": "Agents",
   "Create": "Create",

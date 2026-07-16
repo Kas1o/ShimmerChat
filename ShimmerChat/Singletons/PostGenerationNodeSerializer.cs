@@ -8,14 +8,15 @@ namespace ShimmerChat.Singletons
 {
     /// <summary>
     /// 后生成节点树序列化器。扫描所有 IPostGenerationNode 实现构建类型白名单。
+    /// <see cref="IPluginLoaderService"/>
     /// </summary>
-    public class PostGenerationNodeSerializer : IPostGenerationNodeSerializer
+    public class PostGenerationNodeSerializerService : IPostGenerationNodeSerializerService
     {
         private readonly JsonSerializerSettings _settings;
         private readonly Dictionary<string, Type> _typeMap;
-        private readonly ILogger<PostGenerationNodeSerializer> _logger;
+        private readonly ILogger<PostGenerationNodeSerializerService> _logger;
 
-        public PostGenerationNodeSerializer(IPluginLoaderService pluginLoader, ILogger<PostGenerationNodeSerializer> logger)
+        public PostGenerationNodeSerializerService(IPluginLoaderService pluginLoader, ILogger<PostGenerationNodeSerializerService> logger)
         {
             _logger = logger;
             var types = pluginLoader.GetImplementingTypes(typeof(IPostGenerationNode));
@@ -57,7 +58,7 @@ namespace ShimmerChat.Singletons
             }
         }
 
-        IPostGenerationNode? IPostGenerationNodeSerializer.Deserialize(string json)
+        IPostGenerationNode? IPostGenerationNodeSerializerService.Deserialize(string json)
         {
             if (string.IsNullOrWhiteSpace(json) || json.Trim() == "{}")
                 return null;

@@ -17,7 +17,6 @@ namespace ShimmerChatBuiltin.Generation.Nodes
     {
         public string Id { get; } = Guid.NewGuid().ToString();
 
-        [NodeProperty("prop.node.name", Order = -100)]
         public string Name { get; set; } = "Regex Replace";
 
         [NodeProperty("prop.regex.pattern", Order = 10)]

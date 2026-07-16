@@ -13,15 +13,15 @@ namespace ShimmerChat.Singletons
         private AssemblyDependencyResolver? _resolver;
         private readonly ILogger<PluginLoadContext> _logger;
 
-        private static readonly HashSet<string> SharedPrefixes = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "ShimmerChatLib",
+        private static readonly string[] SharedPrefixes =
+		[
+			"ShimmerChat",
             "SharperLLM",
             "Newtonsoft.Json",
             "System.",
             "Microsoft.",
             "netstandard",
-        };
+        ];
 
         public PluginLoadContext(string pluginDir, ILogger<PluginLoadContext> logger)
             : base(name: $"PluginContext_{Path.GetFileName(pluginDir)}", isCollectible: true)

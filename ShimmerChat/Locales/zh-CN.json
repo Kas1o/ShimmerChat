@@ -4,6 +4,8 @@
   "Context Manager": "上下文管理器",
   "Home": "主页",
   "ShimmerChat": "闪光聊天",
+  "page.pre_generation": "前生成预设",
+  "page.post_generation": "后生成预设",
 
   "AgentSelectPage": "智能体",
   "Create": "创建",

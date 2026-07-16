@@ -20,7 +20,6 @@ namespace ShimmerChatBuiltin.Generation.Nodes
 
         public string Id { get; } = Guid.NewGuid().ToString();
 
-        [NodeProperty("prop.node.name", Order = -100)]
         public string Name { get; set; } = "Markdown Render";
 
         [NodeProperty("prop.markdown.pipe_tables", HintKey = "prop.markdown.pipe_tables_hint", Order = 10)]

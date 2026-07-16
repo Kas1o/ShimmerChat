@@ -8,12 +8,12 @@ namespace ShimmerChat.Singletons
     /// <summary>
     /// 后生成管线管理器。反序列化 Agent 的 PostGenerationTreeJson 并执行节点树。
     /// </summary>
-    public class PostGenerationManager : IPostGenerationManager
+    public class PostGenerationManagerService : IPostGenerationManagerService
     {
         private readonly ITreeNodeSerializer _serializer;
-        private readonly ILogger<PostGenerationManager> _logger;
+        private readonly ILogger<PostGenerationManagerService> _logger;
 
-        public PostGenerationManager(PostGenerationNodeSerializer serializer, ILogger<PostGenerationManager> logger)
+        public PostGenerationManagerService(PostGenerationNodeSerializerService serializer, ILogger<PostGenerationManagerService> logger)
         {
             _serializer = serializer;
             _logger = logger;
