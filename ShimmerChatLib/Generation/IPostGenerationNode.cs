@@ -37,7 +37,7 @@ namespace ShimmerChatLib.Generation
         /// <summary>LLM 原始响应文本（节点可修改）</summary>
         public string ResponseText { get; set; }
 
-        /// <summary>LLM 完整响应消息（含 tool calls、thinking 等）。ResponseText 是此消息 Content 的初始副本。</summary>
+        /// <summary>LLM 完整原始响应消息（含 tool calls、thinking 等）。</summary>
         public ChatMessage ResponseMessage { get; }
 
         /// <summary>前生成管线构建的 Fragments（只读参考）</summary>
