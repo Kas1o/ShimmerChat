@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
+using ShimmerChatBuiltin.Generation.Nodes;
 
 namespace ShimmerChat.Singletons
 {
@@ -20,6 +22,8 @@ namespace ShimmerChat.Singletons
             _serializer = serializer;
             _kvData = kvData;
             _logger = logger;
+
+            EnsureDefaultRenderPreset();
         }
 
         public string Render(Agent? agent, string content, Chat? chat = null)
@@ -34,10 +38,8 @@ namespace ShimmerChat.Singletons
             if (string.IsNullOrEmpty(content))
                 return (content, new List<RenderChangeRecord>());
 
-            IRenderModifierNode? root = ResolveRoot(agent);
-
-            if (root == null)
-                return (content, new List<RenderChangeRecord>());
+            IRenderModifierNode? root = ResolveRoot(agent)
+                ?? CreateFallbackRoot();
 
             var env = new RenderEnv(content, _serializer, _kvData, chat, agent);
             var context = new RenderNodeExecutionContext(env);
@@ -74,6 +76,33 @@ namespace ShimmerChat.Singletons
                 return _serializer.Deserialize(agent.RenderModifierTreeJson) as IRenderModifierNode;
 
             lock (_globalLock) return _globalRoot;
+        }
+
+        private void EnsureDefaultRenderPreset()
+        {
+            var json = _kvData.Read("RenderModifierManager", "render_modifier_presets");
+            var presets = string.IsNullOrEmpty(json)
+                ? new List<RenderModifierPreset>()
+                : (JsonConvert.DeserializeObject<List<RenderModifierPreset>>(json) ?? new List<RenderModifierPreset>());
+
+            presets.RemoveAll(p => p.Id == "__default__");
+
+            presets.Add(new RenderModifierPreset
+            {
+                Id = "__default__",
+                Name = "Default",
+                RootNodeJson = _serializer.Serialize(new MarkdownRenderNode { Name = "Markdown Render" })
+            });
+
+            _kvData.Write("RenderModifierManager", "render_modifier_presets",
+                JsonConvert.SerializeObject(presets, Formatting.Indented));
+        }
+
+        private static IRenderModifierNode CreateFallbackRoot()
+        {
+            var root = new RenderSequenceNode { Name = "Default" };
+            root.Children.Add(new RenderCallNode { PresetId = "__default__" });
+            return root;
         }
     }
 }
