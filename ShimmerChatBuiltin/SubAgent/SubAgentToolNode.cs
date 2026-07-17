@@ -15,23 +15,22 @@ namespace ShimmerChatBuiltin.SubAgent
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent Tool";
 
-        [NodeProperty("prop.sub_agent_tool.config_name", HintKey = "prop.sub_agent_tool.config_name.hint")]
-        public string ConfigName { get; set; } = "";
+        public string ConfigGuid { get; set; } = "";
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
 
-            if (string.IsNullOrWhiteSpace(ConfigName))
+            if (string.IsNullOrWhiteSpace(ConfigGuid))
                 return Task.FromResult(NodeResult.SuccessResult());
 
             var kvData = context.Env.Persistent.KVData;
 
-            var config = LoadConfig(kvData, ConfigName);
+            var config = LoadConfig(kvData, ConfigGuid);
             if (config == null)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_tool_config_not_found", ConfigName),
+                    loc.Format("node_err.subagent_tool_config_not_found", ConfigGuid),
                     nodeId: Id, nodeName: Name));
 
             // 查找或创建 SubAgentToolV2 单例
@@ -47,15 +46,15 @@ namespace ShimmerChatBuiltin.SubAgent
                 context.Env.Transient.Tools.Add(tool);
             }
 
-            tool.AddSubAgent(ConfigName, config);
+            tool.AddSubAgent(config);
             return Task.FromResult(NodeResult.SuccessResult());
         }
 
-        private static SubAgentConfig? LoadConfig(IKVDataService kvData, string name)
+        private static SubAgentConfig? LoadConfig(IKVDataService kvData, string guid)
         {
             var json = kvData.Read("SubAgent", "configs");
             var configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
-            return configs.FirstOrDefault(c => c.Name == name);
+            return configs.FirstOrDefault(c => c.Guid.ToString() == guid);
         }
     }
 }

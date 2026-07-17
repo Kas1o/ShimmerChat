@@ -45,11 +45,59 @@
                 }
             </div>
         </div>
+
+        <div class="ge-field">
+            <label class="ge-label" title="@Loc["prop.post_sub_agent.output_mode.hint"]">
+                @Loc["prop.post_sub_agent.output_mode"]
+            </label>
+            <div class="ge-value">
+                <select class="ge-select" @bind="Node.OutputMode" style="width: 100%; max-width: 400px;">
+                    <option value="">@Loc["editor_subagent.inherit_option"]</option>
+                    <option value="LastMessage">LastMessage</option>
+                    <option value="FullJson">FullJson</option>
+                    <option value="None">None</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="ge-field">
+            <label class="ge-label" title="@Loc["prop.post_sub_agent.max_iterations.hint"]">
+                @Loc["prop.post_sub_agent.max_iterations"]
+            </label>
+            <div class="ge-value">
+                <input type="number" class="ge-input ge-input-num"
+                       value="@Node.MaxIterations"
+                       @onchange="OnMaxIterationsChanged"
+                       style="max-width: 120px;" />
+            </div>
+        </div>
+
+        <div class="ge-field">
+            <label class="ge-label" title="@Loc["prop.post_sub_agent.include_full_context.hint"]">
+                @Loc["prop.post_sub_agent.include_full_context"]
+            </label>
+            <div class="ge-value">
+                <input type="checkbox" class="ge-check"
+                       checked="@Node.IncludeFullContext"
+                       @onchange="OnIncludeFullContextChanged" />
+            </div>
+        </div>
+
+        <div class="ge-field">
+            <label class="ge-label" title="@Loc["prop.post_sub_agent.shared_guid.hint"]">
+                @Loc["prop.post_sub_agent.shared_guid"]
+            </label>
+            <div class="ge-value">
+                <input type="checkbox" class="ge-check"
+                       checked="@Node.SharedGuid"
+                       @onchange="OnSharedGuidChanged" />
+            </div>
+        </div>
     </div>
 }
 
 @code {
-    [Parameter] public SubAgentToolNode Node { get; set; } = default!;
+    [Parameter] public PostSubAgentNode Node { get; set; } = default!;
     [Parameter] public int Depth { get; set; }
     [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
 
@@ -64,5 +112,21 @@
     private void OnConfigChanged(ChangeEventArgs e)
     {
         Node.ConfigGuid = e.Value?.ToString() ?? "";
+    }
+
+    private void OnMaxIterationsChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+            Node.MaxIterations = val;
+    }
+
+    private void OnIncludeFullContextChanged(ChangeEventArgs e)
+    {
+        Node.IncludeFullContext = (bool)(e.Value ?? false);
+    }
+
+    private void OnSharedGuidChanged(ChangeEventArgs e)
+    {
+        Node.SharedGuid = (bool)(e.Value ?? false);
     }
 }

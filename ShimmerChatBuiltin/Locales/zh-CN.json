@@ -468,6 +468,7 @@
   "editor_subagent.preset_label": " | 预设: {0}",
   "editor_subagent.none": "无",
   "editor_subagent.private_tree_label": " | 私有树",
+  "editor_subagent.inherit_option": "（继承配置中的值）",
 
   "editor_tool_instantiate.select_tool": "选择工具",
   "editor_tool_instantiate.clear": "清除",

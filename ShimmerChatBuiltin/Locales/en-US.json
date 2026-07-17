@@ -468,6 +468,7 @@
   "editor_subagent.preset_label": " | Preset: {0}",
   "editor_subagent.none": "None",
   "editor_subagent.private_tree_label": " | Private Tree",
+  "editor_subagent.inherit_option": "(Inherit from config)",
 
   "editor_tool_instantiate.select_tool": "Select Tool",
   "editor_tool_instantiate.clear": "Clear",

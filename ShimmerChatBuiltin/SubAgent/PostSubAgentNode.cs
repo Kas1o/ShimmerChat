@@ -7,13 +7,13 @@ using ShimmerChatLib.Interface;
 namespace ShimmerChatBuiltin.SubAgent
 {
     [NodeInfo("node.post_sub_agent", Icon = "🤖", Color = "var(--node-subagent)", CategoryKeys = ["category.flow", "category.sub_agent", "category.post"])]
+    [NodeEditor(typeof(PostSubAgentNodeEditor))]
     public class PostSubAgentNode : IPostGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Post SubAgent";
 
-        [NodeProperty("prop.post_sub_agent.config_name", HintKey = "prop.post_sub_agent.config_name.hint")]
-        public string ConfigName { get; set; } = "";
+        public string ConfigGuid { get; set; } = "";
 
         [NodeProperty("prop.post_sub_agent.output_mode", HintKey = "prop.post_sub_agent.output_mode.hint")]
         public string OutputMode { get; set; } = "";
@@ -31,19 +31,19 @@ namespace ShimmerChatBuiltin.SubAgent
         {
             var loc = context.Env.Persistent.LocService;
 
-            if (string.IsNullOrWhiteSpace(ConfigName))
+            if (string.IsNullOrWhiteSpace(ConfigGuid))
                 return PostNodeResult.SuccessResult();
 
             var kvData = context.Env.Persistent.KVData;
-            var config = LoadConfig(kvData, ConfigName);
+            var config = LoadConfig(kvData, ConfigGuid);
             if (config == null)
                 return Fail(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_config_not_found", ConfigName));
+                    loc.Format("node_err.subagent_config_not_found", ConfigGuid));
 
             var rootNode = ResolveTree(config, kvData, context.Env.Persistent.Serializer);
             if (rootNode == null)
                 return Fail(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_no_tree", ConfigName));
+                    loc.Format("node_err.subagent_no_tree", config.Name));
 
             // 1. 创建隔离的 PreGenerationEnv，构建聊天历史
             var persistent = new PersistentEnv
@@ -121,7 +121,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 var fragments = subEnv.Transient.Fragments;
                 var mgr = persistent.PostGenerationManager;
                 var ct = context.CancellationToken;
-                var cfgName = ConfigName;
+                var cfgName = config.Name;
                 var debug = context.Env.Persistent.DebugOutput;
                 postProcessor = async msg =>
                 {
@@ -197,11 +197,11 @@ namespace ShimmerChatBuiltin.SubAgent
             return null;
         }
 
-        private static SubAgentConfig? LoadConfig(IKVDataService kvData, string name)
+        private static SubAgentConfig? LoadConfig(IKVDataService kvData, string guid)
         {
             var json = kvData.Read("SubAgent", "configs");
             var configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
-            return configs.FirstOrDefault(c => c.Name == name);
+            return configs.FirstOrDefault(c => c.Guid.ToString() == guid);
         }
 
         private PostNodeResult Fail(string code, string message)

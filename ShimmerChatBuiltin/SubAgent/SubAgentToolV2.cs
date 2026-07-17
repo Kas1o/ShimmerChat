@@ -41,10 +41,11 @@ namespace ShimmerChatBuiltin.SubAgent
         }
 
         /// <summary>注册一个 SubAgent 配置。</summary>
-        public void AddSubAgent(string configName, SubAgentConfig config)
+        public void AddSubAgent(SubAgentConfig config)
         {
-            if (!_entries.Any(e => e.ConfigName == configName))
-                _entries.Add(new SubAgentEntry { ConfigName = configName, Config = config });
+            var guidStr = config.Guid.ToString();
+            if (!_entries.Any(e => e.ConfigGuid == guidStr))
+                _entries.Add(new SubAgentEntry { ConfigGuid = guidStr, ConfigName = config.Name, Config = config });
         }
 
         public Tool GetDefinition()
@@ -207,6 +208,7 @@ namespace ShimmerChatBuiltin.SubAgent
 
         private class SubAgentEntry
         {
+            public string ConfigGuid { get; set; } = "";
             public string ConfigName { get; set; } = "";
             public SubAgentConfig Config { get; set; } = null!;
         }

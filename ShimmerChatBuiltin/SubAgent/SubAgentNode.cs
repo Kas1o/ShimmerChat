@@ -7,13 +7,13 @@ using ShimmerChatLib.Interface;
 namespace ShimmerChatBuiltin.SubAgent
 {
     [NodeInfo("node.sub_agent", Icon = "🤖", Color = "var(--node-subagent)", CategoryKeys = ["category.flow", "category.sub_agent"])]
+    [NodeEditor(typeof(SubAgentNodeEditor))]
     public class SubAgentNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent";
 
-        [NodeProperty("prop.sub_agent.config_name", HintKey = "prop.sub_agent.config_name.hint")]
-        public string ConfigName { get; set; } = "";
+        public string ConfigGuid { get; set; } = "";
 
         [NodeProperty("prop.sub_agent.output_mode", HintKey = "prop.sub_agent.output_mode.hint")]
         public string OutputMode { get; set; } = "";
@@ -28,19 +28,19 @@ namespace ShimmerChatBuiltin.SubAgent
         {
             var loc = context.Env.Persistent.LocService;
 
-            if (string.IsNullOrWhiteSpace(ConfigName))
+            if (string.IsNullOrWhiteSpace(ConfigGuid))
                 return NodeResult.SuccessResult();
 
             var kvData = context.Env.Persistent.KVData;
-            var config = LoadConfig(kvData, ConfigName);
+            var config = LoadConfig(kvData, ConfigGuid);
             if (config == null)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_config_not_found", ConfigName), nodeId: Id, nodeName: Name);
+                    loc.Format("node_err.subagent_config_not_found", ConfigGuid), nodeId: Id, nodeName: Name);
 
             var rootNode = ResolveTree(config, kvData, context.Env.Persistent.Serializer);
             if (rootNode == null)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_no_tree", ConfigName),
+                    loc.Format("node_err.subagent_no_tree", config.Name),
                     nodeId: Id, nodeName: Name);
 
             // 1. 创建隔离的 PreGenerationEnv，将父级 Fragments 转为临时对话写入 SharedState
@@ -106,7 +106,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 var fragments = subEnv.Transient.Fragments;
                 var mgr = persistent.PostGenerationManager;
                 var ct = context.CancellationToken;
-                var cfgName = ConfigName;
+                var cfgName = config.Name;
                 var debug = context.Env.Persistent.DebugOutput;
                 postProcessor = async msg =>
                 {
@@ -166,7 +166,7 @@ namespace ShimmerChatBuiltin.SubAgent
                     From = PromptBuilder.From.assistant,
                     Metadata = new Dictionary<string, object>
                     {
-                        ["subAgentName"] = ConfigName,
+                        ["subAgentName"] = config.Name,
                         ["outputMode"] = mode
                     }
                 });
@@ -192,11 +192,11 @@ namespace ShimmerChatBuiltin.SubAgent
             return null;
         }
 
-        private static SubAgentConfig? LoadConfig(IKVDataService kvData, string name)
+        private static SubAgentConfig? LoadConfig(IKVDataService kvData, string guid)
         {
             var json = kvData.Read("SubAgent", "configs");
             var configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
-            return configs.FirstOrDefault(c => c.Name == name);
+            return configs.FirstOrDefault(c => c.Guid.ToString() == guid);
         }
 
         private static string FragmentFromToSender(PromptBuilder.From from) => from switch
