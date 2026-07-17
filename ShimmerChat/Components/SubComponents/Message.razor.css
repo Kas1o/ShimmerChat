@@ -127,6 +127,7 @@
     background: var(--su-surface-3); border-radius: var(--su-radius-md);
     border-left: 2px solid var(--su-border-0);
     font-size: var(--su-font-sm); color: var(--su-text-1);
+    overflow-x: auto; word-break: break-word;
 }
 
 /* ── Typing cursor ─────────────────────────────── */
