@@ -493,5 +493,7 @@
   "prop.post_sub_agent.max_iterations": "Max Iterations",
   "prop.post_sub_agent.max_iterations.hint": "Maximum tool-call loop iterations",
   "prop.post_sub_agent.include_full_context": "Include Full Context",
-  "prop.post_sub_agent.include_full_context.hint": "When enabled, passes the full conversation history (PreFragments) along with the LLM response to the sub-agent. When disabled, only the LLM response text is passed."
+  "prop.post_sub_agent.include_full_context.hint": "When enabled, passes the full conversation history (PreFragments) along with the LLM response to the sub-agent. When disabled, only the LLM response text is passed.",
+  "prop.post_sub_agent.shared_guid": "Shared GUID",
+  "prop.post_sub_agent.shared_guid.hint": "When enabled, the sub-agent inherits the parent AgentGuid. When disabled, uses the config GUID as an independent identity."
 }

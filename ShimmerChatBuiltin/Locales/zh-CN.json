@@ -493,5 +493,7 @@
   "prop.post_sub_agent.max_iterations": "最大迭代次数",
   "prop.post_sub_agent.max_iterations.hint": "工具调用循环的最大迭代次数",
   "prop.post_sub_agent.include_full_context": "传入完整上下文",
-  "prop.post_sub_agent.include_full_context.hint": "开启后将完整对话历史（PreFragments）和 LLM 响应一并传给子智能体；关闭则仅传入 LLM 响应文本"
+  "prop.post_sub_agent.include_full_context.hint": "开启后将完整对话历史（PreFragments）和 LLM 响应一并传给子智能体；关闭则仅传入 LLM 响应文本",
+  "prop.post_sub_agent.shared_guid": "共享 GUID",
+  "prop.post_sub_agent.shared_guid.hint": "开启后子代理继承父级 AgentGuid；关闭则使用配置 GUID 作为独立身份。"
 }
