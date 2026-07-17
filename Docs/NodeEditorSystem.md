@@ -28,7 +28,7 @@ public class NodeInfoAttribute : Attribute
     public string LabelKey { get; }           // 必填，本地化 Key
     public string Icon { get; init; }         // 默认 "●"
     public string Color { get; init; }        // CSS 颜色值，推荐 CSS 变量
-    public string[] CategoryKeys { get; init; }  // 斜杠分层导航
+    public string[] CategoryKeys { get; init; } = ["category.general"];  // 斜杠分层导航，默认 "category.general"
     public string? DescriptionKey { get; init; }  // 可选描述
 }
 ```
@@ -132,18 +132,17 @@ public class CallNode : IPreGenerationNode { ... }
 
 **步骤 2**: 创建编辑器（与节点同程序集）
 
+以下为示意代码，展示自定义编辑器的基本结构。实际 `CallNodeEditor` 使用预设搜索/选择 UI（注入 `IKVDataService`、`IJSRuntime` 等），比此示例更复杂。
+
 ```razor
 @using ShimmerChatLib.Components
 
 <div class="ge-field">
     <label class="ge-label">Preset</label>
     <div class="ge-value">
-        @* 自定义 UI ... *@
+        @* 自定义 UI（如预设搜索/选择列表）... *@
     </div>
 </div>
-
-<ChildListEditor Label="Children" ChildNodes="Node.Children"
-                 Depth="Depth" CopyMe="CopyMe" />
 
 @code {
     [Parameter] public CallNode Node { get; set; } = default!;
@@ -172,6 +171,7 @@ public class CallNode : IPreGenerationNode { ... }
 | `Node` | 具体节点类型 | 自动按编辑器声明的 `[Parameter]` 类型传入 |
 | `Depth` | `int` | 缩进层级 |
 | `CopyMe` | `Action<ITreeNode>?` | 复制到剪贴板回调 |
+| `RemoveMe` | `Action<ITreeNode>?` | 移除节点回调 |
 
 ---
 
@@ -270,6 +270,7 @@ public class TreeEditorContext
     public ITreeNode CreateNode(Type type);
     public void Copy(ITreeNode node);                    // 剪贴板
     public ITreeNode? Paste();
+    public void ClearClipboard();                         // 清空剪贴板
     public bool HasClipboardContent { get; }
 }
 ```
@@ -304,7 +305,7 @@ public interface ITreeNodeSerializer
 
 三个序列化器分别扫描各自的节点接口构建类型白名单：
 - `PreGenerationNodeSerializer` → `IPreGenerationNode` 实现
-- `PostGenerationNodeSerializer` → `IPostGenerationNode` 实现
+- `PostGenerationNodeSerializerService` → `IPostGenerationNode` 实现
 - `RenderModifierNodeSerializer` → `IRenderModifierNode` 实现
 
 **注意**：`Id` 属性用于 Blazor `@key` 和环路检测，由系统管理，不要加 `[NodeProperty]`。

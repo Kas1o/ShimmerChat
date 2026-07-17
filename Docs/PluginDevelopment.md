@@ -19,11 +19,11 @@ ShimmerChat 支持通过外部 DLL 扩展功能。插件放在 `Plugins/` 目录
 
 ### 共享程序集（回退到默认 ALC）
 
-以下程序集始终走默认 ALC，保证类型一致（`IsAssignableFrom` 正常工作）：
+以下程序集（以 `ShimmerChat` 为前缀）始终走默认 ALC，保证类型一致（`IsAssignableFrom` 正常工作）：
 
 | 程序集 | 说明 |
 |--------|------|
-| `ShimmerChatLib` | 接口/抽象/模型 |
+| `ShimmerChat*` | 所有 `ShimmerChat` 前缀的程序集（含 ShimmerChatLib）|
 | `SharperLLM` | LLM API 抽象 |
 | `Newtonsoft.Json` | JSON 序列化 |
 | `System.*` | .NET 运行时 |
@@ -38,7 +38,7 @@ ShimmerChat 支持通过外部 DLL 扩展功能。插件放在 `Plugins/` 目录
 ```
 启动 → 枚举 Plugins/*/plugin.json
      → 每个插件创建独立 PluginLoadContext(isCollectible: true)
-     → 按 assembiles 列表 LoadFromAssemblyPath
+     → 按 manifest 的 `assembly` 字段 LoadFromAssemblyPath
      → 依赖解析时：共享程序集 → null（回退默认 ALC）
                     私有依赖 → 从插件目录加载
      → 卸载时 Dispose ALC → 该插件所有程序集释放
@@ -272,7 +272,7 @@ public class MyTool : IAutoCreateToolV2
         _agentGuid = agentGuid;
     }
 
-    // 无参构造供反射使用（不会被调用，但接口扫描需要）
+    // 无参构造供反序列化使用
     public MyTool() { }
 
     public Tool GetDefinition()
@@ -344,7 +344,7 @@ if (string.IsNullOrEmpty(config))
 
 ## 5. 自定义生成节点
 
-> **详见 [生成节点与编辑器开发指南](NodeDevelopment.md)** — 节点实现、属性编辑器、容器子列表、拖拽排序、自定义编辑器、上下文对象等完整文档。
+> **详见 [节点编辑器系统](NodeEditorSystem.md)** — 节点实现、属性编辑器、容器子列表、拖拽排序、自定义编辑器、上下文对象等完整文档。
 
 ### 快速示例
 
@@ -362,7 +362,7 @@ public class MyFragmentNode : IPreGenerationNode
     [NodeProperty("prop.my_fragment.text", HintKey = "prop.my_fragment.text.hint", Order = 0)]
     public string Text { get; set; } = "";
 
-    public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+    public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
     {
         context.Env.Transient.Fragments.Add(new ContextSegment
         {
@@ -406,7 +406,11 @@ SharedState   // Dictionary<string, object>  跨节点共享状态
 
 ---
 
-## 6. 自定义消息渲染修改器
+## 6. 自定义消息渲染修改器（已废弃）
+
+> **⚠️ 已废弃**：`IMessageRenderModifier` 已被标记为 `[Obsolete("Replaced by IRenderModifierNode pipeline")]`。新项目应使用 Render Modifier 管线（`IRenderModifierNode` + `RenderSequenceNode`）替代。详见 [Post-Generation & Render Modifier 管线](PostRenderPipelines.md)。
+
+以下内容仅供参考：
 
 修改器在消息发送到 UI 渲染前对内容做后处理。所有插件中的修改器由 `MessageDisplayServiceV1` 自动发现。
 

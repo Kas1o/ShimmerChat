@@ -60,7 +60,7 @@ namespace SharperLLM.API
 **关键类型**：
 
 - **`PromptBuilder`（输入）**：`System`、`Messages`（`(ChatMessage, From)[]`）、`AvailableTools`
-- **`ResponseEx`（输出）**：`Body`（`ChatMessage { Content, thinking, toolCalls, CustomProperties }`）、`FinishReason`（`Stop / Length / FunctionCall / None`）
+- **`ResponseEx`（输出）**：`Body`（`ChatMessage { Content, thinking, toolCalls, CustomProperties }`）、`FinishReason`（`Stop / Length / ContentFilter / FunctionCall / None`）
 
 > 流式输出时，中间 chunk 用 `FinishReason.None`，最后一个 chunk 用 `FinishReason.Stop`（或 `FunctionCall`）。
 
@@ -168,7 +168,7 @@ public class MyApiSelectNode : IPreGenerationNode
     [NodeProperty("prop.my_api.key", Order = 1)]
     public string ApiKey { get; set; } = "";
 
-    public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+    public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
     {
         context.Env.Transient.API = new APISetting
         {

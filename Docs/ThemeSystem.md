@@ -18,7 +18,7 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-**流程**：`ThemeServiceV2` 持有一个当前 `Theme` 对象，当主题切换时通过 JS 互操作把 `Theme` 的所有属性注入到 `<html>` 元素上作为 CSS 自定义属性（`--su-*`、`--node-*`）。所有 UI 样式通过引用这些变量实现主题切换，无需重新加载 CSS 文件。
+**流程**：`ThemeServiceV2` 持有一个当前 `Theme` 对象。`ThemeCss.razor` 组件订阅 `OnThemeChanged` 事件，当主题切换时通过 Blazor 服务端渲染将 `Theme` 的所有属性值写入一个内联 `<style>` 标签的 `:root { ... }` 块中，作为 CSS 自定义属性（`--su-*`、`--node-*`）。所有 UI 样式通过引用这些变量实现主题切换，无需重新加载 CSS 文件。
 
 ---
 
@@ -36,6 +36,8 @@
 | `IsDefault`   | `bool`    | 是否为默认主题                  |
 | `IsBuiltIn`   | `bool`    | 是否为内置主题（不可编辑/删除） |
 | `IsDarkMode`  | `bool`    | 是否为暗色模式                  |
+| `CreatedAt`   | `DateTime`| 创建时间 (UTC)                  |
+| `UpdatedAt`   | `DateTime`| 更新时间 (UTC)                  |
 
 ### Surface 层级
 
@@ -150,11 +152,13 @@
 | `Transition` | `--su-transition`  | `150ms ease` | 全局过渡动画        |
 | `CustomCss`  | (直接注入)         | —            | 用户自定义 CSS 覆盖 |
 
+`Theme` 还提供 `Clone()` 方法（`MemberwiseClone` 浅拷贝），用于创建副本并修改。
+
 ---
 
 ## ThemeServiceV2 服务
 
-`ShimmerChat/Singletons/ThemeServiceV2.cs` 实现了 `IThemeService` 接口，以单例模式注入。
+`ShimmerChat/Singletons/ThemeServiceV2.cs` 实现了 `IThemeService` 接口，以 **Scoped** 模式注入。
 
 ### 核心方法
 
@@ -163,12 +167,13 @@
 | `CurrentTheme`       | 获取当前激活的主题对象                            |
 | `AvailableThemes`    | 获取所有可用主题列表                              |
 | `SetTheme(id)`       | 切换主题，触发 `OnThemeChanged` 事件              |
-| `CreateTheme(theme)` | 创建新用户主题                                    |
-| `UpdateTheme(theme)` | 更新已有主题（仅非 BuiltIn 可编辑）               |
-| `DeleteTheme(id)`    | 删除用户主题（不可删除 BuiltIn/default）          |
-| `ExportTheme(id)`    | 导出主题为 JSON 字符串                            |
+| `CreateTheme(theme)` | 创建新用户主题（ID 重复时抛 `InvalidOperationException`） |
+| `UpdateTheme(theme)` | 更新已有主题（通过 `theme.Id` 查找并替换） |
+| `DeleteTheme(id)`    | 删除用户主题（不可删除 BuiltIn 主题）     |
+| `ExportTheme(id)`    | 导出主题为 JSON 字符串（找不到时抛 `ArgumentException`） |
 | `ImportTheme(json)`  | 从 JSON 导入主题                                  |
 | `GetBuiltInThemes()` | 返回两个内置主题 `light_default` / `dark_default` |
+| `GetUserThemes()`    | 返回所有用户创建的主题列表                |
 
 ### 持久化
 
@@ -181,10 +186,10 @@
 当 `SetTheme` 或 `UpdateTheme` 被调用时：
 
 1. 触发 `OnThemeChanged` 事件
-2. 订阅方（通常是 `MainLayout`）调用 JS 互操作
-3. JS 将 `Theme` 对象的所有属性映射为 `--su-*` / `--node-*` CSS 变量设置到 `<html>` 元素
-4. 对于暗色主题，同时设置 `data-theme="dark"` 属性
-5. 所有 CSS 引用这些变量，立即生效无需刷新
+2. `ThemeCss.razor` 组件接收事件，通过 Blazor 服务端渲染将 `CurrentTheme` 的所有属性值写入内联 `<style>` 标签的 `:root { ... }` 块
+3. 所有 CSS 引用这些变量，立即生效无需刷新
+
+**注意**：`theme.css` 只提供初始后备值，运行时由 `ThemeCss.razor` 渲染的内联样式覆盖。
 
 ---
 
@@ -208,7 +213,7 @@
 }
 ```
 
-这些值与 `Theme.cs` 中 `GetBuiltInThemes()` 的两个内置主题完全一致。`theme.css` 只提供**后备**，运行时由 `ThemeServiceV2` 通过 JS 注入覆盖。
+这些值与 `Theme.cs` 中 `GetBuiltInThemes()` 的两个内置主题完全一致。`theme.css` 只提供**后备**，运行时由 `ThemeCss.razor` 渲染的内联样式覆盖。
 
 ---
 

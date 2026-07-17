@@ -20,7 +20,7 @@ public interface IPreGenerationNode : ITreeNode
     CategoryKeys = ["category.content"])]
 public class MyFragmentNode : IPreGenerationNode
 {
-    public string Id { get; } = Guid.NewGuid().ToString();
+    public string Id { get; set; } = Guid.NewGuid().ToString();  // 需 { get; set; } 以支持序列化
 
     public string Name { get; set; } = "My Fragment";
 
@@ -60,8 +60,8 @@ public class PreNodeExecutionContext
 ```csharp
 public class PreGenerationEnv
 {
-    public TransientEnv Transient { get; }    // 每次生成重建
-    public PersistentEnv Persistent { get; }  // 跨生成持久化
+    public TransientEnv Transient { get; set; } = new();   // 每次生成重建
+    public PersistentEnv Persistent { get; set; }           // 跨生成持久化
 }
 ```
 
@@ -85,6 +85,9 @@ public class PreGenerationEnv
 | `Serializer` | `IPreGenerationNodeSerializer` | 节点树序列化器 |
 | `LocService` | `ILocService` | 本地化服务 |
 | `DebugOutput` | `IDebugOutputService` | 调试输出 |
+| `PostGenerationManager` | `IPostGenerationManagerService?` | 后生成管线管理器 |
+| `GetChat()` | `Chat` | 按需加载当前对话对象 |
+| `GetAgent()` | `Agent` | 按需加载当前 Agent 对象 |
 
 ---
 
@@ -93,7 +96,7 @@ public class PreGenerationEnv
 ```
 Agent.PreGenerationTreeJson
   → PreGenerationNodeSerializer.Deserialize → IPreGenerationNode 树
-  → GenerationTreeExecutor.ExecuteAsync(root, persistentEnv)
+  → rootNode.ExecuteAsync(context)（GenerationManagerV2.BuildEnvironment 直接调用）
       → 逐节点执行，修改 TransientEnv
       → 返回填充好的 PreGenerationEnv
   → ToolCallLoop (LLM 调用 + 工具执行循环)
