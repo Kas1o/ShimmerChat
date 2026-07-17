@@ -112,12 +112,12 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             var promptCtx = new SubAgent.SubAgentPromptContext(
                 subEnv.Transient.Fragments.Select(s => (s.Message, s.From)));
 
+            // 后处理器：始终走后生成管线（对齐主流程，每轮 assistant 响应都触发）
             Func<ChatMessage, Task<ChatMessage>>? postProcessor = null;
-            if (!string.IsNullOrEmpty(config.PostGenerationTreeJson)
-                && persistent.PostGenerationManager != null)
+            if (persistent.PostGenerationManager != null)
             {
                 var postAgent = Agent.Create("__sub_post__", "");
-                postAgent.PostGenerationTreeJson = config.PostGenerationTreeJson;
+                postAgent.PostGenerationTreeJson = config.PostGenerationTreeJson ?? "";
                 var fragments = subEnv.Transient.Fragments;
                 var mgr = persistent.PostGenerationManager;
                 var ct = context.CancellationToken;
@@ -138,7 +138,17 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                 };
             }
 
-            var host = new SubAgent.SubAgentLoopHost(promptCtx, toolExecutor, postProcessor);
+            // 环境重建函数：每次工具调用后重执行修饰器树，对齐主流程 OnToolCompleteAsync
+            Func<Task<List<ContextSegment>>>? rebuildFragments = async () =>
+            {
+                var newEnv = new PreGenerationEnv(persistent);
+                newEnv.Transient.SharedState["ChatMessages"] = chatMessages;
+                var newCtx = new PreNodeExecutionContext(newEnv, context.CancellationToken);
+                await rootNode.ExecuteAsync(newCtx);
+                return newEnv.Transient.Fragments.ToList();
+            };
+
+            var host = new SubAgent.SubAgentLoopHost(promptCtx, toolExecutor, postProcessor, rebuildFragments);
             var loop = new ToolCallLoop();
 
             try
@@ -161,7 +171,7 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             if (mode == "None")
                 return PostNodeResult.SuccessResult();
 
-            var outputText = SubAgent.SubAgentFormatter.Format(mode, promptCtx);
+            var outputText = SubAgent.SubAgentFormatter.Format(mode, host.CurrentContext);
             if (!string.IsNullOrEmpty(outputText))
             {
                 context.Env.ResponseText = outputText;

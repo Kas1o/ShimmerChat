@@ -21,13 +21,15 @@ namespace ShimmerChatBuiltin.SubAgent
         private readonly IPreGenerationNodeSerializer _serializer;
         private readonly ILocService _locService;
         private readonly IDebugOutputService _debugOutput;
+        private readonly IPostGenerationManagerService? _postGenerationManager;
 
         private readonly List<SubAgentEntry> _entries = new();
 
         public SubAgentToolV2(IKVDataService kvData,
             IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid,
             IPreGenerationNodeSerializer serializer, ILocService locService,
-            IDebugOutputService debugOutput)
+            IDebugOutputService debugOutput,
+            IPostGenerationManagerService? postGenerationManager = null)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
@@ -36,6 +38,7 @@ namespace ShimmerChatBuiltin.SubAgent
             _serializer = serializer;
             _locService = locService;
             _debugOutput = debugOutput;
+            _postGenerationManager = postGenerationManager;
         }
 
         /// <summary>注册一个 SubAgent 配置。</summary>
@@ -85,20 +88,27 @@ namespace ShimmerChatBuiltin.SubAgent
 
             var config = entry.Config;
 
+            // 对齐 SubAgentNode：树解析失败时返回错误而非静默降级
             var rootNode = ResolveTree(config, _kvData);
+            if (rootNode == null)
+                return $"[SubAgent Error] Tree for '{config.Name}' not found. Check config or shared preset.";
+
             var persistent = new PersistentEnv
             {
                 KVData = _kvData,
                 ChatGuid = _chatGuid,
-                AgentGuid = _agentGuid,
+                AgentGuid = _agentGuid,     // 工具入口无 SharedGuid 概念，始终共享父级 Guid
                 ToolRegistry = _toolRegistry,
                 Serializer = _serializer,
                 LocService = _locService,
-                DebugOutput = _debugOutput
+                DebugOutput = _debugOutput,
+                PostGenerationManager = _postGenerationManager  // 对齐主流程：设置后处理器
             };
 
             var subEnv = new PreGenerationEnv(persistent);
-            subEnv.Transient.SharedState["ChatMessages"] = new List<Message>
+
+            // 构造 seed 对话（仅用户任务消息）
+            var chatMessages = new List<Message>
             {
                 new Message
                 {
@@ -107,7 +117,9 @@ namespace ShimmerChatBuiltin.SubAgent
                     timestamp = DateTime.Now
                 }
             };
+            subEnv.Transient.SharedState["ChatMessages"] = chatMessages;
 
+            // 执行修饰器树（与 SubAgentNode / PostSubAgentNode 一致）
             try
             {
                 var ctx = new PreNodeExecutionContext(subEnv, CancellationToken.None);
@@ -128,20 +140,59 @@ namespace ShimmerChatBuiltin.SubAgent
             var promptCtx = new SubAgentPromptContext(
                 subEnv.Transient.Fragments.Select(s => (s.Message, s.From)));
 
-            var host = new SubAgentLoopHost(promptCtx, toolExecutor);
+            // 后处理器：始终走后生成管线（对齐主流程）
+            Func<ChatMessage, Task<ChatMessage>>? postProcessor = null;
+            if (_postGenerationManager != null)
+            {
+                var postAgent = Agent.Create("__sub_post__", "");
+                postAgent.PostGenerationTreeJson = config.PostGenerationTreeJson ?? "";
+                var fragments = subEnv.Transient.Fragments;
+                var mgr = _postGenerationManager;
+                var cfgName = config.Name;
+                postProcessor = async msg =>
+                {
+                    try
+                    {
+                        return await mgr.ExecuteAsync(postAgent, msg, fragments, persistent, CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        _debugOutput.Write("SubAgentToolV2", "PostGeneration",
+                            $"[SubAgentToolV2] Post-Generation failed for '{cfgName}': {ex.Message}");
+                        return msg;
+                    }
+                };
+            }
+
+            // 环境重建函数：每次工具调用后重执行修饰器树（对齐主流程）
+            Func<Task<List<ContextSegment>>>? rebuildFragments = async () =>
+            {
+                var newEnv = new PreGenerationEnv(persistent);
+                newEnv.Transient.SharedState["ChatMessages"] = chatMessages;
+                var newCtx = new PreNodeExecutionContext(newEnv, CancellationToken.None);
+                await rootNode.ExecuteAsync(newCtx);
+                return newEnv.Transient.Fragments.ToList();
+            };
+
+            var host = new SubAgentLoopHost(promptCtx, toolExecutor, postProcessor, rebuildFragments);
             var loop = new ToolCallLoop();
 
-            try { await loop.RunAsync(api, toolDefs, host); }
+            try
+            {
+                await loop.RunAsync(api, toolDefs, host,
+                    maxRounds: 50,
+                    continueOnToolError: true,
+                    ct: CancellationToken.None);
+            }
             catch (Exception ex) { return $"[SubAgent Error: {ex.Message}]"; }
 
-            return SubAgentFormatter.Format(config.OutputMode, promptCtx);
+            return SubAgentFormatter.Format(config.OutputMode, host.CurrentContext);
         }
 
-        private IPreGenerationNode ResolveTree(SubAgentConfig config, IKVDataService kvData)
+        private IPreGenerationNode? ResolveTree(SubAgentConfig config, IKVDataService kvData)
         {
             if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
-                return _serializer.Deserialize(config.ModifierTreeJson)
-                    ?? new SequenceNode { Name = config.Name };
+                return _serializer.Deserialize(config.ModifierTreeJson);
 
             if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
             {
@@ -149,11 +200,10 @@ namespace ShimmerChatBuiltin.SubAgent
                 var presets = JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json ?? "[]") ?? [];
                 var preset = presets.FirstOrDefault(p => p.Id == config.ModifierPresetId);
                 if (preset != null)
-                    return _serializer.Deserialize(preset.RootNodeJson)
-                        ?? new SequenceNode { Name = config.Name };
+                    return _serializer.Deserialize(preset.RootNodeJson);
             }
 
-            return new SequenceNode { Name = config.Name };
+            return null;
         }
 
         private class SubAgentEntry
