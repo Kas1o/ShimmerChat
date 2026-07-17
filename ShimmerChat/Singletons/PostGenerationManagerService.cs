@@ -1,10 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using SharperLLM.Util;
+using ShimmerChatBuiltin.Misc.Node.PostGeneration;
+using ShimmerChatBuiltin.NodeBasic.PostGeneration;
 using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
-using ShimmerChatBuiltin.Generation.Nodes;
 
 namespace ShimmerChat.Singletons
 {

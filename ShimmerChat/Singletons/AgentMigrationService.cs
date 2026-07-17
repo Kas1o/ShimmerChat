@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Logging;
+using ShimmerChatBuiltin.Fragments;
+using ShimmerChatBuiltin.NodeBasic.PreGeneration;
 using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
-using ShimmerChatBuiltin.Generation.Nodes;
 
 namespace ShimmerChat.Singletons
 {

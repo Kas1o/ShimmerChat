@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using SharperLLM.FunctionCalling;
+using ShimmerChatBuiltin.ToolManage;
 
 namespace ShimmerChatBuiltin.Tests.Generation.Nodes;
 

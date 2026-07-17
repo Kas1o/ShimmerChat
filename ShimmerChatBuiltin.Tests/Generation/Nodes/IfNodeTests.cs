@@ -1,3 +1,5 @@
+using ShimmerChatBuiltin.NodeBasic.PreGeneration;
+
 namespace ShimmerChatBuiltin.Tests.Generation.Nodes;
 
 public class IfNodeTests : NodeTestBase

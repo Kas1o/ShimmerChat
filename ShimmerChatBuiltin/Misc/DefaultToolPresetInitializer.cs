@@ -1,5 +1,5 @@
 using Newtonsoft.Json;
-using ShimmerChatBuiltin.Generation.Nodes;
+using ShimmerChatBuiltin.ToolManage;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Misc

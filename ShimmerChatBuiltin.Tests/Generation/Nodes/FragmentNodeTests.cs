@@ -1,4 +1,5 @@
 using SharperLLM.Util;
+using ShimmerChatBuiltin.Fragments;
 
 namespace ShimmerChatBuiltin.Tests.Generation.Nodes;
 

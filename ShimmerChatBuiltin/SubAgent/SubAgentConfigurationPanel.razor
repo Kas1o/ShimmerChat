@@ -1,11 +1,12 @@
 @attribute [PluginPanel("panel.sub_agent_config", "panel.sub_agent_config.desc", PanelDisplayPlace.Settings)]
 
+@using Newtonsoft.Json
+@using ShimmerChatBuiltin.NodeBasic.PostGeneration
+@using ShimmerChatBuiltin.NodeBasic.PreGeneration
+@using ShimmerChatBuiltin.SubAgent
 @using ShimmerChatLib.Components
 @using ShimmerChatLib.Generation
 @using ShimmerChatLib.Interface
-@using ShimmerChatBuiltin.SubAgent
-@using ShimmerChatBuiltin.Generation.Nodes
-@using Newtonsoft.Json
 
 @inject IKVDataService pluginData
 @inject IPreGenerationNodeSerializer Serializer

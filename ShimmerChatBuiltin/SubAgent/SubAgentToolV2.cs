@@ -4,7 +4,6 @@ using SharperLLM.Util;
 using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
-using ShimmerChatBuiltin.Generation.Nodes;
 
 namespace ShimmerChatBuiltin.SubAgent
 {

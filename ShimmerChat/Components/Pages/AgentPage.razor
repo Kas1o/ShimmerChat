@@ -1,9 +1,11 @@
 @page "/agent/{agentguid}"
-@using ShimmerChatLib.Models
-@using ShimmerChatLib.Generation
-@using ShimmerChatBuiltin.Generation.Nodes
 @using System.Diagnostics
 @using System.Threading
+@using ShimmerChatBuiltin.NodeBasic.PostGeneration
+@using ShimmerChatBuiltin.NodeBasic.PreGeneration
+@using ShimmerChatBuiltin.NodeBasic.Render
+@using ShimmerChatLib.Generation
+@using ShimmerChatLib.Models
 @inject NavigationManager navigation
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService

@@ -3,10 +3,13 @@ using Newtonsoft.Json;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using SharperLLM.Util;
+using ShimmerChatBuiltin.Fragments;
+using ShimmerChatBuiltin.Misc.Node.PreGeneration;
+using ShimmerChatBuiltin.NodeBasic.PreGeneration;
+using ShimmerChatBuiltin.ToolManage;
 using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
-using ShimmerChatBuiltin.Generation.Nodes;
 
 namespace ShimmerChat.Singletons
 {

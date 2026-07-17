@@ -1,9 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using ShimmerChatBuiltin.Misc.Node.Render;
+using ShimmerChatBuiltin.NodeBasic.Render;
 using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
-using ShimmerChatBuiltin.Generation.Nodes;
 
 namespace ShimmerChat.Singletons
 {
