@@ -27,6 +27,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddSignalR(options =>
+{
+    // 编辑长文本时总是触发重连，从默认的 32KiB 提升到 50MiB。
+	options.MaximumReceiveMessageSize = 50 * 1024 * 1024;
+});
+
 // 配置 KV 数据存储
 ConfigureKVDataStorage(builder);
 
