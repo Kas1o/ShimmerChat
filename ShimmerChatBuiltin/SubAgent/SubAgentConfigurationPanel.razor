@@ -11,6 +11,7 @@
 @inject IPreGenerationNodeSerializer Serializer
 @inject IPostGenerationNodeSerializerService PostSerializer
 @inject ILocService Loc
+@inject INodeTypeCatalog NodeTypeCatalog
 
 
 
@@ -121,7 +122,9 @@
                         {
                             <div class="tree-editor-container">
                                 <CascadingValue Value="_dragContext">
+                                <CascadingValue Value="_preEditorContext">
                                     <TreeEditor Node="@_editingTree" />
+                                </CascadingValue>
                                 </CascadingValue>
                             </div>
                         }
@@ -158,7 +161,9 @@
                     </div>
                     <div class="tree-editor-container">
                         <CascadingValue Value="_postDragContext">
+                        <CascadingValue Value="_postEditorContext">
                             <TreeEditor Node="@_editingPostTree" />
+                        </CascadingValue>
                         </CascadingValue>
                     </div>
                 }
@@ -208,9 +213,13 @@
     IPostGenerationNode? _editingPostTree;
     TreeDragContext _dragContext = new();
     TreeDragContext _postDragContext = new();
+    TreeEditorContext _preEditorContext = default!;
+    TreeEditorContext _postEditorContext = default!;
 
     protected override void OnInitialized()
     {
+        _preEditorContext = new TreeEditorContext(Serializer, NodeTypeCatalog, typeof(IPreGenerationNode));
+        _postEditorContext = new TreeEditorContext(PostSerializer, NodeTypeCatalog, typeof(IPostGenerationNode));
         LoadConfigs();
     }
 
