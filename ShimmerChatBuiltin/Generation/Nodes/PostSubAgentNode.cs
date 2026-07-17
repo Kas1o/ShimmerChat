@@ -6,49 +6,48 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Generation.Nodes
 {
-    [NodeInfo("node.sub_agent", Icon = "🤖", Color = "var(--node-subagent)", CategoryKeys = ["category.flow", "category.sub_agent"])]
-    public class SubAgentNode : IPreGenerationNode
+    [NodeInfo("node.post_sub_agent", Icon = "🤖", Color = "var(--node-subagent)", CategoryKeys = ["category.flow", "category.sub_agent", "category.post"])]
+    public class PostSubAgentNode : IPostGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "SubAgent";
+        public string Name { get; set; } = "Post SubAgent";
 
-        [NodeProperty("prop.sub_agent.config_name", HintKey = "prop.sub_agent.config_name.hint")]
+        [NodeProperty("prop.post_sub_agent.config_name", HintKey = "prop.post_sub_agent.config_name.hint")]
         public string ConfigName { get; set; } = "";
 
-        [NodeProperty("prop.sub_agent.output_mode", HintKey = "prop.sub_agent.output_mode.hint")]
+        [NodeProperty("prop.post_sub_agent.output_mode", HintKey = "prop.post_sub_agent.output_mode.hint")]
         public string OutputMode { get; set; } = "";
 
-        [NodeProperty("prop.sub_agent.max_iterations", HintKey = "prop.sub_agent.max_iterations.hint")]
+        [NodeProperty("prop.post_sub_agent.max_iterations", HintKey = "prop.post_sub_agent.max_iterations.hint")]
         public int MaxIterations { get; set; } = 50;
 
-        [NodeProperty("prop.sub_agent.shared_guid", HintKey = "prop.sub_agent.shared_guid.hint")]
-        public bool SharedGuid { get; set; } = false;
+        [NodeProperty("prop.post_sub_agent.include_full_context", HintKey = "prop.post_sub_agent.include_full_context.hint")]
+        public bool IncludeFullContext { get; set; } = false;
 
-        public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
+        public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
 
             if (string.IsNullOrWhiteSpace(ConfigName))
-                return NodeResult.SuccessResult();
+                return PostNodeResult.SuccessResult();
 
             var kvData = context.Env.Persistent.KVData;
             var config = LoadConfig(kvData, ConfigName);
             if (config == null)
-                return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_config_not_found", ConfigName), nodeId: Id, nodeName: Name);
+                return Fail(NodeErrorCodes.ConfigNotFound,
+                    loc.Format("node_err.subagent_config_not_found", ConfigName));
 
             var rootNode = ResolveTree(config, kvData, context.Env.Persistent.Serializer);
             if (rootNode == null)
-                return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_no_tree", ConfigName),
-                    nodeId: Id, nodeName: Name);
+                return Fail(NodeErrorCodes.ConfigNotFound,
+                    loc.Format("node_err.subagent_no_tree", ConfigName));
 
-            // 1. 创建隔离的 PreGenerationEnv，将父级 Fragments 转为临时对话写入 SharedState
+            // 1. 创建隔离的 PreGenerationEnv，构建聊天历史
             var persistent = new PersistentEnv
             {
                 KVData = kvData,
                 ChatGuid = context.Env.Persistent.ChatGuid,
-                AgentGuid = SharedGuid ? context.Env.Persistent.AgentGuid : config.Guid,
+                AgentGuid = context.Env.Persistent.AgentGuid,
                 ToolRegistry = context.Env.Persistent.ToolRegistry,
                 Serializer = context.Env.Persistent.Serializer,
                 LocService = context.Env.Persistent.LocService,
@@ -59,36 +58,49 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             var subEnv = new PreGenerationEnv(persistent);
 
             var chatMessages = new List<Message>();
-            foreach (var seg in context.Env.Transient.Fragments)
+
+            if (IncludeFullContext)
             {
-                chatMessages.Add(new Message
+                // 传入完整上下文：将 PreFragments 映射为 Message 列表
+                foreach (var seg in context.Env.PreFragments)
                 {
-                    message = seg.Message,
-                    sender = FragmentFromToSender(seg.From),
-                    timestamp = DateTime.Now
-                });
+                    chatMessages.Add(new Message
+                    {
+                        message = seg.Message,
+                        sender = FragmentFromToSender(seg.From),
+                        timestamp = DateTime.Now
+                    });
+                }
             }
+
+            // 始终将当前 ResponseText 作为末尾用户消息追加
+            chatMessages.Add(new Message
+            {
+                message = new ChatMessage { Content = context.Env.ResponseText },
+                sender = Sender.User,
+                timestamp = DateTime.Now
+            });
+
             subEnv.Transient.SharedState["ChatMessages"] = chatMessages;
 
-            // 2. 执行 SubAgent 修饰器树（树产物追加在历史之后）
+            // 2. 执行 SubAgent 修饰器树
             try
             {
                 var ctx = new PreNodeExecutionContext(subEnv, context.CancellationToken);
                 var result = await rootNode.ExecuteAsync(ctx);
                 if (!result.Success)
-                    return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                        loc.Format("node_err.subagent_tree_failed", result.Message), nodeId: Id, nodeName: Name);
+                    return Fail(NodeErrorCodes.ServiceError,
+                        loc.Format("node_err.subagent_tree_failed", result.Message));
             }
             catch (Exception ex)
             {
-                return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                    loc.Format("node_err.subagent_tree_failed", ex.Message), nodeId: Id, nodeName: Name);
+                return Fail(NodeErrorCodes.ServiceError,
+                    loc.Format("node_err.subagent_tree_failed", ex.Message));
             }
 
             // 3. API：由修饰器树中的 APISelectNode 设置
             if (subEnv.Transient.API == null)
-                return NodeResult.Failure(NodeErrorCodes.ApiUnavailable,
-                    loc["node_err.subagent_no_api"], nodeId: Id, nodeName: Name);
+                return Fail(NodeErrorCodes.ApiUnavailable, loc["node_err.subagent_no_api"]);
 
             // 4. Tool Call 循环（隔离 env 内独立运行），每轮 assistant 响应经由 Post-Generation 管线
             var tools = subEnv.Transient.Tools;
@@ -116,8 +128,8 @@ namespace ShimmerChatBuiltin.Generation.Nodes
                     }
                     catch (Exception ex)
                     {
-                        debug.Write("SubAgentNode", "PostGeneration",
-                            $"[SubAgentNode] Post-Generation failed for '{cfgName}': {ex.Message}");
+                        debug.Write("PostSubAgentNode", "PostGeneration",
+                            $"[PostSubAgentNode] Post-Generation failed for '{cfgName}': {ex.Message}");
                         return msg;
                     }
                 };
@@ -137,32 +149,22 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             }
             catch (Exception ex)
             {
-                return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                    $"[SubAgent Error: {ex.Message}]", nodeId: Id, nodeName: Name);
+                return Fail(NodeErrorCodes.ServiceError,
+                    $"[SubAgent Error: {ex.Message}]");
             }
 
-            // 5. 输出格式化，注入父级上下文
+            // 5. 输出格式化，写回 ResponseText
             var mode = !string.IsNullOrWhiteSpace(OutputMode) ? OutputMode : config.OutputMode;
             if (mode == "None")
-                return NodeResult.SuccessResult();
+                return PostNodeResult.SuccessResult();
 
             var outputText = SubAgent.SubAgentFormatter.Format(mode, promptCtx);
             if (!string.IsNullOrEmpty(outputText))
             {
-                context.Env.Transient.Fragments.Add(new ContextSegment
-                {
-                    SourceType = typeof(SubAgentNode),
-                    Message = new ChatMessage { Content = outputText },
-                    From = PromptBuilder.From.assistant,
-                    Metadata = new Dictionary<string, object>
-                    {
-                        ["subAgentName"] = ConfigName,
-                        ["outputMode"] = mode
-                    }
-                });
+                context.Env.ResponseText = outputText;
             }
 
-            return NodeResult.SuccessResult();
+            return PostNodeResult.SuccessResult();
         }
 
         private static IPreGenerationNode? ResolveTree(SubAgent.SubAgentConfig config, IKVDataService kvData, IPreGenerationNodeSerializer serializer)
@@ -187,6 +189,14 @@ namespace ShimmerChatBuiltin.Generation.Nodes
             var json = kvData.Read("SubAgent", "configs");
             var configs = JsonConvert.DeserializeObject<List<SubAgent.SubAgentConfig>>(json ?? "[]") ?? [];
             return configs.FirstOrDefault(c => c.Name == name);
+        }
+
+        private PostNodeResult Fail(string code, string message)
+        {
+            var r = PostNodeResult.Failure(code, message);
+            r.NodeId = Id;
+            r.NodeName = Name;
+            return r;
         }
 
         private static string FragmentFromToSender(PromptBuilder.From from) => from switch

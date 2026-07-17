@@ -63,12 +63,12 @@ namespace ShimmerChatLib
         public string? PreGenerationTreeJson { get; set; }
 
         /// <summary>
-        /// 3.0 后生成树 JSON（LLM 响应后处理管线）
+        /// 2.0 后生成树 JSON（LLM 响应后处理管线）
         /// </summary>
         public string? PostGenerationTreeJson { get; set; }
 
         /// <summary>
-        /// 3.0 渲染修改树 JSON（Markdown→HTML 渲染管线）
+        /// 2.0 渲染修改树 JSON（Markdown→HTML 渲染管线）
         /// </summary>
         public string? RenderModifierTreeJson { get; set; }
 

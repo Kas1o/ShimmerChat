@@ -482,5 +482,16 @@
   "panel.memory_management_agent_plugin_panel.query_info.collection_not_exists_text" : "Collection Not Exists.",
   "panel.memory_management_agent_plugin_panel.query_info" : "Query Info",
   "panel.memory_management_agent_plugin_panel.desc" : "manage agent memory",
-  "panel.memory_management_agent_plugin_panel" : "Memory Manage"
+  "panel.memory_management_agent_plugin_panel" : "Memory Manage",
+
+  "node.post_sub_agent": "Post SubAgent",
+  "node.post_sub_agent.desc": "Process LLM response text using a sub-agent in the post-generation pipeline",
+  "prop.post_sub_agent.config_name": "Config Name",
+  "prop.post_sub_agent.config_name.hint": "Name of the SubAgent configuration",
+  "prop.post_sub_agent.output_mode": "Output Mode",
+  "prop.post_sub_agent.output_mode.hint": "LastMessage, FullJson, or None. Overrides config if set",
+  "prop.post_sub_agent.max_iterations": "Max Iterations",
+  "prop.post_sub_agent.max_iterations.hint": "Maximum tool-call loop iterations",
+  "prop.post_sub_agent.include_full_context": "Include Full Context",
+  "prop.post_sub_agent.include_full_context.hint": "When enabled, passes the full conversation history (PreFragments) along with the LLM response to the sub-agent. When disabled, only the LLM response text is passed."
 }

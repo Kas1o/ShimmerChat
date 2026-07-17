@@ -30,7 +30,7 @@ builder.Services.AddRazorComponents()
 // 配置 KV 数据存储
 ConfigureKVDataStorage(builder);
 
-// ShimmerChat 3.0 服务
+// ShimmerChat 2.0 服务
 builder.Services.AddSingleton<IToolRegistry, ToolRegistry>();
 builder.Services.AddSingleton<IPreGenerationNodeSerializer, PreGenerationNodeSerializer>();
 builder.Services.AddSingleton<INodeTypeCatalog, NodeTypeCatalog>();
@@ -48,7 +48,7 @@ builder.Services.AddSingleton<IRenderModifierManager, RenderModifierManager>();
 builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
-builder.Services.AddSingleton<IPopupService, PopupService>();
+builder.Services.AddSingleton<IPopupService, PopupService>(); // TODO: 大概需要改成 Scoped。
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
 builder.Services.AddSingleton<ILocService, LocService>();

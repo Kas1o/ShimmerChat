@@ -115,7 +115,7 @@ Tauri v2 桌面壳，将 Blazor Server 包装为桌面应用。通过 `SHIMMER_R
 
 ## 4. 核心概念：三管线节点树
 
-ShimmerChat 3.0 采用三管线架构。参见 [管线架构总览](Docs/PipelineArchitecture.md)。
+ShimmerChat 2.0 采用三管线架构。参见 [管线架构总览](Docs/PipelineArchitecture.md)。
 
 ### 4.1 概述
 
@@ -310,7 +310,7 @@ public class ContextSegment
 
 ### 5.16 IAgentMigrationService
 
-**Agent 格式迁移。** 将 1.0 版本的 Agent 数据迁移到 3.0 格式（`PreGenerationTreeJson` 节点树）。启动时自动执行。
+**Agent 格式迁移。** 将 1.0 版本的 Agent 数据迁移到 2.0 格式（`PreGenerationTreeJson` 节点树）。启动时自动执行。
 
 ---
 

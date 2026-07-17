@@ -1,5 +1,4 @@
 using Newtonsoft.Json;
-using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using SharperLLM.Util;
 using ShimmerChatLib;
@@ -16,7 +15,6 @@ namespace ShimmerChatBuiltin.SubAgent
     public class SubAgentToolV2 : IToolV2
     {
         private readonly IKVDataService _kvData;
-        private readonly IChatCompletionClient? _api;
         private readonly IToolRegistry _toolRegistry;
         private readonly Guid _chatGuid;
         private readonly Guid _agentGuid;
@@ -26,13 +24,12 @@ namespace ShimmerChatBuiltin.SubAgent
 
         private readonly List<SubAgentEntry> _entries = new();
 
-        public SubAgentToolV2(IKVDataService kvData, IChatCompletionClient? api,
+        public SubAgentToolV2(IKVDataService kvData,
             IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid,
             IPreGenerationNodeSerializer serializer, ILocService locService,
             IDebugOutputService debugOutput)
         {
             _kvData = kvData;
-            _api = api;
             _toolRegistry = toolRegistry;
             _chatGuid = chatGuid;
             _agentGuid = agentGuid;
@@ -86,9 +83,6 @@ namespace ShimmerChatBuiltin.SubAgent
             if (entry == null)
                 return $"Error: SubAgent '{args.subagent}' is not registered. Available: {string.Join(", ", _entries.Select(e => e.ConfigName))}";
 
-            if (_api == null)
-                return "Error: No API available for SubAgent.";
-
             var config = entry.Config;
 
             var rootNode = ResolveTree(config, _kvData);
@@ -123,7 +117,10 @@ namespace ShimmerChatBuiltin.SubAgent
             }
             catch (Exception ex) { return $"[SubAgent Tree Error: {ex.Message}]"; }
 
-            var api = subEnv.Transient.API?.ChatClient ?? _api;
+            if (subEnv.Transient.API == null)
+                return "Error: No API configured for SubAgent. Add an APISelectNode to the modifier tree.";
+
+            var api = subEnv.Transient.API.ChatClient;
             var tools = subEnv.Transient.Tools;
             var toolDefs = tools.Select(t => t.GetDefinition()).ToList();
             var toolExecutor = new ToolV2Executor(tools);
