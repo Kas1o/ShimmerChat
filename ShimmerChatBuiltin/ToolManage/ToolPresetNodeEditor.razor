@@ -1,0 +1,156 @@
+@using Newtonsoft.Json
+@using ShimmerChatLib.Generation
+@inject ShimmerChatLib.Interface.IKVDataService KVData
+@inject ILocService Loc
+@inject IJSRuntime JS
+
+<div class="call-node-editor">
+    <div class="ge-field">
+        <label class="ge-label">@Loc["editor.tool_preset.label"]</label>
+        <div class="ge-value">
+
+            @if (_showPicker)
+            {
+                <!-- 搜索 + 列表模式 -->
+                <input type="text" class="call-search"
+                       placeholder="@Loc["editor.tool_preset.search_placeholder"]"
+                       @bind-value="SearchText" @bind-value:event="oninput" />
+
+                @if (_filteredPresets.Count > 0)
+                {
+                    <div class="call-list">
+                        @foreach (var preset in _filteredPresets)
+                        {
+                            <div class="call-item @(preset.Id == _selectedPresetId ? "call-item-active" : "")"
+                                 @onclick="() => SelectPreset(preset)">
+                                <span class="call-item-name">@preset.Name</span>
+                                @if (preset.IsDefault)
+                                {
+                                    <span class="call-item-default">@Loc["editor.tool_preset.default_badge"]</span>
+                                }
+                                <span class="call-item-id" title="@preset.Id">@preset.Id</span>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="call-empty">
+                        @(_presets.Count == 0
+                            ? Loc["editor.tool_preset.no_presets"]
+                            : Loc["editor.tool_preset.no_match"])
+                    </div>
+                }
+            }
+            else
+            {
+                <!-- 已选择模式 -->
+                <div class="call-selected">
+                    <span class="call-sel-name">@_selectedPreset?.Name</span>
+                    <button class="call-change-btn" @onclick="StartChange"
+                            title="@Loc["editor.tool_preset.change"]">@Loc["editor.tool_preset.change"]</button>
+                </div>
+                <div class="call-selected-id">
+                    <span class="call-id-label">@Loc["editor.tool_preset.selected_id"]</span>
+                    <code class="call-id-text"
+                          @oncontextmenu="CopyId"
+                          @oncontextmenu:preventDefault
+                          title="Right-click to copy">@_selectedPresetId</code>
+                    <button class="call-copy-btn" @onclick="CopyId"
+                            title="@Loc["editor.tool_preset.copy"]">@Loc["editor.tool_preset.copy"]</button>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public ToolPresetNode Node { get; set; } = default!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
+
+    private List<ToolPreset> _presets = [];
+    private List<ToolPreset> _filteredPresets = [];
+    private ToolPreset? _selectedPreset;
+    private string _selectedPresetId = "";
+    private string _searchText = "";
+    private bool _showPicker;
+
+    private string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            _searchText = value;
+            ApplyFilter();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        var json = KVData.Read("ToolPresets", "__presets__");
+        _presets = JsonConvert.DeserializeObject<List<ToolPreset>>(json ?? "[]") ?? [];
+        _selectedPresetId = Node.PresetId ?? "";
+
+        // 如果 PresetId 为空，尝试匹配默认预设
+        if (string.IsNullOrEmpty(_selectedPresetId))
+        {
+            _selectedPreset = _presets.FirstOrDefault(p => p.IsDefault);
+            if (_selectedPreset != null)
+            {
+                _selectedPresetId = _selectedPreset.Id;
+                Node.PresetId = _selectedPreset.Id;
+            }
+        }
+        else
+        {
+            _selectedPreset = _presets.FirstOrDefault(p => p.Id == _selectedPresetId);
+        }
+
+        // 有选中预设则显示已选择状态，否则显示选择器
+        _showPicker = _selectedPreset == null;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            _filteredPresets = _presets.ToList();
+        }
+        else
+        {
+            var q = _searchText.Trim();
+            _filteredPresets = _presets
+                .Where(p =>
+                    p.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                    p.Id.Contains(q, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+
+    private void SelectPreset(ToolPreset preset)
+    {
+        _selectedPreset = preset;
+        _selectedPresetId = preset.Id;
+        Node.PresetId = preset.Id;
+        _showPicker = false;
+        _searchText = "";
+    }
+
+    private void StartChange()
+    {
+        _showPicker = true;
+        _searchText = "";
+        ApplyFilter();
+    }
+
+    private async Task CopyId()
+    {
+        if (!string.IsNullOrEmpty(_selectedPresetId))
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _selectedPresetId);
+        }
+    }
+}

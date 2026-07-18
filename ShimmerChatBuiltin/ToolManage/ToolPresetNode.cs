@@ -4,16 +4,17 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin.ToolManage
 {
     /// <summary>
-    /// 从 KVData 中加载工具预设。PresetName 为空时使用 IsDefault 预设，否则按名称匹配。
+    /// 从 KVData 中加载工具预设。PresetId 为空时使用 IsDefault 预设，否则按 ID 匹配。
     /// </summary>
     [NodeInfo("node.tool_preset", Icon = "📦", Color = "var(--node-link)", CategoryKeys = ["category.tool", "category.preset"], DescriptionKey = "node.tool_preset.desc")]
+    [NodeEditor(typeof(ToolPresetNodeEditor))]
     public class ToolPresetNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Tool Preset";
 
-        [NodeProperty("prop.tool_preset.preset_name", HintKey = "prop.tool_preset.preset_name.hint")]
-        public string PresetName { get; set; } = "";
+        [NodeProperty("prop.tool_preset.preset_id", HintKey = "prop.tool_preset.preset_id.hint")]
+        public string PresetId { get; set; } = "";
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
@@ -34,15 +35,15 @@ namespace ShimmerChatBuiltin.ToolManage
                     nodeId: Id, nodeName: Name));
 
             ToolPreset? preset;
-            if (string.IsNullOrWhiteSpace(PresetName))
+            if (string.IsNullOrWhiteSpace(PresetId))
                 preset = presets.FirstOrDefault(p => p.IsDefault);
             else
-                preset = presets.FirstOrDefault(p => p.Name == PresetName);
+                preset = presets.FirstOrDefault(p => p.Id == PresetId);
 
             if (preset == null)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    loc.Format("node_err.tool_preset_not_found", string.IsNullOrWhiteSpace(PresetName) ? "(default)" : PresetName),
+                    loc.Format("node_err.tool_preset_not_found", string.IsNullOrWhiteSpace(PresetId) ? "(default)" : PresetId),
                     nodeId: Id, nodeName: Name));
 
             foreach (var typeName in preset.EnabledToolTypeNames)
