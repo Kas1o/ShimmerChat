@@ -7,14 +7,14 @@ namespace ShimmerChatBuiltin.Tests.Generation.Nodes;
 
 public class APISelectNodeTests : NodeTestBase
 {
-    private static string CreateApiSettingsJson()
+    private static (string json, ApiConfig config0, ApiConfig config1) CreateApiSettings()
     {
         var configs = new List<ApiConfig>
         {
             new() { Name = "OpenAI", Type = ApiConfigType.OpenAI, OpenAIUrl = "http://localhost", OpenAIApiKey = "k", OpenAIModel = "gpt" },
             new() { Name = "DeepSeek", Type = ApiConfigType.DeepSeek, DeepSeekUrl = "http://localhost", DeepSeekApiKey = "k", DeepSeekModel = "ds" },
         };
-        return JsonConvert.SerializeObject(configs);
+        return (JsonConvert.SerializeObject(configs), configs[0], configs[1]);
     }
 
     [Fact]
@@ -28,11 +28,12 @@ public class APISelectNodeTests : NodeTestBase
     }
 
     [Fact]
-    public async Task APIIndex_Negative1_UsesGlobalSelected()
+    public async Task APIGuid_Null_UsesGlobalSelected()
     {
-        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting")).Returns(CreateApiSettingsJson());
-        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIIndex")).Returns("1");
-        var node = new APISelectNode { APIIndex = -1 };
+        var (json, _, config1) = CreateApiSettings();
+        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting")).Returns(json);
+        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIGuid")).Returns(config1.Id.ToString());
+        var node = new APISelectNode { APIGuid = null };
         var ctx = CreateContext();
 
         var result = await node.ExecuteAsync(ctx);
@@ -43,11 +44,12 @@ public class APISelectNodeTests : NodeTestBase
     }
 
     [Fact]
-    public async Task APIIndex_Valid_UsesSpecific()
+    public async Task APIGuid_Valid_UsesSpecific()
     {
-        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting")).Returns(CreateApiSettingsJson());
-        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIIndex")).Returns("0");
-        var node = new APISelectNode { APIIndex = 1 };
+        var (json, config0, config1) = CreateApiSettings();
+        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting")).Returns(json);
+        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIGuid")).Returns(config0.Id.ToString());
+        var node = new APISelectNode { APIGuid = config1.Id.ToString() };
         var ctx = CreateContext();
 
         var result = await node.ExecuteAsync(ctx);
@@ -57,10 +59,11 @@ public class APISelectNodeTests : NodeTestBase
     }
 
     [Fact]
-    public async Task APIIndex_OutOfRange_FallsBackToZero()
+    public async Task APIGuid_NotFound_FallsBackToFirst()
     {
-        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting")).Returns(CreateApiSettingsJson());
-        var node = new APISelectNode { APIIndex = 99 };
+        var (json, _, _) = CreateApiSettings();
+        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting")).Returns(json);
+        var node = new APISelectNode { APIGuid = Guid.NewGuid().ToString() };
         var ctx = CreateContext();
 
         var result = await node.ExecuteAsync(ctx);
@@ -72,9 +75,10 @@ public class APISelectNodeTests : NodeTestBase
     [Fact]
     public async Task IsContinuation_OpenAI_SetsPrefix()
     {
-        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting")).Returns(CreateApiSettingsJson());
-        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIIndex")).Returns("0");
-        var node = new APISelectNode { APIIndex = -1 };
+        var (json, config0, _) = CreateApiSettings();
+        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting")).Returns(json);
+        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIGuid")).Returns(config0.Id.ToString());
+        var node = new APISelectNode { APIGuid = null };
         var env = new PreGenerationEnv(CreatePersistentEnv());
         var msg = new Message
         {
@@ -102,8 +106,8 @@ public class APISelectNodeTests : NodeTestBase
         };
         KvMock.Setup(k => k.Read("ApiSettings", "apiSetting"))
             .Returns(JsonConvert.SerializeObject(configs));
-        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIIndex")).Returns("0");
-        var node = new APISelectNode { APIIndex = -1 };
+        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIGuid")).Returns(configs[0].Id.ToString());
+        var node = new APISelectNode { APIGuid = null };
         var env = new PreGenerationEnv(CreatePersistentEnv());
         env.Transient.SharedState["IsContinuation"] = true;
         var ctx = CreateContext(env);

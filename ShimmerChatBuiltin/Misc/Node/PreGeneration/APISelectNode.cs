@@ -7,7 +7,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
 {
     /// <summary>
     /// 设置 TransientEnv.API。
-    /// APIIndex: -1 表示使用全局选中 API；>=0 表示使用指定索引的 API 配置。
+    /// APIGuid: null 表示使用全局选中 API；非 null 表示使用指定 Guid 的 API 配置。
     /// 同时处理续写（IsContinuation）标记。
     /// </summary>
     [NodeInfo("node.api_select", Icon = "⚡", Color = "var(--node-config)", CategoryKeys = ["category.config"], DescriptionKey = "node.api_select.desc")]
@@ -18,9 +18,9 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
         public string Name { get; set; } = "Select API";
 
         /// <summary>
-        /// API 配置索引。-1 表示全局选中。
+        /// API 配置 Guid。null 表示全局选中。
         /// </summary>
-        public int APIIndex { get; set; } = -1;
+        public string? APIGuid { get; set; }
 
         public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
@@ -35,16 +35,19 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
                     loc["node_err.api_no_settings"],
                     nodeId: Id, nodeName: Name);
 
-            int index = APIIndex;
-            if (index == -1)
+            ApiConfig? selectedConfig = null;
+            if (!string.IsNullOrEmpty(APIGuid))
             {
-                var globalIndexStr = kvData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
-                int.TryParse(globalIndexStr, out index);
+                selectedConfig = settings.FirstOrDefault(s => s.Id.ToString() == APIGuid);
+            }
+            else
+            {
+                var globalGuidStr = kvData.Read("ApiSettings", "selectedAPIGuid");
+                if (!string.IsNullOrEmpty(globalGuidStr))
+                    selectedConfig = settings.FirstOrDefault(s => s.Id.ToString() == globalGuidStr);
             }
 
-            var selectedConfig = index >= 0 && index < settings.Count
-                ? settings[index]
-                : settings[0];
+            selectedConfig ??= settings[0];
 
             context.Env.Transient.API = selectedConfig.ToAPISetting();
 

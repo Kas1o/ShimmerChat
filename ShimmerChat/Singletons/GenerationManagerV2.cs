@@ -70,7 +70,7 @@ namespace ShimmerChat.Singletons
                             From = PromptBuilder.From.system
                         },
                         new AppendChatMessagesNode { Name = "Append Chat Messages" },
-                        new APISelectNode { Name = "Select API", APIIndex = -1 },
+                        new APISelectNode { Name = "Select API" },
                         new ToolPresetNode { Name = "Load Tools", PresetName = "" }
                     }
                 })

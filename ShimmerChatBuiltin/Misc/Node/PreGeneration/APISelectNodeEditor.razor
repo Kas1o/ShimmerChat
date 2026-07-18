@@ -10,12 +10,12 @@
             @Loc["node.api_select.label"]
         </label>
         <div class="ge-value">
-            <select class="ge-select" @bind="SelectedIndex" @bind:event="onchange"
+            <select class="ge-select" @bind="SelectedGuid" @bind:event="onchange"
                     style="width: 100%; max-width: 400px;">
-                <option value="-2">@Loc["node.api_select.global_default"]</option>
-                @for (int i = 0; i < _settings.Count; i++)
+                <option value="">@Loc["node.api_select.global_default"]</option>
+                @foreach (var s in _settings)
                 {
-                    <option value="@i">@_settings[i].Name (@_settings[i].Type)</option>
+                    <option value="@s.Id.ToString()">@s.Name (@s.Type)</option>
                 }
             </select>
             @if (_settings.Count == 0)
@@ -26,14 +26,17 @@
             }
             else
             {
+                var selectedSetting = string.IsNullOrEmpty(SelectedGuid)
+                    ? null
+                    : _settings.FirstOrDefault(s => s.Id.ToString() == SelectedGuid);
                 <div style="font-size: 0.72em; color: var(--su-text-1); margin-top: 4px;">
-                    @(SelectedIndex == -2
+                    @(string.IsNullOrEmpty(SelectedGuid)
                         ? Loc["node.api_select.using_global"]
-                        : SelectedIndex >= 0 && SelectedIndex < _settings.Count
+                        : selectedSetting != null
                             ? string.Format(Loc["node.api_select.using_format"],
-                                _settings[SelectedIndex].Name,
-                                _settings[SelectedIndex].Type,
-                                _settings[SelectedIndex].EnableStream
+                                selectedSetting.Name,
+                                selectedSetting.Type,
+                                selectedSetting.EnableStream
                                     ? Loc["node.api_select.streaming"]
                                     : Loc["node.api_select.non_streaming"])
                             : "")
@@ -54,26 +57,15 @@
 
     private List<ApiConfig> _settings = [];
 
-    private int SelectedIndex
+    private string SelectedGuid
     {
-        get => field;
-        set
-        {
-            field = value;
-            Node.APIIndex = value == -2 ? -1 : value;
-        }
-    } = -2;
+        get => Node.APIGuid ?? "";
+        set => Node.APIGuid = string.IsNullOrEmpty(value) ? null : value;
+    }
 
     protected override void OnInitialized()
     {
         var json = KVData.Read("ApiSettings", "apiSetting") ?? "[]";
         _settings = JsonConvert.DeserializeObject<List<ApiConfig>>(json) ?? [];
-
-        if (Node.APIIndex == -1)
-            SelectedIndex = -2;
-        else if (Node.APIIndex >= 0 && Node.APIIndex < _settings.Count)
-            SelectedIndex = Node.APIIndex;
-        else
-            SelectedIndex = -2;
     }
 }

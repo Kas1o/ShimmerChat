@@ -6,10 +6,10 @@
 
 <h3>@Loc["Api Settings"]</h3>
 <h4>@Loc["ApiConfigs Profile:"]</h4>
-<select @bind="_selectedIndex" class="su-select">
+<select @bind="_selectedGuid" class="su-select">
     @for (int i = 0; i < apiSettings.Count; i++)
     {
-        <option value="@i">@apiSettings[i].Name</option>
+        <option value="@apiSettings[i].Id.ToString()">@apiSettings[i].Name</option>
     }
 </select>
 <button class="su-btn su-btn-primary" style="margin:5px" @onclick="CreateNewApiConfig">@Loc["Create New Api Setting Profile"]</button>
@@ -229,13 +229,14 @@
 
     List<ApiConfig> apiSettings { get; set; }
 
-    private int _selectedIndex { get; set; }
-    ApiConfig topAPISetting => (_selectedIndex >= 0 && _selectedIndex < apiSettings.Count) ? apiSettings[_selectedIndex] : null;
+    private string? _selectedGuid { get; set; }
+    ApiConfig topAPISetting => apiSettings.FirstOrDefault(s => s.Id.ToString() == _selectedGuid);
 
     private void CreateNewApiConfig()
     {
-        apiSettings.Add(new ApiConfig { Name = "New API Setting" });
-        _selectedIndex = apiSettings.Count - 1;
+        var newConfig = new ApiConfig { Name = "New API Setting" };
+        apiSettings.Add(newConfig);
+        _selectedGuid = newConfig.Id.ToString();
     }
 
     private void CloneCurrentApiConfig()
@@ -245,7 +246,7 @@
             var clonedSetting = topAPISetting.Clone();
             clonedSetting.Name = $"{clonedSetting.Name} - Copy";
             apiSettings.Add(clonedSetting);
-            _selectedIndex = apiSettings.Count - 1;
+            _selectedGuid = clonedSetting.Id.ToString();
         }
     }
 
@@ -253,15 +254,8 @@
     {
         if (topAPISetting != null)
         {
-            apiSettings.RemoveAt(_selectedIndex);
-            if (apiSettings.Count > 0)
-            {
-                _selectedIndex = Math.Max(0, _selectedIndex - 1);
-            }
-            else
-            {
-                _selectedIndex = -1;
-            }
+            apiSettings.Remove(topAPISetting);
+            _selectedGuid = apiSettings.FirstOrDefault()?.Id.ToString();
         }
     }
 
@@ -281,7 +275,7 @@
     private void SaveAll()
     {
         KVData.Write("ApiSettings", "apiSetting", Newtonsoft.Json.JsonConvert.SerializeObject(apiSettings));
-        KVData.Write("ApiSettings", "selectedAPIIndex", _selectedIndex.ToString()) ;
+        KVData.Write("ApiSettings", "selectedAPIGuid", _selectedGuid ?? "");
         Navigation.NavigateTo(Navigation.Uri, true);
     }
 
@@ -289,8 +283,10 @@
     {
         var apisettings = KVData.Read("ApiSettings", "apiSetting") ?? "[]";
         apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiConfig>>(apisettings) ?? [];
-        var selectedIndex = KVData.Read("ApiSettings", "selectedAPIIndex") ?? "0";
-        _selectedIndex = int.Parse(selectedIndex);
+        _selectedGuid = KVData.Read("ApiSettings", "selectedAPIGuid");
+
+        if (string.IsNullOrEmpty(_selectedGuid))
+            _selectedGuid = apiSettings.FirstOrDefault()?.Id.ToString();
     }
 
 }

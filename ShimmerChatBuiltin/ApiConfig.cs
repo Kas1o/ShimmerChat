@@ -7,6 +7,7 @@ namespace ShimmerChatBuiltin
 {
 	public class ApiConfig
 	{
+		public Guid Id { get; set; } = Guid.NewGuid();
 		public string Name { get; set; } = string.Empty;
 
 		[JsonConverter(typeof(JsonStringEnumConverter))]
@@ -181,6 +182,7 @@ namespace ShimmerChatBuiltin
 		{
 			return new ApiConfig
 			{
+				// Intentional: clone gets a new Id via the default Guid.NewGuid()
 				Name = Name,
 				Type = Type,
 
