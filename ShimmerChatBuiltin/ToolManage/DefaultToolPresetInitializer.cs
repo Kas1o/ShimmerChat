@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 using ShimmerChatBuiltin.ToolManage;
 using ShimmerChatLib.Interface;
 
-namespace ShimmerChatBuiltin.Misc
+namespace ShimmerChatBuiltin.ToolManage
 {
     /// <summary>
     /// 首次启动时创建默认工具预设（IsDefault = true），使生成管线在 ToolManager 被访问前就能正常加载。
