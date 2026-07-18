@@ -1,6 +1,7 @@
 @using System.Collections
 @using System.Reflection
 @using ShimmerChatLib.Generation
+@implements IDisposable
 @inject ILocService Loc
 
 <div class="ge-children">
@@ -62,6 +63,23 @@
     [CascadingParameter] public TreeEditorContext? EditorContext { get; set; }
 
     private bool _showAddMenu;
+
+    protected override void OnInitialized()
+    {
+        if (EditorContext != null)
+            EditorContext.ClipboardChanged += OnClipboardChanged;
+    }
+
+    private void OnClipboardChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (EditorContext != null)
+            EditorContext.ClipboardChanged -= OnClipboardChanged;
+    }
 
     private void HandleDragSourceChanged() { }
 

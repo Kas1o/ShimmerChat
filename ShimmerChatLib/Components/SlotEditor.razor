@@ -1,5 +1,6 @@
 @using System.Reflection
 @using ShimmerChatLib.Generation
+@implements IDisposable
 @inject ILocService Loc
 
 <div class="ge-children @(_isDropTarget ? "tn-drop-inside" : "")"
@@ -53,6 +54,23 @@
 
     private bool _showAddPicker;
     private bool _isDropTarget;
+
+    protected override void OnInitialized()
+    {
+        if (EditorContext != null)
+            EditorContext.ClipboardChanged += OnClipboardChanged;
+    }
+
+    private void OnClipboardChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (EditorContext != null)
+            EditorContext.ClipboardChanged -= OnClipboardChanged;
+    }
 
     private void HandleDragSourceChanged() { }
 

@@ -83,10 +83,11 @@
         }
     }
 
-    private void CopyNode(ITreeNode node)
+    private async void CopyNode(ITreeNode node)
     {
         if (EditorContext != null)
             EditorContext.Copy(node);
+        await InvokeAsync(StateHasChanged);
     }
 
     private RenderFragment RenderProperty(PropInfo prop) => builder =>

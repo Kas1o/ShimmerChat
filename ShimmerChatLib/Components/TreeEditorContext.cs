@@ -24,6 +24,9 @@ public class TreeEditorContext
 
     public bool HasClipboardContent => _clipboardJson != null;
 
+    /// <summary>剪贴板内容变化时触发，供各层 ChildListEditor / SlotEditor 刷新粘贴按钮可见性</summary>
+    public event Action? ClipboardChanged;
+
     public TreeEditorContext(ITreeNodeSerializer serializer, INodeTypeCatalog typeCatalog, Type nodeInterfaceType)
     {
         Serializer = serializer;
@@ -47,6 +50,7 @@ public class TreeEditorContext
     public void Copy(ITreeNode node)
     {
         _clipboardJson = Serializer.Serialize(node);
+        ClipboardChanged?.Invoke();
     }
 
     /// <summary>从剪贴板粘贴节点（自动重新生成所有 Id）</summary>
