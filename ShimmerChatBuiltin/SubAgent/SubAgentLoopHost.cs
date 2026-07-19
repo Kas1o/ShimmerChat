@@ -22,11 +22,12 @@ public class SubAgentLoopHost : IToolCallLoopHost
     private readonly Func<ChatMessage, Task<ChatMessage>>? _postProcessor;
 
     /// <summary>
-    /// 环境重建回调。调用后返回一组新的初始 Fragment，SubAgentLoopHost 会将其与
-    /// 循环中累积的对话消息合并构造新的 SubAgentPromptContext。
+    /// 环境重建回调。接收当前累积的全部对话消息（初始片段 + assistant + tool_result），
+    /// 由调用方注入 SharedState 后重执行修饰器树，返回全新 Fragment 列表。
+    /// 返回的 Fragment 即作为新的 SubAgentPromptContext 内容，无需额外合并。
     /// null = 不重建。
     /// </summary>
-    private readonly Func<Task<List<ContextSegment>>>? _rebuildFragments;
+    private readonly Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? _rebuildFragments;
 
     /// <summary>获取当前 PromptContext（重建后可能被替换），供输出格式化使用。</summary>
     public SubAgentPromptContext CurrentContext => (SubAgentPromptContext)_promptContext;
@@ -35,7 +36,7 @@ public class SubAgentLoopHost : IToolCallLoopHost
         SubAgentPromptContext promptContext,
         IToolExecutor toolExecutor,
         Func<ChatMessage, Task<ChatMessage>>? postProcessor = null,
-        Func<Task<List<ContextSegment>>>? rebuildFragments = null)
+        Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = null)
     {
         _promptContext = promptContext;
         _toolExecutor = toolExecutor;
@@ -71,6 +72,8 @@ public class SubAgentLoopHost : IToolCallLoopHost
     /// <summary>
     /// 每次工具执行完成后：追加工具结果 → 重建环境。
     /// 对齐主流程：每轮工具调用后重建 env 让修饰器树重新执行。
+    /// 将当前全部累积消息传入 rebuild 回调，由回调注入 SharedState 后重执行树，
+    /// 树产出的 Fragment 直接作为新的 PromptContext（无需额外合并，避免初始消息重复）。
     /// </summary>
     public async Task OnToolCompleteAsync(ToolCall toolCall, string result, CancellationToken ct)
     {
@@ -81,20 +84,15 @@ public class SubAgentLoopHost : IToolCallLoopHost
 
         try
         {
-            // 从当前 Context 取出累积的对话消息（SubAgentPromptContext 才有 Messages 属性）
             var current = (SubAgentPromptContext)_promptContext;
-            var accumulatedMessages = current.Messages.ToList();
+            var allMessages = current.Messages.ToList();
 
-            // 重建：重执行修饰器树，拿到全新初始 Fragment
-            var freshFragments = await _rebuildFragments();
+            // 重建：将全部累积消息传给回调，由回调注入 SharedState 后重执行树
+            var freshFragments = await _rebuildFragments(allMessages);
 
-            // 合并：新初始 Fragment + 之前累积的对话消息
-            var merged = freshFragments
-                .Select(s => (s.Message, s.From))
-                .Concat(accumulatedMessages)
-                .ToList();
-
-            _promptContext = new SubAgentPromptContext(merged);
+            // 树已产出完整上下文，直接替换（不再拼接，消除重复）
+            _promptContext = new SubAgentPromptContext(
+                freshFragments.Select(s => (s.Message, s.From)));
         }
         catch
         {
