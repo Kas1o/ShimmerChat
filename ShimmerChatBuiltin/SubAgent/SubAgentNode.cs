@@ -123,18 +123,19 @@ namespace ShimmerChatBuiltin.SubAgent
                 };
             }
 
-            // 环境重建函数：每次工具调用后重执行修饰器树，对齐主流程 OnToolCompleteAsync
-            // 接收全部累积对话消息，注入 SharedState 让树节点（如 AppendChatMessagesNode、
-            // MessagePrintV2Node）能感知完整上下文。
-            Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = async (accumulated) =>
+            // 环境重建函数：每次工具调用后重执行修饰器树。
+            // 接收对话增量（assistant + tool_result），与种子消息合并后注入 SharedState，
+            // 让 AppendChatMessagesNode 等节点能感知完整上下文。
+            Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = async (conversation) =>
             {
-                // 将全部累积消息转为 Message 列表，注入 SharedState
-                var fullChatMessages = accumulated.Select(a => new Message
+                var fullChatMessages = new List<Message>();
+                fullChatMessages.AddRange(chatMessages);  // 种子消息（来自父级 Fragments）
+                fullChatMessages.AddRange(conversation.Select(a => new Message
                 {
                     message = a.Item1,
                     sender = FragmentFromToSender(a.Item2),
                     timestamp = DateTime.Now
-                }).ToList();
+                }));
 
                 var newEnv = new PreGenerationEnv(persistent);
                 newEnv.Transient.SharedState["ChatMessages"] = fullChatMessages;

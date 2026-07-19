@@ -56,7 +56,7 @@ namespace ShimmerChatBuiltin.SubAgent
             _messages.Add((new ChatMessage { Content = toolResult, id = toolCallId }, PromptBuilder.From.tool_result));
         }
 
-        private static ChatMessage CloneChatMessage(ChatMessage original)
+        internal static ChatMessage CloneChatMessage(ChatMessage original)
         {
             return new ChatMessage
             {
