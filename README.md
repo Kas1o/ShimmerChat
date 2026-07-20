@@ -1,3 +1,8 @@
+> # ShimmerChat 2.0 与 ShimmerChat 1.0 不兼容！
+> # ShimmerChat 2.0 is incompatible with ShimmerChat 1.0!
+
+---
+
 <div align="center">
 
 # ✨ ShimmerChat 2 ✨
