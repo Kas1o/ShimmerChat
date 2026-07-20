@@ -26,6 +26,7 @@ namespace ShimmerChatBuiltin
 		public bool OpenAIStream { get; set; } = true;
 		public int OpenAICtx { get; set; } = 16384;
 		public bool OpenAIAsIs { get; set; } = false;
+		public string? OpenAICustomRequestBody { get; set; } = null;
 
 		#endregion OpenAI
 
@@ -68,10 +69,10 @@ namespace ShimmerChatBuiltin
 
 		public APISetting ToAPISetting()
 		{
-			return Type switch
+			switch (Type)
 			{
-				ApiConfigType.Kobold =>
-					new APISetting
+				case ApiConfigType.Kobold:
+					return new APISetting
 					{
 						ChatClient = new TextToChatAdapter(
 							new KoboldTextCompletionClient(KoboldUrl ?? "http://localhost:5001/api")
@@ -81,57 +82,81 @@ namespace ShimmerChatBuiltin
 							GetPromptTemplate()),
 						SupportsStreaming = true,
 						SupportsToolCalling = false
-					},
+					};
 
-				ApiConfigType.OpenAI =>
-					new APISetting
+				case ApiConfigType.OpenAI:
+				{
+					var client = new OpenAIChatCompletionClient(
+						_url: OpenAIUrl ?? "https://api.openai.com/v1",
+						_apiKey: OpenAIApiKey ?? throw new InvalidOperationException("OpenAI API key is required."),
+						_model: OpenAIModel ?? "gpt-4o",
+						_max_tokens: OpenAICtx,
+						_as_is: OpenAIAsIs
+					);
+
+					if (!string.IsNullOrWhiteSpace(OpenAICustomRequestBody))
 					{
-						ChatClient = new OpenAIChatCompletionClient(
-							_url: OpenAIUrl ?? "https://api.openai.com/v1",
-							_apiKey: OpenAIApiKey ?? throw new InvalidOperationException("OpenAI API key is required."),
-							_model: OpenAIModel ?? "gpt-4o",
-							_max_tokens: OpenAICtx,
-							_as_is: OpenAIAsIs
-						),
+						Dictionary<string, object>? customProps;
+						try
+						{
+							customProps = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(OpenAICustomRequestBody);
+						}
+						catch (Newtonsoft.Json.JsonException ex)
+						{
+							throw new InvalidOperationException($"OpenAI custom request body is not valid JSON: {ex.Message}", ex);
+						}
+
+						if (customProps != null && customProps.Count > 0)
+							client.CustomRequestProperties = customProps;
+					}
+
+					return new APISetting
+					{
+						ChatClient = client,
 						SupportsStreaming = OpenAIStream,
 						SupportsToolCalling = true
-					},
+					};
+				}
 
-				ApiConfigType.DeepSeek =>
-					new APISetting
+				case ApiConfigType.DeepSeek:
+				{
+					var client = new OpenAIChatCompletionClient(
+						_url: DeepSeekUrl ?? "https://api.deepseek.com/v1",
+						_apiKey: DeepSeekApiKey ?? throw new InvalidOperationException("DeepSeek API key is required."),
+						_model: DeepSeekModel ?? "deepseek-v4-flash",
+						_max_tokens: DeepSeekCtx,
+						_as_is: DeepSeekAsIs
+					)
 					{
-						ChatClient = new OpenAIChatCompletionClient(
-							_url: DeepSeekUrl ?? "https://api.deepseek.com/v1",
-							_apiKey: DeepSeekApiKey ?? throw new InvalidOperationException("DeepSeek API key is required."),
-							_model: DeepSeekModel ?? "deepseek-v4-flash",
-							_max_tokens: DeepSeekCtx,
-							_as_is: DeepSeekAsIs
-						)
-						{
-							CustomRequestProperties = !string.IsNullOrEmpty(DeepSeekReasoningEffort)
-								? new Dictionary<string, object>
-								{
-									["reasoning_effort"] = DeepSeekReasoningEffort,
-									["thinking"] = new { type = "enabled" }
-								}
-								: new Dictionary<string, object> { ["thinking"] = new { type = "disabled" } }
-						},
+						CustomRequestProperties = !string.IsNullOrEmpty(DeepSeekReasoningEffort)
+							? new Dictionary<string, object>
+							{
+								["reasoning_effort"] = DeepSeekReasoningEffort,
+								["thinking"] = new { type = "enabled" }
+							}
+							: new Dictionary<string, object> { ["thinking"] = new { type = "disabled" } }
+					};
+
+					return new APISetting
+					{
+						ChatClient = client,
 						SupportsStreaming = DeepSeekStream,
 						SupportsToolCalling = true
-					},
+					};
+				}
 
-				ApiConfigType.Ollama =>
-					new APISetting
+				case ApiConfigType.Ollama:
+					return new APISetting
 					{
 						ChatClient = new TextToChatAdapter(
 							new OllamaTextCompletionClient(OllamaUrl ?? "http://localhost:11434", OllamaModel ?? "llama3"),
 							GetPromptTemplate()),
 						SupportsStreaming = true,
 						SupportsToolCalling = false
-					},
+					};
 
-				ApiConfigType.OpenAIText =>
-					new APISetting
+				case ApiConfigType.OpenAIText:
+					return new APISetting
 					{
 						ChatClient = new TextToChatAdapter(
 							new OpenAITextCompletionClient(
@@ -142,18 +167,19 @@ namespace ShimmerChatBuiltin
 							GetPromptTemplate()),
 						SupportsStreaming = true,
 						SupportsToolCalling = false
-					},
+					};
 
-				ApiConfigType.Pseudo =>
-					new APISetting
+				case ApiConfigType.Pseudo:
+					return new APISetting
 					{
 						ChatClient = new PseudoChatCompletionClient(),
 						SupportsStreaming = true,
 						SupportsToolCalling = false
-					},
+					};
 
-				_ => throw new InvalidOperationException($"Unsupported API type: {Type}")
-			};
+				default:
+					throw new InvalidOperationException($"Unsupported API type: {Type}");
+			}
 		}
 
 		private SharperLLM.Util.PromptBuilder GetPromptTemplate()
@@ -195,6 +221,7 @@ namespace ShimmerChatBuiltin
 				OpenAIStream = OpenAIStream,
 				OpenAICtx = OpenAICtx,
 				OpenAIAsIs = OpenAIAsIs,
+				OpenAICustomRequestBody = OpenAICustomRequestBody,
 
 				DeepSeekUrl = DeepSeekUrl,
 				DeepSeekApiKey = DeepSeekApiKey,

@@ -55,6 +55,8 @@
   "API ENABLE CONTINUE": "Enable Continue",
   "API REASONING EFFORT": "Reasoning Effort",
   "API REASONING EFFORT OFF": "Off",
+  "API CUSTOM REQUEST BODY": "Custom Request Body (JSON)",
+  "API CUSTOM REQUEST BODY PLACEHOLDER": "Optional. Enter a JSON object to merge into the request body root. Example:\n{\n  \"temperature\": 0.5,\n  \"top_p\": 0.9\n}",
   "PseudoAPI Info Title": "Pseudo API (no generation)",
   "PseudoAPI Info Description": "This API type does not perform any AI generation. Instead, it directly returns the last message content as the response. It is designed for advanced custom Agentic workflows and is not needed by regular users.",
   "OpenAIText Warning Title": "Note: OpenAI Text Completion (/completions)",

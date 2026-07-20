@@ -180,6 +180,9 @@
                 <input type="checkbox" @bind="topAPISetting.OpenAIStream" />
                 <label>@Loc["API ASIS"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIAsIs" />
+                <label>@Loc["API CUSTOM REQUEST BODY"]</label>
+                <textarea class="shimmer-input" rows="6" @bind="topAPISetting.OpenAICustomRequestBody"
+                    placeholder="@Loc["API CUSTOM REQUEST BODY PLACEHOLDER"]"></textarea>
             }
 
             @if (topAPISetting.Type == ApiConfigType.DeepSeek)

@@ -55,6 +55,8 @@
   "API ENABLE CONTINUE": "启用 \"继续\" 功能",
   "API REASONING EFFORT": "思考强度",
   "API REASONING EFFORT OFF": "关闭",
+  "API CUSTOM REQUEST BODY": "自定义请求体（JSON）",
+  "API CUSTOM REQUEST BODY PLACEHOLDER": "可选。输入 JSON 对象，将被合并到请求体根级别。例如：\n{\n  \"temperature\": 0.5,\n  \"top_p\": 0.9\n}",
   "PseudoAPI Info Title": "伪 API（不进行生成）",
   "PseudoAPI Info Description": "此 API 类型不会执行任何 AI 生成，而是直接返回最后一段消息内容作为响应。它专为高级自定义的 Agentic 工作流而设计，普通用户无需使用。",
   "OpenAIText Warning Title": "注意：OpenAI 文本补全（/completions）",
