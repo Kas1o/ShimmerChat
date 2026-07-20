@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/master/src/NerdBank.GitVersioning/version.schema.json",
-  "version": "v1.4.4", 
+  "version": "2.0.0-beta.{height}",
   "cloudBuild": {
     "buildNumber": {
       "enabled": true

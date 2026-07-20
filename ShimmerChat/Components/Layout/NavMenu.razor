@@ -1,16 +1,17 @@
 @using Microsoft.AspNetCore.Components.Routing
-@using ShimmerChat.Components.SubComponents
+@using ShimmerChatLib.Interface
 @using System.Reflection
-@inject IStringLocalizer<NavMenu> l
+@inject IPluginPanelService PluginPanelService
+@inject ILocService Loc
 @implements IDisposable
 
-<div class="@(IsPortrait ? "shimmer-nav-portrait" : "shimmer-sidebar")">
+<div class="@(IsPortrait ? "shimmer-nav-portrait" : "")">
     @if (!IsPortrait)
     {
         <div class="shimmer-nav-header">
             <div class="shimmer-nav-brand">
                 <img src="@(ThemeService.CurrentTheme?.IsDarkMode == true ? "/shimmer-chat.png" : "/shimmer-chat-light-theme.png")" alt="ShimmerChat Logo" class="shimmer-nav-logo" />
-                <h1 class="shimmer-nav-title">@l["ShimmerChat"]</h1>
+                <h1 class="shimmer-nav-title">@Loc["ShimmerChat"]</h1>
             </div>
         </div>
 
@@ -23,34 +24,25 @@
                 <NavLink class="shimmer-nav-item" href="" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
                         <span class="nav-icon"><i class="bi bi-house-door"></i></span>
-                        <span class="nav-text">@l["Home"]</span>
+                        <span class="nav-text">@Loc["Home"]</span>
                     </div>
                 </NavLink>
             </div>
 
             <div>
-                <NavLink class="shimmer-nav-item" href="apisettings" Match="NavLinkMatch.All">
+                <NavLink class="shimmer-nav-item" href="generationmanager" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-gear"></i></span>
-                        <span class="nav-text">@l["API Settings"]</span>
+                        <span class="nav-icon"><i class="bi bi-diagram-3"></i></span>
+                        <span class="nav-text">@Loc["page.pre_generation"]</span>
                     </div>
                 </NavLink>
             </div>
 
             <div>
-                <NavLink class="shimmer-nav-item" href="contextmanager" Match="NavLinkMatch.All">
+                <NavLink class="shimmer-nav-item" href="postgeneration" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-folder"></i></span>
-                        <span class="nav-text">@l["Context Manager"]</span>
-                    </div>
-                </NavLink>
-            </div>
-
-            <div>
-                <NavLink class="shimmer-nav-item" href="toolmanager" Match="NavLinkMatch.All">
-                    <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-wrench"></i></span>
-                        <span class="nav-text">@l["Tool Manager"]</span>
+                        <span class="nav-icon"><i class="bi bi-arrow-repeat"></i></span>
+                        <span class="nav-text">@Loc["page.post_generation"]</span>
                     </div>
                 </NavLink>
             </div>
@@ -59,213 +51,69 @@
                 <NavLink class="shimmer-nav-item" href="agentselect" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
                         <span class="nav-icon"><i class="bi bi-person"></i></span>
-                        <span class="nav-text">@l["Agents"]</span>
+                        <span class="nav-text">@Loc["Agents"]</span>
                     </div>
                 </NavLink>
             </div>
-            <div>
-                <NavLink class="shimmer-nav-item" href="pluginpanel" Match="NavLinkMatch.All">
-                    <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-puzzle"></i></span>
-                        <span class="nav-text">@l["Plugin Settings"]</span>
-                    </div>
-                </NavLink>
-            </div>
-
-            <div>
-                <NavLink class="shimmer-nav-item" href="messagerender" Match="NavLinkMatch.All">
-                    <div class="nav-item-content">
-                        <span class="nav-icon"><i class="bi bi-eye"></i></span>
-                        <span class="nav-text">消息渲染</span>
-                    </div>
-                </NavLink>
-            </div>
-
-
             <div>
                 <NavLink class="shimmer-nav-item" href="misc" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
                         <span class="nav-icon"><i class="bi bi-ui-checks-grid"></i></span>
-                        <span class="nav-text">@l["Misc"]</span>
+                        <span class="nav-text">@Loc["Misc"]</span>
                     </div>
                 </NavLink>
             </div>
-            
+
+            <div class="shimmer-nav-section-label">@Loc["nav.section_representation"]</div>
+            <div>
+                <NavLink class="shimmer-nav-item" href="messagerender" Match="NavLinkMatch.All">
+                    <div class="nav-item-content">
+                        <span class="nav-icon"><i class="bi bi-eye"></i></span>
+                        <span class="nav-text">@Loc["nav.message_render"]</span>
+                    </div>
+                </NavLink>
+            </div>
             <div>
                 <NavLink class="shimmer-nav-item" href="thememanager" Match="NavLinkMatch.All">
                     <div class="nav-item-content">
                         <span class="nav-icon"><i class="bi bi-palette"></i></span>
-                        <span class="nav-text">主题管理</span>
+                        <span class="nav-text">@Loc["nav.theme_manager"]</span>
                     </div>
                 </NavLink>
             </div>
+
+            <div class="shimmer-nav-section-label">@Loc["nav.section_plugin_panels"]</div>
+            @foreach (var panel in _pluginPanels)
+            {
+                <div>
+                    <NavLink class="shimmer-nav-item" href="@($"pluginpanel/{Uri.EscapeDataString(panel.NameKey)}")" Match="NavLinkMatch.All">
+                        <div class="nav-item-content">
+                            <span class="nav-icon"><i class="bi @(panel.Icon ?? "bi-puzzle")"></i></span>
+                            <span class="nav-text">@Loc[panel.NameKey]</span>
+                        </div>
+                    </NavLink>
+                </div>
+            }
         </div>
     </nav>
 
     @if (!IsPortrait)
     {
     <div class="shimmer-nav-footer">
+        <div class="shimmer-nav-locale">
+            <select class="locale-select" @bind="_selectedCulture" @bind:after="OnCultureChanged">
+                @foreach (var c in Loc.SupportedCultures)
+                {
+                    <option value="@c">@c</option>
+                }
+            </select>
+        </div>
         <div class="shimmer-nav-version">
-            <span>版本 @Version</span>
+            <span>@Loc["nav.version_prefix"] @Version</span>
         </div>
     </div>
     }
 </div>
-
-<style>
-    .shimmer-nav-logo {
-        height: 2em;
-        width: 2em;
-    }
-    .shimmer-sidebar {
-        width: 270px;
-        background-color: var(--color-surface);
-        border-right: 1px solid var(--color-border);
-        display: flex;
-        flex-direction: column;
-        transition: width 0.3s ease;
-        z-index: 10;
-        overflow-y: auto;
-        overflow-x: hidden;
-    }
-
-    /* 品牌标识区域 */
-    .shimmer-nav-brand {
-        padding: 20px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .shimmer-brand-logo {
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: var(--color-card);
-    }
-
-    .shimmer-logo-image {
-        width: 32px;
-        height: 32px;
-        object-fit: contain;
-    }
-
-    .shimmer-brand-text {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: var(--color-primary);
-        margin: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    /* 导航分隔线 */
-    .shimmer-nav-divider {
-        height: 1px;
-        background-color: var(--color-border);
-        margin: 0 16px;
-    }
-
-    /* 菜单区域 */
-    .shimmer-nav-menu {
-        flex: 1;
-        padding: 16px 0;
-    }
-
-    /* 导航菜单项样式 - 组件化版本 */
-    .shimmer-nav-item {
-        display: block;
-        padding: 12px 16px;
-        border-radius: var(--radius-md);
-        margin: 4px 8px;
-        transition: var(--transition);
-        font-weight: 500;
-        text-decoration: none;
-        color: var(--color-text-secondary);
-        background-color: transparent;
-        border: none;
-        width: calc(100% - 16px);
-    }
-
-        .shimmer-nav-item:hover {
-            background-color: var(--color-surface);
-            color: var(--color-primary);
-            transform: translateX(4px);
-        }
-
-        .shimmer-nav-item.active {
-            background-color: var(--color-primary-light);
-            color: var(--color-primary);
-            font-weight: 600;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .shimmer-nav-item.dark-theme.active {
-            background-color: rgba(123, 52, 235, 0.2);
-        }
-
-    .nav-item-content {
-        display: flex;
-        align-items: center;
-        position: relative;
-    }
-
-    .nav-icon {
-        margin-right: 12px;
-        font-size: 1.1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-    }
-
-    .nav-text {
-        flex: 1;
-    }
-
-    .nav-badge {
-        background-color: var(--color-primary);
-        color: white;
-        font-size: 0.8rem;
-        padding: 2px 8px;
-        border-radius: 12px;
-        min-width: 24px;
-        text-align: center;
-        font-weight: 600;
-    }
-
-    /* 导航底部 */
-    .shimmer-nav-footer {
-        padding: 16px;
-        border-top: 1px solid var(--color-border);
-    }
-
-    .shimmer-mobile-theme-toggle {
-        display: none;
-    }
-
-    /* 竖屏模式导航面板 */
-    .shimmer-nav-portrait {
-        background-color: var(--color-surface);
-        display: flex;
-        flex-direction: column;
-        padding: 8px 0;
-    }
-
-    .shimmer-nav-portrait .shimmer-nav-item {
-        margin: 2px 8px;
-        border-radius: var(--radius-md);
-    }
-
-    .shimmer-nav-portrait .shimmer-nav-menu {
-        padding: 8px 0;
-    }
-</style>
 
 @code {
     [Parameter]
@@ -274,15 +122,22 @@
     [Inject]
     public required IThemeService ThemeService { get; set; }
 
-    public string Version { get; set; }
+    public string? Version { get; set; } = default!; // 由 OnInitialized 设置
+
+    private List<PluginPanelInfo> _pluginPanels = new();
+    private string _selectedCulture = "zh-CN";
 
     protected override void OnInitialized()
     {
-        // 订阅主题变更事件
         ThemeService.OnThemeChanged += HandleThemeChanged;
         Version = typeof(Program).Assembly
             .GetCustomAttributes<AssemblyInformationalVersionAttribute>()
             ?.First()?.InformationalVersion ?? "Unknown";
+        _selectedCulture = Loc.CurrentCulture;
+        _pluginPanels = PluginPanelService.GetPluginPanels()
+            .Where(p => p.PanelDisplayPlace == ShimmerChatLib.Panel.PanelDisplayPlace.Settings)
+            .OrderBy(p => p.Order)
+            .ToList();
     }
 
     private void HandleThemeChanged(ShimmerChatLib.Models.Theme theme)
@@ -295,6 +150,15 @@
     {
         // 取消订阅，避免内存泄漏
         ThemeService.OnThemeChanged -= HandleThemeChanged;
+    }
+
+    private async Task OnCultureChanged()
+    {
+        if (_selectedCulture != Loc.CurrentCulture)
+        {
+            Loc.SetCulture(_selectedCulture);
+            StateHasChanged();
+        }
     }
 }
 

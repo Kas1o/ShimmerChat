@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChatLib.Tests", "Shi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChat.Tests", "ShimmerChat.Tests\ShimmerChat.Tests.csproj", "{A6FA6671-D77E-4EF9-9096-6715B04C520B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChatBuiltin.Tests", "ShimmerChatBuiltin.Tests\ShimmerChatBuiltin.Tests.csproj", "{A2954545-F193-4E8B-B474-947A3C88F42A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -97,6 +99,18 @@ Global
 		{A6FA6671-D77E-4EF9-9096-6715B04C520B}.Release|x64.Build.0 = Release|Any CPU
 		{A6FA6671-D77E-4EF9-9096-6715B04C520B}.Release|x86.ActiveCfg = Release|Any CPU
 		{A6FA6671-D77E-4EF9-9096-6715B04C520B}.Release|x86.Build.0 = Release|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Debug|x64.Build.0 = Debug|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Debug|x86.Build.0 = Debug|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Release|x64.ActiveCfg = Release|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Release|x64.Build.0 = Release|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Release|x86.ActiveCfg = Release|Any CPU
+		{A2954545-F193-4E8B-B474-947A3C88F42A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

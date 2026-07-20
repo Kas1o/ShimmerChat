@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Buffers.Text;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
@@ -26,6 +27,7 @@ namespace ShimmerChatLib
         /// <summary>
         /// 描述，SystemPrompt组织中的主要部分
         /// </summary>
+        [Obsolete("ShimmerChat 2.0 中已被私有树替代")]
         public string Description { get; set; }
         /// <summary>
         /// Greeting，新对话时以AI Role发送的第一天Message，可为空
@@ -55,9 +57,21 @@ namespace ShimmerChatLib
         /// </summary>
         public Guid? BackgroundGuid { get; set; }
         /// <summary>
-        /// 此智能体所自定义的工具名，使用时和主配置求并集。
+        /// 预生成树 JSON（生成管线定义）
         /// </summary>
-        public List<string> CustomToolNames { get; set; } = new List<string>();
+        [Newtonsoft.Json.JsonProperty("ModifierTreeJson")]
+        public string? PreGenerationTreeJson { get; set; }
+
+        /// <summary>
+        /// 2.0 后生成树 JSON（LLM 响应后处理管线）
+        /// </summary>
+        public string? PostGenerationTreeJson { get; set; }
+
+        /// <summary>
+        /// 2.0 渲染修改树 JSON（Markdown→HTML 渲染管线）
+        /// </summary>
+        public string? RenderModifierTreeJson { get; set; }
+
         /// <summary>
         /// 仅用户可见的介绍文本
         /// </summary>
@@ -67,13 +81,15 @@ namespace ShimmerChatLib
         /// </summary>
 		public List<string> Tags { get; set; } = new List<string>();
 
+		private readonly ILogger<Agent>? _logger;
+
 		const bool EnablePerfLog = false;
 		static string PerfNow() => DateTime.Now.ToString("HH:mm:ss.fff");
-		static void PerfLog(string message)
+		void PerfLog(string message)
 		{
 			if (EnablePerfLog)
 			{
-				Console.WriteLine($"[PERF][Agent][{PerfNow()}] {message}");
+				_logger?.LogTrace("[PERF][Agent][{PerfTime}] {Message}", PerfNow(), message);
 			}
 		}
 
@@ -297,7 +313,7 @@ namespace ShimmerChatLib
                 catch (Exception ex)
                 {
                     // Handle exception if chat fails to load
-                    Console.WriteLine($"Failed to load chat with GUID '{chatGuid}': {ex.Message}");
+                    _logger?.LogWarning("Failed to load chat with GUID '{ChatGuid}': {Message}", chatGuid, ex.Message);
                 }
             }
             return chats;
@@ -324,7 +340,7 @@ namespace ShimmerChatLib
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Failed to load chat with GUID '{chatGuid}': {ex.Message}");
+                    _logger?.LogWarning("Failed to load chat with GUID '{ChatGuid}': {Message}", chatGuid, ex.Message);
                 }
             }
 
@@ -375,7 +391,7 @@ namespace ShimmerChatLib
                 catch (Exception ex)
                 {
                     failedCount++;
-                    Console.WriteLine($"Failed to load chat summary for GUID '{chatGuid}': {ex.Message}");
+                    _logger?.LogWarning("Failed to load chat summary for GUID '{ChatGuid}': {Message}", chatGuid, ex.Message);
                 }
             }
 
@@ -440,27 +456,30 @@ namespace ShimmerChatLib
         {
 
         }
+
+        private Agent(ILogger<Agent> logger)
+        {
+            _logger = logger;
+        }
         #pragma warning restore CS8618
         /// <summary>
         /// 创建一个新的智能体实例
         /// </summary>
         /// <param name="name">智能体名称</param>
-        /// <param name="desc">描述</param>
+        /// <param name="introduce">描述</param>
         /// <param name="greeting">欢迎语，可为空</param>
         /// <param name="alternativeGreetings">备选欢迎语列表，可为空</param>
         /// <returns>新创建的 Agent 实例</returns>
-        public static Agent Create(string name, string desc, string? greeting = null, List<string>? alternativeGreetings = null)
+        public static Agent Create(string name, string introduce, string? greeting = null, List<string>? alternativeGreetings = null)
 		{
 			return new Agent
 			{
 				ChatGuids = new List<Guid>(),
 				Name = name,
-				Description = desc,
+				UserIntro = introduce,
 				Guid= Guid.NewGuid(),
 				Greeting = greeting,
 				AlternativeGreetings = alternativeGreetings ?? new List<string>(),
-				CustomToolNames = new List<string>(),
-				UserIntro = "",
 				Tags = new List<string>()
 			};
 		}

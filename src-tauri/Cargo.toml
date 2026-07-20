@@ -1,0 +1,20 @@
+[package]
+name = "shimmer-chat"
+# 此版本号在构建时由 build-tauri.ps1 从 version.json (Nerdbank.GitVersioning) 覆盖，此处仅为占位
+version = "0.0.0-placeholder"
+edition = "2021"
+description = "ShimmerChat Desktop App"
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["process", "time", "io-util"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[profile.release]
+strip = true
+lto = true

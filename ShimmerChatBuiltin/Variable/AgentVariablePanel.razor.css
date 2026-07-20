@@ -1,0 +1,65 @@
+.variable-panel {
+        padding: 1rem;
+    }
+
+    .variable-actions {
+        margin-bottom: 1rem;
+    }
+
+    .variable-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .variable-item {
+        display: flex;
+        align-items: center;
+        background: var(--su-surface-1);
+        border: 1px solid var(--su-border-0);
+        border-radius: 8px;
+        padding: 0.75rem;
+        transition: background 0.2s;
+    }
+
+    .variable-item:hover {
+        background: var(--su-surface-3);
+    }
+
+    .variable-info {
+        flex: 1;
+        cursor: pointer;
+        min-width: 0;
+    }
+
+    .variable-name {
+        font-weight: 600;
+        color: var(--su-text-0);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .variable-value {
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.9rem;
+        color: var(--su-accent);
+        word-break: break-all;
+    }
+
+    .variable-meta {
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+
+    .variable-actions-item {
+        margin-left: 0.5rem;
+    }
+
+    .variable-edit {
+        padding: 0.5rem;
+        background: var(--su-accent-soft);
+        border-radius: 6px;
+        margin-top: 0.5rem;
+    }

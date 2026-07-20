@@ -1,8 +1,9 @@
 using ShimmerChat.Components;
 using ShimmerChat.Singletons;
-using Microsoft.AspNetCore.Localization;
-using System.Globalization;
+using ShimmerChatLib.Generation;
+using ShimmerChatLib;
 using ShimmerChatLib.Interface;
+using ShimmerChatLib.Models;
 using Microsoft.Extensions.FileProviders;
 using System.Reflection;
 
@@ -26,41 +27,49 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddLocalization(option => option.ResourcesPath = "Resources");
+builder.Services.AddSignalR(options =>
+{
+    // 编辑长文本时总是触发重连，从默认的 32KiB 提升到 50MiB。
+	options.MaximumReceiveMessageSize = 50 * 1024 * 1024;
+});
 
 // 配置 KV 数据存储
 ConfigureKVDataStorage(builder);
 
-builder.Services.AddSingleton<ICompletionService, CompletionServiceV1>();
-builder.Services.AddSingleton<ICompletionServiceV2, CompletionServiceV2>();
-builder.Services.AddSingleton<IContextBuilderService, ContextBuilderServiceV1>();
-builder.Services.AddSingleton<IAIGenerationService, AIGenerationServiceV1>();
+// ShimmerChat 2.0 服务
+builder.Services.AddSingleton<IToolRegistry, ToolRegistry>();
+builder.Services.AddSingleton<IPreGenerationNodeSerializer, PreGenerationNodeSerializer>();
+builder.Services.AddSingleton<INodeTypeCatalog, NodeTypeCatalog>();
+builder.Services.AddSingleton<IGenerationManagerV2, GenerationManagerV2>();
+
+// Post-Generation 管线
+builder.Services.AddSingleton<PostGenerationNodeSerializerService>();
+builder.Services.AddSingleton<IPostGenerationNodeSerializerService>(sp => sp.GetRequiredService<PostGenerationNodeSerializerService>());
+builder.Services.AddSingleton<IPostGenerationManagerService, PostGenerationManagerService>();
+
+// Render Modifier 管线
+builder.Services.AddSingleton<RenderModifierNodeSerializer>();
+builder.Services.AddSingleton<IRenderModifierManager, RenderModifierManager>();
+
+builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
-builder.Services.AddSingleton<IToolService, ToolServiceV1>();
-builder.Services.AddSingleton<IPopupService, PopupService>();
+builder.Services.AddSingleton<IPopupService, PopupService>(); // TODO: 大概需要改成 Scoped。
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
-builder.Services.AddSingleton<IContextModifierService, ContextModifierServiceV1>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
+builder.Services.AddSingleton<ILocService, LocService>();
+builder.Services.AddSingleton<IDebugOutputService, DebugOutputService>();
 
 var app = builder.Build();
 
 // 执行自动迁移（如果需要）
 ExecuteAutoMigration(app);
 
-var supportedCultures = new[]
-{
-    new CultureInfo("en-US"),
-    new CultureInfo("zh-CN")
-};
+// ShimmerChat 2.0: 执行 Agent 数据迁移
+ExecuteAgentMigration(app);
 
-app.UseRequestLocalization(new RequestLocalizationOptions
-{
-	DefaultRequestCulture = new RequestCulture("zh-CN"),
-	SupportedCultures = supportedCultures,
-	SupportedUICultures = supportedCultures
-});
-
+// 执行插件初始化
+ExecutePluginInitializers(app);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -85,9 +94,49 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/userimages"
 });
 
-app.Run();
+// Tauri sidecar mode: start async and emit ready signal on stdout
+await app.StartAsync();
 
+var urls = app.Urls;
+var targetUrl = urls.FirstOrDefault(u => u.StartsWith("http://127.0.0.1:"))
+                ?? urls.FirstOrDefault(u => u.StartsWith("http://localhost:"))
+                ?? urls.FirstOrDefault()
+                ?? "http://127.0.0.1:5000";
+Console.WriteLine($"SHIMMER_READY:{targetUrl}");
+
+await app.WaitForShutdownAsync();
 return;
+
+// ShimmerChat 2.0: 自动迁移 Agent 到 2.0
+static void ExecuteAgentMigration(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var migrationService = scope.ServiceProvider.GetRequiredService<IAgentMigrationService>();
+    try
+    {
+        int count = migrationService.MigrateAll();
+        Console.WriteLine($"[ShimmerChat 2.0] Agent migration completed. {count} agents migrated.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[ShimmerChat 2.0] Agent migration error: {ex.Message}");
+    }
+}
+
+// 执行所有插件的初始化器
+static void ExecutePluginInitializers(WebApplication app)
+{
+    try
+    {
+        var pluginLoader = app.Services.GetRequiredService<IPluginLoaderService>();
+        pluginLoader.InitializePluginsAsync().GetAwaiter().GetResult();
+        Console.WriteLine("[ShimmerChat] Plugin initializers completed.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[ShimmerChat] Plugin initialization error: {ex.Message}");
+    }
+}
 
 // 配置 KV 数据存储服务
 static void ConfigureKVDataStorage(WebApplicationBuilder builder)
@@ -108,15 +157,15 @@ static void ConfigureKVDataStorage(WebApplicationBuilder builder)
     // 始终注册两种消息存储实现（用于迁移服务）
     builder.Services.AddSingleton<FileMessageStoreService>();
     builder.Services.AddSingleton<LiteDBMessageStoreService>();
-    builder.Services.AddSingleton<MessageStoreMigrationService>();
+    builder.Services.AddSingleton<IMessageStoreMigrationService, MessageStoreMigrationService>();
 
     // 注册迁移标记管理器
-    builder.Services.AddSingleton<KVDataMigrationMarker>();
+    builder.Services.AddSingleton<IKVDataMigrationMarker, KVDataMigrationMarker>();
 
     // 始终注册两种 KV 存储实现（用于迁移服务）
     builder.Services.AddSingleton<LocalFileStorageKVData>();
     builder.Services.AddSingleton<LiteDBKVData>();
-    builder.Services.AddSingleton<KVDataMigrationService>();
+    builder.Services.AddSingleton<IKVDataMigrationService, KVDataMigrationService>();
 
     // 根据配置注册 IKVDataService 和 IMessageStoreService 的实现
     switch (config.GetStorageType())
@@ -144,9 +193,9 @@ static void ExecuteAutoMigration(WebApplication app)
     if (!config.AutoMigrateOnStartup || string.IsNullOrEmpty(config.AutoMigrateFrom))
         return;
 
-    var migrationService = scope.ServiceProvider.GetRequiredService<KVDataMigrationService>();
-    var messageMigrationService = scope.ServiceProvider.GetRequiredService<MessageStoreMigrationService>();
-    var marker = scope.ServiceProvider.GetRequiredService<KVDataMigrationMarker>();
+    var migrationService = scope.ServiceProvider.GetRequiredService<IKVDataMigrationService>();
+    var messageMigrationService = scope.ServiceProvider.GetRequiredService<IMessageStoreMigrationService>();
+    var marker = scope.ServiceProvider.GetRequiredService<IKVDataMigrationMarker>();
     var migrateFrom = config.GetAutoMigrateFromType();
 
     if (migrateFrom == null)

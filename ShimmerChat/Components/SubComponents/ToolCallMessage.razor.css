@@ -1,0 +1,35 @@
+/* ── Inline tool calls (inside AI message) ────── */
+.toolcalls {
+    display: flex; flex-direction: column; gap: 2px;
+    margin-top: var(--su-space-3); padding-top: var(--su-space-3);
+    border-top: var(--su-border-size) solid var(--su-border-1);
+}
+.tc-item {
+    font-size: var(--su-font-sm);
+    border: var(--su-border-size) solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+    overflow: hidden;
+}
+.tc-item[open] { border-color: var(--su-accent); }
+.tc-summary {
+    display: flex; align-items: center;
+    padding: var(--su-space-2) var(--su-space-3);
+    cursor: pointer; user-select: none;
+    background: var(--su-surface-3);
+    transition: background var(--su-transition);
+}
+.tc-summary:hover { background: var(--su-border-1); }
+.tc-summary::-webkit-details-marker { display: none; }
+.tc-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 8px;
+    background: var(--su-accent); color: #fff;
+    border-radius: var(--su-radius-sm);
+    font-family: var(--su-font-mono); font-size: var(--su-font-xs); font-weight: 600;
+}
+.tc-badge::before { content: '🔧'; font-size: 10px; }
+.tc-args {
+    padding: var(--su-space-3);
+    background: var(--su-surface-1);
+    font-size: var(--su-font-xs);
+}

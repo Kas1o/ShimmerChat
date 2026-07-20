@@ -1,16 +1,17 @@
 @inject IPluginPanelService PluginPanelService
+@inject ILocService Loc
 
 <div class="plugin-panel-container">
     @foreach (var item in PluginPanelInfos)
     {
         <details class="plugin-item">
             <summary class="plugin-summary">
-                <span class="plugin-name">@item.Name</span>
+                <span class="plugin-name">@Loc[item.NameKey]</span>
                 <span class="plugin-arrow bi bi-chevron-down"></span>
             </summary>
-            @if (!string.IsNullOrEmpty(item.Description))
+            @if (!string.IsNullOrEmpty(item.DescriptionKey))
             {
-                <p class="plugin-description">@item.Description</p>
+                <p class="plugin-description">@Loc[item.DescriptionKey]</p>
             }
             <div class="plugin-content">
                 <DynamicComponent Type="item.PanelType" Parameters="Parameters"/>
@@ -18,73 +19,6 @@
         </details>
     }
 </div>
-
-<style>
-    .plugin-panel-container {
-        margin-top: 4px;
-    }
-
-    .plugin-item {
-        background: var(--bs-tertiary-bg, #f8f9fa);
-        border: 1px solid var(--bs-border-color, #dee2e6);
-        border-radius: 8px;
-        margin-bottom: 0.75rem;
-        overflow: hidden;
-    }
-
-    .plugin-summary {
-        padding: 0.75rem 1rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: var(--bs-secondary-bg, #e9ecef);
-        font-weight: 500;
-        color: var(--bs-body-color, #212529);
-        user-select: none;
-        transition: background 0.2s;
-    }
-
-    .plugin-summary:hover {
-        background: var(--bs-secondary, #e9ecef);
-    }
-
-    .plugin-summary::-webkit-details-marker {
-        display: none;
-    }
-
-    .plugin-name {
-        flex: 1;
-    }
-
-    .plugin-arrow {
-        transition: transform 0.2s;
-        font-size: 0.875rem;
-        color: var(--bs-secondary-color, #6c757d);
-    }
-
-    details[open] .plugin-arrow {
-        transform: rotate(180deg);
-    }
-
-    .plugin-description {
-        padding: 0.5rem 1rem;
-        margin: 0;
-        font-size: 0.875rem;
-        color: var(--bs-secondary-color, #6c757d);
-        background: var(--bs-body-bg, #fff);
-        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
-    }
-
-    .plugin-content {
-        padding: 0.75rem;
-        background: var(--bs-body-bg, #fff);
-    }
-
-    .plugin-content > * {
-        max-width: 100%;
-    }
-</style>
 
 @code {
     [Parameter]

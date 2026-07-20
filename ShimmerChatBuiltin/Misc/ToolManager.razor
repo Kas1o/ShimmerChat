@@ -1,0 +1,307 @@
+@page "/toolmanager"
+@using ShimmerChatBuiltin.ToolManage
+@using ShimmerChatLib.Generation
+@using ShimmerChatLib.Panel
+@attribute [PluginPanelAttribute("panel.tool_manager", "panel.tool_manager.desc", PanelDisplayPlace.Settings, Order = 2)]
+
+@inject IKVDataService KVData
+@inject IToolRegistry ToolRegistry
+@inject ILocService Loc
+
+<h3>@Loc["panel_toolmanager.title"]</h3>
+
+@if (_loading)
+{
+    <p>@Loc["panel_toolmanager.loading"]</p>
+}
+else
+{
+    <div class="su-group" style="margin-top:16px;">
+        <h5>@Loc["panel_toolmanager.tool_preset"]</h5>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+            <select class="su-select" style="max-width:240px;"
+                    @bind="_selectedPresetId" @bind:after="OnPresetChanged">
+                <option value="">@Loc["panel_toolmanager.new_preset_option"]</option>
+                @foreach (var p in _presets)
+                {
+                    <option value="@p.Id">@p.Name@(p.IsDefault ? Loc["panel_toolmanager.default_suffix"] : "")</option>
+                }
+            </select>
+            <input class="su-input" style="max-width:180px;" placeholder="@Loc["panel_toolmanager.preset_name_placeholder"]"
+                   @bind="_editName" @bind:event="oninput"
+                   disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
+            <label style="display:flex;align-items:center;gap:4px;font-size:0.85em;white-space:nowrap;cursor:pointer;">
+                <input type="checkbox" checked="@_isDefault"
+                       @onchange="e => _isDefault = (bool)(e.Value ?? false)"
+                       disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
+                @Loc["panel_toolmanager.label_default"]
+            </label>
+            <button class="su-btn su-btn-primary su-btn-sm" @onclick="SavePreset"
+                    disabled="@(string.IsNullOrEmpty(_editName) || string.IsNullOrEmpty(_selectedPresetId))">
+                @Loc["panel_toolmanager.save"]
+            </button>
+            <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="OpenSaveAsDialog">
+                @Loc["panel_toolmanager.save_as"]
+            </button>
+            <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="DeletePreset"
+                    disabled="@(string.IsNullOrEmpty(_selectedPresetId))">
+                @Loc["panel_toolmanager.delete"]
+            </button>
+        </div>
+        @if (!string.IsNullOrEmpty(_status))
+        {
+            <div class="su-alert @(_status.Contains("Error") ? "su-alert-danger" : "su-alert-success")" style="padding:4px 8px;font-size:0.85em;">@_status</div>
+        }
+    </div>
+
+    @* Save As dialog *@
+    @if (_showSaveAsDialog)
+    {
+        <div class="tm-overlay" @onclick="CancelSaveAsDialog">
+            <div class="tm-dialog" @onclick:stopPropagation="true">
+                <div class="tm-dialog-title">@Loc["panel_toolmanager.save_as_title"]</div>
+                <input class="su-input" style="width:100%;" placeholder="@Loc["panel_toolmanager.preset_name_placeholder"]"
+                       @bind="_saveAsName" @bind:event="oninput" />
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                    <button class="su-btn su-btn-outline su-btn-sm" @onclick="CancelSaveAsDialog">@Loc["panel_toolmanager.cancel"]</button>
+                    <button class="su-btn su-btn-primary su-btn-sm" @onclick="ConfirmSaveAs"
+                            disabled="@(string.IsNullOrEmpty(_saveAsName))">
+                        @Loc["panel_toolmanager.save"]
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="su-group" style="margin-top:16px;">
+        <h5>@Loc["panel_toolmanager.available_tools"]</h5>
+        <p class="su-text-2" style="font-size:0.85em;">@Loc["panel_toolmanager.available_tools_desc"]</p>
+
+        @foreach (var group in _groupedTools)
+        {
+            <div class="tm-group">
+                <div class="tm-group-header">
+                    <span class="tm-group-icon">@(group.Key.Contains('/') ? "▸" : "▾")</span>
+                    <span class="tm-group-name">@string.Join(" / ", group.Key.Split('/').Select(k => Loc[k.Trim()]))</span>
+                    <span class="tm-group-count">@group.Value.Count</span>
+                </div>
+                @foreach (var tool in group.Value)
+                {
+                    <div class="tm-row">
+                        <div>
+                            <input type="checkbox" checked="@_enabledTools.Contains(tool.NameKey)"
+                                   @onchange="e => ToggleTool(tool.NameKey, (bool)(e.Value ?? false))" />
+                        </div>
+                        <div class="tm-name">@Loc[tool.NameKey]</div>
+                        <div class="tm-desc">@Loc[tool.DescriptionKey]</div>
+                    </div>
+                }
+            </div>
+        }
+        @if (_groupedTools.Count == 0)
+        {
+            <div class="tm-row"><div colspan="3" style="color:#888;">@Loc["panel_toolmanager.no_tools"]</div></div>
+        }
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private Dictionary<string, List<ToolMetadata>> _groupedTools = new();
+    private HashSet<string> _enabledTools = new();
+    private List<ToolPreset> _presets = new();
+    private string _selectedPresetId = "";
+    private string _editName = "";
+    private bool _isDefault = false;
+    private bool _showSaveAsDialog = false;
+    private string _saveAsName = "";
+    private string _status = "";
+
+    protected override void OnInitialized()
+    {
+        _groupedTools = ToolRegistry.AllTools
+            .OrderBy(t => string.Join("/", t.CategoryKeys)).ThenBy(t => t.NameKey)
+            .GroupBy(t => t.CategoryKeys is { Length: > 0 } ? string.Join("/", t.CategoryKeys) : "category.other")
+            .ToDictionary(g => g.Key, g => g.ToList());
+        LoadPresets();
+        EnsureDefaultExists();
+        var def = _presets.FirstOrDefault(p => p.IsDefault);
+        SelectPreset(def?.Id ?? "");
+        _loading = false;
+    }
+
+    private void LoadPresets()
+    {
+        var json = KVData.Read("ToolPresets", "__presets__");
+        if (string.IsNullOrEmpty(json))
+        {
+            _presets = new();
+            return;
+        }
+
+        // 尝试新格式 List<ToolPreset>
+        try
+        {
+            _presets = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ToolPreset>>(json) ?? new();
+            return;
+        }
+        catch (Newtonsoft.Json.JsonException) { }
+
+        // 旧格式 List<string> → 迁移
+        var oldNames = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json) ?? new();
+        _presets = new();
+        bool hasDefault = false;
+        foreach (var name in oldNames)
+        {
+            var data = KVData.Read("ToolPresets", name);
+            if (string.IsNullOrEmpty(data)) continue;
+            try
+            {
+                var old = Newtonsoft.Json.JsonConvert.DeserializeObject<ToolPreset>(data);
+                if (old != null)
+                {
+                    old.Id = Guid.NewGuid().ToString();
+                    _presets.Add(old);
+                }
+            }
+            catch { }
+        }
+        // 也检查 _default_（旧格式不在 __presets__ 列表中）
+        var defData = KVData.Read("ToolPresets", "_default_");
+        if (!string.IsNullOrEmpty(defData))
+        {
+            try
+            {
+                var def = Newtonsoft.Json.JsonConvert.DeserializeObject<ToolPreset>(defData);
+                if (def != null)
+                {
+                    def.Id = Guid.NewGuid().ToString();
+                    def.IsDefault = true;
+                    hasDefault = true;
+                    _presets.Insert(0, def);
+                }
+            }
+            catch { }
+        }
+        if (!hasDefault && _presets.Count > 0)
+            _presets[0].IsDefault = true;
+        Persist();
+    }
+
+    private void EnsureDefaultExists()
+    {
+        if (!_presets.Any(p => p.IsDefault))
+        {
+            _presets.Insert(0, new ToolPreset
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = "Default",
+                IsDefault = true,
+                EnabledToolTypeNames = new()
+            });
+            Persist();
+        }
+    }
+
+    private void OnPresetChanged()
+    {
+        SelectPreset(_selectedPresetId);
+    }
+
+    private void SelectPreset(string id)
+    {
+        _selectedPresetId = id;
+        var preset = _presets.FirstOrDefault(p => p.Id == id);
+        if (preset == null)
+        {
+            _editName = "";
+            _isDefault = false;
+            _enabledTools.Clear();
+        }
+        else
+        {
+            _editName = preset.Name;
+            _isDefault = preset.IsDefault;
+            _enabledTools = preset.EnabledToolTypeNames.ToHashSet();
+        }
+    }
+
+    private void SavePreset()
+    {
+        if (string.IsNullOrEmpty(_selectedPresetId) || string.IsNullOrEmpty(_editName))
+            return;
+
+        var preset = _presets.FirstOrDefault(p => p.Id == _selectedPresetId);
+        if (preset == null) return;
+
+        if (_isDefault && !preset.IsDefault)
+        {
+            foreach (var p in _presets) p.IsDefault = false;
+        }
+
+        preset.Name = _editName;
+        preset.IsDefault = _isDefault;
+        preset.EnabledToolTypeNames = _enabledTools.ToList();
+        Persist();
+        _status = Loc.Format("panel_toolmanager.msg_saved", _editName, _enabledTools.Count);
+    }
+
+    private void OpenSaveAsDialog()
+    {
+        _saveAsName = "";
+        _showSaveAsDialog = true;
+    }
+
+    private void CancelSaveAsDialog()
+    {
+        _showSaveAsDialog = false;
+    }
+
+    private void ConfirmSaveAs()
+    {
+        _showSaveAsDialog = false;
+        if (string.IsNullOrEmpty(_saveAsName))
+            return;
+
+        if (_isDefault)
+        {
+            foreach (var p in _presets) p.IsDefault = false;
+        }
+
+        var preset = new ToolPreset
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = _saveAsName,
+            IsDefault = _isDefault,
+            EnabledToolTypeNames = _enabledTools.ToList()
+        };
+        _presets.Add(preset);
+        Persist();
+        _selectedPresetId = preset.Id;
+        _status = Loc.Format("panel_toolmanager.msg_saved", _saveAsName, _enabledTools.Count);
+    }
+
+    private void DeletePreset()
+    {
+        if (string.IsNullOrEmpty(_selectedPresetId))
+            return;
+        _presets.RemoveAll(p => p.Id == _selectedPresetId);
+        Persist();
+        var def = _presets.FirstOrDefault(p => p.IsDefault);
+        SelectPreset(def?.Id ?? "");
+        _status = Loc["panel_toolmanager.msg_deleted"];
+    }
+
+    private void Persist()
+    {
+        KVData.Write("ToolPresets", "__presets__",
+            Newtonsoft.Json.JsonConvert.SerializeObject(_presets));
+    }
+
+    private void ToggleTool(string name, bool enabled)
+    {
+        if (enabled) _enabledTools.Add(name);
+        else _enabledTools.Remove(name);
+    }
+}
+

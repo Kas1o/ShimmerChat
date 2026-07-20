@@ -1,14 +1,19 @@
-﻿@inject IKVDataService KVData
-@attribute [PluginPanel("EmbeddingAPIConfig", "Configure the openai style embedding API connection settings.")]
-<div class="shimmer-group">
-	<label> URI: </label>
-	<input type="text" @bind="Uri" placeholder="localhost" />
-	<br />
-	<label> APIKEY: </label>
-	<input type="text" @bind="ApiKey" placeholder="your apikey" />
-	<br />
-	<label> MODELNAME: </label>
-	<input type="text" @bind="ModelName" placeholder="openai/text-embedding-3-small" />
+@inject IKVDataService KVData
+@inject ILocService Loc
+@attribute [PluginPanel("panel.embedding_api_config", "panel.embedding_api_config.desc")]
+<div class="su-group su-flex su-flex-col su-gap-3">
+	<div class="su-form-group">
+		<label class="su-label">@Loc["api_config.embedding_uri"]</label>
+		<input class="su-input" type="text" @bind="Uri" placeholder="@Loc["api_config.embedding_uri_placeholder"]" />
+	</div>
+	<div class="su-form-group">
+		<label class="su-label">@Loc["api_config.embedding_apikey"]</label>
+		<input class="su-input" type="text" @bind="ApiKey" placeholder="@Loc["api_config.embedding_apikey_placeholder"]" />
+	</div>
+	<div class="su-form-group">
+		<label class="su-label">@Loc["api_config.embedding_model"]</label>
+		<input class="su-input" type="text" @bind="ModelName" placeholder="@Loc["api_config.embedding_model_placeholder"]" />
+	</div>
 </div>
 
 

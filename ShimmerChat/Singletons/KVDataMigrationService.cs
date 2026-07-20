@@ -1,23 +1,17 @@
+using Microsoft.Extensions.Logging;
+using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Singletons
 {
     /// <summary>
-    /// KV 数据存储类型
-    /// </summary>
-    public enum KVStorageType
-    {
-        LocalFileStorage,
-        LiteDB
-    }
-
-    /// <summary>
     /// KV 数据迁移服务
     /// </summary>
-    public class KVDataMigrationService
+    public class KVDataMigrationService : IKVDataMigrationService
     {
         private readonly LocalFileStorageKVData _localFileStorage;
         private readonly LiteDBKVData _liteDBStorage;
+        private readonly ILogger<KVDataMigrationService> _logger;
 
         /// <summary>
         /// 初始化 KVDataMigrationService 实例
@@ -26,10 +20,12 @@ namespace ShimmerChat.Singletons
         /// <param name="liteDBStorage">LiteDB 存储实例</param>
         public KVDataMigrationService(
             LocalFileStorageKVData localFileStorage,
-            LiteDBKVData liteDBStorage)
+            LiteDBKVData liteDBStorage,
+            ILogger<KVDataMigrationService> logger)
         {
             _localFileStorage = localFileStorage;
             _liteDBStorage = liteDBStorage;
+            _logger = logger;
         }
 
         /// <summary>
@@ -66,7 +62,7 @@ namespace ShimmerChat.Singletons
                 _localFileStorage.ClearAll();
             }
 
-            Console.WriteLine($"Migrated {count} entries from LocalFileStorage to LiteDB");
+            _logger.LogInformation("Migrated {Count} entries from LocalFileStorage to LiteDB", count);
             return count;
         }
 
@@ -93,7 +89,7 @@ namespace ShimmerChat.Singletons
                 _liteDBStorage.ClearAll();
             }
 
-            Console.WriteLine($"Migrated {count} entries from LiteDB to LocalFileStorage");
+            _logger.LogInformation("Migrated {Count} entries from LiteDB to LocalFileStorage", count);
             return count;
         }
 
@@ -133,7 +129,7 @@ namespace ShimmerChat.Singletons
                 }
             }
 
-            Console.WriteLine($"Synced {count} entries between storages");
+            _logger.LogInformation("Synced {Count} entries between storages", count);
             return count;
         }
 

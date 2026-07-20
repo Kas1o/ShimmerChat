@@ -1,5 +1,4 @@
 using ShimmerChatLib.Panel;
-using ShimmerChatLib.Tool;
 
 namespace ShimmerChatLib.Interface
 {
@@ -35,14 +34,14 @@ namespace ShimmerChatLib.Interface
     public class PluginPanelInfo
     {
         /// <summary>
-        /// 面板名称
+        /// 面板名称本地化 Key
         /// </summary>
-        public string Name { get; set; }
+        public string NameKey { get; set; }
 
         /// <summary>
-        /// 面板描述
+        /// 面板描述本地化 Key
         /// </summary>
-        public string Description { get; set; }
+        public string DescriptionKey { get; set; }
 
         /// <summary>
         /// 面板图标
@@ -64,15 +63,15 @@ namespace ShimmerChatLib.Interface
 		/// <summary>
 		/// 构造函数
 		/// </summary>
-		/// <param name="name">面板名称</param>
-		/// <param name="description">面板描述</param>
+		/// <param name="nameKey">面板名称本地化 Key</param>
+		/// <param name="descriptionKey">面板描述本地化 Key</param>
 		/// <param name="icon">面板图标</param>
 		/// <param name="order">面板顺序</param>
 		/// <param name="panelType">面板类型</param>
-		public PluginPanelInfo(string name, string description, string? icon, int order, Type panelType, PanelDisplayPlace panelDisplayPlace)
+		public PluginPanelInfo(string nameKey, string descriptionKey, string? icon, int order, Type panelType, PanelDisplayPlace panelDisplayPlace)
         {
-            Name = name;
-            Description = description;
+            NameKey = nameKey;
+            DescriptionKey = descriptionKey;
             Icon = icon;
             Order = order;
             PanelType = panelType;

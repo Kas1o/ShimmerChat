@@ -1,0 +1,195 @@
+@using System.Collections
+@using System.Reflection
+@using ShimmerChatLib.Generation
+@typeparam TNode where TNode : ITreeNode
+@inject ILocService Loc
+
+<div class="generic-editor">
+    @foreach (var prop in _properties.OrderBy(p => p.Order))
+    {
+        <div class="ge-field">
+            <label class="ge-label" title="@(prop.HintKey != null ? Loc[prop.HintKey] : null)">@Loc[prop.LabelKey]</label>
+            <div class="ge-value">
+                @RenderProperty(prop)
+            </div>
+        </div>
+    }
+    @if (_childNodesProp != null)
+    {
+        <ChildListEditor Label="@Loc[_childNodesProp.LabelKey]"
+                         ChildNodes="@_childNodes"
+                         Depth="@Depth"
+                         CopyMe="CopyNode" />
+    }
+    @foreach (var sp in _singleNodeProps)
+    {
+        var slotNode = sp.GetValue(Node) as ITreeNode;
+        <SlotEditor Label="@Loc[sp.LabelKey]"
+                    SlotNode="@slotNode"
+                    Depth="@Depth"
+                    OnSet="v => sp.SetValue(Node, v)"
+                    OnClear="() => sp.SetValue(Node, null)"
+                    CopyMe="CopyNode" />
+    }
+</div>
+
+@code {
+    [Parameter] public TNode Node { get; set; } = default!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public Action<ITreeNode>? RemoveMe { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
+
+    [CascadingParameter] public TreeEditorContext? EditorContext { get; set; }
+
+    private List<PropInfo> _properties = new();
+    private List<PropInfo> _singleNodeProps = new();
+    private PropInfo? _childNodesProp;
+    private IList _childNodes = new List<ITreeNode>();
+
+    protected override void OnParametersSet()
+    {
+        BuildPropertyList();
+    }
+
+    private void BuildPropertyList()
+    {
+        _properties.Clear();
+        _singleNodeProps.Clear();
+        _childNodesProp = null;
+        _childNodes = new List<ITreeNode>();
+
+        var nodeType = Node.GetType();
+        var props = nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanRead && p.CanWrite);
+
+        foreach (var prop in props)
+        {
+            if (prop.GetCustomAttribute<NodePropertyAttribute>() == null)
+                continue;
+
+            if (TreeNodeReflection.IsListOfTreeNode(prop))
+            {
+                _childNodesProp = new PropInfo(prop);
+                _childNodes = (IList?)prop.GetValue(Node) ?? new List<ITreeNode>();
+            }
+            else if (TreeNodeReflection.IsSingleTreeNode(prop))
+            {
+                _singleNodeProps.Add(new PropInfo(prop));
+            }
+            else
+            {
+                _properties.Add(new PropInfo(prop));
+            }
+        }
+    }
+
+    private async void CopyNode(ITreeNode node)
+    {
+        if (EditorContext != null)
+            EditorContext.Copy(node);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private RenderFragment RenderProperty(PropInfo prop) => builder =>
+    {
+        var value = prop.GetValue(Node);
+
+        if (prop.PropertyType == typeof(string))
+        {
+            if (prop.MultiLine)
+            {
+                builder.OpenElement(0, "textarea");
+                builder.AddAttribute(1, "class", "ge-textarea");
+                builder.AddAttribute(2, "value", value as string ?? "");
+                builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                    v => prop.SetValue(Node, v), value as string ?? ""));
+                builder.CloseElement();
+            }
+            else
+            {
+                builder.OpenElement(0, "input");
+                builder.AddAttribute(1, "class", "ge-input");
+                builder.AddAttribute(2, "value", value as string ?? "");
+                builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                    v => prop.SetValue(Node, v), value as string ?? ""));
+                builder.CloseElement();
+            }
+        }
+        else if (prop.PropertyType == typeof(int))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "number");
+            builder.AddAttribute(2, "class", "ge-input ge-input-num");
+            builder.AddAttribute(3, "value", (int)(value ?? 0));
+            builder.AddAttribute(4, "onchange", EventCallback.Factory.CreateBinder<int>(this,
+                v => prop.SetValue(Node, v), (int)(value ?? 0)));
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType == typeof(bool))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "checkbox");
+            builder.AddAttribute(2, "class", "ge-check");
+            builder.AddAttribute(3, "checked", (bool)(value ?? false));
+            builder.AddAttribute(4, "onchange", EventCallback.Factory.CreateBinder<bool>(this,
+                v => prop.SetValue(Node, v), (bool)(value ?? false)));
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType.IsEnum)
+        {
+            builder.OpenElement(0, "select");
+            builder.AddAttribute(1, "class", "ge-select");
+            var current = value?.ToString() ?? "";
+            builder.AddAttribute(2, "value", current);
+            builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                v => prop.SetValue(Node, Enum.Parse(prop.PropertyType, v)), current));
+            foreach (var name in Enum.GetNames(prop.PropertyType))
+            {
+                builder.OpenElement(4, "option");
+                builder.AddAttribute(5, "value", name);
+                builder.AddContent(6, name);
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType == typeof(float))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "number");
+            builder.AddAttribute(2, "step", "0.1");
+            builder.AddAttribute(3, "class", "ge-input ge-input-num");
+            builder.AddAttribute(4, "value", (float)(value ?? 0f));
+            builder.AddAttribute(5, "onchange", EventCallback.Factory.CreateBinder<float>(this,
+                v => prop.SetValue(Node, v), (float)(value ?? 0f)));
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.AddContent(0, value?.ToString() ?? Loc["node_editor.null_value"]);
+        }
+    };
+
+    private class PropInfo
+    {
+        public string LabelKey { get; }
+        public string? HintKey { get; }
+        public int Order { get; }
+        public bool MultiLine { get; }
+        public PropertyInfo Prop { get; }
+        public Type PropertyType { get; }
+
+        public PropInfo(PropertyInfo prop)
+        {
+            Prop = prop;
+            PropertyType = prop.PropertyType;
+            var attr = prop.GetCustomAttribute<NodePropertyAttribute>();
+            LabelKey = attr?.LabelKey ?? prop.Name;
+            HintKey = attr?.HintKey;
+            Order = attr?.Order ?? 0;
+            MultiLine = attr?.MultiLine ?? false;
+        }
+
+        public object? GetValue(object obj) => Prop.GetValue(obj);
+        public void SetValue(object obj, object? value) => Prop.SetValue(obj, value);
+    }
+}

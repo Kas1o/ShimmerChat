@@ -34,8 +34,8 @@ LiteDB 是默认的存储方案，相比传统文件存储具有以下优势：
 
 ```
 AppBaseDirectory/
-├── KVData/                    # LocalFileStorage 数据目录
-│   ├── .migration_marker      # 迁移标记文件（记录迁移历史）
+├── KVData/                    # 数据目录（含 LocalFileStorage 数据和迁移标记）
+│   ├── .migration_marker      # 迁移标记文件（记录迁移历史，始终在此目录下）
 │   ├── Space1/                # 空间数据文件夹
 │   │   ├── key1.json
 │   │   └── key2.json
@@ -114,10 +114,10 @@ AppBaseDirectory/
 }
 ```
 
-2. 启动应用，CLI 会提示确认：
+2. 启动应用，CLI 会提示确认（提示文字中 `{migrateFrom}` 和 `{targetType}` 为动态变量，取决于配置）：
 ```
 ⚠️  WARNING: Force migration is enabled!
-This will re-migrate all data from LocalFileStorage to LiteDB.
+This will re-migrate all data from {migrateFrom} to {targetType}.
 Existing data in target storage may be duplicated.
 Do you want to continue? (yes/no):
 ```

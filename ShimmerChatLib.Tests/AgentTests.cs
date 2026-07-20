@@ -24,11 +24,10 @@ public class AgentTests
         var agent = Agent.Create("TestAgent", "Test description", "Hello!", new List<string> { "Hi", "Hey" });
 
         agent.Name.Should().Be("TestAgent");
-        agent.Description.Should().Be("Test description");
+        agent.UserIntro.Should().Be("Test description");
         agent.Greeting.Should().Be("Hello!");
         agent.AlternativeGreetings.Should().BeEquivalentTo(["Hi", "Hey"]);
         agent.ChatGuids.Should().BeEmpty();
-        agent.CustomToolNames.Should().BeEmpty();
     }
 
     [Fact]
@@ -263,13 +262,13 @@ public class AgentTests
     [Fact]
     public void Import_CreatesAgent()
     {
-        var agent = Agent.Create("ImportTest", "desc");
+        var agent = Agent.Create("ImportTest", "intro");
         var json = agent.Export(clearChat: true);
 
         var imported = Agent.Import(json);
 
         imported.Name.Should().Be("ImportTest");
-        imported.Description.Should().Be("desc");
+        imported.UserIntro.Should().Be("intro");
         imported.Guid.Should().Be(agent.Guid);
     }
 

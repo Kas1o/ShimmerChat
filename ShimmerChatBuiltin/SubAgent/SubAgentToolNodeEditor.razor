@@ -1,0 +1,68 @@
+@using Newtonsoft.Json
+@using ShimmerChatBuiltin.SubAgent
+@inject ShimmerChatLib.Interface.IKVDataService KVData
+@inject ILocService Loc
+
+@if (Node != null)
+{
+    <div class="subagent-editor">
+        <div class="ge-field">
+            <label class="ge-label" title="@Loc["editor_subagent.select_hint"]">
+                @Loc["editor_subagent.label"]
+            </label>
+            <div class="ge-value">
+                <select class="ge-select" value="@Node.ConfigGuid" @onchange="OnConfigChanged"
+                        style="width: 100%; max-width: 400px;">
+                    <option value="">@Loc["editor_subagent.select_option"]</option>
+                    @foreach (var cfg in _configs)
+                    {
+                        <option value="@cfg.Guid.ToString()">@cfg.Name</option>
+                    }
+                </select>
+                @if (_configs.Count == 0)
+                {
+                    <div style="font-size: 0.75em; color: #e66; margin-top: 4px;">
+                        @Loc["editor_subagent.no_configs"]
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(Node.ConfigGuid))
+                {
+                    var selected = _configs.FirstOrDefault(c => c.Guid.ToString() == Node.ConfigGuid);
+                    if (selected != null)
+                    {
+                        <div style="font-size: 0.72em; color: #666; margin-top: 4px;">
+                            @Loc.Format("editor_subagent.output_label", selected.OutputMode)
+                            @if (selected.UseSharedPreset)
+                            {
+                                <span>@Loc.Format("editor_subagent.preset_label", string.IsNullOrEmpty(selected.ModifierPresetId) ? Loc["editor_subagent.none"] : selected.ModifierPresetId)</span>
+                            }
+                            else
+                            {
+                                <span>@Loc["editor_subagent.private_tree_label"]</span>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public SubAgentToolNode Node { get; set; } = default!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
+
+    private List<SubAgentConfig> _configs = [];
+
+    protected override void OnInitialized()
+    {
+        var json = KVData.Read("SubAgent", "configs");
+        _configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
+    }
+
+    private void OnConfigChanged(ChangeEventArgs e)
+    {
+        Node.ConfigGuid = e.Value?.ToString() ?? "";
+    }
+}

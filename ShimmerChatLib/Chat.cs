@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
 
@@ -9,6 +10,17 @@ namespace ShimmerChatLib
 {
     public class Chat
     {
+		private static ILogger<Chat>? _logger;
+
+		static Chat()
+		{
+		}
+
+		internal static void SetLogger(ILogger<Chat> logger)
+		{
+			_logger = logger;
+		}
+
 		public required string Name {
 			get => field;
 			set
@@ -81,7 +93,7 @@ namespace ShimmerChatLib
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Migration warning for chat {guid}: {ex.Message}");
+                    _logger?.LogWarning("Migration warning for chat {Guid}: {Message}", guid, ex.Message);
                 }
             }
             else

@@ -29,15 +29,8 @@ namespace ShimmerChatLib.Interface
         /// <summary>
         /// 设置当前主题
         /// </summary>
-        /// <param name="themeId">主题ID</param>
         void SetTheme(string themeId);
-        
-        /// <summary>
-        /// 应用主题到文档
-        /// </summary>
-        /// <param name="theme">要应用的主题</param>
-        void ApplyTheme(Theme theme);
-        
+
         /// <summary>
         /// 创建新主题
         /// </summary>

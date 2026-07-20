@@ -1,17 +1,26 @@
-﻿@inject IKVDataService KVData
-@attribute [PluginPanel("QdrantAPIConfig", "Configure the Qdrant API connection settings.")]
-<div class="shimmer-group">
-	<label> GRPc Host: </label>
-	<input type="text" @bind="Host" placeholder="localhost"/>
-	<br />
-	<label> Port: </label>
-	<input type="text" @bind="Port" placeholder="6334" />
-	<br />
-	<label> APIKEY: </label>
-	<input type="text" @bind="ApiKey" placeholder="your apikey" />
-	<br />
-	<label> DIM: </label>
-	<input type="text" @bind="Dim" placeholder="1024" />
+@inject IKVDataService KVData
+@inject ILocService Loc
+@attribute [PluginPanel("panel.qdrant_api_config", "panel.qdrant_api_config.desc")]
+<div class="su-group su-flex su-flex-col su-gap-3">
+	<div class="su-form-group">
+		<label class="su-label">@Loc["api_config.qdrant_host"]</label>
+		<input class="su-input" type="text" @bind="Host" placeholder="@Loc["api_config.qdrant_host_placeholder"]"/>
+	</div>
+	<div style="font-size: 0.72em; color: var(--su-text-1); margin-top: 8px; padding: 6px 8px; background: var(--su-surface-3); border-left: 3px solid var(--su-border-0); border-radius: 2px; line-height: 1.5;">
+        @Loc["api_config.qdrant_host_warning"]
+    </div>
+	<div class="su-form-group">
+		<label class="su-label">@Loc["api_config.qdrant_port"]</label>
+		<input class="su-input" type="text" @bind="Port" placeholder="@Loc["api_config.qdrant_port_placeholder"]" />
+	</div>
+	<div class="su-form-group">
+		<label class="su-label">@Loc["api_config.qdrant_apikey"]</label>
+		<input class="su-input" type="text" @bind="ApiKey" placeholder="@Loc["api_config.qdrant_apikey_placeholder"]" />
+	</div>
+	<div class="su-form-group">
+		<label class="su-label">@Loc["api_config.qdrant_dim"]</label>
+		<input class="su-input" type="text" @bind="Dim" placeholder="@Loc["api_config.qdrant_dim_placeholder"]" />
+	</div>
 </div>
 
 

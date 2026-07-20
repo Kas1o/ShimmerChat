@@ -1,94 +1,243 @@
-name: Create Release
+name: Release
 
 on:
   push:
     tags:
-      - 'v*'  # 如 v1.0.0, v0.5.2
-
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 2.0.0-alpha.1)'
+        required: true
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
-
+  # ═══════════════════════════════════════════════════════════════
+  # Web 版：framework-dependent（无运行时）+ self-contained（带运行时，不裁剪）
+  # ═══════════════════════════════════════════════════════════════
+  web:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # framework-dependent：跨平台，用户需自备 .NET 运行时
+          - os: ubuntu-latest
+            label: web-fdd
+            args: '--self-contained false'
+          # self-contained linux-x64：带运行时，不裁剪未使用代码
+          - os: ubuntu-latest
+            label: web-scd-linux-x64
+            args: '--self-contained true -r linux-x64'
+          # self-contained win-x64
+          - os: windows-latest
+            label: web-scd-win-x64
+            args: '--self-contained true -r win-x64'
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout code including submodules
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 0  # 获取完整历史以生成 changelog
+          fetch-depth: 0
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'  
+          dotnet-version: '10.0.x'
 
-      - name: Determine Version from Tag
+      - name: Determine Version
         id: version
+        shell: bash
         run: |
-          echo "Extracting version from tag ${{ github.ref }}"
-          TAG_NAME=$(echo "${{ github.ref }}" | sed 's|refs/tags/||')
-          echo "version=$TAG_NAME" >> $GITHUB_OUTPUT
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Publish Web
+        run: |
+          dotnet publish ShimmerChat/ShimmerChat.csproj \
+            -c Release \
+            ${{ matrix.args }} \
+            -p:PublishSingleFile=false \
+            -p:PublishTrimmed=false \
+            -o ./publish
         shell: bash
 
-      - name: Restore dependencies
-        run: dotnet restore
+      - name: Zip
         shell: pwsh
-
-      - name: Build project
-        run: dotnet build --configuration Release --no-restore
-        shell: pwsh
-
-      - name: Publish Blazor Server App
         run: |
-          dotnet publish ./ShimmerChat/ShimmerChat.csproj `
-            --configuration Release `
-            --no-build `
-            --output ./publish-output `
-            /p:PublishSingleFile=false `
-            /p:SelfContained=false `
-            /p:TargetFramework=net10.0
+          $ver = '${{ steps.version.outputs.version }}'
+          $name = "ShimmerChat-$ver-${{ matrix.label }}"
+          Compress-Archive -Path "publish/*" -DestinationPath "$name.zip" -CompressionLevel Optimal
+          echo "ZIP_FILE=$name.zip" >> $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: ${{ env.ZIP_FILE }}
+
+  # ═══════════════════════════════════════════════════════════════
+  # Tauri 桌面版：Windows / macOS / Linux
+  # ═══════════════════════════════════════════════════════════════
+  tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            label: tauri-windows
+            bundles: nsis
+          - os: macos-latest
+            rid: osx-arm64
+            label: tauri-macos
+            bundles: dmg
+          - os: ubuntu-latest
+            rid: linux-x64
+            label: tauri-linux
+            bundles: deb
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux system deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchutils \
+            libssl-dev
+
+      - name: Determine Version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Inject version into Tauri config
         shell: pwsh
-        env:
-          DOTNET_ROOT: ${{ env.DOTNET_ROOT }}
+        run: |
+          $ver = '${{ steps.version.outputs.version }}'
+          # tauri.conf.json
+          $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $conf.version = $ver
+          $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri/tauri.conf.json -NoNewline
+          # Cargo.toml
+          $cargo = Get-Content src-tauri/Cargo.toml -Raw
+          $cargo = $cargo -replace '(?m)^version\s*=\s*".*"', "version = `"$ver`""
+          Set-Content src-tauri/Cargo.toml $cargo -NoNewline
+          Write-Host "Injected version: $ver"
+
+      - name: Publish .NET sidecar
+        run: |
+          dotnet publish ShimmerChat/ShimmerChat.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -p:PublishTrimmed=false `
+            -o src-tauri/binaries/shimmer-server
+        shell: pwsh
+
+      - name: Build Tauri
+        run: npx --yes @tauri-apps/cli@^2 build --bundles ${{ matrix.bundles }}
+        working-directory: src-tauri
+
+      - name: Upload Tauri artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/deb/*.deb
+
+  # ═══════════════════════════════════════════════════════════════
+  # 创建 GitHub Release，汇总所有产物
+  # ═══════════════════════════════════════════════════════════════
+  release:
+    needs: [web, tauri]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Version
+        id: version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Collect file list
+        id: files
+        shell: bash
+        run: |
+          # 收集所有文件的相对路径，传给 gh-release
+          files=$(find artifacts -type f -print0 | xargs -0 printf '%s\n')
+          {
+            echo "files<<EOF"
+            echo "$files"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Generate Changelog
         id: changelog
+        shell: bash
         run: |
-          # 获取上一个 tag
           last_tag=$(git describe --tags --abbrev=0 --all HEAD^ 2>/dev/null || echo "")
-          
           if [ -z "$last_tag" ]; then
-            # 没有上一个 tag，列出所有提交
             commits=$(git log --pretty=format:'- %s ([%h](https://github.com/${{ github.repository }}/commit/%H))' HEAD)
           else
-            # 从上一个 tag 到当前
             commits=$(git log --pretty=format:'- %s ([%h](https://github.com/${{ github.repository }}/commit/%H))' $last_tag..HEAD)
           fi
-
-          # 输出到 GITHUB_OUTPUT
           {
             echo "changelog<<EOF"
             echo "$commits"
             echo "EOF"
           } >> $GITHUB_OUTPUT
-        shell: bash
-
-      - name: Compress publish output into ZIP
-        shell: pwsh
-        run: |
-          $tagName = '${{ github.ref }}'.Replace('refs/tags/', '')
-          $zipName = "ShimmerChat-$tagName.zip"
-          Compress-Archive -Path "publish-output/*" -DestinationPath "$zipName" -CompressionLevel Optimal
-          Write-Output "Created archive: $zipName"
-          echo "ZIP_FILE=$zipName" >> $env:GITHUB_ENV
 
       - name: Create Release
-        uses: softprops/action-gh-release@v3.0.0
+        uses: softprops/action-gh-release@v3
         with:
-
           name: ${{ steps.version.outputs.version }}
           body: |
             ## What's Changed
@@ -96,8 +245,33 @@ jobs:
             ${{ steps.changelog.outputs.changelog }}
 
             ---
+
+            ### 下载说明
+
+            | 文件 | 说明 |
+            |------|------|
+            | `web-fdd` | Web 版（无运行时，需自备 .NET 10，Windows 下需要`dotnet ./ShimmerChat.dll`启动） |
+            | `web-scd-linux-x64` | Web 版（带运行时，Linux x64） |
+            | `web-scd-win-x64` | Web 版（带运行时，Windows x64） |
+            | `tauri-windows` | Tauri 桌面版（.exe NSIS 安装包） |
+            | `tauri-macos` | Tauri 桌面版（.dmg，Apple Silicon）测试量极低，效果可能不理想 |
+            | `tauri-linux` | Tauri 桌面版（.deb） 不推荐，由于存储设计，必须要sudo才能运行 |
+
+            ---
+
+              ### Downloads Notes
+  
+              | File | Note |
+              |------|------|
+              | `web-fdd` | Web (no runtime indclude) (.NET 10 Required) (use `dotnet ./ShimmerChat.dll` to launch on Windows) |
+              | `web-scd-linux-x64` | Web (runtime include) x64 |
+              | `web-scd-win-x64` | Web (runtime include) x64 |
+              | `tauri-windows` | Tauri desktop（.exe NSIS installer） |
+              | `tauri-macos` | Tauri desktop (.dmg，Apple Silicon) lack of test  |
+              | `tauri-linux` | Tauri desktop (.deb) not recommend (permission needed) |
+
             Automatically generated by GitHub Actions.
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           generate_release_notes: false
-          files: ${{ env.ZIP_FILE }}  # 只上传 zip 文件
+          files: ${{ steps.files.outputs.files }}

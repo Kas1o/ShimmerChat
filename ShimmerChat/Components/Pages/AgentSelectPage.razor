@@ -1,21 +1,22 @@
 @page "/agentselect"
-@using System.Collections.ObjectModel;
 @inject NavigationManager navigation
-@inject IStringLocalizer<AgentSelectPage> l
+@inject ILocService Loc
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService
 
-<h3>@l["AgentSelectPage"]</h3>
+<h3>@Loc["AgentSelectPage"]</h3>
 <div class="agent-toolbar">
 	<div class="toolbar-left">
-		<button class="btn btn-primary" @onclick="OpenCreateAgentMenu">@l["Create New Agent"]</button>
+		<button class="su-btn su-btn-primary" @onclick="OpenCreateAgentMenu">@Loc["Create New Agent"]</button>
 		<div class="import-group">
-			<InputFile OnChange="InputFileChanged" />
-			<button class="btn btn-primary" @onclick="Import">Import</button>
+			<InputFile OnChange="InputFileChanged" accept=".json" class="import-file-input" id="agent-import-file" />
+			<label for="agent-import-file" class="su-btn su-btn-secondary import-label">
+				<i class="bi bi-upload"></i> @Loc["agent_select.import"]
+			</label>
 		</div>
 	</div>
 	<div class="toolbar-right">
-		<button class="btn btn-secondary view-toggle-btn" @onclick="ToggleViewMode" title="@(IsDetailMode ? l["Switch to Grid View"] : l["Switch to Detail View"])">
+		<button class="su-btn su-btn-secondary view-toggle-btn" @onclick="ToggleViewMode" title="@(IsDetailMode ? Loc["Switch to Grid View"] : Loc["Switch to Detail View"])">
 			<i class="bi @(IsDetailMode ? "bi-grid-3x3-gap-fill" : "bi-list-ul")"></i>
 		</button>
 	</div>
@@ -23,11 +24,11 @@
 
 <div class="search-filter-bar">
 	<div class="search-input-wrapper">
-		<input class="shimmer-input search-input" type="text" @bind="SearchQuery" @bind:event="oninput" placeholder="@l["Search agents..."]" />
+		<input class="shimmer-input search-input" type="text" @bind="SearchQuery" @bind:event="oninput" placeholder="@Loc["Search agents..."]" />
 	</div>
 	<div class="filter-input-wrapper">
 		<input class="shimmer-input filter-input" type="text" @bind="FilterTag" @bind:event="oninput"
-			@onfocus="OnFilterFocus" @onfocusout="OnFilterFocusOut" placeholder="@l["Filter by tag..."]" />
+			@onfocus="OnFilterFocus" @onfocusout="OnFilterFocusOut" placeholder="@Loc["Filter by tag..."]" />
 		@if (ShowTagSuggestions && TagSuggestions.Count > 0)
 		{
 			<div class="tag-suggestions-dropdown">
@@ -44,13 +45,22 @@
 
 @if (IsDetailMode)
 {
-	<div class="shimmer-group">
+	<div class="su-group">
 		<div class="agent-detail-list">
 			@foreach (var agent in FilteredAgents)
 			{
 				<div class="agent-detail-row" @onclick="()=> NavigateToAgent(agent.Guid.ToString())">
 					<div class="agent-detail-avatar">
-						<img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
+						@if (agent.AvatarGuid != null)
+						{
+							<img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
+						}
+						else
+						{
+							<div class="agent-avatar-placeholder" style="background-color: @GetAvatarColor(agent.Name)">
+								@GetAvatarInitial(agent.Name)
+							</div>
+						}
 					</div>
 					<div class="agent-detail-divider"></div>
 					<div class="agent-detail-info">
@@ -76,22 +86,32 @@
 			}
 			@if (!FilteredAgents.Any())
 			{
-				<div class="agent-empty">@l["No agents found"]</div>
+				<div class="agent-empty">@Loc["No agents found"]</div>
 			}
 		</div>
 	</div>
 }
 else
 {
-	<div class="shimmer-group">
+	<div class="su-group">
 		<div class="shimmer-grid">
 			@foreach (var agent in FilteredAgents)
 			{
 				<div class="shimmer-grid-item shimmer-grid-agent-item fixed-size">
 					<div class="content-wrapper">
-						<div class="agent-item-content" style="background-image: url('/userimages/@(agent.AvatarGuid).png');" @onclick="()=> NavigateToAgent( agent.Guid.ToString())">
-							@agent.Name
-						</div>
+						@if (agent.AvatarGuid != null)
+						{
+							<div class="agent-item-content" style="background-image: url('/userimages/@(agent.AvatarGuid).png');" @onclick="()=> NavigateToAgent( agent.Guid.ToString())">
+								@agent.Name
+							</div>
+						}
+						else
+						{
+							<div class="agent-item-content agent-item-placeholder" style="background-color: @GetAvatarColor(agent.Name)" @onclick="()=> NavigateToAgent( agent.Guid.ToString())">
+								<span class="agent-placeholder-initial">@GetAvatarInitial(agent.Name)</span>
+								@agent.Name
+							</div>
+						}
 					</div>
 					<button class="agent-delete-btn" @onclick:stopPropagation @onclick="()=> ShowDeleteConfirmation(agent)">
 						×
@@ -100,7 +120,7 @@ else
 			}
 			@if (!FilteredAgents.Any())
 			{
-				<div class="agent-empty" style="grid-column: 1 / -1; text-align: center; padding: 40px;">@l["No agents found"]</div>
+				<div class="agent-empty" style="grid-column: 1 / -1; text-align: center; padding: 40px;">@Loc["No agents found"]</div>
 			}
 		</div>
 	</div>
@@ -108,340 +128,42 @@ else
 
 @if (CreatePopupVisible)
 {
-	<div class="shimmer-popup-overlay" @onclick="() => CreatePopupVisible=false">
-		<div class="shimmer-popup-content" @onclick:stopPropagation>
-			<h5>@l["Create new Agent popup title"]</h5>
-			<label>@l["Name:"]</label>
-			<input class="shimmer-input" @bind=popupNewAgentName/>
-			<label>@l["Description:"]</label>
-			<textarea class="shimmer-textarea" @bind=popupNewAgentDescription/>
-			<label>@l["Greeting:"]</label>
-			<textarea class="shimmer-textarea" @bind=popupNewAgentGreeting/>
-			<button class="btn btn-dark" @onclick="CreateNewAgent">@l["Create"]</button>
+	<div class="su-modal-mask" @onclick="() => CreatePopupVisible=false">
+		<div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
+			<h5>@Loc["Create new Agent popup title"]</h5>
+			<div class="su-form-group">
+				<label class="su-label">@Loc["Name:"]</label>
+				<input class="su-input" @bind=popupNewAgentName/>
+			</div>
+			<div class="su-form-group">
+				<label class="su-label">@Loc["Description:"]</label>
+				<textarea class="su-textarea" @bind=popupNewAgentDescription/>
+			</div>
+			<div class="su-form-group">
+				<label class="su-label">@Loc["Greeting:"]</label>
+				<textarea class="su-textarea" @bind=popupNewAgentGreeting/>
+			</div>
+			<div style="display:flex;justify-content:flex-end;margin-top:12px;">
+				<button class="su-btn su-btn-primary" @onclick="CreateNewAgent">@Loc["Create"]</button>
+			</div>
 		</div>
 	</div>
 }
 
 @if (DeletePopupVisible)
 {
-	<div class="shimmer-popup-overlay" @onclick="() => DeletePopupVisible=false">
-		<div class="shimmer-popup-content" @onclick:stopPropagation>
-			<h5>@l["Delete Agent popup title"]</h5>
-			<p>@string.Format(l["Delete Agent confirmation message"], AgentToDelete?.Name)</p>
+	<div class="su-modal-mask" @onclick="() => DeletePopupVisible=false">
+		<div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
+			<h5>@Loc["Delete Agent popup title"]</h5>
+			<p>@string.Format(Loc["Delete Agent confirmation message"], AgentToDelete?.Name)</p>
 			<div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-				<button class="btn btn-secondary" @onclick="() => DeletePopupVisible=false">@l["Cancel"]</button>
-				<button class="btn btn-danger" @onclick="DeleteAgentConfirmed">@l["Delete"]</button>
+				<button class="su-btn su-btn-secondary" @onclick="() => DeletePopupVisible=false">@Loc["Cancel"]</button>
+				<button class="su-btn su-btn-danger" @onclick="DeleteAgentConfirmed">@Loc["Delete"]</button>
 			</div>
 		</div>
 	</div>
 }
 
-<style>
-	.agent-toolbar {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 12px;
-		flex-wrap: wrap;
-		gap: 8px;
-	}
-
-	.toolbar-left {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		flex-wrap: wrap;
-	}
-
-	.import-group {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.toolbar-right {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.view-toggle-btn {
-		padding: 6px 12px;
-		font-size: 1.2rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.search-filter-bar {
-		display: flex;
-		gap: 12px;
-		margin-bottom: 12px;
-	}
-
-	.search-input-wrapper {
-		flex: 3;
-		position: relative;
-	}
-
-	.filter-input-wrapper {
-		flex: 1;
-		position: relative;
-	}
-
-	.search-input, .filter-input {
-		width: 100%;
-		box-sizing: border-box;
-	}
-
-	.tag-suggestions-dropdown {
-		position: absolute;
-		top: 100%;
-		left: 0;
-		right: 0;
-		background-color: var(--color-card);
-		border: 1px solid var(--color-border);
-		border-radius: 0 0 var(--radius-md) var(--radius-md);
-		box-shadow: var(--shadow-md);
-		z-index: 100;
-		max-height: 200px;
-		overflow-y: auto;
-	}
-
-	.tag-suggestion-item {
-		padding: 8px 12px;
-		cursor: pointer;
-		transition: background-color 0.15s;
-	}
-
-	.tag-suggestion-item:hover {
-		background-color: var(--color-surface);
-	}
-
-	.mini-tag {
-		display: inline-block;
-		padding: 2px 10px;
-		font-size: 0.8rem;
-		font-weight: 500;
-		border-radius: 12px;
-	}
-
-	.agent-detail-list {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	.agent-detail-row {
-		display: flex;
-		align-items: stretch;
-		padding: 0 16px 0 0;
-		min-height: 100px;
-		background-color: var(--color-card);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
-		cursor: pointer;
-		transition: var(--transition);
-		position: relative;
-		overflow: hidden;
-	}
-
-	.agent-detail-row:hover {
-		border-color: var(--color-primary);
-		background-color: var(--color-surface);
-		box-shadow: var(--shadow-md);
-	}
-
-	.agent-detail-avatar {
-		flex-shrink: 0;
-		width: 100px;
-		overflow: hidden;
-		border-radius: var(--radius-lg) 0 0 var(--radius-lg);
-	}
-
-	.agent-detail-avatar img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-
-	.agent-detail-divider {
-		flex-shrink: 0;
-		width: 1px;
-		background: var(--color-border);
-		margin: 12px 16px;
-		align-self: stretch;
-	}
-
-	.agent-detail-info {
-		flex: 1;
-		min-width: 0;
-		padding: 12px 0;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		gap: 4px;
-	}
-
-	.agent-detail-name {
-		font-size: 1.15rem;
-		font-weight: 600;
-		color: var(--color-text-primary);
-	}
-
-	.agent-detail-intro {
-		font-size: 0.9rem;
-		color: var(--color-text-secondary);
-		white-space: pre-wrap;
-		word-break: break-word;
-	}
-
-	.agent-detail-tags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-	}
-
-	.agent-tag {
-		display: inline-block;
-		padding: 2px 10px;
-		font-size: 0.8rem;
-		font-weight: 500;
-		border-radius: 12px;
-	}
-
-	.agent-empty {
-		text-align: center;
-		padding: 40px;
-		color: var(--color-text-tertiary);
-		font-size: 1rem;
-	}
-
-	.shimmer-grid-agent-item {
-		position: relative;
-		color: var(--color-text-primary);
-		overflow: hidden;
-		border: 2px solid var(--color-border);
-		background-color: var(--color-card);
-		border-radius: 8px;
-		overflow: hidden;
-	}
-
-	.shimmer-grid-item.fixed-size {
-		width: 280px;
-		height: 420px;
-		min-height: 0;
-		padding: 0;
-		overflow: hidden;
-	}
-
-	.shimmer-grid-item.fixed-size .content-wrapper {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-sizing: border-box;
-	}
-
-	.agent-item-content {
-		position: relative;
-		width: 100%;
-		height: 100%;
-		color: white;
-		text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-		font-weight: bold;
-		background-size: cover;
-		background-position: center;
-		background-blend-mode: overlay;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		text-align: center;
-	}
-
-	.agent-item-content::after {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		z-index: 0;
-	}
-
-	.agent-item-content > * {
-		position: relative;
-		z-index: 1;
-	}
-
-	.agent-delete-btn {
-		position: absolute;
-		top: 5px;
-		right: 5px;
-		background: rgba(0, 0, 0, 0.5);
-		color: white;
-		border: none;
-		border-radius: 50%;
-		width: 28px;
-		height: 28px;
-		font-size: 18px;
-		line-height: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		opacity: 0;
-		z-index: 2;
-		transition: all 0.3s ease;
-	}
-
-	.shimmer-grid-agent-item:hover .agent-delete-btn,
-	.agent-detail-row:hover .agent-delete-btn {
-		opacity: 1;
-	}
-
-	.agent-delete-btn:hover {
-		background: var(--color-error);
-	}
-
-	.shimmer-grid-agent-item:hover {
-		border-color: var(--color-primary);
-		background-color: var(--color-surface);
-		transform: translateY(-2px);
-		box-shadow: var(--shadow-md);
-	}
-
-	.shimmer-popup-overlay {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background-color: rgba(0, 0, 0, 0.6);
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		z-index: 1000;
-		backdrop-filter: blur(4px);
-	}
-
-	.shimmer-popup-content {
-		background-color: var(--color-card);
-		padding: 24px;
-		border-radius: var(--radius-xl);
-		box-shadow: var(--shadow-lg);
-		border: 1px solid var(--color-border);
-		max-width: 90vw;
-		max-height: 90vh;
-		overflow-y: auto;
-		min-width: 300px;
-		width: fit-content;
-	}
-</style>
 
 @code {
 	bool CreatePopupVisible { get; set; } = false;
@@ -503,9 +225,9 @@ else
 	}
 
 	#region Popup
-	string popupNewAgentName { get; set; } = "new agent";
-	string popupNewAgentDescription { get; set; } = "this is a cool agent!";
-	string popupNewAgentGreeting { get; set; } = "Hello! How can I help you today?";
+	string popupNewAgentName { get; set; } = "";
+	string popupNewAgentDescription { get; set; } = "";
+	string popupNewAgentGreeting { get; set; } = "";
 	#endregion
 
 	List<Agent> AllAgents { get; set; } = new();
@@ -586,15 +308,38 @@ else
 		ShowTagSuggestions = false;
 	}
 
+	static readonly string[] _avatarColors = new[]
+	{
+		"#5e6ad2", "#e74c3c", "#2ecc71", "#f39c12", "#1abc9c",
+		"#3498db", "#9b59b6", "#e67e22", "#27ae60", "#c0392b",
+	};
+
+	static string GetAvatarColor(string name)
+	{
+		var hash = 0;
+		foreach (var c in name ?? "?")
+			hash = ((hash << 5) + hash) ^ c;
+		return _avatarColors[Math.Abs(hash) % _avatarColors.Length];
+	}
+
+	static string GetAvatarInitial(string name)
+	{
+		if (string.IsNullOrWhiteSpace(name)) return "?";
+		return char.ToUpper(name.TrimStart()[0]).ToString();
+	}
+
 	void OpenCreateAgentMenu()
 	{
+		popupNewAgentName = Loc["agent_select.default_name"];
+		popupNewAgentDescription = Loc["agent_select.default_description"];
+		popupNewAgentGreeting = Loc["agent_select.default_greeting"];
 		CreatePopupVisible = true;
 	}
 
 	void CreateNewAgent()
 	{
 		if (popupNewAgentName == "")
-			popupNewAgentName = "new agent";
+			popupNewAgentName = Loc["agent_select.default_name"];
 
 		var newAgent = Agent.Create
 		(
@@ -631,10 +376,11 @@ else
 		}
 	}
 
-	IBrowserFile File { get; set; }
-	void InputFileChanged(InputFileChangeEventArgs e)
+	IBrowserFile? File { get; set; }
+	async Task InputFileChanged(InputFileChangeEventArgs e)
 	{
 		File = e.File;
+		await Import();
 	}
 
 	async Task<byte[]> ReadFullyAsync(Stream stream)
@@ -653,7 +399,7 @@ else
 	{
 		if(File == null)
 		{
-			await PopupService.ShowAsync("未选择 Agent 文件。");
+			await PopupService.ShowAsync(Loc["agent_select.no_file_selected"]);
 			return;
 		}
 		var originStream = File.OpenReadStream(maxAllowedSize: 1024 * 1024 * 80);
@@ -663,7 +409,7 @@ else
 		var newAgent = Agent.Import(content);
 		if (AllAgents.Any(x => x.Guid == newAgent.Guid))
 		{
-			await PopupService.ShowAsync("已经存在同Agent");
+			await PopupService.ShowAsync(Loc["agent_select.duplicate_agent"]);
 		}
 
 		Agent.AddAgentToAll(newAgent, kvDataService);

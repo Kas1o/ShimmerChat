@@ -1,10 +1,12 @@
 @inject IKVDataService KVData
-@attribute [PluginPanel("TokenizerAPI", "Configure the Tokenizer settings.")]
+@inject ILocService Loc
+@attribute [PluginPanel("panel.tokenizer_api", "panel.tokenizer_api.desc")]
 
-<div class="shimmer-group">
-	<label> Model: </label>
-	<input type="text" @bind="Model" placeholder="./tokenizer.json" />
-	<br />
+<div class="su-group">
+	<div class="su-form-group">
+		<label class="su-label">@Loc["api_config.tokenizer_model"]</label>
+		<input class="su-input" type="text" @bind="Model" placeholder="@Loc["api_config.tokenizer_model_placeholder"]" />
+	</div>
 </div>
 
 

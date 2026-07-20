@@ -18,7 +18,9 @@ namespace ShimmerChatLib
         /// <summary>消息正在首次生成中</summary>
         Generating,
         /// <summary>消息正在重新生成中（清空旧内容）</summary>
-        Regenerating
+        Regenerating,
+        /// <summary>LLM 响应已返回，正在执行后生成管线</summary>
+        PostProcessing
     }
 
 	public class Message
@@ -112,7 +114,7 @@ namespace ShimmerChatLib
         [JsonIgnore]
         public bool IsStreaming
         {
-            get => _generationState == MessageGenerationState.Generating || _generationState == MessageGenerationState.Regenerating;
+            get => _generationState == MessageGenerationState.Generating || _generationState == MessageGenerationState.Regenerating || _generationState == MessageGenerationState.PostProcessing;
             set
             {
                 // 设置时转换为新状态
@@ -135,7 +137,7 @@ namespace ShimmerChatLib
         /// 检查消息是否正在生成中（包括首次生成和重新生成）
         /// </summary>
         [JsonIgnore]
-        public bool IsGenerating => _generationState == MessageGenerationState.Generating || _generationState == MessageGenerationState.Regenerating;
+        public bool IsGenerating => _generationState == MessageGenerationState.Generating || _generationState == MessageGenerationState.Regenerating || _generationState == MessageGenerationState.PostProcessing;
 
         /// <summary>
         /// 检查消息是否正在重新生成中

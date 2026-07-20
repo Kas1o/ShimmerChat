@@ -1,5 +1,6 @@
 using FluentAssertions;
 using LiteDB;
+using Microsoft.Extensions.Logging;
 using ShimmerChat.Singletons;
 
 namespace ShimmerChat.Tests;
@@ -12,7 +13,7 @@ public class LiteDBKVDataTests : IDisposable
     public LiteDBKVDataTests()
     {
         _database = new LiteDatabase(":memory:");
-        _kvData = new LiteDBKVData(_database);
+        _kvData = new LiteDBKVData(_database, Microsoft.Extensions.Logging.Abstractions.NullLogger<LiteDBKVData>.Instance);
     }
 
     public void Dispose()

@@ -1,0 +1,153 @@
+@using System.Reflection
+@using ShimmerChatLib.Generation
+@implements IDisposable
+@inject ILocService Loc
+
+<div class="ge-children @(_isDropTarget ? "tn-drop-inside" : "")"
+     @ondragover="OnSlotDragOver" @ondragover:preventDefault
+     @ondragleave="OnSlotDragLeave" @ondrop="OnSlotDrop">
+    <div class="ge-children-header">
+        <span class="ge-label">@Label</span>
+        @if (SlotNode == null)
+        {
+            <button class="tn-btn tn-btn-add" @onclick="ToggleAddPicker" title="@Loc["node_editor.add_node"]">+</button>
+            @if (EditorContext?.HasClipboardContent == true)
+            {
+                <button class="tn-btn tn-btn-paste" @onclick="PasteNode" title="@Loc["node_editor.paste"]">📋</button>
+            }
+        }
+    </div>
+
+    @if (_showAddPicker && SlotNode == null)
+    {
+        <NodePickerMenu OnSelect="AddChild" OnClose="ClosePicker" />
+    }
+
+    @if (SlotNode != null)
+    {
+        <div class="tn-child-row">
+            <div class="tn-child-tree">
+                <TreeEditor Node="@SlotNode" Depth="@(Depth + 1)"
+                            OnDragSourceChanged="HandleDragSourceChanged"
+                            RemoveMe="RemoveSlot"
+                            OnDragRemove="RemoveSlotAsync"
+                            CopyMe="CopyMe" />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="tn-empty">@Loc["node_editor.empty_hint"]</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public ITreeNode? SlotNode { get; set; }
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public Action<ITreeNode>? OnSet { get; set; }
+    [Parameter] public Action? OnClear { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
+
+    [CascadingParameter] private TreeDragContext? DragContext { get; set; }
+    [CascadingParameter] private TreeEditorContext? EditorContext { get; set; }
+
+    private bool _showAddPicker;
+    private bool _isDropTarget;
+
+    protected override void OnInitialized()
+    {
+        if (EditorContext != null)
+            EditorContext.ClipboardChanged += OnClipboardChanged;
+    }
+
+    private void OnClipboardChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (EditorContext != null)
+            EditorContext.ClipboardChanged -= OnClipboardChanged;
+    }
+
+    private void HandleDragSourceChanged() { }
+
+    private void ToggleAddPicker()
+    {
+        _showAddPicker = !_showAddPicker;
+    }
+
+    private void ClosePicker()
+    {
+        _showAddPicker = false;
+    }
+
+    private void AddChild(Type type)
+    {
+        _showAddPicker = false;
+        var instance = EditorContext?.CreateNode(type);
+        if (instance != null)
+            OnSet?.Invoke(instance);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void PasteNode()
+    {
+        var node = EditorContext?.Paste();
+        if (node != null)
+        {
+            OnSet?.Invoke(node);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void RemoveSlot(ITreeNode _)
+    {
+        OnClear?.Invoke();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RemoveSlotAsync()
+    {
+        OnClear?.Invoke();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // ── Drop target ──────────────────────────────────
+
+    private void OnSlotDragOver(DragEventArgs e)
+    {
+        if (DragContext?.IsDragging != true) return;
+        if (ReferenceEquals(DragContext.DraggedNode, SlotNode)) return;
+        e.DataTransfer.DropEffect = "move";
+        _isDropTarget = true;
+    }
+
+    private void OnSlotDragLeave()
+    {
+        _isDropTarget = false;
+    }
+
+    private async Task OnSlotDrop(DragEventArgs e)
+    {
+        _isDropTarget = false;
+        if (DragContext?.IsDragging != true) return;
+
+        var dragged = DragContext.DraggedNode!;
+        if (ReferenceEquals(dragged, SlotNode)) return;
+        if (SlotNode != null && TreeDragContext.IsAncestorOf(dragged, SlotNode)) return;
+
+        try
+        {
+            OnSet?.Invoke(dragged);
+            await DragContext.RemoveFromSource();
+            DragContext.EndDrag();
+        }
+        catch
+        {
+            DragContext?.EndDrag();
+        }
+    }
+}

@@ -130,3 +130,37 @@ window.isScrolledToTop = function (element, threshold) {
         return true;
     }
 };
+
+// textarea 自适应高度
+window.autoResizeTextarea = function (el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+};
+
+// ─── Tree Editor Drag & Drop Helpers ──────────────────
+
+/**
+ * Returns the ratio (0..1) of the pointer's Y position within the element.
+ * Used by TreeEditor/GenericNodeEditor to determine whether to insert
+ * before (< 0.5) or after (>= 0.5) the target node.
+ */
+window.getDropRatio = function (element, clientY) {
+    if (!element) return 0;
+    var rect = element.getBoundingClientRect();
+    return (clientY - rect.top) / rect.height;
+};
+
+/**
+ * Global dragstart listener for tree nodes.
+ * Firefox requires setData to be called synchronously in the dragstart event
+ * for the drag operation to initiate. Blazor Server's async dispatch happens
+ * too late, so we set minimal data here and let the .NET handler manage state.
+ */
+document.addEventListener('dragstart', function (e) {
+    var header = e.target.closest('.tn-header');
+    if (header && header.hasAttribute('draggable')) {
+        e.dataTransfer.setData('text/plain', 'tree-node');
+        e.dataTransfer.effectAllowed = 'move';
+    }
+});

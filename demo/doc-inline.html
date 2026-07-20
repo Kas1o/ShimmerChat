@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShimmerUI Demo — 文档内联</title>
+<style>
+/* ============================================================
+   Document Inline — Notion / Dropbox Paper inspired
+   Core idea: everything is a block in a document
+   No sidebar, no modals, no tabs — just content
+   ============================================================ */
+
+:root {
+  --bg: #ffffff;
+  --text: #1a1a1a;
+  --text-secondary: #6b6b6b;
+  --text-tertiary: #9b9b9b;
+  --border: #e8e8e8;
+  --surface: #f9f9f9;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', Consolas, monospace;
+  --font-serif: 'Charter', 'Georgia', 'Times New Roman', serif;
+
+  /* Block spacing */
+  --block-gap: 3px;
+  --page-width: 720px;
+  --radius: 4px;
+}
+
+/* [data-theme="dark"] can be added later */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   Page Layout — centered document
+   ============================================================ */
+.page {
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: 80px 24px 120px;
+}
+
+/* ============================================================
+   Page header
+   ============================================================ */
+.page-cover {
+  height: 160px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.page-icon {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  position: absolute;
+  bottom: -24px;
+  left: 24px;
+}
+
+.page-title-wrap {
+  margin-top: 16px;
+  padding-left: 0;
+}
+
+.page-title {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  border: none;
+  outline: none;
+  font-family: var(--font);
+  width: 100%;
+  background: transparent;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.page-meta {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* ============================================================
+   Block system
+   ============================================================ */
+.block {
+  padding: 4px 8px;
+  margin: var(--block-gap) 0;
+  border-radius: var(--radius);
+  border-left: 2px solid transparent;
+  transition: background 100ms, border-color 100ms;
+  cursor: text;
+  position: relative;
+}
+
+.block:hover {
+  background: var(--surface);
+}
+
+.block:focus-within {
+  background: var(--surface);
+}
+
+/* Block types */
+.block-h1 {
+  font-size: 28px;
+  font-weight: 700;
+  padding: 12px 8px 4px;
+  margin-top: 32px;
+}
+
+.block-h2 {
+  font-size: 20px;
+  font-weight: 600;
+  padding: 8px 8px 4px;
+  margin-top: 20px;
+}
+
+.block-h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-size: 11px;
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+
+.block-text {
+  color: var(--text);
+}
+
+.block-caption {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* ============================================================
+   Inline property block (key-value)
+   ============================================================ */
+.block-prop {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 8px;
+}
+
+.block-prop-key {
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-width: 120px;
+  font-weight: 500;
+}
+
+.block-prop-value {
+  font-size: 14px;
+  color: var(--text);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: transparent;
+  transition: background 100ms;
+  cursor: text;
+}
+
+.block-prop-value:hover {
+  background: #e8e8ed;
+}
+
+.block-prop-value code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface);
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: var(--accent);
+}
+
+/* ============================================================
+   Pipeline block (the node tree, inline)
+   ============================================================ */
+.block-pipeline {
+  margin: 8px 0;
+  padding: 0;
+}
+
+.pipeline-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  margin: 2px 0;
+  border-left: 2px solid;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 100ms;
+}
+
+.pipeline-node:hover { background: var(--surface); }
+
+.pipeline-node .pn-icon { font-size: 15px; flex-shrink: 0; width: 20px; text-align: center; }
+.pipeline-node .pn-name { font-weight: 500; }
+.pipeline-node .pn-type { font-size: 11px; color: var(--text-tertiary); margin-left: 8px; }
+.pipeline-node .pn-arrow { color: var(--text-tertiary); font-size: 11px; margin-left: auto; opacity: 0; transition: opacity 100ms; }
+.pipeline-node:hover .pn-arrow { opacity: 1; }
+
+.pipeline-children {
+  margin-left: 24px;
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}
+
+.pipeline-node.selected {
+  background: #f0eeff;
+  border-left-width: 3px;
+}
+
+/* Node colors rendered as left border */
+.pn-color-flow       { border-left-color: #6366f1; }  /* --node-flow indigo */
+.pn-color-branch     { border-left-color: #f59e0b; }  /* amber */
+.pn-color-link       { border-left-color: #10b981; }  /* emerald */
+.pn-color-fragment   { border-left-color: #6366f1; }  /* indigo (same as flow - intentional grouping) */
+.pn-color-prompt     { border-left-color: #a855f7; }  /* purple */
+.pn-color-tool       { border-left-color: #22c55e; }  /* green */
+.pn-color-memory     { border-left-color: #eab308; }  /* yellow */
+.pn-color-config     { border-left-color: #ef4444; }  /* red */
+.pn-color-subagent   { border-left-color: #ec4899; }  /* pink */
+.pn-color-debug      { border-left-color: #94a3b8; }  /* slate */
+
+/* ============================================================
+   Inline tool list
+   ============================================================ */
+.tool-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.tool-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 100ms;
+}
+
+.tool-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tool-chip .tc-dot { width: 6px; height: 6px; border-radius: 50%; }
+.tool-chip .tc-dot.green  { background: #22c55e; }
+.tool-chip .tc-dot.blue   { background: #6366f1; }
+.tool-chip .tc-dot.yellow { background: #eab308; }
+
+/* ============================================================
+   Inline code block
+   ============================================================ */
+.block-code {
+  background: #f6f6f8;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+.block-code .kw { color: #a855f7; }
+.block-code .str { color: #10b981; }
+.block-code .cm { color: var(--text-tertiary); }
+
+/* ============================================================
+   Callout block
+   ============================================================ */
+.block-callout {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f0eeff;
+  border-radius: 6px;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.block-callout-icon { font-size: 18px; flex-shrink: 0; }
+
+/* ============================================================
+   Floating table of contents
+   ============================================================ */
+.toc {
+  position: fixed;
+  left: max(24px, calc((100vw - var(--page-width)) / 2 - 180px));
+  top: 80px;
+  width: 150px;
+  font-size: 12px;
+  display: none;
+}
+
+@media (min-width: 1100px) {
+  .toc { display: block; }
+}
+
+.toc-title {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+
+.toc a {
+  display: block;
+  padding: 3px 0;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: 3px;
+  transition: color 100ms;
+}
+
+.toc a:hover { color: var(--accent); }
+.toc a.active { color: var(--accent); font-weight: 500; }
+
+/* ============================================================
+   Top bar — minimal
+   ============================================================ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+
+.topbar-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  font-family: var(--font);
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 100ms;
+}
+.topbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+.topbar-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ============================================================
+   Demo nav
+   ============================================================ */
+.demo-nav {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 200;
+  display: flex;
+  gap: 4px;
+}
+.demo-nav a {
+  font-size: 10px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-secondary);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  font-family: var(--font);
+}
+.demo-nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="demo-nav">
+  <a href="theme-modern.html">极简</a>
+  <a href="theme-dark.html">暗色工具</a>
+  <a href="theme-glass.html">毛玻璃</a>
+  <a href="canvas-flow.html">画布</a>
+  <a href="command-center.html">命令中心</a>
+  <a href="doc-inline.html" class="active">文档内联</a>
+  <a href="data-dashboard.html">驾驶舱</a>
+</div>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <span style="font-weight:700">ShimmerChat</span>
+    <span style="color:var(--text-tertiary)">/</span>
+    <span>Assistants</span>
+  </div>
+  <div class="topbar-right">
+    <button class="topbar-btn">Share</button>
+    <button class="topbar-btn primary">Run Agent</button>
+  </div>
+</div>
+
+<!-- Table of Contents (floating) -->
+<nav class="toc">
+  <div class="toc-title">On this page</div>
+  <a href="#" class="active">Overview</a>
+  <a href="#">Pipeline</a>
+  <a href="#">Tools</a>
+  <a href="#">System Prompt</a>
+  <a href="#">Model Settings</a>
+  <a href="#">Examples</a>
+</nav>
+
+<div class="page">
+
+  <!-- Cover -->
+  <div class="page-cover">
+    <div class="page-icon">🤖</div>
+  </div>
+
+  <!-- Title -->
+  <div class="page-title-wrap">
+    <div class="block block-h1" style="margin-top:40px; padding-left:0; border:none; background:none">
+      Assistant Pipeline
+    </div>
+    <div class="block block-caption">Last edited 2 hours ago · 8 nodes · 3 tools</div>
+  </div>
+
+  <!-- Overview section -->
+  <div class="block block-h2">Overview</div>
+  <div class="block block-text">
+    A general-purpose assistant agent with a structured pipeline. Takes user input, retrieves relevant memory, delegates complex tasks to sub-agents when needed, and formats responses cleanly.
+  </div>
+
+  <!-- Properties inline -->
+  <div class="block block-h3">Configuration</div>
+  <div class="block block-prop">
+    <span class="block-prop-key">Model</span>
+    <span class="block-prop-value"><code>GPT-4o</code></span>
+  </div>
+  <div class="block block-prop">
+    <span class="block-prop-key">Temperature</span>
+    <span class="block-prop-value">0.7</span>
+  </div>
+  <div class="block block-prop">
+    <span class="block-prop-key">Max Output Tokens</span>
+    <span class="block-prop-value">4096</span>
+  </div>
+
+  <!-- Pipeline section — the node tree as a document block -->
+  <div class="block block-h2">Pipeline</div>
+  <div class="block block-caption">8 nodes. Click any node to edit its properties inline.</div>
+
+  <div class="block block-pipeline">
+    <!-- Sequence (root) -->
+    <div class="pipeline-node pn-color-flow selected">
+      <span class="pn-icon">▦</span>
+      <span class="pn-name">Pipeline Entry</span>
+      <span class="pn-type">SequenceNode</span>
+      <span class="pn-arrow">→ edit</span>
+    </div>
+    <div class="pipeline-children">
+      <div class="pipeline-node pn-color-fragment">
+        <span class="pn-icon">▤</span>
+        <span class="pn-name">System Prompt Fragment</span>
+        <span class="pn-type">FragmentNode</span>
+        <span class="pn-arrow">→</span>
+      </div>
+      <div class="pipeline-node pn-color-fragment">
+        <span class="pn-icon">💬</span>
+        <span class="pn-name">Append Chat History</span>
+        <span class="pn-type">AppendChatMessagesNode</span>
+        <span class="pn-arrow">→</span>
+      </div>
+      <div class="pipeline-node pn-color-branch">
+        <span class="pn-icon">◇</span>
+        <span class="pn-name">Check: has tools?</span>
+        <span class="pn-type">IfNode</span>
+        <span class="pn-arrow">→</span>
+      </div>
+      <div class="pipeline-node pn-color-config">
+        <span class="pn-icon">⚡</span>
+        <span class="pn-name">Select API Provider</span>
+        <span class="pn-type">APISelectNode</span>
+        <span class="pn-arrow">→</span>
+      </div>
+      <div class="pipeline-node pn-color-tool">
+        <span class="pn-icon">📦</span>
+        <span class="pn-name">Load Tool Preset</span>
+        <span class="pn-type">ToolPresetNode</span>
+        <span class="pn-arrow">→</span>
+      </div>
+      <div class="pipeline-node pn-color-memory">
+        <span class="pn-icon">🔍</span>
+        <span class="pn-name">Retrieve Relevant Memory</span>
+        <span class="pn-type">MemoryRetrieveNode</span>
+        <span class="pn-arrow">→</span>
+      </div>
+      <div class="pipeline-children">
+        <div class="pipeline-node pn-color-subagent">
+          <span class="pn-icon">🤖</span>
+          <span class="pn-name">Sub-Agent: Planner</span>
+          <span class="pn-type">SubAgentNode</span>
+          <span class="pn-arrow">→</span>
+        </div>
+        <div class="pipeline-node pn-color-debug">
+          <span class="pn-icon">🖨️</span>
+          <span class="pn-name">Debug Print (dev only)</span>
+          <span class="pn-type">PrintNode</span>
+          <span class="pn-arrow">→</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tools section -->
+  <div class="block block-h2">Tools</div>
+  <div class="tool-list">
+    <span class="tool-chip"><span class="tc-dot green"></span> Filesystem</span>
+    <span class="tool-chip"><span class="tc-dot blue"></span> Memory Search</span>
+    <span class="tool-chip"><span class="tc-dot yellow"></span> Web Search</span>
+    <span class="tool-chip">+ Add tool</span>
+  </div>
+
+  <!-- System Prompt section -->
+  <div class="block block-h2">System Prompt</div>
+  <div class="block-code">
+    <span class="kw">You are</span> <span class="str">"Assistant"</span>, <span class="kw">a helpful AI assistant.</span><br>
+    <span class="cm">// Dynamic: user name is injected at runtime</span><br>
+    <span class="kw">The current user is</span> <span class="str">{{user.name}}</span>.<br>
+    <span class="kw">Always respond in</span> <span class="str">{{user.language}}</span>.
+  </div>
+
+  <!-- Callout -->
+  <div class="block-callout">
+    <span class="block-callout-icon">💡</span>
+    <span>Variables like <code>{{user.name}}</code> are resolved at runtime from Agent Variables. <strong>3 variables</strong> are currently configured for this agent.</span>
+  </div>
+
+  <!-- Model Settings -->
+  <div class="block block-h2">Model Settings</div>
+  <div class="block block-prop">
+    <span class="block-prop-key">Provider</span>
+    <span class="block-prop-value">OpenAI-compatible API</span>
+  </div>
+  <div class="block block-prop">
+    <span class="block-prop-key">Endpoint</span>
+    <span class="block-prop-value"><code>https://api.openai.com/v1</code></span>
+  </div>
+  <div class="block block-prop">
+    <span class="block-prop-key">Model</span>
+    <span class="block-prop-value"><code>gpt-4o</code></span>
+  </div>
+
+  <!-- Examples section -->
+  <div class="block block-h2">Example Conversations</div>
+  <div class="block block-caption">Test runs from the last 24 hours.</div>
+  <div class="block block-prop">
+    <span class="block-prop-key" style="min-width:160px">"Write a Python script..."</span>
+    <span class="block-prop-value" style="color:var(--text-tertiary)">4 tool calls · 2048 tokens</span>
+  </div>
+  <div class="block block-prop">
+    <span class="block-prop-key" style="min-width:160px">"Summarize this document"</span>
+    <span class="block-prop-value" style="color:var(--text-tertiary)">2 tool calls · 1024 tokens</span>
+  </div>
+
+</div>
+
+</body>
+</html>

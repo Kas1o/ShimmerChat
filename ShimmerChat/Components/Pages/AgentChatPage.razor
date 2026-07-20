@@ -1,239 +1,97 @@
 @page "/agent/{AgentGuid}/{ChatGuid}"
 @using ShimmerChatLib
-@using SharperLLM.API
 @using System.Collections.ObjectModel
 @using System.Threading
-@using ShimmerChat.Singletons
 @using Microsoft.JSInterop
 
-@inject ICompletionService completion
-@inject IAIGenerationService aiGenerationService
+@inject IGenerationManagerV2 generationManager
 @inject IPopupService popupService
 @inject IJSRuntime JS
 @inject IKVDataService KVData
 @inject IMessageStoreService messageStore
+@inject ILocService Loc
 @inject NavigationManager navigation
+@inject ILogger<AgentChatPage> logger
+
 
 @if (chat != null)
 {
-	<div id="container">
-		<div id="chat-info" class="shimmer-shadow-box">
-			<label>You are having chat with: </label>
-			<h2 @onclick="BackToAgentPage" style="cursor:pointer">@agent!.Name</h2>
-		</div>
-		<div id="chat-main" @ref="ChatMainElement" @onscroll="OnChatScroll">
-			@if (virtualize)
+	<div class="chat-page">
+		<div class="chat-topbar">
+			<button class="chat-back" @onclick="BackToAgentPage">← @agent!.Name</button>
+			@if (generationPhase != null)
 			{
-				<Virtualize  Items="messages" Context="message" >
-					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
-				</Virtualize>
+				<span class="generation-phase @($"phase-{generationPhase}")">
+					<span class="phase-dot"></span>
+					@switch (generationPhase)
+					{
+						case "pre":
+							@Loc["chat.phase_pre"]
+							break;
+						case "gen":
+							@Loc["chat.phase_gen"]
+							break;
+						case "post":
+							@Loc["chat.phase_post"]
+							break;
+					}
+				</span>
 			}
-			else
-			{
-				@foreach(var message in messages)
+		</div>
+
+		<div class="chat-messages" @ref="ChatMainElement" @onscroll="OnChatScroll">
+			<div class="chat-messages-inner">
+				@if (virtualize)
 				{
-					<ShimmerChat.Components.SubComponents.Message Delete="() => DeleteMessage(message)" RegenerateFrom="() => RegenerateFromMessage(message)" ContinueFrom="() => ContinueFromMessage(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
+					<Virtualize Items="messages" Context="message">
+						<ShimmerChat.Components.SubComponents.Message Delete="async () => await DeleteMessage(message)" RegenerateFrom="async () => await RegenerateFromMessage(message)" ContinueFrom="async () => await ContinueFromMessage(message)" DeleteFrom="async () => await DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
+					</Virtualize>
 				}
-			}
-			<br />
-			<br />
+				else
+				{
+					@foreach (var message in messages)
+					{
+						<ShimmerChat.Components.SubComponents.Message Delete="async () => await DeleteMessage(message)" RegenerateFrom="async () => await RegenerateFromMessage(message)" ContinueFrom="async () => await ContinueFromMessage(message)" DeleteFrom="async () => await DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
+					}
+				}
+			</div>
 		</div>
+
 		@if (!isUserAtBottom)
 		{
-			<button id="scroll-to-bottom-btn" @onclick="ScrollToBottomManually">
+			<button class="chat-scroll-btn" @onclick="ScrollToBottomManually">
 				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
 					<path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
 				</svg>
 			</button>
 		}
-		<div id="input-box" class="shimmer-shadow-box">
-			<!-- 输入框内容 -->
-			<textarea value="@inputText" @oninput="OnInput" @onkeydown="@(e => CheckEnter(e))" placeholder="Type your message here..." rows="3"></textarea>
-			<div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
-				@if (generating)
-				{
-					<button class="btn btn-danger" @onclick="OnClickStopGenerationButton">停止生成</button>
-				}
-				else
-				{
-					<button class="btn btn-primary" @onclick="OnClickSendButton">发送</button>
-				}
-			</div>
+
+		<div class="chat-input">
+			<textarea @ref="inputArea"
+				value="@inputText" @oninput="OnInputResize"
+				@onkeydown="@(e => CheckEnter(e))"
+				placeholder="@Loc["chat.input_placeholder"]"
+				rows="1"></textarea>
+			@if (generating)
+			{
+				<button class="chat-input-stop" @onclick="OnClickStopGenerationButton">
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>
+				</button>
+			}
+			else
+			{
+				<button class="chat-input-send" @onclick="OnClickSendButton" disabled="@(string.IsNullOrWhiteSpace(inputText))">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+				</button>
+			}
 		</div>
 	</div>
 	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.Guid" ChatGuid="chat.Guid" @ref="ChatPluginPanelContainer"/>
-	<style>
-
-		.shimmer-content {
-			padding: 0px !important; /* 覆盖掉主容器的padding，以实现无缝的背景图 */
-		}
-
-		/* 父级容器 */
-		#container {
-			position: relative;
-			height: 100%;
-			display: flex;
-			flex-direction: column;
-			background: url( @($"/userimages/{agent.BackgroundGuid}.png") );
-			background-size: cover;
-			background-position: center;
-		}
-
-		/* 聊天信息栏 */
-		#chat-info {
-		position: absolute; /* 固定在父级容器的左上角 */
-		top: 0;
-		left: 0;
-		padding: 10px;
-		z-index: 100;
-		width: 100%;
-		}
-
-		/* 聊天主区域 */
-		#chat-main {
-		flex: 1; /* 占据剩余空间 */
-		overflow-y: auto; /* 允许垂直滚动 */
-		padding: 20px;
-		margin-top: 80px; /* 为 #chat-info 预留空间 */
-		margin-bottom: 100px; /* 为 #input-box 预留空间 */
-		box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-		}
-
-		/* 输入框 */
-		#input-box {
-		position: absolute; /* 固定在父级容器的左下角 */
-		bottom: 0;
-		left: 0;
-		width: 100%;
-		padding: 15px;
-		z-index: 100;
-		box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-		}
-
-		/* 回到底部按钮 */
-		#scroll-to-bottom-btn {
-			position: absolute;
-			bottom: 120px;
-			left: 50%;
-			transform: translateX(-50%);
-			z-index: 200;
-			width: 40px;
-			height: 40px;
-			border-radius: 50%;
-			border: none;
-			background-color: var(--color-primary);
-			color: var(--color-text-on-primary);
-			cursor: pointer;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			box-shadow: var(--shadow-md);
-			transition: var(--transition);
-		}
-
-		#scroll-to-bottom-btn:hover {
-			background-color: var(--color-primary-dark);
-			box-shadow: var(--shadow-lg);
-		}
-
-		#input-box > textarea{
-			width : 100%;
-			border : none;
-			resize: none;
-			border-radius: 15px;
-			padding: 5px;
-		}
-
-		/* 打字指示器动画 */
-		.shimmer-typing-indicator {
-			display: inline-block;
-			animation: blink 1s infinite;
-			font-weight: bold;
-			font-size: 1.2em;
-		}
-
-		@@keyframes blink {
-			0%, 50% { opacity: 1; }
-			51%, 100% { opacity: 0; }
-		}
-
-		.shimmer-message {
-			padding: 16px;
-			border-radius: var(--radius-lg);
-			margin: 8px 0;
-			max-width: 100%;
-			word-break: break-word;
-			background-color: var(--color-card);
-			border: 1px solid var(--color-border);
-			box-shadow: var(--shadow-sm);
-			transition: var(--transition);
-		}
-
-				.shimmer-message:hover {
-					box-shadow: var(--shadow-md);
-				}
-
-		/* 消息头部 */
-		.shimmer-message-head {
-			font-size: 1.2rem;
-			font-weight: 600;
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			margin-bottom: 12px;
-			color: var(--color-text-primary);
-		}
-
-		/* 消息操作按钮 */
-		.shimmer-message-head-action {
-			font-size: 1rem;
-			display: flex;
-			gap: 12px;
-			cursor: pointer;
-			user-select: none;
-		}
-
-				.shimmer-message-head-action button {
-					background: none;
-					border: none;
-					color: var(--color-text-secondary);
-					cursor: pointer;
-					padding: 4px 8px;
-					border-radius: var(--radius-md);
-					transition: var(--transition);
-				}
-
-						.shimmer-message-head-action button:hover {
-						background-color: var(--color-surface);
-						color: var(--color-primary);
-					}
-
-		/* 思考中消息样式 */
-		.shimmer-message-thinking {
-			backdrop-filter: blur(10px);
-			background-color: var(--color-primary-light);
-			border-radius: var(--radius-lg);
-			padding: 20px;
-			border: 1px solid var(--color-primary-light);
-			color: var(--color-text-primary);
-		}
-
-		/* 工具调用样式 */
-		.shimmer-toolcall {
-			backdrop-filter: blur(10px);
-			background-color: var(--color-surface);
-			border: 1px solid var(--color-border);
-			border-radius: var(--radius-lg);
-			padding: 20px;
-			margin: 12px 0;
-			box-shadow: var(--shadow-sm);
-		}
-	</style>
 }
 
 @if(chat == null)
 {
-	<p>Chat @AgentGuid / @ChatGuid Not Found</p>
+	<p>@Loc.Format("chat.not_found", AgentGuid, ChatGuid)</p>
 }
 
 @code {
@@ -251,8 +109,10 @@
 	/// 指向聊天容器，用于在生成时自动滚动到底部 <see cref="AddLLMReplyStream"/> <see cref="MiscSettingsPage._autoScrollDown"/>
 	/// </summary>
 	ElementReference ChatMainElement;
+	ElementReference inputArea;
 
 	bool generating = false; // 表示当前是否在生成中
+	string? generationPhase = null; // 当前生成阶段：pre / gen / post
 	CancellationTokenSource? cts; // 用于取消生成任务的令牌源
 	private Agent? agent; // 当前对话所属的Agent引用
 	private Chat? chat; // 当前对话的引用
@@ -274,14 +134,11 @@
 	#region 交互
 	private bool _skipNextInput;
 
-	private void OnInput(ChangeEventArgs e)
+	private async void OnInputResize(ChangeEventArgs e)
 	{
-		if (_skipNextInput)
-		{
-			_skipNextInput = false;
-			return; // 直接丢弃 keydown 后的 oninput 覆盖
-		}
+		if (_skipNextInput) { _skipNextInput = false; return; }
 		inputText = e.Value?.ToString() ?? string.Empty;
+		await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
 	}
 	async Task CheckEnter(KeyboardEventArgs e)
 	{
@@ -293,6 +150,14 @@
 	}
 	async Task OnClickStopGenerationButton()
 	{
+		var postProcessing = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.PostProcessing);
+		if (postProcessing != null)
+		{
+			var confirmed = await popupService.ShowAsync(
+				Loc["chat.stop_post_processing_warn"],
+				Loc["chat.stop_warn_title"], showCancel: true);
+			if (!confirmed) return;
+		}
 		StopGeneration();
 	}
 	async Task OnClickSendButton()
@@ -385,6 +250,7 @@
 				cts.Cancel();
 				cts.Dispose();
 				cts = null;
+				generationPhase = null;
 
 				// 标记当前AI消息为完成状态
 				var generatingMessage = GetGeneratingMessage();
@@ -404,7 +270,7 @@
 				}
 				else
 				{
-					popupService.ShowAsync(ex.Message, "停止生成时出错");
+					popupService.ShowAsync(ex.Message, Loc["chat.stop_error"]);
 				}
 			}
 		}
@@ -415,6 +281,7 @@
 			return;
 
 		generating = true;
+		generationPhase = "pre";
 
 		// 创建新的CancellationTokenSource
 		cts = new CancellationTokenSource();
@@ -422,18 +289,17 @@
 
 		try
 		{
-			await aiGenerationService.GenerateAIResponseStreamAsync(
+			await generationManager.GenerateStreamAsync(
 				agent, chat,
-				// 处理流式响应的函数
-				handleStreamResponses: async (responseStream) =>
+				onStreamDelta: async (accumulated) =>
 				{
-					// 查找是否有正在重新生成的消息（Regenerating 状态）
+					generationPhase = "gen";
+					// 在第一个 delta 时创建消息
 					var regeneratingMessage = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Regenerating);
 					Message generatingMessage;
 
 					if (regeneratingMessage != null)
 					{
-						// 重新生成场景：清空内容后转为 Generating 状态
 						generatingMessage = regeneratingMessage;
 						if (generatingMessage.CurrentVersion != null)
 						{
@@ -446,62 +312,70 @@
 					}
 					else
 					{
-						// 创建新的AI消息
-						generatingMessage = new Message
+						var existingGenerating = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Generating);
+						if (existingGenerating != null)
 						{
-							message = new SharperLLM.Util.ChatMessage{ Content = "", thinking = string.Empty},
-							timestamp = DateTime.Now,
-							sender = ShimmerChatLib.Sender.AI,
-							GenerationState = MessageGenerationState.Generating
-						};
-						messages.Add(generatingMessage);
-						chat.SaveMessage(messageStore, generatingMessage);
+							generatingMessage = existingGenerating;
+						}
+						else
+						{
+							generatingMessage = new Message
+							{
+								message = new SharperLLM.Util.ChatMessage{ Content = "", thinking = string.Empty},
+								timestamp = DateTime.Now,
+								sender = ShimmerChatLib.Sender.AI,
+								GenerationState = MessageGenerationState.Generating
+							};
+							messages.Add(generatingMessage);
+							chat.SaveMessage(messageStore, generatingMessage);
+						}
+					}
+
+					// 更新消息内容
+					if (!string.IsNullOrEmpty(accumulated.Body.Content))
+					{
+						if (generatingMessage.CurrentVersion != null)
+							generatingMessage.CurrentVersion.Content = accumulated.Body.Content;
+						else
+							generatingMessage.message = new SharperLLM.Util.ChatMessage { Content = accumulated.Body.Content };
+					}
+
+					if (accumulated.Body.thinking != null)
+					{
+						if (generatingMessage.CurrentVersion != null)
+							generatingMessage.CurrentVersion.thinking = accumulated.Body.thinking;
+						else if (generatingMessage.message != null)
+							generatingMessage.message.thinking = accumulated.Body.thinking;
+					}
+
+					if (accumulated.Body.toolCalls != null)
+					{
+						if (generatingMessage.CurrentVersion != null)
+							generatingMessage.CurrentVersion.toolCalls = accumulated.Body.toolCalls;
+						else if (generatingMessage.message != null)
+							generatingMessage.message.toolCalls = accumulated.Body.toolCalls;
+					}
+
+					if (autoScrollDown && isUserAtBottom)
+					{
+						await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
 					}
 
 					await InvokeAsync(StateHasChanged);
-
-					await foreach (var rsp in responseStream.WithCancellation(cancellationToken))
+				},
+				onAssistantComplete: async (accumulated) =>
+				{
+					generationPhase = null;
+					var generatingMessage = messages.FirstOrDefault(m => m.IsGenerating);
+					if (generatingMessage != null)
 					{
-						// 流式响应更新
-						// 更新消息内容
-						if (!string.IsNullOrEmpty(rsp.Body.Content))
-						{
-							if (generatingMessage.CurrentVersion != null)
-								generatingMessage.CurrentVersion.Content = rsp.Body.Content;
-							else
-								generatingMessage.message = new SharperLLM.Util.ChatMessage { Content = rsp.Body.Content };
-						}
-
-						// 如果有思考内容，更新思考内容
-						if (rsp.Body.thinking != null)
-						{
-							if (generatingMessage.CurrentVersion != null)
-								generatingMessage.CurrentVersion.thinking = rsp.Body.thinking;
-							else if (generatingMessage.message != null)
-								generatingMessage.message.thinking = rsp.Body.thinking;
-						}
-
-						if (rsp.Body.toolCalls != null)
-						{
-							if (generatingMessage.CurrentVersion != null)
-								generatingMessage.CurrentVersion.toolCalls = rsp.Body.toolCalls;
-							else if (generatingMessage.message != null)
-								generatingMessage.message.toolCalls = rsp.Body.toolCalls;
-						}
-
-						if (autoScrollDown && isUserAtBottom)
-						{
-							await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
-						}
-
-						// 立即触发UI刷新，确保流式内容实时显示
-						await InvokeAsync(StateHasChanged);
+						// 同步后生成管线修改过的内容（流式阶段复制的是原始内容）
+						if (generatingMessage.CurrentVersion != null)
+							generatingMessage.CurrentVersion.Content = accumulated.Body.Content;
+						generatingMessage.GenerationState = MessageGenerationState.Completed;
+						chat.SaveMessage(messageStore, generatingMessage);
+						ChatPluginPanelContainer?.OnAgentMessage(generatingMessage);
 					}
-
-					// 流式响应结束，标记为完成状态
-					generatingMessage.GenerationState = MessageGenerationState.Completed;
-					chat.SaveMessage(messageStore, generatingMessage);
-					ChatPluginPanelContainer?.OnAgentMessage(generatingMessage);
 					await InvokeAsync(StateHasChanged);
 				},
 				// 处理工具调用的回调
@@ -532,15 +406,24 @@
 					// 触发UI刷新
 					InvokeAsync(StateHasChanged);
 				},
+				onPostGenerationStarted: async () =>
+				{
+					generationPhase = "post";
+					var msg = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.Generating);
+					if (msg != null) msg.GenerationState = MessageGenerationState.PostProcessing;
+					await InvokeAsync(StateHasChanged);
+				},
 				cancellationToken
 			);
 		}
 		catch (OperationCanceledException)
 		{
+			generationPhase = null;
 			// 操作被用户取消，这是预期行为，不需要显示错误
 		}
 		catch (Exception ex)
 		{
+			generationPhase = null;
 			// 发生错误时，标记所有生成中的消息为完成状态
 			foreach (var msg in messages.Where(m => m.IsGenerating))
 			{
@@ -553,7 +436,7 @@
 			}
 			else
 			{
-				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
+				await popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", Loc.Format("chat.gen_error", ex.Source ?? "[NULL]"));
 			}
 		}
 		finally
@@ -578,6 +461,7 @@
 			return;
 
 		generating = true;
+		generationPhase = "pre";
 
 		// 创建新的CancellationTokenSource
 		cts = new CancellationTokenSource();
@@ -585,50 +469,52 @@
 
 		try
 		{
-			await aiGenerationService.GenerateContinuationStreamAsync(
+			continuationMessage.GenerationState = MessageGenerationState.Generating;
+			string originalContent = continuationMessage.CurrentVersion?.Content ?? "";
+
+			await generationManager.GenerateStreamAsync(
 				agent, chat,
-				continuationMessage,
-				// 处理流式响应的函数
-				handleStreamResponses: async (responseStream) =>
+				onStreamDelta: async (accumulated) =>
 				{
-					// 使用现有的消息进行继续生成
-					continuationMessage.GenerationState = MessageGenerationState.Generating;
-
-					// 保存原始内容
-					string originalContent = continuationMessage.CurrentVersion?.Content ?? "";
-
-					await InvokeAsync(StateHasChanged);
-
-					await foreach (var rsp in responseStream.WithCancellation(cancellationToken))
+					generationPhase = "gen";
+					// 将新内容追加到原始内容后面
+					if (!string.IsNullOrEmpty(accumulated.Body.Content))
 					{
-						// 流式响应更新 - 将新内容追加到原始内容后面
-						if (!string.IsNullOrEmpty(rsp.Body.Content))
-						{
-							if (continuationMessage.CurrentVersion != null)
-								continuationMessage.CurrentVersion.Content = originalContent + rsp.Body.Content;
-						}
-
-						// 如果有思考内容，更新思考内容
-						if (rsp.Body.thinking != null)
-						{
-							if (continuationMessage.CurrentVersion != null)
-								continuationMessage.CurrentVersion.thinking = rsp.Body.thinking;
-						}
-
-						if (autoScrollDown && isUserAtBottom)
-						{
-							await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
-						}
-
-						// 立即触发UI刷新，确保流式内容实时显示
-						await InvokeAsync(StateHasChanged);
+						if (continuationMessage.CurrentVersion != null)
+							continuationMessage.CurrentVersion.Content = originalContent + accumulated.Body.Content;
 					}
 
-					// 流式响应结束，标记为完成状态
+					if (accumulated.Body.thinking != null)
+					{
+						if (continuationMessage.CurrentVersion != null)
+							continuationMessage.CurrentVersion.thinking = accumulated.Body.thinking;
+					}
+
+					if (autoScrollDown && isUserAtBottom)
+					{
+						await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+					}
+
+					await InvokeAsync(StateHasChanged);
+				},
+				onAssistantComplete: async (accumulated) =>
+				{
+					generationPhase = null;
+					// 同步后生成管线修改过的内容（需保留原始前缀）
+					if (continuationMessage.CurrentVersion != null)
+						continuationMessage.CurrentVersion.Content = originalContent + accumulated.Body.Content;
 					continuationMessage.GenerationState = MessageGenerationState.Completed;
 					continuationMessage.IsContinuation = false;
 					chat.SaveMessage(messageStore, continuationMessage);
 					ChatPluginPanelContainer?.OnAgentMessage(continuationMessage);
+					await InvokeAsync(StateHasChanged);
+				},
+				onToolCall: null!,
+				onToolResult: null!,
+				onPostGenerationStarted: async () =>
+				{
+					generationPhase = "post";
+					continuationMessage.GenerationState = MessageGenerationState.PostProcessing;
 					await InvokeAsync(StateHasChanged);
 				},
 				cancellationToken
@@ -636,10 +522,14 @@
 		}
 		catch (OperationCanceledException)
 		{
+			generationPhase = null;
+			continuationMessage.IsContinuation = false;
 			// 操作被用户取消，这是预期行为，不需要显示错误
 		}
 		catch (Exception ex)
 		{
+			generationPhase = null;
+			continuationMessage.IsContinuation = false;
 			// 发生错误时，标记所有生成中的消息为完成状态
 			foreach (var msg in messages.Where(m => m.IsGenerating))
 			{
@@ -652,7 +542,7 @@
 			}
 			else
 			{
-				popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", $"生成时出错！{ex.Source}");
+				await popupService.ShowAsync($"{ex.Message} \n {ex.InnerException?.Message ?? ""}", Loc.Format("chat.gen_error", ex.Source ?? "[NULL]"));
 			}
 		}
 		finally
@@ -686,13 +576,24 @@
 	}
 	async Task DeleteMessage(Message message)
 	{
-		// 如果删除的是当前正在生成的消息，先取消生成
-		if (message.IsGenerating)
-		{
-			StopGeneration();
-		}
-
+		if (message.IsGenerating) StopGeneration();
 		chat?.DeleteMessage(messageStore, message);
+		GetDirty();
+		await Refresh();
+	}
+	async Task DeleteMessagesFrom(Message message)
+	{
+		var count = messages.Count - messages.IndexOf(message) - 1;
+		var confirmed = await popupService.ShowAsync(
+			string.Format(Loc["POPUP_DELETE_FROM"], count),
+			Loc["POPUP_DELETE_FROM_TITLE"], showCancel: true);
+		if (!confirmed) return;
+
+		if (message.IsGenerating) StopGeneration();
+		var idx = messages.IndexOf(message);
+		if (idx < 0) return;
+		for (int i = messages.Count - 1; i >= idx; i--)
+			chat?.DeleteMessage(messageStore, messages[i]);
 		GetDirty();
 		await Refresh();
 	}
@@ -869,13 +770,13 @@
 				};
 
 				// 调用JavaScript中的通知函数
-				await JS.InvokeVoidAsync("showNotification", $"来自 {agent?.Name} 的新消息", notificationOptions);
+				await JS.InvokeVoidAsync("showNotification", Loc.Format("chat.new_message_notification", agent?.Name ?? "No Name"), notificationOptions);
 			}
 		}
 		catch (Exception ex)
 		{
 			// 如果通知失败，记录错误但不中断程序
-			Console.WriteLine($"显示通知时出错: {ex.Message}");
+			logger.LogError($"显示通知时出错: {ex.Message}");
 		}
 	}
 	void GetDirty()

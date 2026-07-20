@@ -1,0 +1,49 @@
+.plugin-panel-container {
+        padding: var(--su-space-4);
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--su-space-4);
+    }
+
+    .panel-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--su-text-0);
+        margin: 0;
+    }
+
+    .panel-content {
+        min-height: 400px;
+        background-color: var(--su-surface-1);
+        border: 1px solid var(--su-border-0);
+        border-radius: var(--su-radius-lg);
+        padding: var(--su-space-4);
+        box-shadow: var(--su-shadow-sm);
+    }
+
+    .panel-not-found {
+        text-align: center;
+        padding: var(--su-space-6) var(--su-space-4);
+    }
+
+    .panel-error-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--su-danger);
+        margin-bottom: var(--su-space-4);
+    }
+
+    .panel-error-message {
+        background-color: var(--su-danger-soft);
+        color: var(--su-danger);
+        padding: var(--su-space-4);
+        border-radius: var(--su-radius-lg);
+        margin-bottom: var(--su-space-4);
+        border: 1px solid var(--su-border-0);
+    }

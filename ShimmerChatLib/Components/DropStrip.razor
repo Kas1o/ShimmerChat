@@ -1,0 +1,54 @@
+@* Reusable drop-zone strip for tree node lists.
+   Place between child nodes to allow drag-and-drop insertion at a specific index.
+   Usage in custom editors:
+     <DropStrip TargetList="@myChildList" InsertIndex="0" />
+     <TreeEditor Node="@child0" ParentList="@myChildList" ... />
+     <DropStrip TargetList="@myChildList" InsertIndex="1" />
+     ...
+*@
+@using System.Collections
+
+<div class="tn-drop-strip @(_active ? "tn-drop-strip-active" : "")"
+     @ondragover="OnDragOver" @ondragover:preventDefault
+     @ondragleave="OnDragLeave" @ondrop="OnDrop">
+</div>
+
+@code {
+    /// <summary>The list to insert into on drop (non-generic IList to support any ITreeNode list type).</summary>
+    [Parameter] public required IList TargetList { get; set; }
+
+    /// <summary>The index at which to insert the dragged node.</summary>
+    [Parameter] public int InsertIndex { get; set; }
+
+    [CascadingParameter] public TreeDragContext? DragContext { get; set; }
+
+    private bool _active;
+
+    private void OnDragOver(DragEventArgs e)
+    {
+        if (DragContext?.IsDragging != true) return;
+
+        e.DataTransfer.DropEffect = "move";
+        _active = true;
+    }
+
+    private void OnDragLeave()
+    {
+        _active = false;
+    }
+
+    private async Task OnDrop(DragEventArgs e)
+    {
+        _active = false;
+        if (DragContext?.IsDragging != true) return;
+
+        try
+        {
+            await DragContext.CommitDrop(TargetList, InsertIndex);
+        }
+        catch
+        {
+            DragContext?.EndDrag();
+        }
+    }
+}

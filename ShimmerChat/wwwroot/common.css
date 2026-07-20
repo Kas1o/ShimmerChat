@@ -1,350 +1,133 @@
-/* 可复用组件定义 */
+/* ── ShimmerChat App Styles ────────────────────────
+   Reset, base elements, and app-specific components.
+   Generic components are in shimmer-ui.css.
+   All variables from --su-* / --node-* tokens.          */
 
-/* 卡片组样式 */
-.shimmer-group {
-    border-radius: var(--radius-lg);
-    border: var(--border-size) solid var(--color-border);
-    background-color: var(--color-card);
-    padding: 16px;
-    margin: 12px 0;
-    transition: var(--transition);
-    box-shadow: var(--shadow-sm);
+/* ── Reset ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    margin: 0; padding: 0;
+    height: 100%; width: 100%; overflow: hidden;
+    font-family: var(--su-font-sans);
+    font-size: var(--su-font-base);
+    color: var(--su-text-0);
+    background: var(--su-surface-0);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-.shimmer-group:hover {
-    border-color: var(--color-border-hover);
-    box-shadow: var(--shadow-md);
-}
+#app { height: 100vh; width: 100vw; overflow: hidden; }
 
+/* ── Base elements ─────────────────────────────── */
+a { color: var(--su-accent); text-decoration: none; transition: color var(--su-transition); }
+a:hover { color: var(--su-accent-hover); }
+h1,h2,h3,h4,h5,h6 { color: var(--su-text-0); font-weight: 600; margin-bottom: var(--su-space-4); }
+h1:focus { outline: none; }
 
-/* 输入框样式 */
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--su-border-0); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--su-text-2); }
+
+/* ── App-specific: shimmer-input / shimmer-textarea ──
+   Used in AgentPage.razor.css scoped selectors.          */
 .shimmer-input {
-    display: block;
-    width: 100%;
-    padding: 0.5rem 2.5rem 0.5rem 1rem;
-    font-size: 1rem;
-    font-weight: 400;
-    line-height: 1.5;
-    color: var(--color-text-primary);
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    transition: var(--transition);
-    background-image: none;
+    display: block; width: 100%;
+    padding: 6px 10px;
+    font-size: var(--su-font-base); font-weight: 400; line-height: 1.5;
+    color: var(--su-text-0);
+    background: var(--su-surface-1);
+    border: var(--su-border-size) solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+    transition: border-color var(--su-transition), box-shadow var(--su-transition);
+    outline: none; appearance: none;
 }
-
 .shimmer-input:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-light);
+    border-color: var(--su-accent);
+    box-shadow: 0 0 0 3px var(--su-accent-soft);
 }
 
-/* 文本域样式 */
 .shimmer-textarea {
-    display: block;
-    width: 100%;
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    font-weight: 400;
-    line-height: 1.5;
-    color: var(--color-text-primary);
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    transition: var(--transition);
-    resize: vertical;
-    overflow: auto;
-    min-height: 120px;
-}
-
-.shimmer-textarea:focus {
+    display: block; width: 100%; min-height: 120px;
+    padding: 6px 10px;
+    font-size: var(--su-font-base); font-weight: 400; line-height: 1.5;
+    color: var(--su-text-0);
+    background: var(--su-surface-1);
+    border: var(--su-border-size) solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+    transition: border-color var(--su-transition), box-shadow var(--su-transition);
     outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(123, 52, 235, 0.2);
+    resize: vertical; overflow: auto;
+}
+.shimmer-textarea:focus {
+    border-color: var(--su-accent);
+    box-shadow: 0 0 0 3px var(--su-accent-soft);
 }
 
-/* 网格布局 */
-.shimmer-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, 280px);
-    gap: 16px;
-    margin: 16px;
-    justify-content: center;
-}
-
-/* 网格项样式 */
+/* ── App-specific: shimmer-grid-item ──────────────
+   Used in AgentSelectPage.razor.css scoped selectors.    */
 .shimmer-grid-item {
-    border-radius: var(--radius-lg);
+    border-radius: var(--su-radius-lg);
     cursor: pointer;
-    border: 1px solid var(--color-border);
-    padding: 24px;
+    border: var(--su-border-size) solid var(--su-border-0);
+    padding: var(--su-space-6);
     text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     min-height: 120px;
-    box-sizing: border-box;
-    font-size: 1.1rem;
-    font-weight: 500;
-    transition: var(--transition);
-    background-color: var(--color-card);
-    color: var(--color-text-primary);
-    position: relative;
+    font-size: var(--su-font-md); font-weight: 500;
+    background: var(--su-surface-1);
+    color: var(--su-text-0);
+    transition: transform var(--su-transition), box-shadow var(--su-transition), border-color var(--su-transition);
 }
-
 .shimmer-grid-item:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-    border-color: var(--color-primary);
+    box-shadow: var(--su-shadow-md);
+    border-color: var(--su-accent);
 }
 
-/* 阴影框样式 */
-.shimmer-shadow-box {
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
-    padding: 16px;
-    transition: var(--transition);
+/* ── Animations ────────────────────────────────── */
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
 }
 
-.shimmer-shadow-box:hover {
-    box-shadow: var(--shadow-lg);
-}
-
-
-/* 错误提示UI */
-.shimmer-error-ui {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 5000;
-    width: 100%;
-    max-width: 400px;
-    pointer-events: none;
-}
-
-.shimmer-error-content {
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-error);
-    border-radius: var(--radius-lg);
-    padding: 16px;
-    box-shadow: var(--shadow-lg);
-    pointer-events: auto;
-}
-
-.shimmer-error-content h3 {
-    margin: 0 0 8px 0;
-    color: var(--color-error);
-    font-size: 1.1rem;
-}
-
-.shimmer-error-content p {
-    margin: 0 0 16px 0;
-    color: var(--color-text-secondary);
-    font-size: 0.95rem;
-}
-
-.shimmer-error-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-}
-
-/* 按钮样式增强 */
-.btn-primary {
-    background-color: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
-}
-
-.btn-primary:hover {
-    background-color: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
-}
-
-.btn-secondary {
-    background-color: var(--color-secondary);
-    border-color: var(--color-secondary);
-    color: white;
-}
-
-.btn-secondary:hover {
-    background-color: var(--color-border-hover);
-    border-color: var(--color-border-hover);
-}
-
-/* 卡片组件样式 */
-.shimmer-card {
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: 24px;
-    margin-bottom: 16px;
-    box-shadow: var(--shadow-sm);
-    transition: var(--transition);
-}
-
-.shimmer-card:hover {
-    box-shadow: var(--shadow-md);
-    border-color: var(--color-border-hover);
-}
-
-.shimmer-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-}
-
-.shimmer-card-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    margin: 0;
-}
-
-/* 表单组件样式增强 */
-.form-control {
-    background-color: var(--color-surface);
-    border-color: var(--color-border);
-    color: var(--color-text-primary);
-}
-
-.form-control:focus {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(123, 52, 235, 0.2);
-    background-color: var(--color-surface);
-    color: var(--color-text-primary);
-}
-
-/* 加载动画 */
 .shimmer-loading {
-    position: relative;
-    overflow: hidden;
-    background-color: var(--color-surface);
+    position: relative; overflow: hidden;
+    background: var(--su-surface-3);
 }
-
 .shimmer-loading::after {
     content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    position: absolute; inset: 0;
     transform: translateX(-100%);
     background-image: linear-gradient(
         90deg,
-        rgba(255, 255, 255, 0) 0,
-        rgba(255, 255, 255, 0.2) 20%,
-        rgba(255, 255, 255, 0.5) 60%,
-        rgba(255, 255, 255, 0)
+        rgba(255,255,255,0) 0,
+        rgba(255,255,255,0.15) 20%,
+        rgba(255,255,255,0.4) 60%,
+        rgba(255,255,255,0)
     );
     animation: shimmer 2s infinite;
 }
+.shimmer-fade-in { animation: fadeIn 0.25s ease-out; }
+.animate-pulse   { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
 
-@keyframes shimmer {
-    100% {
-        transform: translateX(100%);
-    }
-}
+/* ── Validation ────────────────────────────────── */
+.valid.modified:not([type=checkbox]) { outline: 1px solid var(--su-success); border-color: var(--su-success); }
+.invalid                             { outline: 1px solid var(--su-danger);  border-color: var(--su-danger); }
+.validation-message                  { color: var(--su-danger); font-size: var(--su-font-sm); margin-top: 2px; }
+.text-required                       { color: var(--su-danger); font-weight: bold; }
 
-/* 动画效果 */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.shimmer-fade-in {
-    animation: fadeIn 0.3s ease-out;
-}
-
-/* 版本切换相关样式 */
-.version-indicator {
-    background-color: var(--color-primary-light);
-    color: var(--color-text-on-primary);
-    border-radius: 12px;
-    padding: 2px 8px;
-    font-size: 0.8rem;
-    margin-left: 8px;
-    vertical-align: middle;
-}
-
-/* ToolManager 页面特定样式 */
-.alert-custom {
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-lg);
-    color: var(--color-text-primary);
-}
-
-.alert-custom-test {
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-lg);
-    color: var(--color-text-primary);
-}
-
-.text-required {
-    color: var(--color-error);
-    font-weight: bold;
-}
-
-.result-output {
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    padding: var(--spacing-md);
-    color: var(--color-text-primary);
-    white-space: pre-wrap;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.version-navigation {
-    display: inline-flex;
-    align-items: center;
-    margin-right: 12px;
-}
-
-.version-btn {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 0.9rem;
-    margin: 0 2px;
-    transition: var(--transition);
-    color: var(--color-text-secondary);
-}
-
-.version-btn:hover:not(:disabled) {
-    background-color: var(--color-primary);
-    color: var(--color-text-on-primary);
-    border-color: var(--color-primary);
-}
-
-.version-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+/* ── Pages that need full-bleed backgrounds ──────
+   Used by MainLayout via .shimmer-content class.        */
+.shimmer-content:has(#bg-region),
+.shimmer-content:has(.chat-page),
+.shimmer-content:has(.agent-page-container) {
+    padding: 0 !important;
 }

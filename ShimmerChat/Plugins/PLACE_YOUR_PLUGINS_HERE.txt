@@ -1,0 +1,2 @@
+为每个插件准备单独的文件夹
+make folders for each plugins.

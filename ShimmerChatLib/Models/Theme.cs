@@ -1,227 +1,97 @@
 using Newtonsoft.Json;
-using System.Text.Json.Serialization;
 
 namespace ShimmerChatLib.Models
 {
-    /// <summary>
-    /// 主题模型
-    /// </summary>
     public class Theme
     {
-        /// <summary>
-        /// 主题ID
-        /// </summary>
-        [JsonProperty("id")]
-        public string Id { get; set; }
+        // ── Identity ──────────────────────────────────────
+        [JsonProperty("id")]          public string Id { get; set; }
+        [JsonProperty("name")]        public string Name { get; set; }
+        [JsonProperty("description")] public string? Description { get; set; }
+        [JsonProperty("isDefault")]   public bool IsDefault { get; set; }
+        [JsonProperty("isBuiltIn")]   public bool IsBuiltIn { get; set; }
+        [JsonProperty("isDarkMode")]  public bool IsDarkMode { get; set; }
 
-        /// <summary>
-        /// 主题名称
-        /// </summary>
-        [JsonProperty("name")]
-        public string Name { get; set; }
+        // ── Surface 层级 (0=页面底, 1=卡片/面板, 2=弹窗/悬浮, 3=输入框/交替底) ──
+        [JsonProperty("surface0")] public string Surface0 { get; set; } = "#f8f9fa";
+        [JsonProperty("surface1")] public string Surface1 { get; set; } = "#ffffff";
+        [JsonProperty("surface2")] public string Surface2 { get; set; } = "#ffffff";
+        [JsonProperty("surface3")] public string Surface3 { get; set; } = "#f1f3f5";
 
-        /// <summary>
-        /// 主题描述
-        /// </summary>
-        [JsonProperty("description")]
-        public string? Description { get; set; }
+        // ── Text 层级 (0=主, 1=次, 2=辅助/占位) ──
+        [JsonProperty("text0")] public string Text0 { get; set; } = "#11181c";
+        [JsonProperty("text1")] public string Text1 { get; set; } = "#4a5568";
+        [JsonProperty("text2")] public string Text2 { get; set; } = "#8896a4";
 
-        /// <summary>
-        /// 是否为默认主题
-        /// </summary>
-        [JsonProperty("isDefault")]
-        public bool IsDefault { get; set; }
+        // ── Border 层级 ──
+        [JsonProperty("border0")] public string Border0 { get; set; } = "#e2e8f0";
+        [JsonProperty("border1")] public string Border1 { get; set; } = "#edf2f7";
 
-        /// <summary>
-        /// 是否为内置主题（不可删除）
-        /// </summary>
-        [JsonProperty("isBuiltIn")]
-        public bool IsBuiltIn { get; set; }
+        // ── Accent ──
+        [JsonProperty("accent")]      public string Accent { get; set; }      = "#5e6ad2";
+        [JsonProperty("accentHover")] public string AccentHover { get; set; } = "#4f5ac7";
+        [JsonProperty("accentSoft")]  public string AccentSoft { get; set; }  = "#f0f1fd";
 
-        // 颜色变量
-        [JsonProperty("colorPrimary")]
-        public string ColorPrimary { get; set; } = "#ffa200";
+        // ── Semantic ──
+        [JsonProperty("success")]     public string Success { get; set; }     = "#2da44e";
+        [JsonProperty("successSoft")] public string SuccessSoft { get; set; } = "#e6f4ea";
+        [JsonProperty("warning")]     public string Warning { get; set; }     = "#d97706";
+        [JsonProperty("warningSoft")] public string WarningSoft { get; set; } = "#fef3c7";
+        [JsonProperty("danger")]      public string Danger { get; set; }      = "#cf222e";
+        [JsonProperty("dangerSoft")]  public string DangerSoft { get; set; }  = "#fde8e8";
+        [JsonProperty("info")]        public string Info { get; set; }        = "#2563eb";
+        [JsonProperty("infoSoft")]    public string InfoSoft { get; set; }    = "#eff6ff";
 
-        [JsonProperty("colorPrimaryHover")]
-        public string ColorPrimaryHover { get; set; } = "#ff7300";
+        // ── Node 语义色 ──
+        [JsonProperty("nodeFlow")]     public string NodeFlow { get; set; }     = "#3b82f6";
+        [JsonProperty("nodeBranch")]   public string NodeBranch { get; set; }   = "#f59e0b";
+        [JsonProperty("nodeLink")]     public string NodeLink { get; set; }     = "#10b981";
+        [JsonProperty("nodeFragment")] public string NodeFragment { get; set; } = "#6366f1";
+        [JsonProperty("nodePrompt")]   public string NodePrompt { get; set; }   = "#a855f7";
+        [JsonProperty("nodeTool")]     public string NodeTool { get; set; }     = "#22c55e";
+        [JsonProperty("nodeMemory")]   public string NodeMemory { get; set; }   = "#eab308";
+        [JsonProperty("nodeConfig")]   public string NodeConfig { get; set; }   = "#ef4444";
+        [JsonProperty("nodeSubagent")] public string NodeSubagent { get; set; } = "#ec4899";
+        [JsonProperty("nodeDebug")]    public string NodeDebug { get; set; }    = "#94a3b8";
 
-        [JsonProperty("colorPrimaryActive")]
-        public string ColorPrimaryActive { get; set; } = "#e66300";
+        // ── Shadows ──
+        [JsonProperty("shadowSm")] public string ShadowSm { get; set; } = "0 1px 2px rgba(0,0,0,0.04)";
+        [JsonProperty("shadowMd")] public string ShadowMd { get; set; } = "0 4px 12px rgba(0,0,0,0.06)";
+        [JsonProperty("shadowLg")] public string ShadowLg { get; set; } = "0 12px 32px rgba(0,0,0,0.10)";
 
-        [JsonProperty("colorSecondary")]
-        public string ColorSecondary { get; set; } = "#6b7280";
+        // ── Radii ──
+        [JsonProperty("radiusSm")] public string RadiusSm { get; set; } = "4px";
+        [JsonProperty("radiusMd")] public string RadiusMd { get; set; } = "6px";
+        [JsonProperty("radiusLg")] public string RadiusLg { get; set; } = "10px";
 
-        [JsonProperty("colorSecondaryHover")]
-        public string ColorSecondaryHover { get; set; } = "#565d6e";
+        // ── Spacing (8级) ──
+        [JsonProperty("space1")]  public string Space1 { get; set; }  = "4px";
+        [JsonProperty("space2")]  public string Space2 { get; set; }  = "8px";
+        [JsonProperty("space3")]  public string Space3 { get; set; }  = "12px";
+        [JsonProperty("space4")]  public string Space4 { get; set; }  = "16px";
+        [JsonProperty("space5")]  public string Space5 { get; set; }  = "20px";
+        [JsonProperty("space6")]  public string Space6 { get; set; }  = "24px";
+        [JsonProperty("space8")]  public string Space8 { get; set; }  = "32px";
+        [JsonProperty("space10")] public string Space10 { get; set; } = "40px";
 
-        [JsonProperty("colorSecondaryActive")]
-        public string ColorSecondaryActive { get; set; } = "#4b5563";
+        // ── Typography ──
+        [JsonProperty("fontSans")]  public string FontSans { get; set; }  = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif";
+        [JsonProperty("fontMono")]  public string FontMono { get; set; }  = "'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace";
+        [JsonProperty("fontXs")]    public string FontXs { get; set; }    = "11px";
+        [JsonProperty("fontSm")]    public string FontSm { get; set; }    = "12px";
+        [JsonProperty("fontBase")]  public string FontBase { get; set; }  = "13px";
+        [JsonProperty("fontMd")]    public string FontMd { get; set; }    = "14px";
+        [JsonProperty("fontLg")]    public string FontLg { get; set; }    = "16px";
 
-        [JsonProperty("colorSuccess")]
-        public string ColorSuccess { get; set; } = "#10b981";
+        // ── Misc ──
+        [JsonProperty("borderSize")] public string BorderSize { get; set; } = "1px";
+        [JsonProperty("transition")] public string Transition { get; set; } = "150ms ease";
+        [JsonProperty("customCss")]  public string? CustomCss { get; set; }
 
-        [JsonProperty("colorSuccessHover")]
-        public string ColorSuccessHover { get; set; } = "#0ea570";
+        // ── Timestamps ──
+        [JsonProperty("createdAt")] public DateTime CreatedAt { get; set; }
+        [JsonProperty("updatedAt")] public DateTime UpdatedAt { get; set; }
 
-        [JsonProperty("colorSuccessActive")]
-        public string ColorSuccessActive { get; set; } = "#0d9264";
-
-        [JsonProperty("colorWarning")]
-        public string ColorWarning { get; set; } = "#f59e0b";
-
-        [JsonProperty("colorWarningHover")]
-        public string ColorWarningHover { get; set; } = "#d97706";
-
-        [JsonProperty("colorWarningActive")]
-        public string ColorWarningActive { get; set; } = "#b45309";
-
-        [JsonProperty("colorDanger")]
-        public string ColorDanger { get; set; } = "#ef4444";
-
-        [JsonProperty("colorDangerHover")]
-        public string ColorDangerHover { get; set; } = "#dc2626";
-
-        [JsonProperty("colorDangerActive")]
-        public string ColorDangerActive { get; set; } = "#b91c1c";
-
-        [JsonProperty("colorInfo")]
-        public string ColorInfo { get; set; } = "#3b82f6";
-
-        [JsonProperty("colorInfoHover")]
-        public string ColorInfoHover { get; set; } = "#2563eb";
-
-        [JsonProperty("colorInfoActive")]
-        public string ColorInfoActive { get; set; } = "#1d4ed8";
-
-        [JsonProperty("colorTextPrimary")]
-        public string ColorTextPrimary { get; set; } = "#111827";
-
-        [JsonProperty("colorTextSecondary")]
-        public string ColorTextSecondary { get; set; } = "#4b5563";
-
-        [JsonProperty("colorTextTertiary")]
-        public string ColorTextTertiary { get; set; } = "#9ca3af";
-
-        [JsonProperty("colorTextInverse")]
-        public string ColorTextInverse { get; set; } = "#ffffff";
-
-        [JsonProperty("colorBgPrimary")]
-        public string ColorBgPrimary { get; set; } = "#ffffff";
-
-        [JsonProperty("colorBgSecondary")]
-        public string ColorBgSecondary { get; set; } = "#f9fafb";
-
-        [JsonProperty("colorBgTertiary")]
-        public string ColorBgTertiary { get; set; } = "#f3f4f6";
-
-        [JsonProperty("colorBgInverse")]
-        public string ColorBgInverse { get; set; } = "#111827";
-
-        [JsonProperty("colorBorderPrimary")]
-        public string ColorBorderPrimary { get; set; } = "#e5e7eb";
-
-        [JsonProperty("colorBorderSecondary")]
-        public string ColorBorderSecondary { get; set; } = "#d1d5db";
-
-        [JsonProperty("colorBorderTertiary")]
-        public string ColorBorderTertiary { get; set; } = "#9ca3af";
-
-        [JsonProperty("colorOverlay")]
-        public string ColorOverlay { get; set; } = "rgba(0, 0, 0, 0.5)";
-
-        [JsonProperty("shadowSm")]
-        public string ShadowSm { get; set; } = "0 1px 2px 0 rgba(0, 0, 0, 0.05)";
-
-        [JsonProperty("shadowBase")]
-        public string ShadowBase { get; set; } = "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)";
-
-        [JsonProperty("shadowMd")]
-        public string ShadowMd { get; set; } = "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)";
-
-        [JsonProperty("shadowLg")]
-        public string ShadowLg { get; set; } = "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)";
-
-        [JsonProperty("shadowXl")]
-        public string ShadowXl { get; set; } = "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)";
-
-        [JsonProperty("shadow2Xl")]
-        public string Shadow2Xl { get; set; } = "0 25px 50px -12px rgba(0, 0, 0, 0.25)";
-
-        [JsonProperty("radiusXs")]
-        public string RadiusXs { get; set; } = "0.125rem";
-
-        [JsonProperty("radiusSm")]
-        public string RadiusSm { get; set; } = "0.25rem";
-
-        [JsonProperty("radiusMd")]
-        public string RadiusMd { get; set; } = "0.375rem";
-
-        [JsonProperty("radiusLg")]
-        public string RadiusLg { get; set; } = "0.5rem";
-
-        [JsonProperty("radiusXl")]
-        public string RadiusXl { get; set; } = "0.75rem";
-
-        [JsonProperty("radius2Xl")]
-        public string Radius2Xl { get; set; } = "1rem";
-
-        [JsonProperty("radius3Xl")]
-        public string Radius3Xl { get; set; } = "1.5rem";
-
-        [JsonProperty("radiusFull")]
-        public string RadiusFull { get; set; } = "9999px";
-
-        [JsonProperty("spacingXs")]
-        public string SpacingXs { get; set; } = "0.25rem";
-
-        [JsonProperty("spacingSm")]
-        public string SpacingSm { get; set; } = "0.5rem";
-
-        [JsonProperty("spacingMd")]
-        public string SpacingMd { get; set; } = "0.75rem";
-
-        [JsonProperty("spacingLg")]
-        public string SpacingLg { get; set; } = "1rem";
-
-        [JsonProperty("spacingXl")]
-        public string SpacingXl { get; set; } = "1.5rem";
-
-        [JsonProperty("spacing2Xl")]
-        public string Spacing2Xl { get; set; } = "2rem";
-
-        [JsonProperty("spacing3Xl")]
-        public string Spacing3Xl { get; set; } = "2.5rem";
-
-        [JsonProperty("borderSize")]
-        public string BorderSize { get; set; } = "1px";
-
-        [JsonProperty("isDarkMode")]
-        public bool IsDarkMode { get; set; } = false;
-
-        [JsonProperty("lightColorFactor")]
-        public double LightColorFactor { get; set; } = 0.5;
-
-        /// <summary>
-        /// 自定义CSS
-        /// </summary>
-        [JsonProperty("customCss")]
-        public string? CustomCss { get; set; }
-
-        /// <summary>
-        /// 创建时间
-        /// </summary>
-        [JsonProperty("createdAt")]
-        public DateTime CreatedAt { get; set; }
-
-        /// <summary>
-        /// 最后修改时间
-        /// </summary>
-        [JsonProperty("updatedAt")]
-        public DateTime UpdatedAt { get; set; }
-
-        /// <summary>
-        /// 构造函数
-        /// </summary>
         public Theme()
         {
             Id = Guid.NewGuid().ToString();
@@ -230,9 +100,6 @@ namespace ShimmerChatLib.Models
             UpdatedAt = DateTime.UtcNow;
         }
 
-        public Theme Clone()
-        {
-            return (Theme)MemberwiseClone();
-        }
+        public Theme Clone() => (Theme)MemberwiseClone();
     }
 }

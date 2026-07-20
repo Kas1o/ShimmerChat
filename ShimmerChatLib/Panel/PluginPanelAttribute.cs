@@ -3,25 +3,26 @@
 namespace ShimmerChatLib.Panel
 {
 	/// <summary>
-	/// 标记插件面板组件的特性
+	/// 标记插件面板组件的特性。
+	/// NameKey / DescriptionKey 均为本地化 Key，由 LocService 解析为显示字符串。
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
 	public class PluginPanelAttribute : Attribute
 	{
 		/// <summary>
-		/// 面板名称
+		/// 面板名称本地化 Key（建议前缀 "panel.xxx"）
 		/// </summary>
-		public string Name { get; }
+		public string NameKey { get; }
 
 		/// <summary>
-		/// 面板描述
+		/// 面板描述本地化 Key（建议前缀 "panel.xxx.desc"）
 		/// </summary>
-		public string Description { get; }
+		public string DescriptionKey { get; }
 
 		/// <summary>
 		/// 面板图标（可选）
 		/// </summary>
-		public string Icon { get; set; }
+		public string? Icon { get; set; }
 
 		/// <summary>
 		/// 面板顺序（用于排序）
@@ -33,12 +34,12 @@ namespace ShimmerChatLib.Panel
 		/// <summary>
 		/// 构造函数
 		/// </summary>
-		/// <param name="name">面板名称</param>
-		/// <param name="description">面板描述</param>
-		public PluginPanelAttribute(string name, string description, PanelDisplayPlace panelDisplayPlace = PanelDisplayPlace.Settings)
+		/// <param name="nameKey">面板名称本地化 Key</param>
+		/// <param name="descriptionKey">面板描述本地化 Key</param>
+		public PluginPanelAttribute(string nameKey, string descriptionKey, PanelDisplayPlace panelDisplayPlace = PanelDisplayPlace.Settings)
 		{
-			Name = name;
-			Description = description;
+			NameKey = nameKey;
+			DescriptionKey = descriptionKey;
 			Order = 0; // 默认顺序
 			PanelDisplayPlace = panelDisplayPlace;
 		}

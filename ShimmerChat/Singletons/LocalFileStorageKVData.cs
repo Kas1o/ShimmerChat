@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using ShimmerChatLib.Interface;
 using System;
 using System.Collections.Generic;
@@ -22,6 +23,7 @@ namespace ShimmerChat.Singletons
     public class LocalFileStorageKVData : IKVDataService
     {
         private readonly string root;
+        private readonly ILogger<LocalFileStorageKVData> _logger;
 
         /// <summary>
         /// 获取根目录路径
@@ -31,11 +33,12 @@ namespace ShimmerChat.Singletons
 		/// <summary>
 		/// 初始化 LocalFileStorageKVData 实例
 		/// </summary>
-		public LocalFileStorageKVData()
+		public LocalFileStorageKVData(ILogger<LocalFileStorageKVData> logger)
         {
             // 创建KV数据存储根目录
             root = Path.Combine(AppContext.BaseDirectory, "KVData");
             InitializeKVDataFolder();
+            _logger = logger;
         }
 
         /// <summary>
@@ -81,17 +84,17 @@ namespace ShimmerChat.Singletons
             }
             catch (UnauthorizedAccessException ex)
             {
-                Console.WriteLine($"Access denied when reading space data: {ex.Message}");
+                _logger.LogWarning(ex, "Access denied when reading space data: {Message}", ex.Message);
                 return null;
             }
             catch (IOException ex)
             {
-                Console.WriteLine($"IO error when reading space data: {ex.Message}");
+                _logger.LogError(ex, "IO error when reading space data: {Message}", ex.Message);
                 return null;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error reading space data: {ex.Message}");
+                _logger.LogError(ex, "Unexpected error reading space data: {Message}", ex.Message);
                 return null;
             }
         }
@@ -129,17 +132,17 @@ namespace ShimmerChat.Singletons
             }
             catch (UnauthorizedAccessException ex)
             {
-                Console.WriteLine($"Access denied when writing space data: {ex.Message}");
+                _logger.LogWarning(ex, "Access denied when writing space data: {Message}", ex.Message);
                 throw new IOException("Access denied when writing space data", ex);
             }
             catch (IOException ex)
             {
-                Console.WriteLine($"IO error when writing space data: {ex.Message}");
+                _logger.LogError(ex, "IO error when writing space data: {Message}", ex.Message);
                 throw;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unexpected error writing space data: {ex.Message}");
+                _logger.LogError(ex, "Unexpected error writing space data: {Message}", ex.Message);
                 throw new IOException("Failed to write space data", ex);
             }
         }

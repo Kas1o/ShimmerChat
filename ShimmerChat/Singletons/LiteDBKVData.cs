@@ -1,4 +1,5 @@
 using LiteDB;
+using Microsoft.Extensions.Logging;
 using ShimmerChatLib.Interface;
 using System;
 using System.IO;
@@ -12,6 +13,7 @@ namespace ShimmerChat.Singletons
     {
         private readonly LiteDatabase _database;
         private readonly ILiteCollection<KVDataEntry> _collection;
+        private readonly ILogger<LiteDBKVData> _logger;
 
         /// <summary>
         /// KV 数据条目实体
@@ -27,9 +29,10 @@ namespace ShimmerChat.Singletons
         /// <summary>
         /// 初始化 LiteDBKVData 实例
         /// </summary>
-        public LiteDBKVData(LiteDatabase database)
+        public LiteDBKVData(LiteDatabase database, ILogger<LiteDBKVData> logger)
         {
             _database = database;
+            _logger = logger;
             _collection = _database.GetCollection<KVDataEntry>("kvdata");
             _collection.EnsureIndex(x => x.SpaceId);
             _collection.EnsureIndex(x => new { x.SpaceId, x.Key }, true);
@@ -55,7 +58,7 @@ namespace ShimmerChat.Singletons
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error reading from LiteDB: {ex.Message}");
+                _logger.LogError(ex, "Error reading from LiteDB: {Message}", ex.Message);
                 return null;
             }
         }
@@ -95,7 +98,7 @@ namespace ShimmerChat.Singletons
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error writing to LiteDB: {ex.Message}");
+                _logger.LogError(ex, "Error writing to LiteDB: {Message}", ex.Message);
                 throw new IOException("Failed to write data to LiteDB", ex);
             }
         }

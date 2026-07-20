@@ -1,17 +1,14 @@
 @page "/pluginpanel/{PanelName}"
 @inject IPluginPanelService PluginPanelService
+@inject ILocService Loc
 
-<PageTitle>插件面板 - @PanelTitle</PageTitle>
+<PageTitle>@(panelType != null ? Loc[PanelName] : Loc["plugin_panel.fallback_title"])</PageTitle>
 
 <div class="plugin-panel-container">
     @if (panelType != null)
     {
         <div class="panel-header">
-            <h1 class="panel-title">@PanelTitle</h1>
-            <button class="btn btn-secondary" @onclick="NavigateBack">
-                <span class="icon-back"></span>
-                返回列表
-            </button>
+            <h1 class="panel-title">@Loc[PanelName]</h1>
         </div>
         <div class="panel-content">
             <DynamicComponent Type="panelType" />
@@ -20,87 +17,22 @@
     else
     {
         <div class="panel-not-found">
-            <h1 class="panel-error-title">面板不存在</h1>
+            <h1 class="panel-error-title">@Loc["plugin_panel.not_found"]</h1>
             <div class="panel-error-message">
-                <p>未找到名称为 "@PanelName" 的插件面板</p>
+                <p>@Loc.Format("plugin_panel.not_found_msg", Loc[PanelName])</p>
             </div>
-            <button class="btn btn-primary" @onclick="NavigateBack">
-                <span class="icon-back"></span>
-                返回面板列表
-            </button>
         </div>
     }
 </div>
 
-<style>
-    .plugin-panel-container {
-        padding: var(--spacing-lg);
-        max-width: 1200px;
-        margin: 0 auto;
-    }
-
-    .panel-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: var(--spacing-lg);
-    }
-
-    .panel-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: var(--color-text-primary);
-        margin: 0;
-    }
-
-    .panel-content {
-        min-height: 400px;
-        background-color: var(--color-card);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-lg);
-        padding: var(--spacing-lg);
-        box-shadow: var(--shadow-sm);
-    }
-
-    .panel-not-found {
-        text-align: center;
-        padding: var(--spacing-xl) var(--spacing-lg);
-    }
-
-    .panel-error-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: var(--color-error);
-        margin-bottom: var(--spacing-lg);
-    }
-
-    .panel-error-message {
-        background-color: var(--color-error-light, rgba(239, 68, 68, 0.1));
-        color: var(--color-error);
-        padding: var(--spacing-lg);
-        border-radius: var(--radius-lg);
-        margin-bottom: var(--spacing-lg);
-        border: 1px solid var(--color-error-border, rgba(239, 68, 68, 0.2));
-    }
-
-    /* 图标样式 */
-    .icon-back::before {
-        content: "←";
-        margin-right: var(--spacing-xs);
-    }
-</style>
 
 @code {
     [Parameter]
     public string PanelName { get; set; } = string.Empty;
-    
-    [Inject]
-    public NavigationManager Navigation { get; set; } = null!;
 
     private Type? panelType;
-    private string PanelTitle => panelType != null ? PanelName : "插件面板";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         // 确保插件面板服务已加载完成
         await Task.Delay(100); // 短暂延迟确保服务初始化
@@ -113,10 +45,5 @@
             PluginPanelService.RefreshPluginPanels();
             panelType = PluginPanelService.GetPluginPanelType(PanelName);
         }
-    }
-    
-    private void NavigateBack()
-    {
-        Navigation.NavigateTo("/pluginpanel");
     }
 }
