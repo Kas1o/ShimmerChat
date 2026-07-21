@@ -173,7 +173,29 @@
                 <label>@Loc["API KEY"]</label>
                 <input type="password" class="shimmer-input" @bind="topAPISetting.OpenAIApiKey" />
                 <label>@Loc["API MODEL"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.OpenAIModel" />
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input class="shimmer-input" style="flex: 1;" @bind="topAPISetting.OpenAIModel" />
+                    <button class="su-btn su-btn-secondary" style="white-space: nowrap;"
+                            disabled="@_isLoadingOpenAIModels" @onclick="FetchOpenAIModels">
+                        @(_isLoadingOpenAIModels ? Loc["Fetching..."] : Loc["Fetch Models"])
+                    </button>
+                </div>
+                @if (_openAIModels is { Count: > 0 })
+                {
+                    <select class="su-select" style="width: 100%; margin-top: 4px;"
+                            @bind:get="_selectedOpenAIModel"
+                            @bind:set="OnOpenAIModelSelected">
+                        <option value="">-- @Loc["Select or type model"] --</option>
+                        @foreach (var m in _openAIModels)
+                        {
+                            <option value="@m">@m</option>
+                        }
+                    </select>
+                }
+                @if (!string.IsNullOrEmpty(_openAIModelError))
+                {
+                    <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px;">@_openAIModelError</div>
+                }
                 <label>@Loc["API GENERATION LENGTH"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.OpenAICtx" />
                 <label>@Loc["API ENABLE STREAM"]</label>
@@ -192,7 +214,29 @@
                 <label>@Loc["API KEY"]</label>
                 <input type="password" class="shimmer-input" @bind="topAPISetting.DeepSeekApiKey" />
                 <label>@Loc["API MODEL"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.DeepSeekModel" />
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input class="shimmer-input" style="flex: 1;" @bind="topAPISetting.DeepSeekModel" />
+                    <button class="su-btn su-btn-secondary" style="white-space: nowrap;"
+                            disabled="@_isLoadingDeepSeekModels" @onclick="FetchDeepSeekModels">
+                        @(_isLoadingDeepSeekModels ? Loc["Fetching..."] : Loc["Fetch Models"])
+                    </button>
+                </div>
+                @if (_deepSeekModels is { Count: > 0 })
+                {
+                    <select class="su-select" style="width: 100%; margin-top: 4px;"
+                            @bind:get="_selectedDeepSeekModel"
+                            @bind:set="OnDeepSeekModelSelected">
+                        <option value="">-- @Loc["Select or type model"] --</option>
+                        @foreach (var m in _deepSeekModels)
+                        {
+                            <option value="@m">@m</option>
+                        }
+                    </select>
+                }
+                @if (!string.IsNullOrEmpty(_deepSeekModelError))
+                {
+                    <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px;">@_deepSeekModelError</div>
+                }
                 <label>@Loc["API GENERATION LENGTH"]</label>
                 <input class="shimmer-input" @bind="topAPISetting.DeepSeekCtx" />
                 <label>@Loc["API ENABLE STREAM"]</label>
@@ -234,6 +278,86 @@
 
     private string? _selectedGuid { get; set; }
     ApiConfig topAPISetting => apiSettings.FirstOrDefault(s => s.Id.ToString() == _selectedGuid);
+
+    // OpenAI model fetching
+    private List<string>? _openAIModels;
+    private bool _isLoadingOpenAIModels;
+    private string? _openAIModelError;
+    private string _selectedOpenAIModel = "";
+
+    private void OnOpenAIModelSelected(string value)
+    {
+        _selectedOpenAIModel = value;
+        if (!string.IsNullOrEmpty(value) && topAPISetting != null)
+        {
+            topAPISetting.OpenAIModel = value;
+        }
+    }
+
+    // DeepSeek model fetching
+    private List<string>? _deepSeekModels;
+    private bool _isLoadingDeepSeekModels;
+    private string? _deepSeekModelError;
+    private string _selectedDeepSeekModel = "";
+
+    private void OnDeepSeekModelSelected(string value)
+    {
+        _selectedDeepSeekModel = value;
+        if (!string.IsNullOrEmpty(value) && topAPISetting != null)
+        {
+            topAPISetting.DeepSeekModel = value;
+        }
+    }
+
+    private async Task FetchOpenAIModels()
+    {
+        if (topAPISetting == null) return;
+        _openAIModelError = null;
+        _isLoadingOpenAIModels = true;
+        try
+        {
+            var client = new SharperLLM.API.OpenAIChatCompletionClient(
+                _url: topAPISetting.OpenAIUrl ?? "https://api.openai.com/v1",
+                _apiKey: topAPISetting.OpenAIApiKey ?? "",
+                _model: topAPISetting.OpenAIModel ?? "gpt-4o"
+            );
+            _openAIModels = await client.GetModelNameList();
+        }
+        catch (Exception ex)
+        {
+            _openAIModelError = ex.Message;
+            _openAIModels = null;
+        }
+        finally
+        {
+            _isLoadingOpenAIModels = false;
+        }
+    }
+
+    private async Task FetchDeepSeekModels()
+    {
+        if (topAPISetting == null) return;
+        _deepSeekModelError = null;
+        _isLoadingDeepSeekModels = true;
+        try
+        {
+            var client = new SharperLLM.API.OpenAIChatCompletionClient(
+                _url: topAPISetting.DeepSeekUrl ?? "https://api.deepseek.com/v1",
+                _apiKey: topAPISetting.DeepSeekApiKey ?? "",
+                _model: topAPISetting.DeepSeekModel ?? "deepseek-v4-flash"
+            );
+            _deepSeekModels = await client.GetModelNameList();
+        }
+        catch (Exception ex)
+        {
+            _deepSeekModelError = ex.Message;
+            _deepSeekModels = null;
+        }
+        finally
+        {
+            _isLoadingDeepSeekModels = false;
+        }
+    }
 
     private void CreateNewApiConfig()
     {
