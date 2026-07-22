@@ -12,7 +12,7 @@ namespace ShimmerChatBuiltin
     public class SetChatNameToolV2 : IAutoCreateToolV2
     {
         private readonly IKVDataService _kvData;
-        private readonly Guid _chatGuid;
+        private readonly Chat _chat;
 
         public static string NameKey => "tool.set_chat_name";
         public static string DescriptionKey => "tool.set_chat_name.desc";
@@ -20,14 +20,14 @@ namespace ShimmerChatBuiltin
 
         public SetChatNameToolV2() { }
 
-        private SetChatNameToolV2(IKVDataService kvData, Guid chatGuid)
+        private SetChatNameToolV2(IKVDataService kvData, Chat chat)
         {
             _kvData = kvData;
-            _chatGuid = chatGuid;
+            this._chat = chat;
         }
 
         public static IAutoCreateToolV2 Create(PersistentEnv env) =>
-            new SetChatNameToolV2(env.KVData, env.ChatGuid);
+            new SetChatNameToolV2(env.KVData, env.Chat);
 
         public Tool GetDefinition() => new()
         {
@@ -44,9 +44,8 @@ namespace ShimmerChatBuiltin
             var obj = JsonConvert.DeserializeObject<Dictionary<string, string>>(input);
             if (obj != null && obj.TryGetValue("name", out var name))
             {
-                var chat = Chat.Load(_chatGuid, _kvData);
-                chat.Name = name;
-                chat.Save(_kvData);
+                _chat.Name = name;
+                _chat.Save(_kvData);
                 return Task.FromResult($"Chat name updated to: {name}");
             }
             return Task.FromResult("Error: name parameter is missing.");
