@@ -49,13 +49,13 @@ namespace ShimmerChatBuiltin.SubAgent
             var persistent = new PersistentEnv
             {
                 KVData = kvData,
-                ChatGuid = context.Env.Persistent.ChatGuid,
-                AgentGuid = SharedGuid ? context.Env.Persistent.AgentGuid : config.Guid,
                 ToolRegistry = context.Env.Persistent.ToolRegistry,
                 Serializer = context.Env.Persistent.Serializer,
                 LocService = context.Env.Persistent.LocService,
                 DebugOutput = context.Env.Persistent.DebugOutput,
-                PostGenerationManager = context.Env.Persistent.PostGenerationManager
+                PostGenerationManager = context.Env.Persistent.PostGenerationManager,
+                Chat = context.Env.Persistent.Chat,
+                Agent = SharedGuid ? context.Env.Persistent.Agent : Agent.Load(config.Guid, kvData)
             };
 
             var subEnv = new PreGenerationEnv(persistent);

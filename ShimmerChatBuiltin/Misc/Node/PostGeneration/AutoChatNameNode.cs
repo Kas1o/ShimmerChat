@@ -28,7 +28,8 @@ namespace ShimmerChatBuiltin.Misc.Node.PostGeneration
         DescriptionKey = "node.auto_chat_name.desc")]
     public partial class AutoChatNameNode : IPostGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
+        [Newtonsoft.Json.JsonIgnore]
+        public string Id { get; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Auto Chat Name";
 
         [NodeProperty("prop.auto_chat_name.strategy", Order = 10,
@@ -63,17 +64,10 @@ namespace ShimmerChatBuiltin.Misc.Node.PostGeneration
             var kvData = context.Env.Persistent.KVData;
             var chatGuid = context.Env.Persistent.ChatGuid;
 
-            // 1. 加载 Chat
-            Chat chat;
-            try
-            {
-                chat = Chat.Load(chatGuid, kvData);
-            }
-            catch (Exception ex)
-            {
-                return Fail(NodeErrorCodes.DataMissing,
-                    loc.Format("node_err.auto_chat_name_load_chat_failed", chatGuid, ex.Message));
-            }
+            // 1. 获取 Chat 实例（优先使用 Persistent 传入的共享实例）
+            var chat = context.Env.Persistent.Chat;
+            if (chat == null)
+                return PostNodeResult.SuccessResult();
 
             // 2. 根据策略判断是否需要生成名称
             var shouldGenerate = Strategy switch

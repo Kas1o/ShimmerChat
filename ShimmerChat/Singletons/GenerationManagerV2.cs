@@ -150,13 +150,13 @@ namespace ShimmerChat.Singletons
             var persistent = new PersistentEnv
             {
                 KVData = _kvData,
-                ChatGuid = chat.Guid,
-                AgentGuid = agent.Guid,
                 ToolRegistry = _toolRegistry,
                 Serializer = _serializer,
                 LocService = _locService,
                 DebugOutput = _debugOutput,
-                PostGenerationManager = _postManager
+                PostGenerationManager = _postManager,
+                Chat = chat,
+                Agent = agent
             };
 
             IPreGenerationNode rootNode;

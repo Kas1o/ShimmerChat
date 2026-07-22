@@ -515,6 +515,5 @@
   "prop.auto_chat_name.latest_n.hint": "Number of recent conversation turns to pass to the LLM",
   "prop.auto_chat_name.prompt_template": "Prompt Template",
   "prop.auto_chat_name.prompt_template.hint": "Use {conversation} as the placeholder for conversation content",
-  "node_err.auto_chat_name_load_chat_failed": "Failed to load chat (Guid: {0}): {1}",
   "node_err.auto_chat_name_generate_failed": "LLM name generation failed: {0}"
 }

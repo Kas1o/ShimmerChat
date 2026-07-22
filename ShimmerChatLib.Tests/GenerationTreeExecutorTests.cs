@@ -17,12 +17,12 @@ public class GenerationTreeExecutorTests
         return new PersistentEnv
         {
             KVData = _kvMock.Object,
-            ChatGuid = Guid.NewGuid(),
-            AgentGuid = Guid.NewGuid(),
             ToolRegistry = _toolRegistryMock.Object,
             Serializer = _serializerMock.Object,
             LocService = _locMock.Object,
             DebugOutput = _debugOutputMock.Object,
+            Chat = new Chat { Name = "TestChat" },
+            Agent = Agent.Create("TestAgent", "")
         };
     }
 

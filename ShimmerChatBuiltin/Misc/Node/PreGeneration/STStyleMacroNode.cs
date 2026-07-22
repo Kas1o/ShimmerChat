@@ -13,7 +13,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
         {
             var persistent = context.Env.Persistent;
             var username = persistent.KVData.Read("User", "username") ?? "User";
-            var agent = persistent.GetAgent();
+            var agent = persistent.Agent;
             var charname = agent.Name ?? agent.Guid.ToString();
 
             foreach (var segment in context.Env.Transient.Fragments)

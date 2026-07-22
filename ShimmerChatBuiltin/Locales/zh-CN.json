@@ -515,6 +515,5 @@
   "prop.auto_chat_name.latest_n.hint": "传入 LLM 的最近对话轮次数",
   "prop.auto_chat_name.prompt_template": "Prompt 模板",
   "prop.auto_chat_name.prompt_template.hint": "使用 {conversation} 作为对话内容的占位符",
-  "node_err.auto_chat_name_load_chat_failed": "加载对话失败 (Guid: {0}): {1}",
   "node_err.auto_chat_name_generate_failed": "LLM 名称生成失败: {0}"
 }

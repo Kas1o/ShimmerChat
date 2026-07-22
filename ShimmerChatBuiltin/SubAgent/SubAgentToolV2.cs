@@ -15,8 +15,8 @@ namespace ShimmerChatBuiltin.SubAgent
     {
         private readonly IKVDataService _kvData;
         private readonly IToolRegistry _toolRegistry;
-        private readonly Guid _chatGuid;
-        private readonly Guid _agentGuid;
+        private readonly Chat _chat;
+        private readonly Agent _agent;
         private readonly IPreGenerationNodeSerializer _serializer;
         private readonly ILocService _locService;
         private readonly IDebugOutputService _debugOutput;
@@ -25,15 +25,15 @@ namespace ShimmerChatBuiltin.SubAgent
         private readonly List<SubAgentEntry> _entries = new();
 
         public SubAgentToolV2(IKVDataService kvData,
-            IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid,
+            IToolRegistry toolRegistry, Chat chat, Agent agent,
             IPreGenerationNodeSerializer serializer, ILocService locService,
             IDebugOutputService debugOutput,
             IPostGenerationManagerService? postGenerationManager = null)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
-            _chatGuid = chatGuid;
-            _agentGuid = agentGuid;
+            _chat = chat;
+            _agent = agent;
             _serializer = serializer;
             _locService = locService;
             _debugOutput = debugOutput;
@@ -96,13 +96,13 @@ namespace ShimmerChatBuiltin.SubAgent
             var persistent = new PersistentEnv
             {
                 KVData = _kvData,
-                ChatGuid = _chatGuid,
-                AgentGuid = _agentGuid,     // 工具入口无 SharedGuid 概念，始终共享父级 Guid
                 ToolRegistry = _toolRegistry,
                 Serializer = _serializer,
                 LocService = _locService,
                 DebugOutput = _debugOutput,
-                PostGenerationManager = _postGenerationManager  // 对齐主流程：设置后处理器
+                PostGenerationManager = _postGenerationManager,  // 对齐主流程：设置后处理器
+                Chat = _chat,
+                Agent = _agent
             };
 
             var subEnv = new PreGenerationEnv(persistent);

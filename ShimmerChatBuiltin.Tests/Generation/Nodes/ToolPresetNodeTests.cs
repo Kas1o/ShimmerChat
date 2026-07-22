@@ -48,12 +48,12 @@ public class ToolPresetNodeTests : NodeTestBase
         return new PersistentEnv
         {
             KVData = KvMock.Object,
-            ChatGuid = Guid.NewGuid(),
-            AgentGuid = Guid.NewGuid(),
             ToolRegistry = registry,
             Serializer = SerializerMock.Object,
             LocService = LocMock.Object,
             DebugOutput = DebugOutputMock.Object,
+            Chat = new Chat { Name = "TestChat" },
+            Agent = Agent.Create("TestAgent", "")
         };
     }
 

@@ -41,7 +41,7 @@ namespace ShimmerChatBuiltin.Memory
             var loc = context.Env.Persistent.LocService;
             var kvData = context.Env.Persistent.KVData;
             var agentGuid = context.Env.Persistent.AgentGuid;
-            var chat = context.Env.Persistent.GetChat();
+            var chat = context.Env.Persistent.Chat;
 
             var recentMessages = context.Env.Transient.Fragments
                 .Where(f => f.From != PromptBuilder.From.tool_result && !string.IsNullOrEmpty(f.Message.Content))
