@@ -85,7 +85,8 @@ namespace ShimmerChat.Singletons
                     Name = "Default",
                     Children = new List<IPostGenerationNode>
                     {
-                        new PostDebugOutputNode { Name = "Debug Output" }
+                        new PostDebugOutputNode { Name = "Debug Output" },
+                        new AutoChatNameNode { Name = "Auto Chat Name" }
                     }
                 })
             });

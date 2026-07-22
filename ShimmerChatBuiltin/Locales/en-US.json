@@ -505,5 +505,16 @@
   "prop.post_sub_agent.include_full_context": "Include Full Context",
   "prop.post_sub_agent.include_full_context.hint": "When enabled, passes the full conversation history (PreFragments) along with the LLM response to the sub-agent. When disabled, only the LLM response text is passed.",
   "prop.post_sub_agent.shared_guid": "Shared GUID",
-  "prop.post_sub_agent.shared_guid.hint": "When enabled, the sub-agent inherits the parent AgentGuid. When disabled, uses the config GUID as an independent identity."
+  "prop.post_sub_agent.shared_guid.hint": "When enabled, the sub-agent inherits the parent AgentGuid. When disabled, uses the config GUID as an independent identity.",
+
+  "node.auto_chat_name": "Auto Chat Name",
+  "node.auto_chat_name.desc": "After generation, automatically checks if the chat name is a default date format and uses LLM to generate a meaningful name",
+  "prop.auto_chat_name.strategy": "Generation Strategy",
+  "prop.auto_chat_name.strategy.hint": "NamePattern: only generate when name matches default date format; GuidFlag: generate once per chat; Always: regenerate every time",
+  "prop.auto_chat_name.latest_n": "Latest Messages",
+  "prop.auto_chat_name.latest_n.hint": "Number of recent conversation turns to pass to the LLM",
+  "prop.auto_chat_name.prompt_template": "Prompt Template",
+  "prop.auto_chat_name.prompt_template.hint": "Use {conversation} as the placeholder for conversation content",
+  "node_err.auto_chat_name_load_chat_failed": "Failed to load chat (Guid: {0}): {1}",
+  "node_err.auto_chat_name_generate_failed": "LLM name generation failed: {0}"
 }

@@ -505,5 +505,16 @@
   "prop.post_sub_agent.include_full_context": "传入完整上下文",
   "prop.post_sub_agent.include_full_context.hint": "开启后将完整对话历史（PreFragments）和 LLM 响应一并传给子智能体；关闭则仅传入 LLM 响应文本",
   "prop.post_sub_agent.shared_guid": "共享 GUID",
-  "prop.post_sub_agent.shared_guid.hint": "开启后子代理继承父级 AgentGuid；关闭则使用配置 GUID 作为独立身份。"
+  "prop.post_sub_agent.shared_guid.hint": "开启后子代理继承父级 AgentGuid；关闭则使用配置 GUID 作为独立身份。",
+
+  "node.auto_chat_name": "自动对话命名",
+  "node.auto_chat_name.desc": "生成结束后自动检查对话名称，若为默认日期格式则调用 LLM 生成有意义的名称",
+  "prop.auto_chat_name.strategy": "生成策略",
+  "prop.auto_chat_name.strategy.hint": "NamePattern：仅当名称为默认日期格式时生成；GuidFlag：同一对话仅生成一次；Always：每次都重新生成",
+  "prop.auto_chat_name.latest_n": "最近消息数",
+  "prop.auto_chat_name.latest_n.hint": "传入 LLM 的最近对话轮次数",
+  "prop.auto_chat_name.prompt_template": "Prompt 模板",
+  "prop.auto_chat_name.prompt_template.hint": "使用 {conversation} 作为对话内容的占位符",
+  "node_err.auto_chat_name_load_chat_failed": "加载对话失败 (Guid: {0}): {1}",
+  "node_err.auto_chat_name_generate_failed": "LLM 名称生成失败: {0}"
 }
