@@ -15,8 +15,8 @@ namespace ShimmerChatBuiltin.SubAgent
     {
         private readonly IKVDataService _kvData;
         private readonly IToolRegistry _toolRegistry;
-        private readonly Chat _chat;
-        private readonly Agent _agent;
+        private readonly Guid _chatGuid;
+        private readonly Guid _agentGuid;
         private readonly IPreGenerationNodeSerializer _serializer;
         private readonly ILocService _locService;
         private readonly IDebugOutputService _debugOutput;
@@ -25,15 +25,15 @@ namespace ShimmerChatBuiltin.SubAgent
         private readonly List<SubAgentEntry> _entries = new();
 
         public SubAgentToolV2(IKVDataService kvData,
-            IToolRegistry toolRegistry, Chat chat, Agent agent,
+            IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid,
             IPreGenerationNodeSerializer serializer, ILocService locService,
             IDebugOutputService debugOutput,
             IPostGenerationManagerService? postGenerationManager = null)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
-            _chat = chat;
-            _agent = agent;
+            _chatGuid = chatGuid;
+            _agentGuid = agentGuid;
             _serializer = serializer;
             _locService = locService;
             _debugOutput = debugOutput;
@@ -100,9 +100,9 @@ namespace ShimmerChatBuiltin.SubAgent
                 Serializer = _serializer,
                 LocService = _locService,
                 DebugOutput = _debugOutput,
-                PostGenerationManager = _postGenerationManager,  // 对齐主流程：设置后处理器
-                Chat = _chat,
-                Agent = _agent
+                PostGenerationManager = _postGenerationManager,
+                Chat = new Chat { Name = "sub", Guid = _chatGuid },
+                Agent = CreateVirtualAgent(_agentGuid)
             };
 
             var subEnv = new PreGenerationEnv(persistent);
@@ -234,6 +234,13 @@ namespace ShimmerChatBuiltin.SubAgent
         {
             [JsonProperty("subagent")] public string? subagent { get; set; }
             [JsonProperty("task")] public string? task { get; set; }
+        }
+
+        private static Agent CreateVirtualAgent(Guid guid)
+        {
+            var agent = Agent.Create("sub", "");
+            agent.Guid = guid;
+            return agent;
         }
     }
 }

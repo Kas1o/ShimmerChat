@@ -54,8 +54,9 @@ namespace ShimmerChatBuiltin.SubAgent
                 LocService = context.Env.Persistent.LocService,
                 DebugOutput = context.Env.Persistent.DebugOutput,
                 PostGenerationManager = context.Env.Persistent.PostGenerationManager,
-                Chat = context.Env.Persistent.Chat,
-                Agent = SharedGuid ? context.Env.Persistent.Agent : Agent.Load(config.Guid, kvData)
+                Chat = new Chat { Name = "sub", Guid = context.Env.Persistent.ChatGuid },
+                Agent = CreateVirtualAgent(config,
+                    SharedGuid ? context.Env.Persistent.AgentGuid : config.Guid)
             };
 
             var subEnv = new PreGenerationEnv(persistent);
@@ -230,5 +231,12 @@ namespace ShimmerChatBuiltin.SubAgent
             PromptBuilder.From.tool_result => Sender.ToolResult,
             _ => Sender.System
         };
+
+        private static Agent CreateVirtualAgent(SubAgentConfig config, Guid guid)
+        {
+            var agent = Agent.Create(config.Name, "");
+            agent.Guid = guid;
+            return agent;
+        }
     }
 }
