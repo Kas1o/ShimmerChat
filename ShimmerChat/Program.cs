@@ -41,6 +41,7 @@ builder.Services.AddSingleton<IToolRegistry, ToolRegistry>();
 builder.Services.AddSingleton<IPreGenerationNodeSerializer, PreGenerationNodeSerializer>();
 builder.Services.AddSingleton<INodeTypeCatalog, NodeTypeCatalog>();
 builder.Services.AddSingleton<IGenerationManagerV2, GenerationManagerV2>();
+builder.Services.AddSingleton<GenerationSessionService>();
 
 // Post-Generation 管线
 builder.Services.AddSingleton<PostGenerationNodeSerializerService>();
