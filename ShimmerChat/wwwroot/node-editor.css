@@ -83,7 +83,7 @@
     transition: all 0.15s;
 }
 .tn-add-cat:hover { border-color: rgba(100,150,255,0.4); color: var(--su-text-0); }
-.tn-add-cat.active { background: rgba(100,150,255,0.15); border-color: var(--su-accent); color: #fff; }
+.tn-add-cat.active { background: rgba(100,150,255,0.15); border-color: var(--su-accent); }
 .tn-cat-name { font-weight: 500; }
 .tn-cat-count {
     font-size: 0.8em; color: var(--su-text-1);
