@@ -1,41 +1,58 @@
 @using ShimmerChatLib.Generation
 @inject ILocService Loc
+@inject IJSRuntime JS
+@implements IDisposable
 
-<div class="tn-add-menu">
-    <input class="tn-add-search" placeholder="@Loc["node_editor.filter_placeholder"]" @bind="_filter" @bind:event="oninput"
+<div class="tn-add-menu" @ref="_menuRef">
+    <input class="tn-add-search" placeholder="@Loc["node_editor.filter_placeholder"]"
+           @ref="_searchInput"
+           value="@_filter"
+           @oninput="OnFilterInput"
            @onkeydown="OnKeyDown" />
 
-    @if (_navPath.Count == 0)
+    @if (!string.IsNullOrEmpty(_filter))
     {
-        <div class="tn-add-categories">
-            @foreach (var child in _categoryTree)
+        // Search mode: flat list across all categories, no category chrome
+        RebuildVisibleItems();
+        var flatNodes = _allNodes.Where(n => n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        <div class="tn-add-flat">
+            @for (int i = 0; i < flatNodes.Count; i++)
             {
-                var count = CountLeafNodes(child, _filter);
-                <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
+                var leaf = flatNodes[i];
+                var isActive = i == _selectedIndex;
+                <div class="tn-add-item @(isActive ? "tn-add-item-active" : "")"
+                     @onclick="() => Select(leaf.Type)" @onclick:preventDefault>
+                    <span class="tn-item-left">
+                        <span style="color:@leaf.Color">@leaf.Icon</span>
+                        <span class="tn-item-label">@Loc[leaf.LabelKey]</span>
+                    </span>
+                    <span class="tn-add-item-cat">@string.Join(" / ", leaf.FullCategory.Split('/').Select(k => Loc[k.Trim()]))</span>
+                </div>
+            }
+        </div>
+    }
+    else if (_navPath.Count == 0)
+    {
+        RebuildVisibleItems();
+        <div class="tn-add-categories">
+            @for (int i = 0; i < _categoryTree.Count; i++)
+            {
+                var child = _categoryTree[i];
+                var count = CountLeafNodes(child, "");
+                var vi = _visibleItems.FirstOrDefault(v => v.Kind == VisibleItemKind.Category && ReferenceEquals(v.Data, child));
+                var isActive = vi?.Index == _selectedIndex;
+                <button class="tn-add-cat @(isActive ? "active" : "")"
+                        @onclick="() => NavigateInto(child)" @onclick:preventDefault>
                     <span class="tn-cat-name">@Loc[child.Name]</span>
                     <span class="tn-cat-count">@count</span>
                 </button>
             }
         </div>
-        @if (!string.IsNullOrEmpty(_filter))
-        {
-            <div class="tn-add-flat">
-                @foreach (var leaf in _allNodes.Where(n =>
-                    n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
-                {
-                    <div class="tn-add-item" @onclick="() => Select(leaf.Type)" @onclick:preventDefault>
-                        <span class="tn-item-left">
-                            <span style="color:@leaf.Color">@leaf.Icon</span>
-                            <span class="tn-item-label">@Loc[leaf.LabelKey]</span>
-                        </span>
-                        <span class="tn-add-item-cat">@string.Join(" / ", leaf.FullCategory.Split('/').Select(k => Loc[k.Trim()]))</span>
-                    </div>
-                }
-            </div>
-        }
     }
     else
     {
+        RebuildVisibleItems();
         var current = _navPath[^1];
         <div class="tn-add-breadcrumb">
             <button class="tn-add-back" @onclick="NavigateUp" title="@Loc["node_editor.back"]">←</button>
@@ -51,8 +68,11 @@
         <div class="tn-add-categories">
             @foreach (var child in current.Children)
             {
-                var count = CountLeafNodes(child, _filter);
-                <button class="tn-add-cat" @onclick="() => NavigateInto(child)" @onclick:preventDefault>
+                var count = CountLeafNodes(child, "");
+                var vi = _visibleItems.FirstOrDefault(v => v.Kind == VisibleItemKind.Category && ReferenceEquals(v.Data, child));
+                var isActive = vi?.Index == _selectedIndex;
+                <button class="tn-add-cat @(isActive ? "active" : "")"
+                        @onclick="() => NavigateInto(child)" @onclick:preventDefault>
                     <span class="tn-cat-name">@Loc[child.Name]</span>
                     <span class="tn-cat-count">@count</span>
                 </button>
@@ -61,11 +81,13 @@
         @if (current.LeafNodes.Count > 0)
         {
             <div class="tn-add-nodes">
-                @foreach (var nt in current.LeafNodes.Where(n =>
-                    string.IsNullOrEmpty(_filter) ||
-                    n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+                @for (int i = 0; i < current.LeafNodes.Count; i++)
                 {
-                    <div class="tn-add-item" @onclick="() => Select(nt.Type)" @onclick:preventDefault>
+                    var nt = current.LeafNodes[i];
+                    var vi = _visibleItems.FirstOrDefault(v => v.Kind == VisibleItemKind.LeafNode && ReferenceEquals(v.Data, nt));
+                    var isActive = vi?.Index == _selectedIndex;
+                    <div class="tn-add-item @(isActive ? "tn-add-item-active" : "")"
+                         @onclick="() => Select(nt.Type)" @onclick:preventDefault>
                         <span class="tn-item-left">
                             <span style="color:@nt.Color">@nt.Icon</span>
                             <span class="tn-item-label">@Loc[nt.LabelKey]</span>
@@ -87,10 +109,17 @@
 
     [CascadingParameter] public TreeEditorContext? EditorContext { get; set; }
 
+    private ElementReference _searchInput;
+    private ElementReference _menuRef;
     private string _filter = "";
     private List<CategoryTreeNode> _categoryTree = new();
     private List<CategoryTreeNode> _navPath = new();
     private IReadOnlyList<NodeTypeMetadata> _allNodes = Array.Empty<NodeTypeMetadata>();
+
+    private int _selectedIndex = 0;
+    private List<VisibleItem> _visibleItems = new();
+    private bool _shouldFocus;
+    private bool _shouldScroll;
 
     protected override void OnInitialized()
     {
@@ -128,6 +157,25 @@
         _categoryTree = root.Values.OrderBy(c => c.Name).ToList();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _searchInput.FocusAsync();
+        }
+        else if (_shouldFocus)
+        {
+            _shouldFocus = false;
+            await _searchInput.FocusAsync();
+        }
+
+        if (_shouldScroll)
+        {
+            _shouldScroll = false;
+            await JS.InvokeVoidAsync("scrollNodePickerActiveIntoView", _menuRef);
+        }
+    }
+
     private static int CountLeafNodes(CategoryTreeNode node, string filter)
     {
         int count = node.LeafNodes.Count(n =>
@@ -137,30 +185,146 @@
         return count;
     }
 
-    private void NavigateInto(CategoryTreeNode node) => _navPath.Add(node);
+    private void NavigateInto(CategoryTreeNode node)
+    {
+        _navPath.Add(node);
+        _selectedIndex = 0;
+    }
 
     private void NavigateUp()
     {
         if (_navPath.Count > 0)
+        {
             _navPath.RemoveAt(_navPath.Count - 1);
+            _selectedIndex = 0;
+        }
     }
 
-    private void NavigateTo(List<CategoryTreeNode> path) => _navPath = path;
+    private void NavigateTo(List<CategoryTreeNode> path)
+    {
+        _navPath = path;
+        _selectedIndex = 0;
+    }
 
     private async Task Select(Type type)
     {
         _filter = "";
         _navPath.Clear();
+        _selectedIndex = 0;
+        _shouldFocus = true;
         await OnSelect.InvokeAsync(type);
+    }
+
+    private async Task OnFilterInput(ChangeEventArgs e)
+    {
+        _filter = e.Value?.ToString() ?? "";
+        _selectedIndex = 0;
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Escape")
+        switch (e.Key)
         {
-            _filter = "";
-            _navPath.Clear();
-            await OnClose.InvokeAsync();
+            case "Escape":
+                _filter = "";
+                _navPath.Clear();
+                _selectedIndex = 0;
+                await OnClose.InvokeAsync();
+                break;
+
+            case "ArrowDown":
+                RebuildVisibleItems();
+                if (_visibleItems.Count > 0)
+                {
+                    _selectedIndex = (_selectedIndex + 1) % _visibleItems.Count;
+                    _shouldScroll = true;
+                }
+                break;
+
+            case "ArrowUp":
+                RebuildVisibleItems();
+                if (_visibleItems.Count > 0)
+                {
+                    _selectedIndex = (_selectedIndex - 1 + _visibleItems.Count) % _visibleItems.Count;
+                    _shouldScroll = true;
+                }
+                break;
+
+            case "Enter":
+                RebuildVisibleItems();
+                if (_selectedIndex >= 0 && _selectedIndex < _visibleItems.Count)
+                {
+                    var item = _visibleItems[_selectedIndex];
+                    if (item.Kind == VisibleItemKind.Category)
+                    {
+                        NavigateInto((CategoryTreeNode)item.Data);
+                    }
+                    else
+                    {
+                        await Select(((NodeTypeMetadata)item.Data).Type);
+                    }
+                }
+                break;
+        }
+    }
+
+    private void RebuildVisibleItems()
+    {
+        _visibleItems.Clear();
+
+        if (!string.IsNullOrEmpty(_filter))
+        {
+            // Search mode: flat list of matching leaves only
+            foreach (var leaf in _allNodes.Where(n =>
+                n.LabelKey.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
+            {
+                _visibleItems.Add(new VisibleItem(VisibleItemKind.LeafNode, leaf, _visibleItems.Count));
+            }
+        }
+        else if (_navPath.Count == 0)
+        {
+            // Categories at root
+            foreach (var child in _categoryTree)
+                _visibleItems.Add(new VisibleItem(VisibleItemKind.Category, child, _visibleItems.Count));
+        }
+        else
+        {
+            var current = _navPath[^1];
+
+            // Sub-categories
+            foreach (var child in current.Children)
+                _visibleItems.Add(new VisibleItem(VisibleItemKind.Category, child, _visibleItems.Count));
+
+            // Leaf nodes in current category
+            foreach (var nt in current.LeafNodes)
+                _visibleItems.Add(new VisibleItem(VisibleItemKind.LeafNode, nt, _visibleItems.Count));
+        }
+
+        // Clamp selection
+        if (_visibleItems.Count == 0)
+            _selectedIndex = -1;
+        else if (_selectedIndex < 0 || _selectedIndex >= _visibleItems.Count)
+            _selectedIndex = 0;
+    }
+
+    public void Dispose()
+    {
+        // No unmanaged resources; satisfies IDisposable contract
+    }
+
+    private enum VisibleItemKind { Category, LeafNode }
+
+    private sealed class VisibleItem
+    {
+        public VisibleItemKind Kind { get; }
+        public object Data { get; }
+        public int Index { get; }
+
+        public VisibleItem(VisibleItemKind kind, object data, int index)
+        {
+            Kind = kind;
+            Data = data;
+            Index = index;
         }
     }
 

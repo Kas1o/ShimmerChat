@@ -138,6 +138,19 @@ window.autoResizeTextarea = function (el) {
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
 };
 
+// ─── Node Picker scroll helpers ──────────────────
+
+/**
+ * Scrolls the .tn-add-item-active element inside the container into view.
+ */
+window.scrollNodePickerActiveIntoView = function (container) {
+    if (!container) return;
+    var active = container.querySelector('.tn-add-item-active');
+    if (active) {
+        active.scrollIntoView({ block: 'nearest' });
+    }
+};
+
 // ─── Tree Editor Drag & Drop Helpers ──────────────────
 
 /**

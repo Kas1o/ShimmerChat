@@ -95,7 +95,6 @@
 
     private void AddChild(Type type)
     {
-        _showAddMenu = false;
         var instance = EditorContext?.CreateNode(type);
         if (instance != null)
             ChildNodes.Add(instance);

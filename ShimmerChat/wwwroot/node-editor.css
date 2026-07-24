@@ -118,6 +118,7 @@
     transition: background 0.1s;
 }
 .tn-add-item:hover { background: rgba(100,150,255,0.12); color: #fff; }
+.tn-add-item-active { background: rgba(100,150,255,0.18); color: #fff; }
 .tn-item-left { display: flex; align-items: center; gap: 6px; }
 .tn-item-label { font-weight: 500; }
 .tn-item-desc {
