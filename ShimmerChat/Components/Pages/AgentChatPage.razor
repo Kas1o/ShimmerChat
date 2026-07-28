@@ -18,6 +18,7 @@
 
 @if (chat != null)
 {
+	<PageTitle> @($"{agent!.Name} | {chat.Name}")</PageTitle>
 	<div class="chat-page">
 		<div class="chat-topbar">
 			<button class="chat-back" @onclick="BackToAgentPage">← @agent!.Name</button>
