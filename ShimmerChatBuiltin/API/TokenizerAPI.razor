@@ -1,43 +1,238 @@
 @inject IKVDataService KVData
 @inject ILocService Loc
+@implements IDisposable
 @attribute [PluginPanel("panel.tokenizer_api", "panel.tokenizer_api.desc")]
 
-<div class="su-group">
+<div class="su-group su-flex su-flex-col su-gap-4">
 	<div class="su-form-group">
 		<label class="su-label">@Loc["api_config.tokenizer_model"]</label>
-		<input class="su-input" type="text" @bind="Model" placeholder="@Loc["api_config.tokenizer_model_placeholder"]" />
+		<div class="su-flex su-gap-2">
+			<input class="su-input su-flex-1" type="text" @bind="Model"
+				   placeholder="@Loc["api_config.tokenizer_model_placeholder"]"
+				   disabled="@_isLoading" />
+			<button class="su-btn su-btn-primary" @onclick="LoadTokenizer" disabled="@_isLoading">
+				@(_isLoading ? Loc["panel_tokenizer.loading"] : _tokenizer != null ? Loc["panel_tokenizer.reload"] : Loc["panel_tokenizer.load"])
+			</button>
+		</div>
 	</div>
+
+	@if (_statusMessage != null)
+	{
+		<div class="@(_isError ? "su-alert su-alert-error" : "su-alert su-alert-success")">
+			@_statusMessage
+		</div>
+	}
+
+	<div class="su-form-group">
+		<label class="su-label">@Loc["panel_tokenizer.status"]</label>
+		<div class="su-text-sm">
+			@if (_tokenizer != null)
+			{
+				<div class="su-flex su-flex-col su-gap-1">
+					<span class="su-text-success">@Loc["panel_tokenizer.status_loaded"]</span>
+				</div>
+			}
+			else
+			{
+				<span class="su-text-muted">@Loc["panel_tokenizer.status_not_loaded"]</span>
+			}
+		</div>
+	</div>
+
+	<hr class="su-divider" />
+
+	<div class="su-form-group">
+		<label class="su-label">@Loc["panel_tokenizer.test_label"]</label>
+		<textarea class="su-input su-textarea" rows="4" @bind="_testInput"
+				  placeholder="@Loc["panel_tokenizer.test_placeholder"]"
+				  disabled="@(_tokenizer == null)"></textarea>
+	</div>
+
+	<div class="su-flex su-gap-2">
+		<button class="su-btn su-btn-primary" @onclick="EncodeText"
+				disabled="@(_tokenizer == null || string.IsNullOrWhiteSpace(_testInput))">
+			@Loc["panel_tokenizer.encode"]
+		</button>
+		<button class="su-btn su-btn-secondary" @onclick="ClearTest"
+				disabled="@(_tokenizer == null && string.IsNullOrWhiteSpace(_testInput))">
+			@Loc["panel_tokenizer.clear"]
+		</button>
+	</div>
+
+	@if (_encodeResult != null)
+	{
+		<div class="su-form-group">
+			<label class="su-label">@Loc["panel_tokenizer.token_count"]</label>
+			<div class="su-badge su-badge-info">@_encodeResult.TokenCount</div>
+		</div>
+
+		<div class="su-form-group">
+			<label class="su-label">@Loc["panel_tokenizer.token_ids"]</label>
+			<code class="su-code-block">@string.Join(", ", _encodeResult.Ids)</code>
+		</div>
+
+		<div class="su-form-group">
+			<label class="su-label">@Loc["panel_tokenizer.tokens"]</label>
+			<div class="su-flex su-flex-wrap su-gap-1">
+				@foreach (var (token, id) in _encodeResult.TokenPairs)
+				{
+					<span class="su-token-tag" title="ID: @id">@token</span>
+				}
+			</div>
+		</div>
+	}
 </div>
 
 
 
 @code {
-    string? Model
-    {
-        get;
-        set{
-            field = value;
-            Save();
-        }
-    }
+	string? Model
+	{
+		get;
+		set
+		{
+			if (field == value)
+				return;
+			if (value == null)
+				return;
+			field = value;
+			Save();
+		}
+	}
 
-    bool Initialized
-    {
-        get;
-        set;
-    }
+	bool Initialized
+	{
+		get;
+		set;
+	}
 
+	Tokenizers.HuggingFace.Tokenizer.Tokenizer? _tokenizer;
+	bool _isLoading;
+	string? _statusMessage;
+	bool _isError;
+	string _testInput = string.Empty;
+	EncodeResult? _encodeResult;
 
-    void Save(){
-        if(!Initialized)
-            return;
-        KVData.Write("Tokenize", "local_vocab_path", Model);
-    }
+	void Save()
+	{
+		if (!Initialized)
+			return;
+		KVData.Write("Tokenize", "local_vocab_path", Model ?? string.Empty);
+	}
 
+	protected override void OnInitialized()
+	{
+		Model = KVData.Read("Tokenize", "local_vocab_path") ?? string.Empty;
 
-    protected override void OnInitialized()
-    {
-        Model = KVData.Read("Tokenize", "local_vocab_path");
-        Initialized = true;
-    }
+		if (!string.IsNullOrWhiteSpace(Model))
+		{
+			_ = LoadTokenizerAsync();
+		}
+
+		Initialized = true;
+	}
+
+	async Task LoadTokenizer()
+	{
+		await LoadTokenizerAsync();
+	}
+
+	async Task LoadTokenizerAsync()
+	{
+		if (string.IsNullOrWhiteSpace(Model))
+		{
+			_statusMessage = Loc["panel_tokenizer.msg_path_empty"];
+			_isError = true;
+			return;
+		}
+
+		_isLoading = true;
+		_statusMessage = null;
+		_isError = false;
+		_tokenizer = null;
+
+		try
+		{
+			var path = Model;
+			if (!Path.IsPathRooted(path))
+			{
+				path = Path.GetFullPath(Path.Combine(
+					AppContext.BaseDirectory, path));
+			}
+
+			if (!File.Exists(path))
+			{
+				_statusMessage = Loc["panel_tokenizer.msg_file_not_found"];
+				_isError = true;
+				return;
+			}
+
+			_tokenizer = await Task.Run(() =>
+				Tokenizers.HuggingFace.Tokenizer.Tokenizer.FromFile(path));
+
+			_statusMessage = Loc["panel_tokenizer.msg_load_success"];
+			_isError = false;
+		}
+		catch (Exception ex)
+		{
+			_statusMessage = string.Format(Loc["panel_tokenizer.msg_load_failed"], ex.Message);
+			_isError = true;
+			_tokenizer = null;
+		}
+		finally
+		{
+			_isLoading = false;
+		}
+	}
+
+	void EncodeText()
+	{
+		if (_tokenizer == null || string.IsNullOrWhiteSpace(_testInput))
+			return;
+
+		try
+		{
+			var encoded = _tokenizer.Encode(_testInput, true,
+				includeTokens: true,
+				includeTypeIds: false,
+				includeWords: false,
+				includeOffsets: false,
+				includeSpecialTokensMask: false,
+				includeAttentionMask: false,
+				includeOverflowing: false).FirstOrDefault();
+
+			if (encoded?.Ids == null || encoded.Ids.Count == 0)
+			{
+				_encodeResult = new EncodeResult(0, [], []);
+				return;
+			}
+
+			var ids = encoded.Ids.Select(x => (int)x).ToList();
+			var tokens = encoded.Tokens?.ToList() ?? [];
+			var tokenPairs = ids.Select((id, idx) => (
+				Token: idx < tokens.Count ? tokens[idx] ?? $"<id:{id}>" : $"<id:{id}>",
+				Id: id
+			)).ToList();
+
+			_encodeResult = new EncodeResult(ids.Count, ids, tokenPairs);
+		}
+		catch (Exception ex)
+		{
+			_statusMessage = string.Format(Loc["panel_tokenizer.msg_encode_failed"], ex.Message);
+			_isError = true;
+		}
+	}
+
+	void ClearTest()
+	{
+		_testInput = string.Empty;
+		_encodeResult = null;
+	}
+
+	public void Dispose()
+	{
+		_tokenizer?.Dispose();
+	}
+
+	record EncodeResult(int TokenCount, List<int> Ids, List<(string Token, int Id)> TokenPairs);
 }

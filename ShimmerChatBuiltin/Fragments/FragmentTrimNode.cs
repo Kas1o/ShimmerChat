@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using SharperLLM.Util;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
@@ -39,9 +40,9 @@ namespace ShimmerChatBuiltin.Fragments
         public bool KeepFirstSystem { get; set; } = true;
 
         /// <summary>
-        /// 分词器词汇表路径（从 KVData 获取）
+        /// Tokenizer 实例缓存（按解析后的绝对路径缓存），跨节点实例和生成会话共享。
         /// </summary>
-        public static Func<IKVDataService, Tokenizers.HuggingFace.Tokenizer.Tokenizer>? TokenizerFactory { get; set; }
+        private static readonly ConcurrentDictionary<string, Tokenizers.HuggingFace.Tokenizer.Tokenizer> TokenizerCache = new();
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
@@ -62,13 +63,12 @@ namespace ShimmerChatBuiltin.Fragments
             if (Mode == TrimMode.LatestN)
             {
                 TrimByCount(fragments, Count, hasFirstSystem, firstSystem);
+                return Task.FromResult(NodeResult.SuccessResult());
             }
             else
             {
-                TrimByTokens(context, fragments, hasFirstSystem, firstSystem);
+                return Task.FromResult(TrimByTokens(context, fragments, hasFirstSystem, firstSystem));
             }
-
-            return Task.FromResult(NodeResult.SuccessResult());
         }
 
         private static void TrimByCount(List<ContextSegment> fragments, int count,
@@ -96,12 +96,45 @@ namespace ShimmerChatBuiltin.Fragments
             fragments.AddRange(kept);
         }
 
-        private void TrimByTokens(PreNodeExecutionContext context, List<ContextSegment> fragments,
+        private NodeResult TrimByTokens(PreNodeExecutionContext context, List<ContextSegment> fragments,
             bool hasFirstSystem, ContextSegment? firstSystem)
         {
-            var tokenizer = TokenizerFactory?.Invoke(context.Env.Persistent.KVData);
-            if (tokenizer == null)
-                return;
+            var kvData = context.Env.Persistent.KVData;
+            var rawPath = kvData.Read("Tokenize", "local_vocab_path");
+
+            if (string.IsNullOrWhiteSpace(rawPath))
+            {
+                return NodeResult.Failure(
+                    NodeErrorCodes.ConfigNotFound,
+                    "FragmentTrim: Tokenizer 路径未配置，请在 Tokenizer 配置面板中设置 Model 路径。",
+                    nodeId: Id,
+                    nodeName: Name);
+            }
+
+            string resolvedPath;
+            if (Path.IsPathRooted(rawPath))
+            {
+                resolvedPath = rawPath;
+            }
+            else
+            {
+                resolvedPath = Path.GetFullPath(Path.Combine(
+                    AppContext.BaseDirectory, rawPath));
+            }
+
+            if (!File.Exists(resolvedPath))
+            {
+                return NodeResult.Failure(
+                    NodeErrorCodes.ConfigNotFound,
+                    $"FragmentTrim: Tokenizer 文件不存在: {resolvedPath}",
+                    nodeId: Id,
+                    nodeName: Name);
+            }
+
+            var tokenizer = TokenizerCache.GetOrAdd(resolvedPath, path =>
+            {
+                return Tokenizers.HuggingFace.Tokenizer.Tokenizer.FromFile(path);
+            });
 
             var tokenCounts = fragments.Select(s =>
                 tokenizer.Encode(s.Message.Content, true).FirstOrDefault()?.Ids?.Count ?? 0).ToList();
@@ -146,6 +179,8 @@ namespace ShimmerChatBuiltin.Fragments
             }
 
             fragments.RemoveAll(s => removeIndices.Contains(fragments.IndexOf(s)));
+
+            return NodeResult.SuccessResult();
         }
 
         private static HashSet<string> FindOrphanToolResultIds(
