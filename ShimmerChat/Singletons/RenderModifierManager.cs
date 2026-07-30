@@ -92,7 +92,16 @@ namespace ShimmerChat.Singletons
             {
                 Id = "__default__",
                 Name = "Default",
-                RootNodeJson = _serializer.Serialize(new MarkdownRenderNode { Name = "Markdown Render" })
+                RootNodeJson = _serializer.Serialize
+                (
+                    new RenderSequenceNode
+                    {
+                        Children = 
+                        [
+                            new MarkdownRenderNode { Name = "Markdown Render" }
+                        ]
+                    }
+                )
             });
 
             _kvData.Write("RenderModifierManager", "render_modifier_presets",
