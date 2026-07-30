@@ -34,7 +34,7 @@ namespace ShimmerChatBuiltin.DynPrompt
 
             var json = kvData.Read("DynPrompt", "DynPromptSets");
             if (string.IsNullOrEmpty(json))
-                return Task.FromResult(NodeResult.SuccessResult());
+                return Task.FromResult(NodeResult.Failure(NodeErrorCodes.PresetNotFound,$"No DynPromptSet Exists."));
 
             List<DynPromptSet>? allSets;
             try

@@ -432,7 +432,7 @@
   "api_config.qdrant_apikey_placeholder": "your apikey",
   "api_config.qdrant_dim": "DIM",
   "api_config.qdrant_dim_placeholder": "1024",
-  
+
   "api_config.tokenizer_model": "Model",
   "api_config.tokenizer_model_placeholder": "./tokenizer.json",
 
@@ -488,11 +488,11 @@
   "builtin.regex_render_modifier.name": "Regex Replacement",
   "builtin.regex_render_modifier.desc": "Applies a set of Regex replacement rules to the message content. Input: Name of the Regex Set to apply.",
 
-  "panel.memory_management_agent_plugin_panel.delete_collection" : "Delete Collection",
-  "panel.memory_management_agent_plugin_panel.query_info.collection_not_exists_text" : "Collection Not Exists.",
-  "panel.memory_management_agent_plugin_panel.query_info" : "Query Info",
-  "panel.memory_management_agent_plugin_panel.desc" : "manage agent memory",
-  "panel.memory_management_agent_plugin_panel" : "Memory Manage",
+  "panel.memory_management_agent_plugin_panel.delete_collection": "Delete Collection",
+  "panel.memory_management_agent_plugin_panel.query_info.collection_not_exists_text": "Collection Not Exists.",
+  "panel.memory_management_agent_plugin_panel.query_info": "Query Info",
+  "panel.memory_management_agent_plugin_panel.desc": "manage agent memory",
+  "panel.memory_management_agent_plugin_panel": "Memory Manage",
 
   "node.post_sub_agent": "Post SubAgent",
   "node.post_sub_agent.desc": "Process LLM response text using a sub-agent in the post-generation pipeline",
@@ -515,5 +515,8 @@
   "prop.auto_chat_name.latest_n.hint": "Number of recent conversation turns to pass to the LLM",
   "prop.auto_chat_name.prompt_template": "Prompt Template",
   "prop.auto_chat_name.prompt_template.hint": "Use {conversation} as the placeholder for conversation content",
-  "node_err.auto_chat_name_generate_failed": "LLM name generation failed: {0}"
+  "node_err.auto_chat_name_generate_failed": "LLM name generation failed: {0}",
+
+  "node.fallback_execute": "Fallback Execute",
+  "node.fallback_execute.fallback_list": "Fallback Node List"
 }

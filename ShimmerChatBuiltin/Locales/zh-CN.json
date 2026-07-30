@@ -432,7 +432,7 @@
   "api_config.qdrant_apikey_placeholder": "your apikey",
   "api_config.qdrant_dim": "向量维度",
   "api_config.qdrant_dim_placeholder": "1024",
-  
+
   "api_config.tokenizer_model": "Model",
   "api_config.tokenizer_model_placeholder": "./tokenizer.json",
 
@@ -488,11 +488,11 @@
   "builtin.regex_render_modifier.name": "正则替换",
   "builtin.regex_render_modifier.desc": "对消息内容应用一组正则替换规则。输入: 要应用的 Regex 集合名称。",
 
-  "panel.memory_management_agent_plugin_panel.delete_collection" : "删除数据",
-  "panel.memory_management_agent_plugin_panel.query_info.collection_not_exists_text" : "数据不存在",
-  "panel.memory_management_agent_plugin_panel.query_info" : "查询信息",
-  "panel.memory_management_agent_plugin_panel.desc" : "管理Agent的记忆",
-  "panel.memory_management_agent_plugin_panel" : "记忆管理",
+  "panel.memory_management_agent_plugin_panel.delete_collection": "删除数据",
+  "panel.memory_management_agent_plugin_panel.query_info.collection_not_exists_text": "数据不存在",
+  "panel.memory_management_agent_plugin_panel.query_info": "查询信息",
+  "panel.memory_management_agent_plugin_panel.desc": "管理Agent的记忆",
+  "panel.memory_management_agent_plugin_panel": "记忆管理",
 
   "node.post_sub_agent": "后处理子智能体",
   "node.post_sub_agent.desc": "在后生成管线中使用子智能体处理 LLM 响应文本",
@@ -515,5 +515,8 @@
   "prop.auto_chat_name.latest_n.hint": "传入 LLM 的最近对话轮次数",
   "prop.auto_chat_name.prompt_template": "Prompt 模板",
   "prop.auto_chat_name.prompt_template.hint": "使用 {conversation} 作为对话内容的占位符",
-  "node_err.auto_chat_name_generate_failed": "LLM 名称生成失败: {0}"
+  "node_err.auto_chat_name_generate_failed": "LLM 名称生成失败: {0}",
+
+  "node.fallback_execute": "回退执行",
+  "node.fallback_execute.fallback_list": "回退节点列表"
 }

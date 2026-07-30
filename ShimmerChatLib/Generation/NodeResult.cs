@@ -74,5 +74,11 @@ namespace ShimmerChatLib.Generation
 
         /// <summary>执行被取消</summary>
         public const string Cancelled = "CANCELLED";
+
+		/// <summary> 参数错误 </summary>
+		public const string ParameterError = "PARAM_ERROR";
+
+        /// <summary> 通常错误 </summary>
+        public const string CommonError = "COMMON_ERROR";
     }
 }
