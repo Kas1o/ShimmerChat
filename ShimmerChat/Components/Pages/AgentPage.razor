@@ -15,6 +15,9 @@
 @inject PostGenerationNodeSerializerService PostSerializer
 @inject RenderModifierNodeSerializer RenderSerializer
 @inject ILocService Loc
+@inject IGenerationEventStore EventStore
+@inject IGenerationProviderRegistry ProviderRegistry
+@inject GenerationProviderHostService ProviderHost
 @inject ILogger<AgentPage> logger
 
 @if(agent != null)
@@ -66,6 +69,15 @@
                             <input type="checkbox" checked="@EnableFullTextSearch" @onchange="OnEnableFullTextSearchChanged" />
                             @Loc["agent.full_text_search"]
                         </label>
+                        <select class="shimmer-input chat-provider-filter" title="@Loc["agent.chat_filter.title"]"
+                                value="@_chatProviderFilter" @onchange="OnChatProviderFilterChanged">
+                            <option value="">@Loc["agent.chat_filter.direct"]</option>
+                            <option value="__all__">@Loc["agent.chat_filter.all"]</option>
+                            @foreach (var t in _providerTypes)
+                            {
+                                <option value="@t.TypeName">@t.Icon @Loc[t.NameKey]</option>
+                            }
+                        </select>
                         <div class="chat-toolbar-meta">
                             <span>@Loc.Format("agent.search_results", FilteredChatSummaries.Count)</span>
                             @if (IsSearchInProgress)
@@ -90,7 +102,15 @@
                             <ItemContent>
                                 <div class="chat-item" @onclick="() => OpenChatSummary(summary)">
                                     <div class="chat-info">
-                                        <div class="chat-name">@summary.Name</div>
+                                        <div class="chat-name">
+                                            @summary.Name
+                                            @if (summary.ProviderSource != null)
+                                            {
+                                                <span class="chat-provider-badge" title="@GetProviderNameByType(summary.ProviderSource)">
+                                                    @GetProviderIconByType(summary.ProviderSource) @GetProviderNameByType(summary.ProviderSource)
+                                                </span>
+                                            }
+                                        </div>
                                         <div class="chat-last-message">@summary.LastMessagePreview</div>
                                     </div>
                                     <button class="chat-delete-btn" @onclick:stopPropagation @onclick="() => ShowDeleteChatConfirmation(summary)">
@@ -114,7 +134,15 @@
                         {
                             <div class="chat-item" @onclick="() => OpenChatSummary(summary)">
                                 <div class="chat-info">
-                                    <div class="chat-name">@summary.Name</div>
+                                    <div class="chat-name">
+                                        @summary.Name
+                                        @if (summary.ProviderSource != null)
+                                        {
+                                            <span class="chat-provider-badge" title="@GetProviderNameByType(summary.ProviderSource)">
+                                                @GetProviderIconByType(summary.ProviderSource) @GetProviderNameByType(summary.ProviderSource)
+                                            </span>
+                                        }
+                                    </div>
                                     <div class="chat-last-message">@summary.LastMessagePreview</div>
                                 </div>
                                 <button class="chat-delete-btn" @onclick:stopPropagation @onclick="() => ShowDeleteChatConfirmation(summary)">
@@ -392,6 +420,126 @@
                             }
                         </div>
                     </div>
+
+                    <div class="settings-group">
+                        <h4><i class="bi bi-lightning-charge"></i> @Loc["agent.section_gen_events"]</h4>
+                        <p class="gen-config-hint" style="font-size:0.8em;">@Loc["agent.gen_events_intro"]</p>
+
+                        @foreach (var evt in _agentEvents)
+                        {
+                            <div style="border:1px solid rgba(128,128,128,0.35); border-radius:6px; padding:8px; margin-bottom:8px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span title="@GetProviderTypeName(evt)">@GetProviderIcon(evt)</span>
+                                    <strong style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">@evt.Name</strong>
+                                    <label style="display:flex; align-items:center; gap:4px; font-size:0.8em;">
+                                        <input type="checkbox" checked="@evt.Enabled" @onchange="(e) => OnEventEnabledChanged(evt, e)" />
+                                        @Loc["agent.gen_events_enabled"]
+                                    </label>
+                                    <button class="su-btn su-btn-sm su-btn-outline-primary" title="@Loc["agent.gen_events_trigger"]" @onclick="() => TriggerEventNow(evt)">
+                                        <i class="bi bi-play-fill"></i>
+                                    </button>
+                                    <button class="su-btn su-btn-sm su-btn-outline" title="@Loc["Edit"]" @onclick="() => StartEditEvent(evt)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="su-btn su-btn-sm su-btn-outline-danger" title="@Loc["Delete"]" @onclick="() => ShowDeleteEventConfirmation(evt)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                                <div class="gen-config-hint" style="font-size:0.75em; margin-top:4px;">
+                                    @Loc["agent.gen_events_last_run"]: @(evt.LastTriggerTime?.ToString() ?? Loc["agent.gen_events_never"])
+                                    @if (evt.LastRunStatus != null)
+                                    {
+                                        <text> — @evt.LastRunStatus</text>
+                                    }
+                                    @if (ProviderHost.IsEventRunning(agent!.Guid, evt.Id))
+                                    {
+                                        <text> [@Loc["agent.gen_events_running"]]</text>
+                                    }
+                                </div>
+
+                                @if (_editingEventId == evt.Id && _editingEvent != null)
+                                {
+                                    <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(128,128,128,0.35);">
+                                        <div class="settings-field">
+                                            <label>@Loc["agent.gen_events_name"]</label>
+                                            <input class="shimmer-input" @bind="_editingEvent.Name" @bind:event="oninput" />
+                                        </div>
+
+                                        @if (_editingProviderInstance != null)
+                                        {
+                                            <div class="settings-field">
+                                                <label>@Loc["agent.gen_events_config"]</label>
+                                                <ObjectPropertyForm Target="_editingProviderInstance" OnPipelineTreeEdit="OnPipelineTreeEdit" />
+                                            </div>
+                                        }
+                                        @if (_editingProviderInstance == null)
+                                        {
+                                            <div class="su-alert su-alert-warning">@Loc["agent.gen_events_provider_missing"]</div>
+                                        }
+
+                                        @if (_editingEvent.GeneratedChatGuids.Count > 0)
+                                        {
+                                            <div class="settings-field">
+                                                <label>@Loc["agent.gen_events_generated_chats"]</label>
+                                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                                    @foreach (var chatGuid in _editingEvent.GeneratedChatGuids.Take(10))
+                                                    {
+                                                        <button class="su-btn su-btn-sm su-btn-secondary" style="text-align:left;"
+                                                                @onclick="() => OpenGeneratedChat(chatGuid)">
+                                                            <i class="bi bi-chat-dots"></i> @GetGeneratedChatName(chatGuid)
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+
+                                        <div style="display:flex; gap:8px; margin-top:8px;">
+                                            <button class="su-btn su-btn-primary su-btn-sm" @onclick="SaveEditingEvent">
+                                                <i class="bi bi-check-lg"></i> @Loc["Save"]
+                                            </button>
+                                            <button class="su-btn su-btn-secondary su-btn-sm" @onclick="CancelEditEvent">@Loc["Cancel"]</button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        @if (_agentEvents.Count == 0)
+                        {
+                            <p class="gen-config-hint">@Loc["agent.gen_events_empty"]</p>
+                        }
+
+                        <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+                            <select class="shimmer-input" style="flex:1; max-width:300px;" @bind="_newEventProviderType">
+                                <option value="">@Loc["agent.gen_events_select_provider"]</option>
+                                @foreach (var t in _providerTypes)
+                                {
+                                    <option value="@t.TypeName">@t.Icon @Loc[t.NameKey]</option>
+                                }
+                            </select>
+                            <button class="su-btn su-btn-primary su-btn-sm" @onclick="AddEvent"
+                                    disabled="@string.IsNullOrEmpty(_newEventProviderType)">
+                                <i class="bi bi-plus-lg"></i> @Loc["agent.gen_events_add"]
+                            </button>
+                            <button class="su-btn su-btn-secondary su-btn-sm" @onclick="RefreshEvents" title="@Loc["agent.gen_events_refresh"]">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (DeleteEventPopupVisible)
+                    {
+                        <div class="su-modal-mask" @onclick="() => DeleteEventPopupVisible=false">
+                            <div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
+                                <h5>@Loc["agent.gen_events_delete_title"]</h5>
+                                <p>@Loc.Format("agent.gen_events_delete_msg", EventToDelete?.Name ?? "")</p>
+                                <div class="su-modal-footer">
+                                    <button class="su-btn su-btn-secondary" @onclick="() => DeleteEventPopupVisible=false">@Loc["Cancel"]</button>
+                                    <button class="su-btn su-btn-danger" @onclick="DeleteEventConfirmed">@Loc["Delete"]</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
 
                     <div class="settings-group">
                         <h4><i class="bi bi-puzzle"></i> @Loc["agent.section_plugins"]</h4>
@@ -683,9 +831,14 @@
 
     bool IsSearchActive => !string.IsNullOrWhiteSpace(ChatSearchQuery) || EnableFullTextSearch;
 
-    int EffectiveTotalCount => IsSearchActive
-        ? FilteredChatSummaries.Count
-        : (agent?.GetChatCount() ?? 0);
+    /// <summary>提供者筛选是否激活（默认空 = 仅直接对话）</summary>
+    bool IsProviderFilterActive => _chatProviderFilter != "";
+
+    int EffectiveTotalCount => IsProviderFilterActive
+        ? _providerFilteredSummaries.Count
+        : (IsSearchActive
+            ? FilteredChatSummaries.Count
+            : (agent?.GetChatCount() ?? 0));
 
     int TotalPages => Math.Max(1, (int)Math.Ceiling((double)EffectiveTotalCount / PageSize));
 
@@ -693,6 +846,14 @@
     {
         get
         {
+            if (IsProviderFilterActive)
+            {
+                return _providerFilteredSummaries
+                    .Skip((CurrentPage - 1) * PageSize)
+                    .Take(PageSize)
+                    .ToList();
+            }
+
             if (IsSearchActive)
             {
                 return FilteredChatSummaries
@@ -719,7 +880,7 @@
         }
     }
 
-    bool CanUseVirtualizedList => virtualize && string.IsNullOrWhiteSpace(ChatSearchQuery) && !EnableFullTextSearch;
+    bool CanUseVirtualizedList => virtualize && string.IsNullOrWhiteSpace(ChatSearchQuery) && !EnableFullTextSearch && !IsProviderFilterActive;
 
     const bool EnablePerfLog = true;
     string PerfNow() => DateTime.Now.ToString("HH:mm:ss.fff");
@@ -765,6 +926,7 @@
 
         // ShimmerChat 2.0: tools are now managed via GenerationManager + ToolManager
         LoadPresets();
+        LoadGenerationEvents();
 
         var swTags = Stopwatch.StartNew();
         LoadAllTags();
@@ -1081,8 +1243,30 @@
     {
         if (ChatToDelete != null && agent != null)
         {
-            agent.RemoveChatGuid(ChatToDelete.Guid);
-            agent.Save(kvDataService);
+            if (ChatToDelete.ProviderSource != null)
+            {
+                // 提供器生成的 Chat 不在 agent.ChatGuids 中，
+                // 需从各事件的 GeneratedChatGuids 移除才能使其真正从列表消失
+                var events = EventStore.GetEvents(agent.Guid);
+                var changed = false;
+                foreach (var evt in events)
+                    changed |= evt.GeneratedChatGuids.Remove(ChatToDelete.Guid);
+                if (changed)
+                    EventStore.SaveEvents(agent.Guid, events);
+
+                // EventStore 每次返回反序列化副本，必须重新加载 _agentEvents，
+                // 否则重建筛选列表时旧缓存会把已删除的对话再加回来
+                LoadGenerationEvents(resetEditState: false);
+
+                // 当前页条目被删完时回退页码，避免列表显示为空
+                if (CurrentPage > TotalPages)
+                    CurrentPage = TotalPages;
+            }
+            else
+            {
+                agent.RemoveChatGuid(ChatToDelete.Guid);
+                agent.Save(kvDataService);
+            }
 
             messageStore.DeleteAllMessages(ChatToDelete.Guid);
 
@@ -1291,5 +1475,268 @@
         if (agent == null) return;
         agent.RenderModifierTreeJson = null;
         agent.Save(kvDataService);
+    }
+
+    // ─── 生成事件管理（生成提供器） ───
+
+    private List<GenerationEvent> _agentEvents = new();
+    private IReadOnlyList<ProviderTypeInfo> _providerTypes = new List<ProviderTypeInfo>();
+    private string _newEventProviderType = "";
+    private string? _editingEventId;
+    private GenerationEvent? _editingEvent;
+    private object? _editingProviderInstance;
+    private bool DeleteEventPopupVisible;
+    private GenerationEvent? EventToDelete;
+    private readonly Dictionary<Guid, string> _generatedChatNames = new();
+
+    // 提供者筛选："" = 仅直接对话（默认）；"__all__" = 全部；其余 = 提供器类型名
+    private string _chatProviderFilter = "";
+    private List<ChatSummary> _providerFilteredSummaries = new();
+
+    private void LoadGenerationEvents(bool resetEditState = true)
+    {
+        _agentEvents = agent != null ? EventStore.GetEvents(agent.Guid) : new();
+        _providerTypes = ProviderRegistry.GetAllProviderTypes();
+        _generatedChatNames.Clear();
+
+        if (resetEditState)
+        {
+            _editingEventId = null;
+            _editingEvent = null;
+            _editingProviderInstance = null;
+        }
+        else if (_editingEventId != null
+                 && _agentEvents.All(e => e.Id != _editingEventId))
+        {
+            // 正在编辑的事件已不存在（被删除），退出编辑
+            _editingEventId = null;
+            _editingEvent = null;
+            _editingProviderInstance = null;
+        }
+
+        // 事件列表变化（新增/删除/触发）后同步刷新激活的提供者筛选列表
+        if (IsProviderFilterActive)
+            RebuildProviderFilterList();
+    }
+
+    private async Task RefreshEvents()
+    {
+        LoadGenerationEvents(resetEditState: false);
+        await Task.CompletedTask;
+    }
+
+    private string GetProviderTypeName(GenerationEvent evt)
+        => GetProviderNameByType(evt.ProviderTypeName);
+
+    private string GetProviderIcon(GenerationEvent evt)
+        => GetProviderIconByType(evt.ProviderTypeName);
+
+    private string GetProviderNameByType(string typeName)
+    {
+        var info = ProviderRegistry.GetProviderType(typeName);
+        return info != null ? Loc[info.NameKey] : typeName;
+    }
+
+    private string GetProviderIconByType(string typeName)
+        => ProviderRegistry.GetProviderType(typeName)?.Icon ?? "⚡";
+
+    private void OnChatProviderFilterChanged(ChangeEventArgs e)
+    {
+        _chatProviderFilter = e.Value?.ToString() ?? "";
+        CurrentPage = 1;
+        loadedPage = -1;
+        RebuildProviderFilterList();
+    }
+
+    /// <summary>
+    /// 按当前提供者筛选重建对话列表。直接对话来自 Agent.ChatGuids，
+    /// 提供器对话来自各事件的 GeneratedChatGuids（二者不交叉）。
+    /// </summary>
+    private void RebuildProviderFilterList()
+    {
+        _providerFilteredSummaries = new();
+        if (agent == null || !IsProviderFilterActive) return;
+
+        var guids = new List<Guid>();
+        if (_chatProviderFilter == "__all__")
+        {
+            LoadAllChatSummaries();
+            _providerFilteredSummaries.AddRange(allChatSummaries);
+            foreach (var evt in _agentEvents)
+                guids.AddRange(evt.GeneratedChatGuids);
+        }
+        else
+        {
+            foreach (var evt in _agentEvents.Where(e => e.ProviderTypeName == _chatProviderFilter))
+                guids.AddRange(evt.GeneratedChatGuids);
+        }
+
+        foreach (var g in guids.Distinct())
+        {
+            try
+            {
+                _providerFilteredSummaries.Add(agent.GetChatSummary(g, kvDataService));
+            }
+            catch (Exception ex)
+            {
+                // 对话记录可能已被删除，事件中残留的 GUID 跳过并记录日志
+                logger.LogWarning("[AgentPage] Failed to load provider chat {ChatGuid}: {Message}", g, ex.Message);
+            }
+        }
+
+        _providerFilteredSummaries = _providerFilteredSummaries
+            .OrderByDescending(s => s.LastModifyTime)
+            .ToList();
+    }
+
+    private async Task OnEventEnabledChanged(GenerationEvent evt, ChangeEventArgs e)
+    {
+        if (agent == null) return;
+        evt.Enabled = e.Value is bool b && b;
+        EventStore.UpdateEvent(agent.Guid, evt);
+        await ProviderHost.ReloadEventAsync(agent.Guid, evt.Id);
+        LoadGenerationEvents(resetEditState: false);
+    }
+
+    private void TriggerEventNow(GenerationEvent evt)
+    {
+        if (agent == null) return;
+        var agentGuid = agent.Guid;
+        var eventId = evt.Id;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await ProviderHost.TriggerAsync(agentGuid, eventId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "[AgentPage] Trigger event {EventId} failed: {Message}", eventId, ex.Message);
+            }
+            await InvokeAsync(() => LoadGenerationEvents(resetEditState: false));
+        });
+    }
+
+    private void StartEditEvent(GenerationEvent evt)
+    {
+        if (agent == null) return;
+        if (_editingEventId == evt.Id)
+        {
+            CancelEditEvent();
+            return;
+        }
+
+        var fresh = EventStore.GetEvent(agent.Guid, evt.Id);
+        if (fresh == null) return;
+
+        _editingEventId = fresh.Id;
+        _editingEvent = fresh;
+
+        var typeInfo = ProviderRegistry.GetProviderType(fresh.ProviderTypeName);
+        _editingProviderInstance = typeInfo != null ? ProviderRegistry.CreateInstance(typeInfo) : null;
+        if (_editingProviderInstance != null && !string.IsNullOrEmpty(fresh.ConfigJson))
+        {
+            try
+            {
+                ProviderConfigHelper.Populate(_editingProviderInstance, fresh.ConfigJson);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "[AgentPage] Event config deserialization failed ({EventId}): {Message}",
+                    fresh.Id, ex.Message);
+            }
+        }
+    }
+
+    private void CancelEditEvent()
+    {
+        _editingEventId = null;
+        _editingEvent = null;
+        _editingProviderInstance = null;
+    }
+
+    private async Task SaveEditingEvent()
+    {
+        if (agent == null || _editingEvent == null) return;
+
+        if (_editingProviderInstance != null)
+            _editingEvent.ConfigJson = ProviderConfigHelper.Serialize(_editingProviderInstance);
+
+        EventStore.UpdateEvent(agent.Guid, _editingEvent);
+        await ProviderHost.ReloadEventAsync(agent.Guid, _editingEvent.Id);
+
+        CancelEditEvent();
+        LoadGenerationEvents();
+    }
+
+    private void ShowDeleteEventConfirmation(GenerationEvent evt)
+    {
+        EventToDelete = evt;
+        DeleteEventPopupVisible = true;
+    }
+
+    private async Task DeleteEventConfirmed()
+    {
+        DeleteEventPopupVisible = false;
+        if (agent == null || EventToDelete == null) return;
+
+        await ProviderHost.StopEventAsync(agent.Guid, EventToDelete.Id);
+
+        var events = EventStore.GetEvents(agent.Guid);
+        events.RemoveAll(e => e.Id == EventToDelete.Id);
+        EventStore.SaveEvents(agent.Guid, events);
+
+        EventToDelete = null;
+        LoadGenerationEvents();
+    }
+
+    private void OnPipelineTreeEdit(PipelineTreeEditArgs args)
+    {
+        if (agent == null || _editingEvent == null) return;
+
+        var route = args.Kind switch
+        {
+            ProviderPipelineKind.PreGeneration => "/generationmanager",
+            ProviderPipelineKind.PostGeneration => "/postgeneration",
+            ProviderPipelineKind.RenderModifier => "/messagerender",
+            _ => throw new ArgumentOutOfRangeException(nameof(args), $"Unknown pipeline kind: {args.Kind}")
+        };
+        navigation.NavigateTo($"{route}?agent={agent.Guid}&evt={_editingEvent.Id}&prop={args.PropertyName}");
+    }
+
+    private void OpenGeneratedChat(Guid chatGuid)
+        => navigation.NavigateTo($"/agent/{agent?.Guid}/{chatGuid}");
+
+    private string GetGeneratedChatName(Guid chatGuid)
+    {
+        if (!_generatedChatNames.TryGetValue(chatGuid, out var name))
+        {
+            try
+            {
+                name = Chat.Load(chatGuid, kvDataService)?.Name ?? chatGuid.ToString();
+            }
+            catch (Exception)
+            {
+                name = chatGuid.ToString();
+            }
+            _generatedChatNames[chatGuid] = name;
+        }
+        return name;
+    }
+
+    private void AddEvent()
+    {
+        if (agent == null || string.IsNullOrEmpty(_newEventProviderType)) return;
+
+        var evt = new GenerationEvent
+        {
+            ProviderTypeName = _newEventProviderType,
+            Name = $"{GetProviderTypeName(new GenerationEvent { ProviderTypeName = _newEventProviderType })} {_agentEvents.Count + 1}"
+        };
+
+        EventStore.UpdateEvent(agent.Guid, evt);
+        _newEventProviderType = "";
+        LoadGenerationEvents();
+        StartEditEvent(evt);
     }
 }

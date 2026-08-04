@@ -1,0 +1,201 @@
+@using System.Reflection
+@using ShimmerChatLib.Generation
+@inject ILocService Loc
+
+<div class="generic-editor">
+    @foreach (var prop in _properties.OrderBy(p => p.Order))
+    {
+        <div class="ge-field">
+            <label class="ge-label" title="@(prop.HintKey != null ? Loc[prop.HintKey] : null)">@Loc[prop.LabelKey]</label>
+            <div class="ge-value">
+                @RenderProperty(prop)
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// 反射式属性表单。目标对象中标记了 <see cref="NodePropertyAttribute"/>
+    /// 的公有可读写属性会被自动生成编辑控件（string/int/float/bool/enum）；
+    /// 标记了 <see cref="PipelineTreePropertyAttribute"/> 的属性渲染为
+    /// 管线树编辑入口（通过 <see cref="OnPipelineTreeEdit"/> 回调交由宿主导航）。
+    /// 供生成提供器事件配置等非节点场景复用 GenericNodeEditor 的表单能力。
+    /// </summary>
+    [Parameter] public object Target { get; set; } = default!;
+
+    /// <summary>用户请求编辑某个管线树属性时触发（携带属性名与管线类别）</summary>
+    [Parameter] public EventCallback<PipelineTreeEditArgs> OnPipelineTreeEdit { get; set; }
+
+    private List<PropInfo> _properties = new();
+
+    protected override void OnParametersSet()
+    {
+        BuildPropertyList();
+    }
+
+    private void BuildPropertyList()
+    {
+        _properties.Clear();
+        if (Target == null) return;
+
+        foreach (var prop in ProviderConfigHelper.GetConfigProperties(Target.GetType()))
+        {
+            _properties.Add(new PropInfo(prop));
+        }
+    }
+
+    private RenderFragment RenderProperty(PropInfo prop) => builder =>
+    {
+        var value = prop.GetValue(Target);
+
+        if (prop.TreeKind != null)
+        {
+            // 管线树参数：显示覆盖状态 + 编辑/清除入口，实际编辑在对应的树编辑页完成
+            var overridden = !string.IsNullOrEmpty(value as string);
+
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "style", "display:flex; align-items:center; gap:8px; flex-wrap:wrap;");
+
+            builder.OpenElement(2, "span");
+            builder.AddAttribute(3, "style", "font-size:0.8em; opacity:0.8;");
+            builder.AddContent(4, overridden
+                ? "● " + Loc["prop.tree_override"]
+                : "○ " + Loc["prop.tree_inherit"]);
+            builder.CloseElement();
+
+            builder.OpenElement(5, "button");
+            builder.AddAttribute(6, "class", "su-btn su-btn-sm su-btn-outline-primary");
+            builder.AddAttribute(7, "onclick", EventCallback.Factory.Create<PipelineTreeEditArgs>(this,
+                () => OnPipelineTreeEdit.InvokeAsync(new PipelineTreeEditArgs(prop.Prop.Name, prop.TreeKind!.Value))));
+            builder.AddContent(8, Loc["prop.tree_edit"]);
+            builder.CloseElement();
+
+            if (overridden)
+            {
+                builder.OpenElement(9, "button");
+                builder.AddAttribute(10, "class", "su-btn su-btn-sm su-btn-outline");
+                builder.AddAttribute(11, "onclick", EventCallback.Factory.Create(this, () =>
+                {
+                    prop.SetValue(Target, null);
+                    StateHasChanged();
+                }));
+                builder.AddContent(12, Loc["prop.tree_clear"]);
+                builder.CloseElement();
+            }
+
+            builder.CloseElement();
+            return;
+        }
+
+        if (prop.PropertyType == typeof(string))
+        {
+            if (prop.MultiLine)
+            {
+                builder.OpenElement(0, "textarea");
+                builder.AddAttribute(1, "class", "ge-textarea");
+                builder.AddAttribute(2, "value", value as string ?? "");
+                builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                    v => prop.SetValue(Target, v), value as string ?? ""));
+                builder.CloseElement();
+            }
+            else
+            {
+                builder.OpenElement(0, "input");
+                builder.AddAttribute(1, "class", "ge-input");
+                builder.AddAttribute(2, "value", value as string ?? "");
+                builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                    v => prop.SetValue(Target, v), value as string ?? ""));
+                builder.CloseElement();
+            }
+        }
+        else if (prop.PropertyType == typeof(int))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "number");
+            builder.AddAttribute(2, "class", "ge-input ge-input-num");
+            builder.AddAttribute(3, "value", (int)(value ?? 0));
+            builder.AddAttribute(4, "onchange", EventCallback.Factory.CreateBinder<int>(this,
+                v => prop.SetValue(Target, v), (int)(value ?? 0)));
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType == typeof(bool))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "checkbox");
+            builder.AddAttribute(2, "class", "ge-check");
+            builder.AddAttribute(3, "checked", (bool)(value ?? false));
+            builder.AddAttribute(4, "onchange", EventCallback.Factory.CreateBinder<bool>(this,
+                v => prop.SetValue(Target, v), (bool)(value ?? false)));
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType.IsEnum)
+        {
+            builder.OpenElement(0, "select");
+            builder.AddAttribute(1, "class", "ge-select");
+            var current = value?.ToString() ?? "";
+            builder.AddAttribute(2, "value", current);
+            builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                v => prop.SetValue(Target, Enum.Parse(prop.PropertyType, v)), current));
+            foreach (var name in Enum.GetNames(prop.PropertyType))
+            {
+                builder.OpenElement(4, "option");
+                builder.AddAttribute(5, "value", name);
+                builder.AddContent(6, name);
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType == typeof(float))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "number");
+            builder.AddAttribute(2, "step", "0.1");
+            builder.AddAttribute(3, "class", "ge-input ge-input-num");
+            builder.AddAttribute(4, "value", (float)(value ?? 0f));
+            builder.AddAttribute(5, "onchange", EventCallback.Factory.CreateBinder<float>(this,
+                v => prop.SetValue(Target, v), (float)(value ?? 0f)));
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.AddContent(0, value?.ToString() ?? Loc["node_editor.null_value"]);
+        }
+    };
+
+    private class PropInfo
+    {
+        public string LabelKey { get; }
+        public string? HintKey { get; }
+        public int Order { get; }
+        public bool MultiLine { get; }
+        public ProviderPipelineKind? TreeKind { get; }
+        public PropertyInfo Prop { get; }
+        public Type PropertyType { get; }
+
+        public PropInfo(PropertyInfo prop)
+        {
+            Prop = prop;
+            PropertyType = prop.PropertyType;
+
+            var treeAttr = prop.GetCustomAttribute<PipelineTreePropertyAttribute>();
+            if (treeAttr != null)
+            {
+                LabelKey = treeAttr.LabelKey;
+                HintKey = treeAttr.HintKey;
+                Order = treeAttr.Order;
+                TreeKind = treeAttr.Kind;
+                return;
+            }
+
+            var attr = prop.GetCustomAttribute<NodePropertyAttribute>();
+            LabelKey = attr?.LabelKey ?? prop.Name;
+            HintKey = attr?.HintKey;
+            Order = attr?.Order ?? 0;
+            MultiLine = attr?.MultiLine ?? false;
+        }
+
+        public object? GetValue(object obj) => Prop.GetValue(obj);
+        public void SetValue(object obj, object? value) => Prop.SetValue(obj, value);
+    }
+}

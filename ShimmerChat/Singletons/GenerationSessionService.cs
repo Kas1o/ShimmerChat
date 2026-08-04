@@ -126,9 +126,10 @@ public class GenerationSessionService
 
     /// <summary>
     /// 启动普通生成。会话持有 Chat/Agent 引用，消息操作直接作用在 Chat.Messages 上。
+    /// overrides 非空时用其树 JSON 替代 Agent 的管线树（生成提供器场景）。
     /// </summary>
     public void StartGeneration(GenerationSession session, Agent agent, Chat chat,
-        bool throwExceptionInsteadOfPopup = false)
+        bool throwExceptionInsteadOfPopup = false, PipelineTreeOverrides? overrides = null)
     {
         if (session.IsActive)
         {
@@ -147,7 +148,7 @@ public class GenerationSessionService
         var ct = session.Cts.Token;
         session.RunningTask = Task.Run(() =>
             RunGenerationLoop(session, agent, chat, continuationMessage: null,
-                throwExceptionInsteadOfPopup, ct));
+                throwExceptionInsteadOfPopup, overrides, ct));
     }
 
     /// <summary>
@@ -173,7 +174,7 @@ public class GenerationSessionService
         var ct = session.Cts.Token;
         session.RunningTask = Task.Run(() =>
             RunGenerationLoop(session, agent, chat, continuationMessage,
-                throwExceptionInsteadOfPopup, ct));
+                throwExceptionInsteadOfPopup, overrides: null, ct));
     }
 
     // ---- 生成主循环 ----
@@ -184,6 +185,7 @@ public class GenerationSessionService
         Chat chat,
         Message? continuationMessage,
         bool throwExceptionInsteadOfPopup,
+        PipelineTreeOverrides? overrides,
         CancellationToken ct)
     {
         string? originalContent = continuationMessage?.CurrentVersion?.Content;
@@ -224,6 +226,7 @@ public class GenerationSessionService
                     session.NotifyStateChanged();
                     return Task.CompletedTask;
                 },
+                overrides: overrides,
                 cancellationToken: ct);
         }
         catch (OperationCanceledException)

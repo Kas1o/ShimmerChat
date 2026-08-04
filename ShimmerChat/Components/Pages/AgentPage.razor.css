@@ -148,6 +148,13 @@
             gap: 8px;
         }
 
+        .chat-provider-filter {
+            width: auto;
+            max-width: 170px;
+            padding: 2px 6px;
+            font-size: 0.8rem;
+        }
+
         .chat-search-input {
             width: 100%;
         }
@@ -222,6 +229,22 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        .chat-provider-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            margin-left: 6px;
+            padding: 1px 6px;
+            font-size: 0.7em;
+            font-weight: 500;
+            color: var(--su-accent);
+            background-color: color-mix(in srgb, var(--su-accent) 12%, transparent);
+            border: 1px solid color-mix(in srgb, var(--su-accent) 35%, transparent);
+            border-radius: var(--su-radius-sm, 4px);
+            vertical-align: middle;
+            white-space: nowrap;
         }
 
         .chat-last-message {

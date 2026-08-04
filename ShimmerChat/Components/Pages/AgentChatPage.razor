@@ -414,6 +414,23 @@
 		}
 	}
 
+	/// <summary>
+	/// 生成提供器创建的 Chat 不在 Agent.ChatGuids 中（记录在事件的
+	/// GeneratedChatGuids），通过 Chat 自身盖印的 ProviderSource 识别，
+	/// 允许从事件管理界面/提供者筛选列表直接打开。
+	/// </summary>
+	private bool IsProviderGeneratedChat(Guid chatGuid)
+	{
+		try
+		{
+			return Chat.Load(chatGuid, KVData)?.ProviderSource != null;
+		}
+		catch (InvalidOperationException)
+		{
+			return false;
+		}
+	}
+
 	protected override async Task OnParametersSetAsync()
 	{
 		// 先取消旧会话订阅
@@ -430,7 +447,8 @@
 				agent = Agent.Load(guid, KVData);
 				if (agent != null)
 				{
-					if (Guid.TryParse(ChatGuid, out var chatGuid) && agent.ChatGuids.Contains(chatGuid))
+					if (Guid.TryParse(ChatGuid, out var chatGuid)
+						&& (agent.ChatGuids.Contains(chatGuid) || IsProviderGeneratedChat(chatGuid)))
 					{
 						// 检查是否有活跃的生成会话（从其他页面返回）
 						var existingSession = sessionService.GetSession(ChatGuid);

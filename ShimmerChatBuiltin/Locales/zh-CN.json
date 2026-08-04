@@ -537,5 +537,15 @@
   "node_err.auto_chat_name_generate_failed": "LLM 名称生成失败: {0}",
 
   "node.fallback_execute": "回退执行",
-  "node.fallback_execute.fallback_list": "回退节点列表"
+  "node.fallback_execute.fallback_list": "回退节点列表",
+
+  "provider.cron.name": "CRON 定时任务",
+  "provider.cron.desc": "按 CRON 表达式定时触发一次生成。",
+  "provider.cron.expr": "CRON 表达式",
+  "provider.cron.expr_hint": "5 字段标准格式：分 时 日 月 周。支持 *、区间(a-b)、列表(,)、步进(/n)。例：0 9 * * * = 每天 9:00；*/30 * * * * = 每 30 分钟。",
+  "provider.cron.trigger_text": "触发消息",
+  "provider.cron.trigger_text_hint": "触发时以 System 身份写入会话的消息文本，留空则不写入。",
+  "provider.cron.pre_tree": "前生成树",
+  "provider.cron.post_tree": "后生成树",
+  "provider.cron.render_tree": "渲染修改树"
 }

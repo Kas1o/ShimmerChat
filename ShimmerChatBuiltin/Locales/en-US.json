@@ -537,5 +537,15 @@
   "node_err.auto_chat_name_generate_failed": "LLM name generation failed: {0}",
 
   "node.fallback_execute": "Fallback Execute",
-  "node.fallback_execute.fallback_list": "Fallback Node List"
+  "node.fallback_execute.fallback_list": "Fallback Node List",
+
+  "provider.cron.name": "CRON Schedule",
+  "provider.cron.desc": "Triggers a generation on a CRON schedule.",
+  "provider.cron.expr": "CRON expression",
+  "provider.cron.expr_hint": "Standard 5 fields: minute hour day month weekday. Supports *, ranges (a-b), lists (,) and steps (/n). E.g.: 0 9 * * * = daily at 9:00; */30 * * * * = every 30 minutes.",
+  "provider.cron.trigger_text": "Trigger message",
+  "provider.cron.trigger_text_hint": "Message text written to the chat as System when triggered. Leave empty to skip.",
+  "provider.cron.pre_tree": "Pre-generation tree",
+  "provider.cron.post_tree": "Post-generation tree",
+  "provider.cron.render_tree": "Render modifier tree"
 }

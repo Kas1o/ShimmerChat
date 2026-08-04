@@ -26,6 +26,7 @@ namespace ShimmerChatLib.Interface
             Action<List<ToolCall>> onToolCall,
             Action<(string name, string resp, string id)> onToolResult,
             Func<Task>? onPostGenerationStarted = null,
+            PipelineTreeOverrides? overrides = null,
             CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -38,10 +39,12 @@ namespace ShimmerChatLib.Interface
             Action<(string name, string resp, string id)> onToolResult);
 
         /// <summary>
-        /// 构建生成环境：执行修改器树 + 加载历史消息
+        /// 构建生成环境：执行修改器树 + 加载历史消息。
+        /// overrides 非空时用其树 JSON 替代 Agent 的前生成树（生成提供器场景）。
         /// </summary>
         Task<PreGenerationEnv> BuildEnvironment(
-            Agent agent, Chat chat, CancellationToken ct);
+            Agent agent, Chat chat, CancellationToken ct,
+            PipelineTreeOverrides? overrides = null);
 
         /// <summary>
         /// 后生成处理：执行后生成管线对 LLM 响应消息进行变换。
@@ -50,6 +53,7 @@ namespace ShimmerChatLib.Interface
         Task<ChatMessage> PostProcessAsync(
             Agent agent, ChatMessage responseMessage,
             IReadOnlyList<ContextSegment> preFragments,
-            PersistentEnv persistentEnv, CancellationToken ct);
+            PersistentEnv persistentEnv, CancellationToken ct,
+            PipelineTreeOverrides? overrides = null);
     }
 }

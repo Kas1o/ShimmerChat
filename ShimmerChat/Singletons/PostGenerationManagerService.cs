@@ -30,12 +30,14 @@ namespace ShimmerChat.Singletons
 
         public async Task<ChatMessage> ExecuteAsync(Agent agent, ChatMessage responseMessage,
             IReadOnlyList<ContextSegment> preFragments,
-            PersistentEnv persistentEnv, CancellationToken ct = default)
+            PersistentEnv persistentEnv, CancellationToken ct = default,
+            PipelineTreeOverrides? overrides = null)
         {
             IPostGenerationNode? root;
-            if (!string.IsNullOrEmpty(agent.PostGenerationTreeJson))
+            var postTreeJson = overrides?.PostGenerationTreeJson ?? agent.PostGenerationTreeJson;
+            if (!string.IsNullOrEmpty(postTreeJson))
             {
-                root = _serializer.Deserialize(agent.PostGenerationTreeJson) as IPostGenerationNode
+                root = _serializer.Deserialize(postTreeJson) as IPostGenerationNode
                     ?? CreateFallbackRoot();
             }
             else

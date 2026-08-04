@@ -52,6 +52,13 @@ builder.Services.AddSingleton<IPostGenerationManagerService, PostGenerationManag
 builder.Services.AddSingleton<RenderModifierNodeSerializer>();
 builder.Services.AddSingleton<IRenderModifierManager, RenderModifierManager>();
 
+// 生成提供器系统（Agent 级生成事件：CRON / Hook / 聊天软件集成等）
+builder.Services.AddSingleton<IGenerationProviderRegistry, GenerationProviderRegistry>();
+builder.Services.AddSingleton<IGenerationEventStore, GenerationEventStore>();
+builder.Services.AddSingleton<GenerationProviderHostService>();
+builder.Services.AddSingleton<IProviderTriggerService>(sp => sp.GetRequiredService<GenerationProviderHostService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<GenerationProviderHostService>());
+
 builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();

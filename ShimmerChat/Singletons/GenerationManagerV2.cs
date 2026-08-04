@@ -91,16 +91,24 @@ namespace ShimmerChat.Singletons
             Action<List<ToolCall>> onToolCall,
             Action<(string name, string resp, string id)> onToolResult,
             Func<Task>? onPostGenerationStarted = null,
+            PipelineTreeOverrides? overrides = null,
             CancellationToken cancellationToken = default)
         {
-            var env = await BuildEnvironment(agent, chat, cancellationToken);
+            var env = await BuildEnvironment(agent, chat, cancellationToken, overrides);
 
             var host = new MainLoopHost(this, agent, chat, env,
                 onStreamDelta, onAssistantComplete, onToolCall, onToolResult,
-                onPostGenerationStarted, cancellationToken);
+                onPostGenerationStarted, overrides, cancellationToken);
 
             var apiSetting = env.Transient.API
                 ?? throw new InvalidOperationException("No API configured.");
+
+            // 前生成管线未产出任何消息时明确报错（常见于事件覆盖树缺少
+            // 历史/片段注入节点），避免 LLM 报晦涩的 'messages' array cannot be empty
+            if (env.Transient.Fragments.Count == 0)
+                throw new InvalidOperationException(
+                    "Pre-generation pipeline produced no messages (Fragments is empty). " +
+                    "Add a chat-history or fragment node to the pre-generation tree.");
 
             if (!apiSetting.SupportsToolCalling && env.Transient.Tools.Count > 0)
                 _logger.LogWarning("[GenerationManagerV2] Warning: API does not support tool calling, but {Count} tool(s) are registered.", env.Transient.Tools.Count);
@@ -142,10 +150,12 @@ namespace ShimmerChat.Singletons
         }
 
         /// <summary>
-        /// 构建生成环境：执行修改器树 + 加载历史消息
+        /// 构建生成环境：执行修改器树 + 加载历史消息。
+        /// overrides 非空时用其前生成树 JSON 替代 Agent 的设置（生成提供器场景）。
         /// </summary>
         public async Task<PreGenerationEnv> BuildEnvironment(
-            Agent agent, Chat chat, CancellationToken ct)
+            Agent agent, Chat chat, CancellationToken ct,
+            PipelineTreeOverrides? overrides = null)
         {
             var persistent = new PersistentEnv
             {
@@ -160,9 +170,10 @@ namespace ShimmerChat.Singletons
             };
 
             IPreGenerationNode rootNode;
-            if (!string.IsNullOrEmpty(agent.PreGenerationTreeJson))
+            var preTreeJson = overrides?.PreGenerationTreeJson ?? agent.PreGenerationTreeJson;
+            if (!string.IsNullOrEmpty(preTreeJson))
             {
-                rootNode = _serializer.Deserialize(agent.PreGenerationTreeJson)
+                rootNode = _serializer.Deserialize(preTreeJson)
                     ?? CreateFallbackRoot(agent);
             }
             else
@@ -191,9 +202,10 @@ namespace ShimmerChat.Singletons
         /// 后生成处理：执行后生成管线对 LLM 响应消息进行变换。
         /// </summary>
         public async Task<ChatMessage> PostProcessAsync(Agent agent, ChatMessage responseMessage,
-            IReadOnlyList<ContextSegment> preFragments, PersistentEnv persistentEnv, CancellationToken ct)
+            IReadOnlyList<ContextSegment> preFragments, PersistentEnv persistentEnv, CancellationToken ct,
+            PipelineTreeOverrides? overrides = null)
         {
-            return await _postManager.ExecuteAsync(agent, responseMessage, preFragments, persistentEnv, ct);
+            return await _postManager.ExecuteAsync(agent, responseMessage, preFragments, persistentEnv, ct, overrides);
         }
 
         /// <summary>
@@ -210,6 +222,7 @@ namespace ShimmerChat.Singletons
             private readonly Action<List<ToolCall>>? _onToolCall;
             private readonly Action<(string, string, string)>? _onToolResult;
             private readonly Func<Task>? _onPostGenerationStarted;
+            private readonly PipelineTreeOverrides? _overrides;
             private readonly CancellationToken _ct;
 
             public MainLoopHost(
@@ -222,6 +235,7 @@ namespace ShimmerChat.Singletons
                 Action<List<ToolCall>>? onToolCall,
                 Action<(string, string, string)>? onToolResult,
                 Func<Task>? onPostGenerationStarted,
+                PipelineTreeOverrides? overrides,
                 CancellationToken ct)
             {
                 _manager = manager;
@@ -233,6 +247,7 @@ namespace ShimmerChat.Singletons
                 _onToolCall = onToolCall;
                 _onToolResult = onToolResult;
                 _onPostGenerationStarted = onPostGenerationStarted;
+                _overrides = overrides;
                 _ct = ct;
             }
 
@@ -275,7 +290,7 @@ namespace ShimmerChat.Singletons
                         await _onPostGenerationStarted();
                     var processed = await _manager.PostProcessAsync(
                         _agent, fullResponse.Body,
-                        _env.Transient.Fragments, _env.Persistent, ct);
+                        _env.Transient.Fragments, _env.Persistent, ct, _overrides);
                     fullResponse.Body = processed;
                 }
                 catch (Exception ex)
@@ -293,7 +308,7 @@ namespace ShimmerChat.Singletons
                 _onToolResult?.Invoke((toolCall.name, result, toolCall.id ?? ""));
 
                 // 重建 env，让 AppendChatMessagesNode 从 Chat 统一加载（handleStream 和 onToolResult 已持久化）
-                _env = await _manager.BuildEnvironment(_agent, _chat, ct);
+                _env = await _manager.BuildEnvironment(_agent, _chat, ct, _overrides);
             }
         }
 

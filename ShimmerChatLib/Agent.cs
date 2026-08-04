@@ -384,7 +384,8 @@ namespace ShimmerChatLib
                         CreateTime = chat.CreateTime,
                         LastModifyTime = chat.LastModifyTime,
                         LastMessagePreview = chat.LastMessagePreview,
-                        MessageCount = chat.MessageCount
+                        MessageCount = chat.MessageCount,
+                        ProviderSource = chat.ProviderSource
                     });
                     successCount++;
                 }
@@ -420,7 +421,8 @@ namespace ShimmerChatLib
                 CreateTime = chat.CreateTime,
                 LastModifyTime = chat.LastModifyTime,
                 LastMessagePreview = chat.LastMessagePreview,
-                MessageCount = chat.MessageCount
+                MessageCount = chat.MessageCount,
+                ProviderSource = chat.ProviderSource
             };
         }
 
