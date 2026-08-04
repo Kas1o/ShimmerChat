@@ -435,7 +435,7 @@
                                         <input type="checkbox" checked="@evt.Enabled" @onchange="(e) => OnEventEnabledChanged(evt, e)" />
                                         @Loc["agent.gen_events_enabled"]
                                     </label>
-                                    <button class="su-btn su-btn-sm su-btn-outline-primary" title="@Loc["agent.gen_events_trigger"]" @onclick="() => TriggerEventNow(evt)">
+                                    <button class="su-btn su-btn-sm su-btn-outline-primary" title="@Loc["agent.gen_events_trigger"]" @onclick="() => TriggerEventNow(evt)" disabled="@_triggeringEventIds.Contains(evt.Id)">
                                         <i class="bi bi-play-fill"></i>
                                     </button>
                                     <button class="su-btn su-btn-sm su-btn-outline" title="@Loc["Edit"]" @onclick="() => StartEditEvent(evt)">
@@ -1489,6 +1489,9 @@
     private GenerationEvent? EventToDelete;
     private readonly Dictionary<Guid, string> _generatedChatNames = new();
 
+    /// <summary>正在手动触发中的事件 Id（防重复点击触发并发生成）</summary>
+    private readonly HashSet<string> _triggeringEventIds = new();
+
     // 提供者筛选："" = 仅直接对话（默认）；"__all__" = 全部；其余 = 提供器类型名
     private string _chatProviderFilter = "";
     private List<ChatSummary> _providerFilteredSummaries = new();
@@ -1601,6 +1604,11 @@
     private void TriggerEventNow(GenerationEvent evt)
     {
         if (agent == null) return;
+        // 同一事件已有触发在进行时忽略重复点击，避免并发生成
+        if (!_triggeringEventIds.Add(evt.Id))
+            return;
+        StateHasChanged();
+
         var agentGuid = agent.Guid;
         var eventId = evt.Id;
         _ = Task.Run(async () =>
@@ -1613,7 +1621,15 @@
             {
                 logger.LogError(ex, "[AgentPage] Trigger event {EventId} failed: {Message}", eventId, ex.Message);
             }
-            await InvokeAsync(() => LoadGenerationEvents(resetEditState: false));
+            finally
+            {
+                await InvokeAsync(() =>
+                {
+                    _triggeringEventIds.Remove(eventId);
+                    LoadGenerationEvents(resetEditState: false);
+                    StateHasChanged();
+                });
+            }
         });
     }
 
@@ -1731,7 +1747,7 @@
         var evt = new GenerationEvent
         {
             ProviderTypeName = _newEventProviderType,
-            Name = $"{GetProviderTypeName(new GenerationEvent { ProviderTypeName = _newEventProviderType })} {_agentEvents.Count + 1}"
+            Name = $"{GetProviderNameByType(_newEventProviderType)} {_agentEvents.Count + 1}"
         };
 
         EventStore.UpdateEvent(agent.Guid, evt);

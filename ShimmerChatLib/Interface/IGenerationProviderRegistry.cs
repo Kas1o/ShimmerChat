@@ -47,5 +47,13 @@ namespace ShimmerChatLib.Interface
 
         /// <summary>更新单个事件（不存在则追加）</summary>
         void UpdateEvent(Guid agentGuid, GenerationEvent evt);
+
+        /// <summary>
+        /// 仅更新事件的运行状态字段（LastTriggerTime / LastRunStatus），
+        /// 其余字段以存储中的最新值为准，避免后台线程用生成开始时的
+        /// 旧快照覆盖生成期间用户对事件配置的并发修改。
+        /// </summary>
+        void UpdateEventStatus(Guid agentGuid, string eventId,
+            DateTime? lastTriggerTime, string? lastRunStatus);
     }
 }

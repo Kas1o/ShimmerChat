@@ -228,6 +228,7 @@
   "prop.tree_override": "已覆盖",
   "prop.tree_inherit": "继承智能体",
   "editor.event_prop_missing": "缺少 prop 查询参数（提供器配置中的管线树属性名）。",
+  "editor.event_tree_template_hint": "提示：未设置覆盖时以智能体树为模板，保存后将固化为本事件专用的覆盖树；在事件配置中点「清除覆盖」可恢复继承智能体。",
   "agent.section_plugins": "插件",
   "agent.export_agent": "导出智能体",
   "agent.not_exist": "智能体 \"{0}\" 不存在。",

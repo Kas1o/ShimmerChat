@@ -23,11 +23,32 @@ namespace ShimmerChatLib.Generation
             return obj.ToString(Formatting.None);
         }
 
-        /// <summary>用 ConfigJson 填充提供器实例的配置属性（空 JSON 时不做任何操作）</summary>
+        /// <summary>
+        /// 用 ConfigJson 填充提供器实例的配置属性（空 JSON 时不做任何操作）。
+        /// 只填充标记了配置 Attribute 的属性，避免 PopulateObject 写入
+        /// 实例上其他同名公有可写成员（如注入的服务）。
+        /// </summary>
         public static void Populate(object instance, string? configJson)
         {
-            if (string.IsNullOrEmpty(configJson)) return;
-            JsonConvert.PopulateObject(configJson, instance);
+            if (string.IsNullOrWhiteSpace(configJson)) return;
+            var obj = JObject.Parse(configJson);
+            foreach (var prop in GetConfigProperties(instance.GetType()))
+            {
+                if (!obj.TryGetValue(prop.Name, out var token)) continue;
+
+                if (token.Type == JTokenType.Null)
+                {
+                    // 仅引用类型与可空值类型可被置为 null
+                    if (!prop.PropertyType.IsValueType
+                        || Nullable.GetUnderlyingType(prop.PropertyType) != null)
+                    {
+                        prop.SetValue(instance, null);
+                    }
+                    continue;
+                }
+
+                prop.SetValue(instance, token.ToObject(prop.PropertyType));
+            }
         }
 
         /// <summary>

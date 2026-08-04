@@ -9,6 +9,7 @@
 @inject INodeTypeCatalog NodeTypeCatalog
 @inject IGenerationEventStore EventStore
 @inject IGenerationProviderRegistry ProviderRegistry
+@inject GenerationProviderHostService ProviderHost
 @inject IJSRuntime JS
 @inject ILocService Loc
 
@@ -25,6 +26,10 @@
     @if (_eventConfigError != null)
     {
         <div class="su-alert su-alert-danger" style="margin-top:8px;">@_eventConfigError</div>
+    }
+    @if (_targetEvent != null && _eventConfigError == null)
+    {
+        <div class="su-alert su-alert-info" style="margin-top:8px;">@Loc["editor.event_tree_template_hint"]</div>
     }
 }
 
@@ -326,7 +331,7 @@
         SavePresets();
     }
 
-    private void SaveAll()
+    private async Task SaveAll()
     {
         if (_editingRoot == null) return;
 
@@ -338,6 +343,9 @@
                 ProviderConfigHelper.SetTreeJson(_eventProviderInstance, prop, Serializer.Serialize(_editingRoot));
                 _targetEvent.ConfigJson = ProviderConfigHelper.Serialize(_eventProviderInstance);
                 EventStore.UpdateEvent(_agentGuid, _targetEvent);
+                // 重载运行中的提供器实例，使新树覆盖立即生效
+                // （否则运行中的实例仍持有旧配置，触发时继续使用旧树）
+                await ProviderHost.ReloadEventAsync(_agentGuid, _targetEvent.Id);
                 return;
             }
 

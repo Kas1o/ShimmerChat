@@ -228,6 +228,7 @@
   "prop.tree_override": "overridden",
   "prop.tree_inherit": "inherits agent",
   "editor.event_prop_missing": "Missing 'prop' query parameter (pipeline tree property name in provider config).",
+  "editor.event_tree_template_hint": "Tip: when no override is set, the agent tree is used as a template; saving will persist it as this event's dedicated override tree. Use \"Clear override\" in the event config to inherit from the agent again.",
   "agent.section_plugins": "Plugins",
   "agent.export_agent": "Export Agent",
   "agent.not_exist": "the agent \"{0}\" not exist.",

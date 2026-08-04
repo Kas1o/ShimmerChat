@@ -74,7 +74,19 @@ namespace ShimmerChatBuiltin.Providers
                             $"[{runtime.AgentGuid}/{runtime.Event.Id}] Cron generation failed: {ex.Message}");
                     }
 
-                    next = schedule.GetNextOccurrence(DateTime.Now);
+                    try
+                    {
+                        next = schedule.GetNextOccurrence(DateTime.Now);
+                    }
+                    catch (Exception ex)
+                    {
+                        // 未来一年内没有可匹配时刻（如 "0 0 30 2 *" 之类的非法日期表达式）：
+                        // 记录错误并正常退出调度循环，避免未观察异常静默杀死循环、
+                        // 而 UI 仍显示"运行中"的假象
+                        runtime.DebugOutput.Write("CronProvider", "error",
+                            $"[{runtime.AgentGuid}/{runtime.Event.Id}] Cron schedule exhausted: {ex.Message}");
+                        break;
+                    }
                 }
             }, token);
 
@@ -88,6 +100,7 @@ namespace ShimmerChatBuiltin.Providers
             {
                 try { await _loop; }
                 catch (OperationCanceledException) { }
+                catch (Exception) { /* 循环已因调度耗尽等异常退出，忽略 */ }
             }
             _cts?.Dispose();
             _cts = null;
@@ -200,7 +213,8 @@ namespace ShimmerChatBuiltin.Providers
                     if (!int.TryParse(part[(stepIdx + 1)..], out step) || step <= 0)
                         throw new FormatException($"Invalid cron step: '{raw}'.");
                     part = part[..stepIdx];
-                    if (part == "*")
+                    // "*/N" 与空前缀（无区间基数的步进）都视为全范围步进
+                    if (part is "" or "*")
                         part = $"{min}-{max}";
                 }
 

@@ -419,16 +419,28 @@
 	/// GeneratedChatGuids），通过 Chat 自身盖印的 ProviderSource 识别，
 	/// 允许从事件管理界面/提供者筛选列表直接打开。
 	/// </summary>
+	/// <remarks>
+	/// Chat 的来源身份（是否提供器生成）不会变化，缓存于页面实例避免
+	/// 每次参数变化都重新读取并反序列化 Chat。
+	/// </remarks>
+	private readonly Dictionary<Guid, bool> _providerChatCache = new();
+
 	private bool IsProviderGeneratedChat(Guid chatGuid)
 	{
+		if (_providerChatCache.TryGetValue(chatGuid, out var cached))
+			return cached;
+
+		bool isProvider;
 		try
 		{
-			return Chat.Load(chatGuid, KVData)?.ProviderSource != null;
+			isProvider = Chat.Load(chatGuid, KVData)?.ProviderSource != null;
 		}
 		catch (InvalidOperationException)
 		{
-			return false;
+			isProvider = false;
 		}
+		_providerChatCache[chatGuid] = isProvider;
+		return isProvider;
 	}
 
 	protected override async Task OnParametersSetAsync()

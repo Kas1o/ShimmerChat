@@ -95,7 +95,7 @@
                 builder.OpenElement(0, "textarea");
                 builder.AddAttribute(1, "class", "ge-textarea");
                 builder.AddAttribute(2, "value", value as string ?? "");
-                builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                builder.AddAttribute(3, "oninput", EventCallback.Factory.CreateBinder<string>(this,
                     v => prop.SetValue(Target, v), value as string ?? ""));
                 builder.CloseElement();
             }
@@ -104,7 +104,7 @@
                 builder.OpenElement(0, "input");
                 builder.AddAttribute(1, "class", "ge-input");
                 builder.AddAttribute(2, "value", value as string ?? "");
-                builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                builder.AddAttribute(3, "oninput", EventCallback.Factory.CreateBinder<string>(this,
                     v => prop.SetValue(Target, v), value as string ?? ""));
                 builder.CloseElement();
             }

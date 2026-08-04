@@ -127,9 +127,11 @@ public class GenerationSessionService
     /// <summary>
     /// 启动普通生成。会话持有 Chat/Agent 引用，消息操作直接作用在 Chat.Messages 上。
     /// overrides 非空时用其树 JSON 替代 Agent 的管线树（生成提供器场景）。
+    /// externalCt 非空时与会话取消令牌链接：外部令牌取消（如提供器停止）会同时取消本次生成。
     /// </summary>
     public void StartGeneration(GenerationSession session, Agent agent, Chat chat,
-        bool throwExceptionInsteadOfPopup = false, PipelineTreeOverrides? overrides = null)
+        bool throwExceptionInsteadOfPopup = false, PipelineTreeOverrides? overrides = null,
+        CancellationToken externalCt = default)
     {
         if (session.IsActive)
         {
@@ -141,6 +143,7 @@ public class GenerationSessionService
         session.Chat = chat;
         session.Agent = agent;
         session.ResetCts();
+        session.LinkExternalToken(externalCt);
         session.IsActive = true;
         session.Phase = "pre";
         session.NotifyStateChanged();
@@ -386,6 +389,12 @@ public class GenerationSessionService
     {
         chat.LastModifyTime = DateTime.Now;
         chat.Save(_kvData);
+
+        // 提供器生成的 Chat 不在 Agent.ChatGuids 中（记录在事件的 GeneratedChatGuids），
+        // MoveChatToTop 对它是无操作，无需因此整写 Agent
+        if (chat.ProviderSource != null)
+            return;
+
         agent.MoveChatToTop(chat.Guid);
         agent.Save(_kvData);
     }

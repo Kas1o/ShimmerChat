@@ -36,6 +36,10 @@ namespace ShimmerChat.Singletons
         /// <summary>运行中的提供器实例，键为 "{agentGuid}:{eventId}"</summary>
         private readonly ConcurrentDictionary<string, IGenerationProvider> _running = new();
 
+        /// <summary>事件生命周期操作互斥锁：防止启动扫描与 UI 操作并发触发
+        /// 同一事件的 Stop→Start 时产生双实例泄漏（两个 CRON 循环同时运行）</summary>
+        private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+
         public GenerationProviderHostService(
             IGenerationProviderRegistry registry,
             IGenerationEventStore eventStore,
@@ -110,10 +114,18 @@ namespace ShimmerChat.Singletons
         /// </summary>
         public async Task ReloadEventAsync(Guid agentGuid, string eventId)
         {
-            await StopEventAsync(agentGuid, eventId);
-            var evt = _eventStore.GetEvent(agentGuid, eventId);
-            if (evt != null && evt.Enabled)
-                await StartEventAsync(agentGuid, evt);
+            await _lifecycleLock.WaitAsync();
+            try
+            {
+                await StopEventCoreAsync(agentGuid, eventId);
+                var evt = _eventStore.GetEvent(agentGuid, eventId);
+                if (evt != null && evt.Enabled)
+                    await StartEventCoreAsync(agentGuid, evt);
+            }
+            finally
+            {
+                _lifecycleLock.Release();
+            }
         }
 
         /// <summary>
@@ -121,21 +133,42 @@ namespace ShimmerChat.Singletons
         /// </summary>
         public async Task ReloadAgentAsync(Guid agentGuid)
         {
-            var prefix = agentGuid.ToString() + ":";
-            foreach (var key in _running.Keys.Where(k => k.StartsWith(prefix)).ToList())
+            await _lifecycleLock.WaitAsync();
+            try
             {
-                await StopEventAsync(agentGuid, key[prefix.Length..]);
-            }
+                var prefix = agentGuid.ToString() + ":";
+                foreach (var key in _running.Keys.Where(k => k.StartsWith(prefix)).ToList())
+                {
+                    await StopEventCoreAsync(agentGuid, key[prefix.Length..]);
+                }
 
-            foreach (var evt in _eventStore.GetEvents(agentGuid))
+                foreach (var evt in _eventStore.GetEvents(agentGuid))
+                {
+                    if (evt.Enabled)
+                        await StartEventCoreAsync(agentGuid, evt);
+                }
+            }
+            finally
             {
-                if (evt.Enabled)
-                    await StartEventAsync(agentGuid, evt);
+                _lifecycleLock.Release();
             }
         }
 
         /// <summary>停止指定事件的提供器实例（事件删除/禁用时由 UI 调用）</summary>
         public async Task StopEventAsync(Guid agentGuid, string eventId)
+        {
+            await _lifecycleLock.WaitAsync();
+            try
+            {
+                await StopEventCoreAsync(agentGuid, eventId);
+            }
+            finally
+            {
+                _lifecycleLock.Release();
+            }
+        }
+
+        private async Task StopEventCoreAsync(Guid agentGuid, string eventId)
         {
             if (_running.TryRemove(MakeKey(agentGuid, eventId), out var provider))
             {
@@ -152,13 +185,21 @@ namespace ShimmerChat.Singletons
             }
         }
 
-        private async Task StartEventAsync(Guid agentGuid, GenerationEvent evt)
+        private async Task StartEventCoreAsync(Guid agentGuid, GenerationEvent evt)
         {
+            // 防御：生命周期锁内正常不会重复启动，但防止未来调用路径遗漏
+            if (_running.ContainsKey(MakeKey(agentGuid, evt.Id)))
+            {
+                _logger.LogWarning(
+                    "[GenerationProviderHost] Provider already running (Agent {AgentGuid}, Event {EventId}), skip start",
+                    agentGuid, evt.Id);
+                return;
+            }
+
             var typeInfo = _registry.GetProviderType(evt.ProviderTypeName);
             if (typeInfo == null)
             {
-                evt.LastRunStatus = "PROVIDER_MISSING";
-                _eventStore.UpdateEvent(agentGuid, evt);
+                _eventStore.UpdateEventStatus(agentGuid, evt.Id, null, "PROVIDER_MISSING");
                 _logger.LogWarning(
                     "[GenerationProviderHost] Provider type '{TypeName}' not found (plugin missing?). Agent {AgentGuid}, Event {EventId}",
                     evt.ProviderTypeName, agentGuid, evt.Id);
@@ -177,8 +218,7 @@ namespace ShimmerChat.Singletons
                 }
                 catch (Exception ex)
                 {
-                    evt.LastRunStatus = $"CONFIG_ERROR: {ex.Message}";
-                    _eventStore.UpdateEvent(agentGuid, evt);
+                    _eventStore.UpdateEventStatus(agentGuid, evt.Id, null, $"CONFIG_ERROR: {ex.Message}");
                     _logger.LogError(ex,
                         "[GenerationProviderHost] Config deserialization failed (Agent {AgentGuid}, Event {EventId}): {Message}",
                         agentGuid, evt.Id, ex.Message);
@@ -203,8 +243,7 @@ namespace ShimmerChat.Singletons
             }
             catch (Exception ex)
             {
-                evt.LastRunStatus = $"START_ERROR: {ex.Message}";
-                _eventStore.UpdateEvent(agentGuid, evt);
+                _eventStore.UpdateEventStatus(agentGuid, evt.Id, null, $"START_ERROR: {ex.Message}");
                 _debugOutput.Write("GenerationProvider", "error",
                     $"[{agentGuid}/{evt.Id}] Provider start failed: {ex.Message}");
                 _logger.LogError(ex,
@@ -290,30 +329,33 @@ namespace ShimmerChat.Singletons
             var chatGuidStr = chat.Guid.ToString();
             var session = _sessionService.GetOrCreateSession(chatGuidStr, agent.Guid.ToString());
             _sessionService.StartGeneration(session, agent, chat,
-                throwExceptionInsteadOfPopup: true, overrides: overrides);
+                throwExceptionInsteadOfPopup: true, overrides: overrides, externalCt: ct);
 
             var running = session.RunningTask;
             if (running != null)
             {
+                string status;
                 try
                 {
                     await running;
-                    evt.LastRunStatus = "OK";
+                    status = "OK";
                 }
                 catch (OperationCanceledException)
                 {
-                    evt.LastRunStatus = "CANCELLED";
+                    status = "CANCELLED";
                 }
                 catch (Exception ex)
                 {
-                    evt.LastRunStatus = $"ERROR: {ex.Message}";
+                    status = $"ERROR: {ex.Message}";
                     _debugOutput.Write("GenerationProvider", "error",
                         $"[{agentGuid}/{eventId}] Generation failed: {ex}");
                     _logger.LogError(ex,
                         "[GenerationProviderHost] Trigger generation failed (Agent {AgentGuid}, Event {EventId})",
                         agentGuid, eventId);
                 }
-                _eventStore.UpdateEvent(agentGuid, evt);
+                // 只回写状态字段：用生成开始时的旧快照整体覆盖会丢失
+                // 生成期间用户对事件配置的并发修改
+                _eventStore.UpdateEventStatus(agentGuid, eventId, null, status);
             }
 
             _sessionService.CleanupSession(chatGuidStr);

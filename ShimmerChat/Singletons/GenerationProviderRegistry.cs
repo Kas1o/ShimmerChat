@@ -83,6 +83,10 @@ namespace ShimmerChat.Singletons
     {
         private const string SpaceId = "GenerationProviders";
 
+        /// <summary>序列化锁：GetEvents→修改→SaveEvents 的 read-modify-write 需互斥，
+        /// 否则后台触发线程与 UI 编辑并发时可能互相覆盖（丢失配置修改或状态更新）</summary>
+        private readonly object _lock = new();
+
         private readonly IKVDataService _kvData;
         private readonly ILogger<GenerationEventStore> _logger;
 
@@ -93,6 +97,14 @@ namespace ShimmerChat.Singletons
         }
 
         public List<GenerationEvent> GetEvents(Guid agentGuid)
+        {
+            lock (_lock)
+            {
+                return GetEventsCore(agentGuid);
+            }
+        }
+
+        private List<GenerationEvent> GetEventsCore(Guid agentGuid)
         {
             var json = _kvData.Read(SpaceId, agentGuid.ToString());
             if (string.IsNullOrEmpty(json))
@@ -113,24 +125,51 @@ namespace ShimmerChat.Singletons
 
         public GenerationEvent? GetEvent(Guid agentGuid, string eventId)
         {
-            return GetEvents(agentGuid).FirstOrDefault(e => e.Id == eventId);
+            lock (_lock)
+            {
+                return GetEventsCore(agentGuid).FirstOrDefault(e => e.Id == eventId);
+            }
         }
 
         public void SaveEvents(Guid agentGuid, List<GenerationEvent> events)
         {
-            _kvData.Write(SpaceId, agentGuid.ToString(),
-                Newtonsoft.Json.JsonConvert.SerializeObject(events));
+            lock (_lock)
+            {
+                _kvData.Write(SpaceId, agentGuid.ToString(),
+                    Newtonsoft.Json.JsonConvert.SerializeObject(events));
+            }
         }
 
         public void UpdateEvent(Guid agentGuid, GenerationEvent evt)
         {
-            var events = GetEvents(agentGuid);
-            var index = events.FindIndex(e => e.Id == evt.Id);
-            if (index >= 0)
-                events[index] = evt;
-            else
-                events.Add(evt);
-            SaveEvents(agentGuid, events);
+            lock (_lock)
+            {
+                var events = GetEventsCore(agentGuid);
+                var index = events.FindIndex(e => e.Id == evt.Id);
+                if (index >= 0)
+                    events[index] = evt;
+                else
+                    events.Add(evt);
+                _kvData.Write(SpaceId, agentGuid.ToString(),
+                    Newtonsoft.Json.JsonConvert.SerializeObject(events));
+            }
+        }
+
+        public void UpdateEventStatus(Guid agentGuid, string eventId,
+            DateTime? lastTriggerTime, string? lastRunStatus)
+        {
+            lock (_lock)
+            {
+                var events = GetEventsCore(agentGuid);
+                var index = events.FindIndex(e => e.Id == eventId);
+                if (index < 0)
+                    return;
+                if (lastTriggerTime.HasValue)
+                    events[index].LastTriggerTime = lastTriggerTime;
+                events[index].LastRunStatus = lastRunStatus;
+                _kvData.Write(SpaceId, agentGuid.ToString(),
+                    Newtonsoft.Json.JsonConvert.SerializeObject(events));
+            }
         }
     }
 }

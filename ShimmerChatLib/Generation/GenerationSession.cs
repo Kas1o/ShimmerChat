@@ -1,3 +1,4 @@
+using System.Threading;
 using SharperLLM.API;
 using SharperLLM.Util;
 
@@ -87,6 +88,19 @@ public class GenerationSession
     {
         Cts?.Dispose();
         Cts = new CancellationTokenSource();
+    }
+
+    /// <summary>
+    /// 链接外部取消令牌（如生成提供器停止）。外部令牌被取消时，
+    /// 本会话的生成也会一并取消；取消本会话（用户停止）不影响外部令牌。
+    /// 须在 <see cref="Cts"/> 已重置、且生成任务启动前调用。
+    /// </summary>
+    internal void LinkExternalToken(CancellationToken externalToken)
+    {
+        if (!externalToken.CanBeCanceled) return;
+        var linked = CancellationTokenSource.CreateLinkedTokenSource(Cts.Token, externalToken);
+        Cts.Dispose();
+        Cts = linked;
     }
 
     internal void DisposeCts()
