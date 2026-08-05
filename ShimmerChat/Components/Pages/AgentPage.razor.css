@@ -561,8 +561,8 @@
             padding-top: 8px;
         }
 
-        /* Portrait / narrow screen */
-        @@media (max-width: 768px) {
+        /* Portrait (aligned with MainLayout: innerHeight > innerWidth) */
+        @media (orientation: portrait) {
             .agent-tabs {
                 display: flex;
             }
