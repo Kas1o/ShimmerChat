@@ -102,23 +102,42 @@ namespace ShimmerChat.Singletons
             }
         }
 
-        public List<DebugOutputEntry> GetEntries(int skip, int take, string? sourceFilter = null, string? categoryFilter = null)
+        /// <summary>
+        /// 判断条目是否匹配筛选条件。来源/类别使用序数相等匹配，
+        /// 关键词对来源/类别/内容做不区分大小写的包含匹配，时间为闭区间。
+        /// </summary>
+        private static bool Matches(DebugOutputEntry e, string? sourceFilter, string? categoryFilter, string? keyword, DateTime? from, DateTime? to)
+        {
+            if (!string.IsNullOrEmpty(sourceFilter) && !string.Equals(e.Source, sourceFilter, StringComparison.Ordinal))
+                return false;
+            if (!string.IsNullOrEmpty(categoryFilter) && !string.Equals(e.Category, categoryFilter, StringComparison.Ordinal))
+                return false;
+            if (!string.IsNullOrEmpty(keyword) &&
+                !e.Source.Contains(keyword, StringComparison.OrdinalIgnoreCase) &&
+                !e.Category.Contains(keyword, StringComparison.OrdinalIgnoreCase) &&
+                !e.Content.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (from.HasValue && e.Timestamp < from.Value)
+                return false;
+            if (to.HasValue && e.Timestamp > to.Value)
+                return false;
+            return true;
+        }
+
+        public List<DebugOutputEntry> GetEntries(int skip, int take, string? sourceFilter = null, string? categoryFilter = null, string? keyword = null, DateTime? from = null, DateTime? to = null)
         {
             return ReadAllEntries()
-                .Where(e => string.IsNullOrEmpty(sourceFilter) || e.Source == sourceFilter)
-                .Where(e => string.IsNullOrEmpty(categoryFilter) || e.Category == categoryFilter)
+                .Where(e => Matches(e, sourceFilter, categoryFilter, keyword, from, to))
                 .OrderByDescending(e => e.Timestamp)
                 .Skip(skip)
                 .Take(take)
                 .ToList();
         }
 
-        public int GetCount(string? sourceFilter = null, string? categoryFilter = null)
+        public int GetCount(string? sourceFilter = null, string? categoryFilter = null, string? keyword = null, DateTime? from = null, DateTime? to = null)
         {
             return ReadAllEntries()
-                .Count(e =>
-                    (string.IsNullOrEmpty(sourceFilter) || e.Source == sourceFilter) &&
-                    (string.IsNullOrEmpty(categoryFilter) || e.Category == categoryFilter));
+                .Count(e => Matches(e, sourceFilter, categoryFilter, keyword, from, to));
         }
 
         public List<string> GetSources()
@@ -155,6 +174,62 @@ namespace ShimmerChat.Singletons
                 _logger.LogError(ex, "Failed to delete debug output entry {Id}: {Message}", id, ex.Message);
                 throw;
             }
+        }
+
+        public int TrimToRecent(int keep)
+        {
+            var all = ReadAllEntries();
+
+            if (keep <= 0)
+            {
+                ClearAll();
+                return all.Count;
+            }
+
+            if (all.Count <= keep)
+                return 0;
+
+            var keepSet = all
+                .OrderByDescending(e => e.Timestamp)
+                .Take(keep)
+                .Select(e => e.Id)
+                .ToHashSet();
+
+            var toDelete = all.Where(e => !keepSet.Contains(e.Id)).ToList();
+            foreach (var entry in toDelete)
+            {
+                try
+                {
+                    File.Delete(GetEntryFilePath(entry.Id));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to delete debug output entry {Id} during trim: {Message}", entry.Id, ex.Message);
+                    throw;
+                }
+            }
+            return toDelete.Count;
+        }
+
+        public int DeleteOlderThan(DateTime cutoffUtc)
+        {
+            var toDelete = ReadAllEntries()
+                .Where(e => e.Timestamp < cutoffUtc)
+                .ToList();
+
+            foreach (var entry in toDelete)
+            {
+                try
+                {
+                    File.Delete(GetEntryFilePath(entry.Id));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to delete debug output entry {Id} older than cutoff: {Message}", entry.Id, ex.Message);
+                    throw;
+                }
+            }
+            return toDelete.Count;
         }
 
         public void ClearAll()

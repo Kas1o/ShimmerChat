@@ -1,0 +1,728 @@
+@page "/debugoutput"
+@using ShimmerChatLib.Models
+@using System.Text
+@using System.Text.Json
+@inject IDebugOutputService DebugOutput
+@inject ILocService Loc
+@inject IJSRuntime JSRuntime
+@inject ILogger<DebugOutputPage> Logger
+@implements IAsyncDisposable
+
+<div class="debug-page">
+    <div class="debug-page-header">
+        <h2>@Loc["debug.title"]</h2>
+        <div class="debug-page-header-actions">
+            <label class="debug-auto-refresh">
+                <input type="checkbox" @bind="autoRefresh" @bind:after="OnAutoRefreshChanged" />
+                <span>@Loc["debug.auto_refresh"]</span>
+            </label>
+            <select class="su-select su-select-sm" @bind="refreshIntervalSeconds" @bind:after="OnRefreshIntervalChanged" disabled="@(!autoRefresh)">
+                <option value="1">1s</option>
+                <option value="3">3s</option>
+                <option value="5">5s</option>
+                <option value="10">10s</option>
+                <option value="30">30s</option>
+            </select>
+            <button class="su-btn su-btn-outline" @onclick="Reload" title="@Loc["debug.refresh"]">
+                <i class="bi bi-arrow-clockwise"></i> @Loc["debug.refresh"]
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(lastError))
+    {
+        <div class="debug-error-banner">
+            <i class="bi bi-exclamation-triangle"></i> @lastError
+        </div>
+    }
+
+    <div class="debug-stats">
+        <div class="debug-stat-card">
+            <div class="debug-stat-value">@totalCount</div>
+            <div class="debug-stat-label">@Loc["debug.stat.filtered"]</div>
+        </div>
+        <div class="debug-stat-card">
+            <div class="debug-stat-value">@allCount</div>
+            <div class="debug-stat-label">@Loc["debug.stat.total"]</div>
+        </div>
+        <div class="debug-stat-card">
+            <div class="debug-stat-value">@sources.Count</div>
+            <div class="debug-stat-label">@Loc["debug.stat.sources"]</div>
+        </div>
+        <div class="debug-stat-card">
+            <div class="debug-stat-value">@categories.Count</div>
+            <div class="debug-stat-label">@Loc["debug.stat.categories"]</div>
+        </div>
+    </div>
+
+    <div class="debug-filters">
+        <div class="su-form-group">
+            <label>@Loc["debug.filter.source"]</label>
+            <select class="su-select" @bind="sourceFilter" @bind:after="ApplyFilters">
+                <option value="">@Loc["debug.filter.all"]</option>
+                @foreach (var s in sources)
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+        </div>
+        <div class="su-form-group">
+            <label>@Loc["debug.filter.category"]</label>
+            <select class="su-select" @bind="categoryFilter" @bind:after="ApplyFilters">
+                <option value="">@Loc["debug.filter.all"]</option>
+                @foreach (var c in categories)
+                {
+                    <option value="@c">@c</option>
+                }
+            </select>
+        </div>
+        <div class="su-form-group">
+            <label>@Loc["debug.filter.keyword"]</label>
+            <input type="text" class="su-input" @bind="keyword" @onkeydown="OnKeywordKeydown" placeholder="@Loc["debug.filter.keyword_placeholder"]" />
+        </div>
+        <div class="su-form-group">
+            <label>@Loc["debug.filter.from"]</label>
+            <input type="datetime-local" class="su-input" @bind="dateFrom" @bind:after="ApplyFilters" />
+        </div>
+        <div class="su-form-group">
+            <label>@Loc["debug.filter.to"]</label>
+            <input type="datetime-local" class="su-input" @bind="dateTo" @bind:after="ApplyFilters" />
+        </div>
+        <div class="debug-filter-actions">
+            <button class="su-btn su-btn-primary" @onclick="ApplyFilters">@Loc["debug.filter.apply"]</button>
+            <button class="su-btn su-btn-secondary" @onclick="ResetFilters">@Loc["debug.filter.reset"]</button>
+        </div>
+    </div>
+
+    <div class="debug-toolbar">
+        <div class="debug-toolbar-left">
+            <label class="debug-select-all">
+                <input type="checkbox" checked="@(entries.Count > 0 && selected.Count == entries.Count)" @onchange="ToggleSelectAll" />
+                <span>@Loc["debug.select_all"]</span>
+            </label>
+            <span class="debug-selected-count">@Loc.Format("debug.selected_count", selected.Count)</span>
+        </div>
+        <div class="debug-toolbar-right">
+            <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="DeleteSelected" disabled="@(selected.Count == 0)">
+                <i class="bi bi-trash"></i> @Loc["debug.delete_selected"]
+            </button>
+            <div class="debug-export">
+                <span class="debug-export-label">@Loc["debug.export"]:</span>
+                <button class="su-btn su-btn-outline su-btn-sm" @onclick="() => Export(ExportFormat.Json)" title="JSON">JSON</button>
+                <button class="su-btn su-btn-outline su-btn-sm" @onclick="() => Export(ExportFormat.Txt)" title="TXT">TXT</button>
+                <button class="su-btn su-btn-outline su-btn-sm" @onclick="() => Export(ExportFormat.Csv)" title="CSV">CSV</button>
+            </div>
+            <button class="su-btn su-btn-danger su-btn-sm" @onclick="ClearAll" disabled="@(allCount == 0)">
+                <i class="bi bi-trash3"></i> @Loc["debug.clear_all"]
+            </button>
+        </div>
+    </div>
+
+    <div class="debug-cleanup">
+        <div class="debug-cleanup-item">
+            <button class="su-btn su-btn-outline su-btn-sm" @onclick="KeepRecent" disabled="@(allCount == 0)" title="@Loc["debug.keep_recent_hint"]">
+                <i class="bi bi-sort-numeric-down"></i> @Loc["debug.keep_recent"]
+            </button>
+        </div>
+        <div class="debug-cleanup-item">
+            <span class="debug-cleanup-label">@Loc["debug.delete_before"]:</span>
+            <input type="datetime-local" class="su-input su-input-sm" @bind="cleanupCutoff" />
+            <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="DeleteBefore" disabled="@(cleanupCutoff == null)">
+                <i class="bi bi-trash"></i> @Loc["debug.delete_before_button"]
+            </button>
+        </div>
+    </div>
+
+    <div class="debug-table-wrap">
+        @if (entries.Count == 0 && !loading)
+        {
+            <div class="debug-empty">@Loc["debug.empty"]</div>
+        }
+        else if (entries.Count == 0)
+        {
+            <div class="debug-loading">@Loc["debug.loading"]</div>
+        }
+        else
+        {
+            <table class="debug-table">
+                <thead>
+                    <tr>
+                        <th class="debug-col-check"></th>
+                        <th class="debug-col-time">@Loc["debug.col_time"]</th>
+                        <th class="debug-col-source">@Loc["debug.col_source"]</th>
+                        <th class="debug-col-category">@Loc["debug.col_category"]</th>
+                        <th>@Loc["debug.col_content"]</th>
+                        <th class="debug-col-actions">@Loc["debug.col_actions"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in entries)
+                    {
+                        <tr class="@(detailEntry?.Id == entry.Id ? "row-active" : "") @(selected.Contains(entry.Id) ? "row-selected" : "")"
+                            @onclick="() => OpenDetail(entry)">
+                            <td class="debug-col-check" @onclick:stopPropagation="true">
+                                <input type="checkbox" checked="@selected.Contains(entry.Id)" @onchange="@(e => ToggleSelected(entry.Id, e))" />
+                            </td>
+                            <td class="debug-col-time debug-mono">@FormatTime(entry.Timestamp)</td>
+                            <td class="debug-col-source"><span class="debug-badge debug-badge-source">@entry.Source</span></td>
+                            <td class="debug-col-category"><span class="debug-badge @CategoryClass(entry.Category)">@entry.Category</span></td>
+                            <td class="debug-col-content" title="@entry.Content"><span class="debug-content-preview">@Preview(entry.Content)</span></td>
+                            <td class="debug-col-actions">
+                                <button class="su-btn su-btn-sm su-btn-ghost" @onclick:stopPropagation="true" @onclick="() => CopyEntry(entry)" title="@Loc["debug.copy"]"><i class="bi bi-clipboard"></i></button>
+                                <button class="su-btn su-btn-sm su-btn-ghost" @onclick:stopPropagation="true" @onclick="() => DeleteEntry(entry)" title="@Loc["debug.delete"]"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="debug-pagination">
+        <div class="debug-pagination-info">
+            @Loc.Format("debug.page_info", TotalPages == 0 ? 0 : pageIndex + 1, TotalPages, totalCount)
+        </div>
+        <div class="debug-pagination-controls">
+            <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => GoToPage(0)" disabled="@(pageIndex <= 0)" title="«">«</button>
+            <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => GoToPage(pageIndex - 1)" disabled="@(pageIndex <= 0)" title="‹">‹</button>
+            @foreach (var p in GetVisiblePages())
+            {
+                @if (p == null)
+                {
+                    <span class="debug-page-ellipsis">…</span>
+                }
+                else
+                {
+                    <button class="su-btn su-btn-sm @(p - 1 == pageIndex ? "su-btn-primary" : "su-btn-outline")" @onclick="() => GoToPage(p!.Value - 1)">@p</button>
+                }
+            }
+            <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => GoToPage(pageIndex + 1)" disabled="@(pageIndex >= TotalPages - 1)" title="›">›</button>
+            <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => GoToPage(TotalPages - 1)" disabled="@(pageIndex >= TotalPages - 1)" title="»">»</button>
+        </div>
+        <div class="debug-pagination-size">
+            @Loc["debug.page_size"]:
+            <select class="su-select su-select-sm" @bind="pageSize" @bind:after="OnPageSizeChanged">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+    </div>
+
+    @if (detailEntry != null)
+    {
+        <div class="debug-detail-overlay" @onclick="CloseDetail">
+            <div class="debug-detail" @onclick:stopPropagation="true">
+                <div class="debug-detail-header">
+                    <div>
+                        <span class="debug-badge debug-badge-source">@detailEntry.Source</span>
+                        <span class="debug-badge @CategoryClass(detailEntry.Category)">@detailEntry.Category</span>
+                        <span class="debug-detail-time debug-mono">@FormatTime(detailEntry.Timestamp)</span>
+                    </div>
+                    <div class="debug-detail-actions">
+                        <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => CopyEntry(detailEntry)">
+                            <i class="bi bi-clipboard"></i> @Loc["debug.copy"]
+                        </button>
+                        <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => DeleteEntry(detailEntry)">
+                            <i class="bi bi-trash"></i> @Loc["debug.delete"]
+                        </button>
+                        <button class="su-btn su-btn-sm su-btn-outline" @onclick="CloseDetail" title="@Loc["debug.close"]">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="debug-detail-id debug-mono">@detailEntry.Id</div>
+                <pre class="debug-detail-content">@detailEntry.Content</pre>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<DebugOutputEntry> entries = [];
+    private List<string> sources = [];
+    private List<string> categories = [];
+    private readonly HashSet<Guid> selected = [];
+
+    private string? sourceFilter;
+    private string? categoryFilter;
+    private string? keyword;
+    private DateTime? dateFrom;
+    private DateTime? dateTo;
+
+    private int pageIndex;
+    private int pageSize = 25;
+    private int totalCount;
+    private int allCount;
+    private bool loading = true;
+
+    private bool autoRefresh;
+    private int refreshIntervalSeconds = 3;
+    private System.Threading.Timer? refreshTimer;
+
+    private DebugOutputEntry? detailEntry;
+    private string? lastError;
+    private DateTime? cleanupCutoff;
+
+    private static class ExportFormat
+    {
+        public const string Json = "json";
+        public const string Txt = "txt";
+        public const string Csv = "csv";
+    }
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+
+    protected override void OnInitialized()
+    {
+        ReloadFacets();
+        LoadData();
+    }
+
+    /// <summary>刷新来源/类别候选列表（全局去重，不受当前筛选影响）。</summary>
+    private void ReloadFacets()
+    {
+        try
+        {
+            sources = DebugOutput.GetSources();
+            categories = DebugOutput.GetCategories();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load debug output facets");
+            lastError = Loc.Format("debug.load_failed", ex.Message);
+        }
+    }
+
+    /// <summary>重新加载统计、当前页条目，并保持筛选/分页状态。失败时严格报错并显示在页面顶部。</summary>
+    private void LoadData()
+    {
+        loading = true;
+        StateHasChanged();
+        try
+        {
+            var fromUtc = ToUtc(dateFrom);
+            var toUtc = ToUtc(dateTo);
+
+            allCount = DebugOutput.GetCount();
+            totalCount = DebugOutput.GetCount(sourceFilter, categoryFilter, keyword, fromUtc, toUtc);
+
+            int pages = TotalPages;
+            if (pageIndex >= pages)
+                pageIndex = Math.Max(0, pages - 1);
+
+            entries = DebugOutput.GetEntries(pageIndex * pageSize, pageSize, sourceFilter, categoryFilter, keyword, fromUtc, toUtc);
+
+            // 详情中已打开的条目若在本页，则同步其最新内容
+            if (detailEntry != null)
+            {
+                var updated = entries.FirstOrDefault(e => e.Id == detailEntry.Id);
+                if (updated != null)
+                    detailEntry = updated;
+            }
+
+            lastError = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load debug output entries");
+            lastError = Loc.Format("debug.load_failed", ex.Message);
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Reload()
+    {
+        ReloadFacets();
+        LoadData();
+    }
+
+    private void ApplyFilters()
+    {
+        pageIndex = 0;
+        LoadData();
+    }
+
+    private void ResetFilters()
+    {
+        sourceFilter = null;
+        categoryFilter = null;
+        keyword = null;
+        dateFrom = null;
+        dateTo = null;
+        pageIndex = 0;
+        ReloadFacets();
+        LoadData();
+    }
+
+    private void OnKeywordKeydown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            ApplyFilters();
+    }
+
+    private void GoToPage(int index)
+    {
+        pageIndex = Math.Clamp(index, 0, Math.Max(0, TotalPages - 1));
+        LoadData();
+    }
+
+    private void OnPageSizeChanged()
+    {
+        pageIndex = 0;
+        LoadData();
+    }
+
+    private void OnAutoRefreshChanged()
+    {
+        if (autoRefresh)
+            StartRefreshTimer();
+        else
+            StopRefreshTimer();
+    }
+
+    private void OnRefreshIntervalChanged()
+    {
+        if (autoRefresh)
+            StartRefreshTimer();
+    }
+
+    private void StartRefreshTimer()
+    {
+        StopRefreshTimer();
+        refreshTimer = new System.Threading.Timer(
+            _ => _ = InvokeAsync(() => LoadData()),
+            null,
+            TimeSpan.FromSeconds(refreshIntervalSeconds),
+            TimeSpan.FromSeconds(refreshIntervalSeconds));
+    }
+
+    private void StopRefreshTimer()
+    {
+        refreshTimer?.Dispose();
+        refreshTimer = null;
+    }
+
+    private void ToggleSelected(Guid id, ChangeEventArgs e)
+    {
+        if (e.Value is bool b && b)
+            selected.Add(id);
+        else
+            selected.Remove(id);
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        if (e.Value is bool b && b)
+        {
+            foreach (var id in entries.Select(x => x.Id))
+                selected.Add(id);
+        }
+        else
+        {
+            foreach (var id in entries.Select(x => x.Id))
+                selected.Remove(id);
+        }
+    }
+
+    private void OpenDetail(DebugOutputEntry entry) => detailEntry = entry;
+
+    private void CloseDetail() => detailEntry = null;
+
+    private async Task DeleteEntry(DebugOutputEntry entry)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", Loc["debug.delete_confirm"]))
+            return;
+
+        try
+        {
+            DebugOutput.DeleteEntry(entry.Id);
+            selected.Remove(entry.Id);
+            if (detailEntry?.Id == entry.Id)
+                detailEntry = null;
+            LoadData();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete debug output entry {Id}", entry.Id);
+            lastError = Loc.Format("debug.delete_failed", ex.Message);
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteSelected()
+    {
+        if (selected.Count == 0)
+            return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", Loc.Format("debug.delete_selected_confirm", selected.Count)))
+            return;
+
+        try
+        {
+            foreach (var id in selected.ToList())
+                DebugOutput.DeleteEntry(id);
+            selected.Clear();
+            if (detailEntry != null && entries.All(e => e.Id != detailEntry.Id))
+                detailEntry = null;
+            LoadData();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete selected debug output entries");
+            lastError = Loc.Format("debug.delete_failed", ex.Message);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearAll()
+    {
+        if (allCount == 0)
+            return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", Loc.Format("debug.clear_all_confirm", allCount)))
+            return;
+
+        try
+        {
+            DebugOutput.ClearAll();
+            selected.Clear();
+            detailEntry = null;
+            pageIndex = 0;
+            ReloadFacets();
+            LoadData();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to clear debug output entries");
+            lastError = Loc.Format("debug.clear_failed", ex.Message);
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>仅保留最近 N 条：提示输入保留条数，确认后删除更旧的条目。</summary>
+    private async Task KeepRecent()
+    {
+        var input = await JSRuntime.InvokeAsync<string?>("prompt", Loc["debug.keep_recent_prompt"]);
+        if (string.IsNullOrWhiteSpace(input))
+            return; // 用户取消
+
+        if (!int.TryParse(input.Trim(), out var keep) || keep < 0)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", Loc["debug.keep_recent_invalid"]);
+            return;
+        }
+
+        if (keep >= allCount)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", Loc.Format("debug.keep_recent_noop", keep));
+            return;
+        }
+
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", Loc.Format("debug.keep_recent_confirm", keep)))
+            return;
+
+        try
+        {
+            int deleted = DebugOutput.TrimToRecent(keep);
+            selected.Clear();
+            if (detailEntry != null && entries.All(e => e.Id != detailEntry.Id))
+                detailEntry = null;
+            pageIndex = 0;
+            ReloadFacets();
+            LoadData();
+            if (deleted > 0)
+                await JSRuntime.InvokeVoidAsync("alert", Loc.Format("debug.keep_recent_result", deleted));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to trim debug output entries");
+            lastError = Loc.Format("debug.delete_failed", ex.Message);
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>删除早于所选时间的全部条目。</summary>
+    private async Task DeleteBefore()
+    {
+        if (cleanupCutoff == null)
+            return;
+
+        var cutoffUtc = ToUtc(cleanupCutoff);
+        if (cutoffUtc == null)
+            return;
+
+        var localDisplay = cleanupCutoff.Value.ToString("yyyy-MM-dd HH:mm");
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", Loc.Format("debug.delete_before_confirm", localDisplay)))
+            return;
+
+        try
+        {
+            int deleted = DebugOutput.DeleteOlderThan(cutoffUtc.Value);
+            selected.Clear();
+            if (detailEntry != null && entries.All(e => e.Id != detailEntry.Id))
+                detailEntry = null;
+            pageIndex = 0;
+            ReloadFacets();
+            LoadData();
+            if (deleted > 0)
+                await JSRuntime.InvokeVoidAsync("alert", Loc.Format("debug.delete_before_result", deleted));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete debug output entries older than {Cutoff}", cutoffUtc.Value);
+            lastError = Loc.Format("debug.delete_failed", ex.Message);
+            StateHasChanged();
+        }
+    }
+
+    private async Task CopyEntry(DebugOutputEntry entry)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("copyTextToClipboard", entry.Content);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to copy debug output entry {Id}", entry.Id);
+            lastError = Loc.Format("debug.copy_failed", ex.Message);
+            StateHasChanged();
+        }
+    }
+
+    private async Task Export(string format)
+    {
+        try
+        {
+            var fromUtc = ToUtc(dateFrom);
+            var toUtc = ToUtc(dateTo);
+            int count = DebugOutput.GetCount(sourceFilter, categoryFilter, keyword, fromUtc, toUtc);
+            if (count == 0)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", Loc["debug.export_empty"]);
+                return;
+            }
+
+            var items = DebugOutput.GetEntries(0, count, sourceFilter, categoryFilter, keyword, fromUtc, toUtc);
+            var (content, ext) = format switch
+            {
+                "json" => (JsonSerializer.Serialize(items, new JsonSerializerOptions { WriteIndented = true }), "json"),
+                "txt" => (BuildTxt(items), "txt"),
+                "csv" => (BuildCsv(items), "csv"),
+                _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported export format")
+            };
+
+            var bytes = Encoding.UTF8.GetBytes(content);
+            using var ms = new MemoryStream(bytes);
+            using var streamRef = new DotNetStreamReference(ms);
+            await JSRuntime.InvokeVoidAsync("downloadFileFromStream", $"debug-output-{DateTime.Now:yyyyMMdd-HHmmss}.{ext}", streamRef);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to export debug output as {Format}", format);
+            lastError = Loc.Format("debug.export_failed", ex.Message);
+            StateHasChanged();
+        }
+    }
+
+    private static string BuildTxt(IEnumerable<DebugOutputEntry> items)
+    {
+        var sb = new StringBuilder();
+        foreach (var e in items)
+        {
+            sb.Append('[').Append(e.Timestamp.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture))
+              .Append("] [").Append(e.Source).Append('/').Append(e.Category).AppendLine("]");
+            sb.AppendLine(e.Content);
+            sb.AppendLine(new string('-', 48));
+        }
+        return sb.ToString();
+    }
+
+    private static string BuildCsv(IEnumerable<DebugOutputEntry> items)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("timestamp,source,category,content");
+        foreach (var e in items)
+        {
+            sb.Append(CsvEscape(e.Timestamp.ToString("o"))).Append(',')
+              .Append(CsvEscape(e.Source)).Append(',')
+              .Append(CsvEscape(e.Category)).Append(',')
+              .AppendLine(CsvEscape(e.Content));
+        }
+        return sb.ToString();
+    }
+
+    private static string CsvEscape(string value)
+    {
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        return value;
+    }
+
+    /// <summary>把界面上的本地时间（datetime-local 输入）转换为存储所用的 UTC 时间。</summary>
+    private static DateTime? ToUtc(DateTime? local)
+    {
+        if (!local.HasValue)
+            return null;
+        return local.Value.Kind switch
+        {
+            DateTimeKind.Utc => local,
+            DateTimeKind.Local => local.Value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(local.Value, DateTimeKind.Local).ToUniversalTime()
+        };
+    }
+
+    /// <summary>生成紧凑页码序列；null 表示省略号。</summary>
+    private List<int?> GetVisiblePages()
+    {
+        int total = TotalPages;
+        int current = pageIndex + 1;
+        if (total <= 7)
+        {
+            var all = new List<int?>(total);
+            for (int i = 1; i <= total; i++)
+                all.Add(i);
+            return all;
+        }
+
+        var pages = new HashSet<int> { 1, total, current - 1, current, current + 1 }
+            .Where(p => p >= 1 && p <= total)
+            .OrderBy(p => p)
+            .ToList();
+
+        var result = new List<int?>();
+        int? prev = null;
+        foreach (var p in pages)
+        {
+            if (prev.HasValue && p - prev.Value > 1)
+                result.Add(null);
+            result.Add(p);
+            prev = p;
+        }
+        return result;
+    }
+
+    private static string FormatTime(DateTime utc) => utc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+
+    private static string Preview(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+            return string.Empty;
+        var singleLine = content.Replace('\r', ' ').Replace('\n', ' ');
+        return singleLine.Length > 300 ? singleLine[..300] + "…" : singleLine;
+    }
+
+    private static string CategoryClass(string category) =>
+        string.Equals(category, "error", StringComparison.OrdinalIgnoreCase)
+            ? "debug-badge-error"
+            : "debug-badge-cat";
+
+    public async ValueTask DisposeAsync()
+    {
+        StopRefreshTimer();
+        await Task.CompletedTask;
+    }
+}
