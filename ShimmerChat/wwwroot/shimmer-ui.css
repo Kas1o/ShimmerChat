@@ -373,7 +373,8 @@
 .debug-detail-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 24px; }
 .debug-detail { background: var(--su-surface-1); border: 1px solid var(--su-border-0); border-radius: var(--su-radius-lg); width: min(900px, 100%); max-height: 80vh; display: flex; flex-direction: column; box-shadow: var(--su-shadow-lg); }
 .debug-detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--su-border-0); flex-wrap: wrap; }
-.debug-detail-actions { display: flex; align-items: center; gap: 8px; }
+.debug-detail-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.debug-ansi-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--su-font-sm); color: var(--su-text-1); user-select: none; cursor: pointer; white-space: nowrap; }
 .debug-detail-time { color: var(--su-text-1); margin-left: 8px; }
 .debug-detail-id { padding: 4px 16px 0; font-size: 0.8em; color: var(--su-text-2); }
 .debug-detail-content { margin: 0; padding: 16px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: var(--su-font-mono); font-size: var(--su-font-sm); color: var(--su-text-0); }

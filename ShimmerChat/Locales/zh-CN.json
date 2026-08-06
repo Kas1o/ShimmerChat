@@ -441,6 +441,8 @@
   "debug.col_content": "内容",
   "debug.col_actions": "操作",
   "debug.copy": "复制",
+  "debug.strip_ansi": "跳过转义",
+  "debug.strip_ansi_hint": "去除 ANSI 终端转义序列（如颜色、光标控制码），使显示更清洁",
   "debug.delete": "删除",
   "debug.close": "关闭",
   "debug.page_info": "第 {0} / {1} 页（共 {2} 条）",

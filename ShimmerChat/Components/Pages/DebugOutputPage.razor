@@ -221,6 +221,10 @@
                         <span class="debug-detail-time debug-mono">@FormatTime(detailEntry.Timestamp)</span>
                     </div>
                     <div class="debug-detail-actions">
+                        <label class="debug-ansi-toggle" title="@Loc["debug.strip_ansi_hint"]">
+                            <input type="checkbox" @bind="stripAnsi" />
+                            <span>@Loc["debug.strip_ansi"]</span>
+                        </label>
                         <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => CopyEntry(detailEntry)">
                             <i class="bi bi-clipboard"></i> @Loc["debug.copy"]
                         </button>
@@ -233,7 +237,7 @@
                     </div>
                 </div>
                 <div class="debug-detail-id debug-mono">@detailEntry.Id</div>
-                <pre class="debug-detail-content">@detailEntry.Content</pre>
+                <pre class="debug-detail-content">@DetailContent</pre>
             </div>
         </div>
     }
@@ -264,6 +268,34 @@
     private DebugOutputEntry? detailEntry;
     private string? lastError;
     private DateTime? cleanupCutoff;
+    private bool stripAnsi;
+
+    /// <summary>
+    /// 匹配 ANSI 终端转义序列（ECMA-48）：CSI、8-bit CSI、OSC、字符集选择、两字符 ESC 指令。
+    /// 用于详情界面的"跳过转义"显示模式。
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex AnsiEscapeRegex = new(
+        @"\x1b\[[0-9;?]*[ -/]*[@-~]"        // CSI（颜色、光标、擦除等）
+        + @"|\x9b[0-9;?]*[ -/]*[@-~]"       // 8-bit CSI（U+009B）
+        + @"|\x1b\][^\x1b\x07]*(?:\x07|\x1b\\)"  // OSC（标题、剪贴板等，以 BEL/ST 结束）
+        + @"|\x1b[()][0-9A-B]"               // 字符集选择（ESC ( B 等）
+        + @"|\x1b[78=<>MDEHcZNOPX^_]"        // 两字符 ESC 指令（DECSC/DECRC/键盘/换行等）
+        + @"|\x1b[\]\\]",                    // 孤立的 OSC/ST 起始（缺少终止符时）
+        System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>详情面板显示内容：开启"跳过转义"时剥离 ANSI 序列。</summary>
+    private string DetailContent =>
+        detailEntry == null
+            ? string.Empty
+            : stripAnsi ? StripAnsi(detailEntry.Content) : detailEntry.Content;
+
+    /// <summary>去除 ANSI 终端转义序列，使显示更清洁。</summary>
+    private static string StripAnsi(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+            return content;
+        return AnsiEscapeRegex.Replace(content, string.Empty);
+    }
 
     private static class ExportFormat
     {

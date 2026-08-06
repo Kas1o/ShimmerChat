@@ -441,6 +441,8 @@
   "debug.col_content": "Content",
   "debug.col_actions": "Actions",
   "debug.copy": "Copy",
+  "debug.strip_ansi": "Strip ANSI",
+  "debug.strip_ansi_hint": "Remove ANSI terminal escape sequences (e.g. color and cursor control codes) for cleaner display",
   "debug.delete": "Delete",
   "debug.close": "Close",
   "debug.page_info": "Page {0} / {1} ({2} items)",
