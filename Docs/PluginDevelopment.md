@@ -111,16 +111,18 @@ git clone https://github.com/Kas1o/ShimmerChat.git
   "name": "MyCoolPlugin",
   "version": "1.0.0",
   "description": "一个示例插件",
-  "assembly": "MyCoolPlugin.dll"
+  "assembly": "MyCoolPlugin.dll",
+  "static": "www"
 }
 ```
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
-| `name` | 是 | 插件名称 |
-| `assembly` | 是 | 入口程序集文件名，相对于插件目录 |
+| `name` | 是 | 插件名称，同时作为 `/pluginstatic/` 下的 URL 段 |
+| `assembly` | 否 | 入口程序集文件名，相对于插件目录（纯静态插件可省略） |
 | `version` | 否 | 版本号 |
 | `description` | 否 | 描述 |
+| `static` | 否 | 静态资源目录，相对于插件目录；声明后可通过 `/pluginstatic/{name}/...` 访问 |
 
 ### 部署
 
@@ -155,8 +157,39 @@ ShimmerChat/
     └── MyCoolPlugin/
         ├── plugin.json
         ├── MyCoolPlugin.dll
-        └── SomeDependency.dll     ← ALC 自动解析
+        ├── SomeDependency.dll     ← ALC 自动解析
+        └── www/                   ← static 字段指定的静态资源目录
+            ├── index.html
+            └── js/app.js
 ```
+
+### 静态资源（static 字段）
+
+在 `plugin.json` 中声明 `static` 字段后，插件目录下的子目录会通过 HTTP 暴露：
+
+```
+/pluginstatic/MyCoolPlugin/index.html   →  Plugins/MyCoolPlugin/www/index.html
+/pluginstatic/MyCoolPlugin/js/app.js    →  Plugins/MyCoolPlugin/www/js/app.js
+```
+
+- URL 段取自 `name` 字段（只保留 ASCII 字母数字与 `- _ .`，非法时回退插件目录名）。
+- 静态目录必须是插件目录的**严格子目录**，指向插件根目录或目录外路径（如 `../`）会被拒绝并记录错误。
+- 目录不存在时仅禁用该插件的静态资源，插件本身照常加载。
+- 纯静态插件（无程序集）允许：省略 `assembly`，只提供 `name` + `static`。
+- 两个插件使用相同的 `name` 时，后者的静态资源被跳过（记录错误）。
+
+静态文件需要在构建时复制到插件目录，在 `.csproj` 中配置：
+
+```xml
+<ItemGroup>
+  <Content Include="www\**">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+  </Content>
+</ItemGroup>
+```
+
+> 提示：`UseStaticFiles` 默认不提供默认文档。若想让 `/pluginstatic/MyCoolPlugin/` 直接返回 `index.html`，需在插件页面中用 JS 重定向，或在插件初始化器里另行处理。
 
 ---
 

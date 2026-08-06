@@ -79,6 +79,9 @@ ExecuteAgentMigration(app);
 // 执行插件初始化
 ExecutePluginInitializers(app);
 
+// 注册插件静态资源：/pluginstatic/{pluginName}/... → Plugins/{plugin}/www
+RegisterPluginStaticFiles(app);
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -143,6 +146,36 @@ static void ExecutePluginInitializers(WebApplication app)
     catch (Exception ex)
     {
         Console.WriteLine($"[ShimmerChat] Plugin initialization error: {ex.Message}");
+    }
+}
+
+// 为在 plugin.json 中声明了 "static" 字段的插件注册静态文件中间件
+static void RegisterPluginStaticFiles(WebApplication app)
+{
+    try
+    {
+        var loader = app.Services.GetRequiredService<IPluginLoaderService>() as PluginLoaderServiceV1;
+        var mappings = loader?.GetStaticFileMappings() ?? [];
+
+        foreach (var mapping in mappings)
+        {
+            if (!Directory.Exists(mapping.StaticDirPath))
+            {
+                Console.WriteLine($"[PluginStatic] {mapping.UrlSegment}: directory missing, skipped.");
+                continue;
+            }
+
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new PhysicalFileProvider(mapping.StaticDirPath),
+                RequestPath = $"/pluginstatic/{mapping.UrlSegment}"
+            });
+            Console.WriteLine($"[PluginStatic] /pluginstatic/{mapping.UrlSegment}/ -> {mapping.StaticDirPath}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[PluginStatic] Failed to register plugin static resources: {ex.Message}");
     }
 }
 
