@@ -22,7 +22,7 @@ namespace ShimmerChatBuiltin
             name = "EvalCsharp",
             parameters =
             [
-                (new ToolParameter { name = "code", type = ParameterType.String, description = "C# expression to eval." }, true),
+                (new ToolParameter { name = "code", type = ParameterType.String, description = "C# expression to eval. with `#r` to load assembly." }, true),
                 (new ToolParameter { name = "using", type = ParameterType.String, description = "Namespaces separated by comma." }, true)
             ]
         };
@@ -44,7 +44,7 @@ namespace ShimmerChatBuiltin
                 }
                 catch (Exception ex) { return ex.Message; }
             }
-            throw new InvalidOperationException("Invalid input: code and using required.");
+            return "Invalid input: code and using required.";
         }
     }
 }
