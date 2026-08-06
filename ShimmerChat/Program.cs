@@ -312,6 +312,9 @@ static void ExecuteAutoMigration(WebApplication app)
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Error during auto-migration: {ex.Message}");
+        Console.WriteLine($"Error during auto-migration: {ex}");
+        // 迁移失败属于数据完整性问题：不写迁移标记、中止启动，
+        // 避免应用在数据不一致的状态下运行
+        throw;
     }
 }
