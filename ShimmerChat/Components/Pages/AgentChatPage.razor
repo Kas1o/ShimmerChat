@@ -19,7 +19,7 @@
 @if (chat != null)
 {
 	<PageTitle> @($"{agent!.Name} | {chat.Name}")</PageTitle>
-	<div class="chat-page">
+	<div class="chat-page" style="@ChatPageBackgroundStyle">
 		<div class="chat-topbar">
 			<button class="chat-back" @onclick="BackToAgentPage">← @agent!.Name</button>
 			@if (session != null && session.Phase != null)
@@ -132,6 +132,17 @@
 	bool isUserAtBottom = true;
 
 	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
+	#endregion
+
+	#region 样式
+
+	/// <summary>
+	/// Agent 背景图的内联样式。无背景图（<see cref="Agent.BackgroundGuid"/> 为 null）时返回 null，
+	/// 保持默认主题背景。
+	/// </summary>
+	string? ChatPageBackgroundStyle => agent?.BackgroundGuid != null
+		? $"background-image: url('/userimages/{agent.BackgroundGuid}.png'); background-size: cover; background-position: center;"
+		: null;
 	#endregion
 
 	#region 交互
