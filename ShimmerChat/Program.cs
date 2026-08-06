@@ -66,7 +66,6 @@ builder.Services.AddSingleton<IPopupService, PopupService>(); // TODO: 大概需
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
 builder.Services.AddSingleton<ILocService, LocService>();
-builder.Services.AddSingleton<IDebugOutputService, DebugOutputService>();
 
 var app = builder.Build();
 
@@ -208,19 +207,27 @@ static void ConfigureKVDataStorage(WebApplicationBuilder builder)
     builder.Services.AddSingleton<LiteDBKVData>();
     builder.Services.AddSingleton<IKVDataMigrationService, KVDataMigrationService>();
 
-    // 根据配置注册 IKVDataService 和 IMessageStoreService 的实现
+    // 始终注册两种 DebugOutput 实现
+    builder.Services.AddSingleton<LiteDBDebugOutputService>();
+    builder.Services.AddSingleton<FileSystemDebugOutputService>();
+
+    // 根据配置注册 IKVDataService、IMessageStoreService 和 IDebugOutputService 的实现
     switch (config.GetStorageType())
     {
         case KVStorageType.LiteDB:
             Console.WriteLine("Using LiteDB for KV data storage");
+            Console.WriteLine("Using LiteDB for debug output");
             builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LiteDBKVData>());
             builder.Services.AddSingleton<IMessageStoreService>(sp => sp.GetRequiredService<LiteDBMessageStoreService>());
+            builder.Services.AddSingleton<IDebugOutputService>(sp => sp.GetRequiredService<LiteDBDebugOutputService>());
             break;
         case KVStorageType.LocalFileStorage:
         default:
             Console.WriteLine("Using LocalFileStorage for KV data storage");
+            Console.WriteLine("Using FileSystem for debug output");
             builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LocalFileStorageKVData>());
             builder.Services.AddSingleton<IMessageStoreService>(sp => sp.GetRequiredService<FileMessageStoreService>());
+            builder.Services.AddSingleton<IDebugOutputService>(sp => sp.GetRequiredService<FileSystemDebugOutputService>());
             break;
     }
 }

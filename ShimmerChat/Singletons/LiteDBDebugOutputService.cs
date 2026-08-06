@@ -4,7 +4,7 @@ using ShimmerChatLib.Models;
 
 namespace ShimmerChat.Singletons
 {
-    public class DebugOutputService : IDebugOutputService
+    public class LiteDBDebugOutputService : IDebugOutputService
     {
         private readonly ILiteCollection<DebugOutputDocument> _collection;
 
@@ -18,7 +18,7 @@ namespace ShimmerChat.Singletons
             public string Content { get; set; } = string.Empty;
         }
 
-        public DebugOutputService(LiteDatabase database)
+        public LiteDBDebugOutputService(LiteDatabase database)
         {
             _collection = database.GetCollection<DebugOutputDocument>("debug_output");
             _collection.EnsureIndex(x => x.Timestamp);
