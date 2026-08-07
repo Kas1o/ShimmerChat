@@ -6,3 +6,122 @@
 }
 
 .tree-editor-container { margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.15); border-radius: 6px; }
+
+/* ── 面板头部 ─────────────────────────────────── */
+.subagent-panel { display: flex; flex-direction: column; gap: 16px; }
+
+.subagent-header {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.subagent-header h2 { margin: 0; font-size: 1.4rem; }
+.subagent-header p { margin: 4px 0 0; }
+
+/* ── 布局：宽屏侧栏 + 窄屏二级 ─────────────────── */
+.subagent-layout { display: flex; align-items: flex-start; gap: 16px; }
+
+.subagent-list-pane {
+    flex: 0 0 300px;
+    max-width: 300px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.subagent-list-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--su-border-1);
+}
+.subagent-list-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+
+.subagent-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+.subagent-list-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px;
+    background: var(--su-surface-3);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+    cursor: pointer;
+    transition: border-color var(--su-transition), background var(--su-transition);
+}
+.subagent-list-item:hover { background: var(--su-surface-2); border-color: var(--su-border-1); }
+.subagent-list-item.active { background: var(--su-accent-soft); border-color: var(--su-accent); }
+
+.subagent-list-item-main { min-width: 0; flex: 1; }
+.subagent-list-item-name { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 500; }
+.subagent-list-item-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: var(--su-font-xs); font-weight: 600; color: #fff;
+}
+.subagent-list-item-meta { display: flex; align-items: center; gap: 4px; margin-top: 6px; min-width: 0; flex-wrap: wrap; }
+.subagent-list-item-meta .su-badge { max-width: 100%; }
+.subagent-list-item-meta .subagent-preset-badge {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.subagent-delete-btn {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; background: transparent; color: var(--su-text-2);
+    border-radius: var(--su-radius-sm);
+    cursor: pointer;
+    transition: color var(--su-transition), background var(--su-transition);
+}
+.subagent-delete-btn:hover { color: var(--su-danger); background: var(--su-danger-soft); }
+
+/* 空状态 */
+.subagent-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    text-align: center; padding: 40px 16px; color: var(--su-text-2);
+}
+.subagent-empty i { font-size: 2.5rem; opacity: 0.35; }
+.subagent-empty p { margin: 0; }
+
+/* ── 编辑区 ───────────────────────────────────── */
+.subagent-editor-pane { flex: 1; min-width: 0; padding: 16px; }
+.subagent-editor-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.subagent-editor-header h3 { margin: 0; font-size: var(--su-font-lg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subagent-back-btn { display: none; }
+.subagent-editor-delete { margin-left: auto; flex-shrink: 0; }
+
+.subagent-editor-body { display: flex; flex-direction: column; gap: 20px; }
+.subagent-editor-section h5 {
+    display: flex; align-items: center; gap: 6px;
+    margin: 0 0 10px; font-size: var(--su-font-base);
+    padding-bottom: 6px; border-bottom: 1px solid var(--su-border-1);
+}
+.subagent-editor-section .settings-field + .settings-field { margin-top: 12px; }
+
+.subagent-editor-footer {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--su-border-1);
+}
+
+.subagent-editor-placeholder {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    text-align: center; padding: 80px 20px; color: var(--su-text-2); min-height: 320px;
+}
+.subagent-editor-placeholder i { font-size: 3rem; opacity: 0.35; }
+.subagent-editor-placeholder p { margin: 0; }
+
+/* ── 窄屏：二级布局（列表页 → 编辑页） ─────────── */
+@media (max-width: 899px) {
+    .subagent-layout { display: block; }
+    .subagent-list-pane {
+        max-width: none;
+        position: static;
+        max-height: none;
+        display: block;
+    }
+    .subagent-editor-pane { display: none; }
+    .subagent-layout.show-editor .subagent-list-pane { display: none; }
+    .subagent-layout.show-editor .subagent-editor-pane { display: block; }
+    .subagent-back-btn { display: inline-flex; }
+}
