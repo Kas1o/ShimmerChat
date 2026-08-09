@@ -182,8 +182,13 @@
 		}
 		_UserName = KVData.Read("User", "username") ?? "";
 		Initialized = true;
-		
-		// 获取当前通知权限状态
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		// JS 互操作不能在静态渲染（预渲染）阶段调用，只能等交互式渲染完成后再获取通知权限状态
+		if (!firstRender) return;
+
 		var jsPermission = await JS.InvokeAsync<string>("eval", "Notification.permission");
 		notificationPermissionStatus = jsPermission?.ToLowerInvariant() switch
 		{
