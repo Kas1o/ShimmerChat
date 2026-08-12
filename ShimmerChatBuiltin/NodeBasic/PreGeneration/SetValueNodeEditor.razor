@@ -1,0 +1,83 @@
+@using ShimmerChatLib.Generation
+@using ShimmerChatLib.Components
+@inject ILocService LocService
+
+<div class="set-value-editor">
+    <div class="ge-field">
+        <label class="ge-label" title="@LocService["prop.set_value.target.hint"]">
+            @LocService["prop.set_value.target"]
+        </label>
+        <div class="ge-value">
+            <select class="ge-select" value="@Node.Target" @onchange="OnTargetChanged">
+                <option value="@SetValueTarget.SharedState">@LocService["prop.set_value.target.shared_state"]</option>
+                <option value="@SetValueTarget.KVData">@LocService["prop.set_value.target.kv"]</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="ge-field">
+        <label class="ge-label" title="@LocService["prop.set_value.key.hint"]">
+            @LocService["prop.set_value.key"]
+        </label>
+        <div class="ge-value">
+            <input class="ge-input" @bind="Node.Key" @bind:event="oninput"
+                   placeholder="@LocService["prop.set_value.key.placeholder"]" />
+        </div>
+    </div>
+
+    @if (Node.Target == SetValueTarget.SharedState)
+    {
+        <div class="ge-field">
+            <label class="ge-label" title="@LocService["prop.set_value.value_type.hint"]">
+                @LocService["prop.set_value.value_type"]
+            </label>
+            <div class="ge-value">
+                <select class="ge-select" value="@Node.ValueType" @onchange="OnValueTypeChanged">
+                    <option value="@SetValueType.String">@LocService["prop.set_value.value_type.string"]</option>
+                    <option value="@SetValueType.Int">@LocService["prop.set_value.value_type.int"]</option>
+                    <option value="@SetValueType.Float">@LocService["prop.set_value.value_type.float"]</option>
+                    <option value="@SetValueType.Bool">@LocService["prop.set_value.value_type.bool"]</option>
+                </select>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="ge-field">
+            <label class="ge-label" title="@LocService["prop.set_value.kv_collection.hint"]">
+                @LocService["prop.set_value.kv_collection"]
+            </label>
+            <div class="ge-value">
+                <input class="ge-input" @bind="Node.KVCollection" @bind:event="oninput"
+                       placeholder="@LocService["prop.set_value.kv_collection.placeholder"]" />
+            </div>
+        </div>
+    }
+
+    <div class="ge-field">
+        <label class="ge-label" title="@LocService["prop.set_value.value.hint"]">
+            @LocService["prop.set_value.value"]
+        </label>
+        <div class="ge-value">
+            <textarea class="ge-textarea" @bind="Node.Value" @bind:event="oninput"></textarea>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public SetValueNode Node { get; set; } = default!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
+
+    private void OnTargetChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<SetValueTarget>(e.Value?.ToString(), out var val))
+            Node.Target = val;
+    }
+
+    private void OnValueTypeChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<SetValueType>(e.Value?.ToString(), out var val))
+            Node.ValueType = val;
+    }
+}
