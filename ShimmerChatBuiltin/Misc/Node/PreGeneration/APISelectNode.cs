@@ -58,12 +58,12 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
                 if (selectedConfig.Type == ApiConfigType.OpenAI
                     || selectedConfig.Type == ApiConfigType.DeepSeek)
                 {
-                    var messages = context.Env.Transient.SharedState["ChatMessages"] as List<Message>;
-                    var lastAi = messages?.LastOrDefault(m => m.sender == Sender.AI);
-                    if (lastAi != null)
+                    var last = context.Env.Transient.Fragments.LastOrDefault(f => f.From == SharperLLM.Util.PromptBuilder.From.assistant);
+                    
+                    if (last != null)
                     {
-                        lastAi.message.CustomProperties ??= new Dictionary<string, object>();
-                        lastAi.message.CustomProperties["prefix"] = true;
+                        last.Message.CustomProperties ??= new Dictionary<string, object>();
+                        last.Message.CustomProperties["prefix"] = true;
                     }
                 }
                 else
