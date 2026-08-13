@@ -83,7 +83,11 @@
   "node.set_value.desc": "Write a key/value pair to SharedState (this generation only) or KVData (persisted)",
   "node.config": "Config",
   "node.config.desc": "Easy-adjust settings node: define items (name / SharedState key / type / default) in Edit mode, adjust each item's value in Configure mode; effective values are written into SharedState (this generation only)",
+  "node.comment": "Comment",
+  "node.comment.desc": "A multi-line note node with no effect, used only for documentation in the node tree",
 
+  "prop.comment.text": "Comment",
+  "prop.comment.text.hint": "Arbitrary text for documentation only, does not affect generation",
   "prop.call_node.preset_id": "Preset ID",
   "prop.call_node.preset_id.hint": "ID of the generation preset to inline",
   "prop.dyn_prompt.set_name": "Set Name",

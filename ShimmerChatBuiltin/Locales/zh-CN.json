@@ -83,7 +83,11 @@
   "node.set_value.desc": "将键值对写入 SharedState（仅本次生成有效）或 KVData（持久保存）",
   "node.config": "配置",
   "node.config.desc": "易用设置值节点：编辑模式定义配置项（名称 / SharedState 键 / 类型 / 默认值），配置模式调整每个项的值；运行时将生效值写入 SharedState（仅本次生成有效）",
+  "node.comment": "注释",
+  "node.comment.desc": "多行自由编辑的注释节点，不产生任何效果，仅用于在节点树中记录说明",
 
+  "prop.comment.text": "注释内容",
+  "prop.comment.text.hint": "任意文本，仅作说明，不会影响生成结果",
   "prop.call_node.preset_id": "预设 ID",
   "prop.call_node.preset_id.hint": "要内联的生成预设 ID",
   "prop.dyn_prompt.set_name": "集合名称",
