@@ -81,6 +81,8 @@
   "node.file_system_tool_set.desc": "勾选要启用的文件系统工具，并配置文件访问范围（与全局配置 覆盖/并集/交集）",
   "node.set_value": "设置值",
   "node.set_value.desc": "将键值对写入 SharedState（仅本次生成有效）或 KVData（持久保存）",
+  "node.config": "配置",
+  "node.config.desc": "易用设置值节点：编辑模式定义配置项（名称 / SharedState 键 / 类型 / 默认值），配置模式调整每个项的值；运行时将生效值写入 SharedState（仅本次生成有效）",
 
   "prop.call_node.preset_id": "预设 ID",
   "prop.call_node.preset_id.hint": "要内联的生成预设 ID",
@@ -218,6 +220,18 @@
   "prop.set_value.kv_collection": "KV 集合",
   "prop.set_value.kv_collection.hint": "KVData 集合（命名空间）名称",
   "prop.set_value.kv_collection.placeholder": "输入集合名...",
+
+  "editor.config.mode_edit": "编辑",
+  "editor.config.mode_config": "配置",
+  "editor.config.add_item": "添加项",
+  "editor.config.remove": "删除项",
+  "editor.config.name": "名称",
+  "editor.config.key.hint": "该项写入 SharedState 时使用的键名",
+  "editor.config.key.placeholder": "SharedState 键...",
+  "editor.config.default": "默认值",
+  "editor.config.value": "值",
+  "editor.config.empty": "暂无配置项，点击「添加项」创建。",
+  "editor.config.parse_error": "配置数据解析失败，节点数据可能已被外部修改。",
 
   "category.other": "其他",
 
@@ -518,6 +532,9 @@
   "node_err.tool_preset_none": "ToolPreset: 未找到预设。",
   "node_err.tool_preset_empty": "ToolPreset: 预设列表为空。",
   "node_err.tool_preset_not_found": "ToolPreset: 未找到预设 '{0}'。",
+  "node_err.config_parse_failed": "ConfigNode: 配置项数据解析失败。",
+  "node_err.config_empty_key": "ConfigNode: 配置项「{0}」缺少 SharedState 键。",
+  "node_err.config_invalid_value": "ConfigNode: 无法将「{0}」转换为 {1}（配置项：{2}）。",
 
   "editor_subagent.select_hint": "从列表中选择 SubAgent 配置",
   "editor_subagent.label": "SubAgent",

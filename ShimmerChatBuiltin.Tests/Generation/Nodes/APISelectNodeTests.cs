@@ -80,21 +80,16 @@ public class APISelectNodeTests : NodeTestBase
         KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIGuid")).Returns(config0.Id.ToString());
         var node = new APISelectNode { APIGuid = null };
         var env = new PreGenerationEnv(CreatePersistentEnv());
-        var msg = new Message
-        {
-            sender = Sender.AI,
-            timestamp = DateTime.UtcNow,
-            message = new SharperLLM.Util.ChatMessage { Content = "prefix text" }
-        };
+        var msg = new SharperLLM.Util.ChatMessage { Content = "prefix text" };
         env.Transient.SharedState["IsContinuation"] = true;
-        env.Transient.SharedState["ChatMessages"] = new List<Message> { msg };
+        env.Transient.Fragments = [new ContextSegment{ From = SharperLLM.Util.PromptBuilder.From.assistant, Message = msg}];
         var ctx = CreateContext(env);
 
         var result = await node.ExecuteAsync(ctx);
 
         result.Success.Should().BeTrue();
-        msg.message.CustomProperties.Should().ContainKey("prefix");
-        msg.message.CustomProperties!["prefix"].Should().Be(true);
+        msg.CustomProperties.Should().ContainKey("prefix");
+        msg.CustomProperties!["prefix"].Should().Be(true);
     }
 
     [Fact]

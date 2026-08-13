@@ -81,6 +81,8 @@
   "node.file_system_tool_set.desc": "Select FileSystem tools to enable and configure file access scope (Override/Union/Intersection with global config)",
   "node.set_value": "Set Value",
   "node.set_value.desc": "Write a key/value pair to SharedState (this generation only) or KVData (persisted)",
+  "node.config": "Config",
+  "node.config.desc": "Easy-adjust settings node: define items (name / SharedState key / type / default) in Edit mode, adjust each item's value in Configure mode; effective values are written into SharedState (this generation only)",
 
   "prop.call_node.preset_id": "Preset ID",
   "prop.call_node.preset_id.hint": "ID of the generation preset to inline",
@@ -218,6 +220,18 @@
   "prop.set_value.kv_collection": "KV Collection",
   "prop.set_value.kv_collection.hint": "KVData collection (space) name",
   "prop.set_value.kv_collection.placeholder": "Enter collection name...",
+
+  "editor.config.mode_edit": "Edit",
+  "editor.config.mode_config": "Configure",
+  "editor.config.add_item": "Add Item",
+  "editor.config.remove": "Remove item",
+  "editor.config.name": "Name",
+  "editor.config.key.hint": "SharedState key this item is written to",
+  "editor.config.key.placeholder": "SharedState key...",
+  "editor.config.default": "Default",
+  "editor.config.value": "Value",
+  "editor.config.empty": "No items yet. Click \"Add Item\" to create one.",
+  "editor.config.parse_error": "Failed to parse config data. The node may have been modified externally.",
 
   "category.other": "Other",
 
@@ -518,6 +532,9 @@
   "node_err.tool_preset_none": "ToolPreset: No presets found.",
   "node_err.tool_preset_empty": "ToolPreset: Preset list is empty.",
   "node_err.tool_preset_not_found": "ToolPreset: Preset '{0}' not found.",
+  "node_err.config_parse_failed": "ConfigNode: failed to parse config item data.",
+  "node_err.config_empty_key": "ConfigNode: item \"{0}\" is missing a SharedState key.",
+  "node_err.config_invalid_value": "ConfigNode: cannot convert \"{0}\" to {1} (item: {2}).",
 
   "editor_subagent.select_hint": "Select a SubAgent configuration from the list",
   "editor_subagent.label": "SubAgent",

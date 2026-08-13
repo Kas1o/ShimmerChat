@@ -250,6 +250,53 @@
 .ti-item-desc { font-size: 0.72em; color: var(--su-text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ti-empty { padding: 12px; color: var(--su-text-1); text-align: center; font-style: italic; }
 
+/* ── ConfigNodeEditor: config-* ──────────────── */
+.config-node-editor { font-size: 0.82em; }
+.config-mode-bar { display: flex; gap: 4px; margin-bottom: 8px; }
+.config-mode-btn {
+    flex: 1; padding: 4px 8px;
+    border: 1px solid var(--su-border-0); border-radius: 4px;
+    background: var(--su-surface-3); color: var(--su-text-2);
+    font-size: 0.78em; cursor: pointer;
+}
+.config-mode-btn:hover { border-color: rgba(100,150,255,0.3); }
+.config-mode-btn-active {
+    background: rgba(100,150,255,0.12);
+    border-color: rgba(100,150,255,0.35);
+    color: var(--su-text-0);
+}
+.config-item { display: flex; gap: 6px; align-items: center; padding: 3px 0; flex-wrap: wrap; }
+.config-name { flex: 1; min-width: 90px; }
+.config-key { flex: 1; min-width: 110px; }
+.config-type { flex: 0 0 auto; }
+.config-default { flex: 1; min-width: 80px; }
+.config-default-check { flex: 0 0 auto; }
+.config-remove {
+    flex: 0 0 auto; width: 22px; height: 22px; line-height: 1;
+    border: none; background: transparent; color: var(--su-text-2);
+    cursor: pointer; font-size: 0.85em; border-radius: 3px;
+}
+.config-remove:hover { color: #f66; background: rgba(220,60,60,0.1); }
+.config-add {
+    width: 100%; margin-top: 6px; padding: 5px 10px;
+    border: 1px dashed var(--su-border-0); border-radius: 4px;
+    background: transparent; color: var(--su-text-2);
+    font-size: 0.8em; cursor: pointer; text-align: left;
+}
+.config-add:hover { border-color: rgba(100,150,255,0.3); color: var(--su-text-0); }
+.config-empty { padding: 8px; color: var(--su-text-1); text-align: center; font-style: italic; font-size: 0.78em; }
+.config-parse-error {
+    padding: 6px 8px; margin: 4px 0;
+    background: rgba(220,60,60,0.1); border-left: 3px solid #d44;
+    border-radius: 3px; color: var(--su-danger, #d44); font-size: 0.75em;
+    word-break: break-word;
+}
+.config-value-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.config-value-meta { flex: 1; min-width: 0; }
+.config-value-name { font-size: 0.8em; color: var(--su-text-0); }
+.config-value-key { font-size: 0.68em; color: var(--su-text-2); margin-left: 6px; font-family: monospace; }
+.config-value-input { flex: 1; min-width: 140px; }
+
 /* ── Drag & Drop ───────────────────────────────── */
 
 /* Dragging source */
