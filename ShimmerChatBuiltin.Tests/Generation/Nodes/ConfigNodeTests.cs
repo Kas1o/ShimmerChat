@@ -65,6 +65,22 @@ public class ConfigNodeTests : NodeTestBase
         ctx.Env.Transient.SharedState["count"].Should().Be(7);
     }
 
+    [Theory]
+    [InlineData(SetValueType.String, "")]
+    [InlineData(SetValueType.Int, 0)]
+    [InlineData(SetValueType.Float, 0f)]
+    [InlineData(SetValueType.Bool, false)]
+    public async Task Execute_NeitherValueNorDefaultSet_FallsBackToTypeDefault(SetValueType type, object expected)
+    {
+        var node = CreateNode(new ConfigItem { Key = "key", ValueType = type });
+        var ctx = CreateContext();
+
+        var result = await node.ExecuteAsync(ctx);
+
+        result.Success.Should().BeTrue();
+        ctx.Env.Transient.SharedState["key"].Should().Be(expected);
+    }
+
     [Fact]
     public async Task Execute_ValueOverridesDefault()
     {

@@ -6,7 +6,8 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
 {
     /// <summary>
     /// 单个配置项：Name 用于 UI 展示，Key 是写入 SharedState 的键，
-    /// ValueType 决定值的类型，DefaultValue 为默认值，Value 为配置模式下调整的值（留空则使用默认值）。
+    /// ValueType 决定值的类型，DefaultValue 为默认值，Value 为配置模式下调整的值（留空则使用默认值；
+    /// 默认值也为空时使用类型默认值：0 / 0.0 / false / 空字符串）。
     /// </summary>
     public class ConfigItem
     {
@@ -20,7 +21,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
     /// <summary>
     /// 配置节点：整体作为易调整的设置值节点，仅作用于 SharedState。
     /// 编辑模式定义配置项（名字 / SharedState 键 / 类型 / 默认值），配置模式调整每个项的值；
-    /// 运行时将每个项的生效值（配置值优先，否则默认值）转换为对应类型后写入 SharedState。
+    /// 运行时将每个项的生效值（配置值优先，否则默认值；两者都空时使用类型默认值）写入 SharedState。
     /// </summary>
     [NodeInfo("node.config", Icon = "⚙", Color = "var(--node-fragment)", CategoryKeys = ["category.variable"], DescriptionKey = "node.config.desc")]
     [NodeEditor(typeof(ConfigNodeEditor))]
@@ -72,12 +73,20 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                         nodeId: Id, nodeName: Name));
 
                 var raw = string.IsNullOrEmpty(item.Value) ? item.DefaultValue : item.Value;
-                if (!TryConvertValue(raw, item.ValueType, out var converted, out var error))
+                object converted;
+                if (string.IsNullOrEmpty(raw))
+                {
+                    // 既未设置值也未设置默认值：回退到该类型的默认值（0 / 0.0 / false / 空字符串）
+                    converted = GetTypeDefault(item.ValueType);
+                }
+                else if (!TryConvertValue(raw, item.ValueType, out converted, out var error))
+                {
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ParseError,
                         loc.Format("node_err.config_invalid_value", raw, LocTypeName(loc, item.ValueType), label),
                         error,
                         Id, Name));
+                }
 
                 context.Env.Transient.SharedState[item.Key] = converted;
             }
@@ -93,6 +102,20 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                 SetValueType.Float => loc["prop.set_value.value_type.float"],
                 SetValueType.Bool => loc["prop.set_value.value_type.bool"],
                 _ => loc["prop.set_value.value_type.string"]
+            };
+        }
+
+        /// <summary>
+        /// 值未设置且默认值也未设置时的回退值：各类型的默认值。
+        /// </summary>
+        private static object GetTypeDefault(SetValueType type)
+        {
+            return type switch
+            {
+                SetValueType.Int => 0,
+                SetValueType.Float => 0f,
+                SetValueType.Bool => false,
+                _ => ""
             };
         }
 
