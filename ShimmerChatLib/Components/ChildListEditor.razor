@@ -20,7 +20,7 @@
         <NodePickerMenu OnSelect="AddChild" OnClose="CloseAddMenu" />
     }
 
-    <DropStrip TargetList="@ChildNodes" InsertIndex="0" />
+    <DropStrip TargetList="@ChildNodes" InsertIndex="0" OnDropCommitted="Refresh" />
 
     @for (int i = 0; i < ChildNodes.Count; i++)
     {
@@ -46,7 +46,7 @@
             </div>
         </div>
 
-        <DropStrip TargetList="@ChildNodes" InsertIndex="@(index + 1)" />
+        <DropStrip TargetList="@ChildNodes" InsertIndex="@(index + 1)" OnDropCommitted="Refresh" />
     }
     @if (ChildNodes.Count == 0)
     {
@@ -81,7 +81,15 @@
             EditorContext.ClipboardChanged -= OnClipboardChanged;
     }
 
+    // 空实现即可：OnDragSourceChanged 是 EventCallback，被源 TreeEditor 调用时
+    // Blazor 会自动对接收方（本组件）触发重渲染，源列表的移除即时可见。
     private void HandleDragSourceChanged() { }
+
+    /// <summary>拖放落入本列表后刷新，使新增节点立即显示（DropStrip.OnDropCommitted）。</summary>
+    private async Task Refresh()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
 
     private void ToggleAddMenu()
     {

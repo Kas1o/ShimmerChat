@@ -1,5 +1,9 @@
 global using Xunit;
 global using FluentAssertions;
 global using Moq;
+global using Bunit;
+global using Microsoft.Extensions.DependencyInjection;
 global using ShimmerChatLib;
 global using ShimmerChatLib.Generation;
+global using ShimmerChatLib.Components;
+global using ShimmerChatLib.Interface;

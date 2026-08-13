@@ -20,6 +20,13 @@
     /// <summary>The index at which to insert the dragged node.</summary>
     [Parameter] public int InsertIndex { get; set; }
 
+    /// <summary>
+    /// Invoked after a successful drop commit, so the owning editor (e.g. ChildListEditor)
+    /// re-renders. Without it the target list's contents changed but the parent is never
+    /// notified and the newly dropped node stays invisible until the next manual refresh.
+    /// </summary>
+    [Parameter] public EventCallback OnDropCommitted { get; set; }
+
     [CascadingParameter] public TreeDragContext? DragContext { get; set; }
 
     private bool _active;
@@ -44,7 +51,10 @@
 
         try
         {
-            await DragContext.CommitDrop(TargetList, InsertIndex);
+            if (await DragContext.CommitDrop(TargetList, InsertIndex))
+            {
+                await OnDropCommitted.InvokeAsync();
+            }
         }
         catch
         {
