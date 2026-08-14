@@ -17,7 +17,7 @@ namespace ShimmerChatBuiltin.SubAgent;
 ///
 /// 对话累积策略：
 /// - _conversation 列表直接维护 assistant + tool_result 增量，每次消息到达即追加
-/// - 重建时将 _conversation 传给回调，回调负责 种子消息 + conversation → SharedState → 重执行树
+/// - 重建时将 _conversation 传给回调，回调负责 种子消息 + conversation → 写入虚拟 Chat.Messages → 重执行树
 /// - 树产出的 Fragment 直接替换 _promptContext，不做任何二次合并
 /// </summary>
 public class SubAgentLoopHost : IToolCallLoopHost
@@ -34,7 +34,7 @@ public class SubAgentLoopHost : IToolCallLoopHost
 
     /// <summary>
     /// 环境重建回调。接收当前累积的对话增量（assistant + tool_result），
-    /// 由调用方合并种子消息后注入 SharedState，重执行修饰器树，返回全新 Fragment 列表。
+    /// 由调用方合并种子消息后写入虚拟 Chat 的 Messages，重执行修饰器树，返回全新 Fragment 列表。
     /// null = 不重建。
     /// </summary>
     private readonly Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? _rebuildFragments;
@@ -92,7 +92,7 @@ public class SubAgentLoopHost : IToolCallLoopHost
 
         try
         {
-            // 将对话增量传给回调，由回调合并种子消息后注入 SharedState 重执行树
+            // 将对话增量传给回调，由回调合并种子消息后写入虚拟 Chat 重执行树
             var freshFragments = await _rebuildFragments(_conversation.ToList());
 
             // 树产出即完整上下文，直接替换

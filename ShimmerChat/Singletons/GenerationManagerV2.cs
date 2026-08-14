@@ -182,7 +182,6 @@ namespace ShimmerChat.Singletons
             }
 
             var env = new PreGenerationEnv(persistent);
-            env.Transient.SharedState["ChatMessages"] = chat.Messages.ToList();
 
             // 续写检测：最后一条 AI 消息带 IsContinuation 标记
             var lastMsg = chat.Messages.LastOrDefault();
@@ -307,7 +306,8 @@ namespace ShimmerChat.Singletons
             {
                 _onToolResult?.Invoke((toolCall.name, result, toolCall.id ?? ""));
 
-                // 重建 env，让 AppendChatMessagesNode 从 Chat 统一加载（handleStream 和 onToolResult 已持久化）
+                // 重建 env：AppendChatMessagesNode 实时读取 Chat.Messages
+                // （handleStream / onToolResult 已将增量写入 chat.Messages，无需快照）
                 _env = await _manager.BuildEnvironment(_agent, _chat, ct, _overrides);
             }
         }

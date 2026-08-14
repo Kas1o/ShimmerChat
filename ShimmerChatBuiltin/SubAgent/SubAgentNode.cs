@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Newtonsoft.Json;
 using SharperLLM.Util;
 using ShimmerChatLib;
@@ -43,7 +44,7 @@ namespace ShimmerChatBuiltin.SubAgent
                     loc.Format("node_err.subagent_no_tree", config.Name),
                     nodeId: Id, nodeName: Name);
 
-            // 1. 创建隔离的 PreGenerationEnv，将父级 Fragments 转为临时对话写入 SharedState
+            // 1. 创建隔离的 PreGenerationEnv，将父级 Fragments 转为临时对话写入虚拟 Chat
             var persistent = new PersistentEnv
             {
                 KVData = kvData,
@@ -69,7 +70,7 @@ namespace ShimmerChatBuiltin.SubAgent
                     timestamp = DateTime.Now
                 });
             }
-            subEnv.Transient.SharedState["ChatMessages"] = chatMessages;
+            persistent.Chat.Messages = new ObservableCollection<Message>(chatMessages);
 
             // 2. 执行 SubAgent 修饰器树（树产物追加在历史之后）
             try
@@ -125,8 +126,8 @@ namespace ShimmerChatBuiltin.SubAgent
             }
 
             // 环境重建函数：每次工具调用后重执行修饰器树。
-            // 接收对话增量（assistant + tool_result），与种子消息合并后注入 SharedState，
-            // 让 AppendChatMessagesNode 等节点能感知完整上下文。
+            // 接收对话增量（assistant + tool_result），与种子消息合并后写入虚拟 Chat 的 Messages，
+            // 让 AppendChatMessagesNode 等节点从 Chat 统一加载完整上下文。
             Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = async (conversation) =>
             {
                 var fullChatMessages = new List<Message>();
@@ -138,8 +139,8 @@ namespace ShimmerChatBuiltin.SubAgent
                     timestamp = DateTime.Now
                 }));
 
+                persistent.Chat.Messages = new ObservableCollection<Message>(fullChatMessages);
                 var newEnv = new PreGenerationEnv(persistent);
-                newEnv.Transient.SharedState["ChatMessages"] = fullChatMessages;
                 var newCtx = new PreNodeExecutionContext(newEnv, context.CancellationToken);
                 await rootNode.ExecuteAsync(newCtx);
                 return newEnv.Transient.Fragments.ToList();

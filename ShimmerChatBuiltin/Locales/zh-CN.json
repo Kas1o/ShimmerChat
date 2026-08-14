@@ -48,7 +48,7 @@
   "node.api_select": "API 选择",
   "node.api_select.desc": "选择用于生成的 API 配置",
   "node.append_chat_messages": "附加聊天消息",
-  "node.append_chat_messages.desc": "将 SharedState 中的聊天历史消息附加到上下文片段",
+  "node.append_chat_messages.desc": "从当前 Chat 实时读取聊天消息并附加到上下文片段",
   "node.call_preset": "调用预设",
   "node.call_preset.desc": "加载并执行生成管理器中的预设",
   "node.dyn_prompt": "动态提示词",

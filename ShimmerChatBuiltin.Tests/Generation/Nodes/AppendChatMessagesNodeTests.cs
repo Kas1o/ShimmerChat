@@ -21,7 +21,7 @@ public class AppendChatMessagesNodeTests : NodeTestBase
     {
         var node = new AppendChatMessagesNode();
         var env = new PreGenerationEnv(CreatePersistentEnv());
-        env.Transient.SharedState["ChatMessages"] = new List<Message> { CreateMsg(Sender.User, "hello") };
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.User, "hello"));
         var ctx = CreateContext(env);
 
         await node.ExecuteAsync(ctx);
@@ -36,7 +36,7 @@ public class AppendChatMessagesNodeTests : NodeTestBase
     {
         var node = new AppendChatMessagesNode();
         var env = new PreGenerationEnv(CreatePersistentEnv());
-        env.Transient.SharedState["ChatMessages"] = new List<Message> { CreateMsg(Sender.AI, "reply") };
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.AI, "reply"));
         var ctx = CreateContext(env);
 
         await node.ExecuteAsync(ctx);
@@ -50,11 +50,8 @@ public class AppendChatMessagesNodeTests : NodeTestBase
     {
         var node = new AppendChatMessagesNode();
         var env = new PreGenerationEnv(CreatePersistentEnv());
-        env.Transient.SharedState["ChatMessages"] = new List<Message>
-        {
-            CreateMsg(Sender.User, "skip", MessageGenerationState.Regenerating),
-            CreateMsg(Sender.AI, "keep")
-        };
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.User, "skip", MessageGenerationState.Regenerating));
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.AI, "keep"));
         var ctx = CreateContext(env);
 
         await node.ExecuteAsync(ctx);
@@ -68,13 +65,10 @@ public class AppendChatMessagesNodeTests : NodeTestBase
     {
         var node = new AppendChatMessagesNode();
         var env = new PreGenerationEnv(CreatePersistentEnv());
-        env.Transient.SharedState["ChatMessages"] = new List<Message>
-        {
-            CreateMsg(Sender.System, "s"),
-            CreateMsg(Sender.User, "u"),
-            CreateMsg(Sender.AI, "a"),
-            CreateMsg(Sender.ToolResult, "t")
-        };
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.System, "s"));
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.User, "u"));
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.AI, "a"));
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.ToolResult, "t"));
         var ctx = CreateContext(env);
 
         await node.ExecuteAsync(ctx);
@@ -84,5 +78,22 @@ public class AppendChatMessagesNodeTests : NodeTestBase
         ctx.Env.Transient.Fragments[1].From.Should().Be(PromptBuilder.From.user);
         ctx.Env.Transient.Fragments[2].From.Should().Be(PromptBuilder.From.assistant);
         ctx.Env.Transient.Fragments[3].From.Should().Be(PromptBuilder.From.tool_result);
+    }
+
+    [Fact]
+    public async Task MessageAddedToChatAfterEnvBuild_IsAppended()
+    {
+        // 节点在执行时实时读取 Chat.Messages：环境构建（旧实现在此处 ToList 快照）之后
+        // 对 chat.Messages 的修改也必须被感知，而不是使用构建时的副本。
+        var node = new AppendChatMessagesNode();
+        var env = new PreGenerationEnv(CreatePersistentEnv());
+        var ctx = CreateContext(env);
+
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.User, "late"));
+
+        await node.ExecuteAsync(ctx);
+
+        ctx.Env.Transient.Fragments.Should().HaveCount(1);
+        ctx.Env.Transient.Fragments[0].Message.Content.Should().Be("late");
     }
 }

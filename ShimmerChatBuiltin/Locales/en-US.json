@@ -48,7 +48,7 @@
   "node.api_select": "API Select",
   "node.api_select.desc": "Choose which API configuration to use for generation",
   "node.append_chat_messages": "Append Chat Messages",
-  "node.append_chat_messages.desc": "Append chat history messages from SharedState into context fragments",
+  "node.append_chat_messages.desc": "Append live chat messages from the current Chat into context fragments",
   "node.call_preset": "Call Preset",
   "node.call_preset.desc": "Load and execute a preset from Generation Manager",
   "node.dyn_prompt": "DynPrompt",

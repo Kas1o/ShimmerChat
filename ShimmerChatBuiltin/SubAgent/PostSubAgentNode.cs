@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Newtonsoft.Json;
 using SharperLLM.Util;
 using ShimmerChatLib;
@@ -85,7 +86,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 timestamp = DateTime.Now
             });
 
-            subEnv.Transient.SharedState["ChatMessages"] = chatMessages;
+            persistent.Chat.Messages = new ObservableCollection<Message>(chatMessages);
 
             // 2. 执行 SubAgent 修饰器树
             try
@@ -140,7 +141,7 @@ namespace ShimmerChatBuiltin.SubAgent
             }
 
             // 环境重建函数：每次工具调用后重执行修饰器树。
-            // 接收对话增量（assistant + tool_result），与种子消息合并后注入 SharedState。
+            // 接收对话增量（assistant + tool_result），与种子消息合并后写入虚拟 Chat 的 Messages。
             Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = async (conversation) =>
             {
                 var fullChatMessages = new List<Message>();
@@ -152,8 +153,8 @@ namespace ShimmerChatBuiltin.SubAgent
                     timestamp = DateTime.Now
                 }));
 
+                persistent.Chat.Messages = new ObservableCollection<Message>(fullChatMessages);
                 var newEnv = new PreGenerationEnv(persistent);
-                newEnv.Transient.SharedState["ChatMessages"] = fullChatMessages;
                 var newCtx = new PreNodeExecutionContext(newEnv, context.CancellationToken);
                 await rootNode.ExecuteAsync(newCtx);
                 return newEnv.Transient.Fragments.ToList();
