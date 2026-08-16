@@ -395,7 +395,16 @@ public class GenerationSessionService
         if (chat.ProviderSource != null)
             return;
 
-        agent.MoveChatToTop(chat.Guid);
-        agent.Save(_kvData);
+        // 只更新 ChatGuids 顺序，避免整对象 Save 覆盖其它连接（如 Agent 编辑器）的并发编辑。
+        try
+        {
+            Agent.Update(agent.Guid, _kvData, a => a.MoveChatToTop(chat.Guid));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "[GenerationSessionService] Failed to persist chat order for agent {AgentGuid}: {Message}",
+                agent.Guid, ex.Message);
+        }
     }
 }

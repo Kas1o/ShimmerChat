@@ -349,9 +349,8 @@
                 return;
             }
 
-            var ag = Agent.Load(_agentGuid, KVData);
-            ag.RenderModifierTreeJson = Serializer.Serialize(_editingRoot);
-            ag.Save(KVData);
+            // 仅更新渲染修改树字段，避免整对象 Save 覆盖其它连接对 Agent 的并发修改。
+            Agent.Update(_agentGuid, KVData, ag => ag.RenderModifierTreeJson = Serializer.Serialize(_editingRoot));
             return;
         }
 

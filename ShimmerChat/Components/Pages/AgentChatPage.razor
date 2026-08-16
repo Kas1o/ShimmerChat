@@ -574,8 +574,16 @@
 		chat.Save(KVData);
 		if (agent != null)
 		{
-			agent.MoveChatToTop(chat.Guid);
-			agent.Save(KVData);
+			// 只更新 ChatGuids 顺序，避免整对象 Save 覆盖其它连接（如 Agent 编辑器）的并发编辑。
+			try
+			{
+				Agent.Update(agent.Guid, KVData, a => a.MoveChatToTop(chat.Guid));
+			}
+			catch (Exception ex)
+			{
+				logger.LogWarning(ex, "[AgentChatPage] Failed to persist chat order for agent {AgentGuid}: {Message}",
+					agent.Guid, ex.Message);
+			}
 		}
 	}
 	async Task Refresh()

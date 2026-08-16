@@ -349,9 +349,8 @@
                 return;
             }
 
-            var ag = Agent.Load(_agentGuid, KVData);
-            ag.PostGenerationTreeJson = Serializer.Serialize(_editingRoot);
-            ag.Save(KVData);
+            // 仅更新后生成树字段，避免整对象 Save 覆盖其它连接对 Agent 的并发修改。
+            Agent.Update(_agentGuid, KVData, ag => ag.PostGenerationTreeJson = Serializer.Serialize(_editingRoot));
             return;
         }
 

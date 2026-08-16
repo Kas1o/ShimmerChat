@@ -202,6 +202,25 @@ namespace ShimmerChatLib
             }
             return JsonConvert.DeserializeObject<Agent>(agentJson) ?? throw new InvalidOperationException($"Agent with GUID '{guid}' not found.");
         }
+
+        private static readonly object UpdateLock = new();
+
+        /// <summary>
+        /// 以进程内互斥的方式读取最新 Agent、应用指定字段变更并写回。
+        /// Blazor Server 多电路（多连接）下，聊天链路与编辑器各自持有独立的
+        /// Agent 副本；若直接整对象 Save，会产生“最后写入覆盖”并丢失另一侧的编辑。
+        /// 所有“只改部分字段”的更新都应经由此方法，避免相互覆盖。
+        /// </summary>
+        public static Agent Update(Guid guid, IKVDataService kvDataService, Action<Agent> mutate)
+        {
+            lock (UpdateLock)
+            {
+                var agent = Load(guid, kvDataService);
+                mutate(agent);
+                agent.Save(kvDataService);
+                return agent;
+            }
+        }
 		#endregion
 		#region Statics
         /// <summary>

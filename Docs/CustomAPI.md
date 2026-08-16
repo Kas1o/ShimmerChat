@@ -304,7 +304,7 @@ public class MyPluginInitializer : IPluginInitializer
 ```csharp
 if (context.Env.Transient.SharedState.TryGetValue("IsContinuation", out var v) && v is true)
 {
-    var msgs = context.Env.Persistent.Chat.Messages;
+x    var msgs = context.Env.Persistent.Chat.Messages;
     var lastAi = msgs.LastOrDefault(m => m.sender == Sender.AI);
     if (lastAi != null)
     {
