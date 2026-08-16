@@ -193,6 +193,11 @@ public class GenerationSessionService
     {
         string? originalContent = continuationMessage?.CurrentVersion?.Content;
 
+        // 每次开始新一轮生成都重新从持久化读取 Agent，避免长期驻留的对话页
+        // 持有过期副本，导致在其它连接中编辑的节点树 / 后处理树不生效。
+        agent = ReloadAgent(agent);
+        session.Agent = agent;
+
         try
         {
             await _generationManager.GenerateStreamAsync(
@@ -258,6 +263,21 @@ public class GenerationSessionService
             GetDirty(chat, agent);
             session.NotifyStateChanged();
             session.NotifyGenerationCompleted();
+        }
+    }
+
+    private Agent ReloadAgent(Agent agent)
+    {
+        try
+        {
+            return Agent.Load(agent.Guid, _kvData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "[GenerationSessionService] Failed to reload agent {AgentGuid}, using in-memory copy: {Message}",
+                agent.Guid, ex.Message);
+            return agent;
         }
     }
 

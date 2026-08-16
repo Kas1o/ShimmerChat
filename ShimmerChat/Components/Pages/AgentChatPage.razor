@@ -215,6 +215,9 @@
 		if (chat == null || agent == null)
 			return;
 
+		// 重新读取 Agent，确保在其它连接中编辑的节点树 / 渲染树立即生效
+		ReloadAgent();
+
 		// 取消之前的生成
 		sessionService.CancelPreviousGeneration(ChatGuid);
 
@@ -276,6 +279,9 @@
 	{
 		await sessionService.StopGeneration(ChatGuid);
 
+		// 重新读取 Agent，确保在其它连接中编辑的节点树 / 渲染树立即生效
+		ReloadAgent();
+
 		int messageIndex = messages.IndexOf(message);
 		if (messageIndex == -1) return;
 
@@ -314,6 +320,9 @@
 	async Task ContinueFromMessage(Message message)
 	{
 		await sessionService.StopGeneration(ChatGuid);
+
+		// 重新读取 Agent，确保在其它连接中编辑的节点树 / 渲染树立即生效
+		ReloadAgent();
 
 		int messageIndex = messages.IndexOf(message);
 		if (messageIndex == -1) return;
@@ -584,6 +593,20 @@
 				logger.LogWarning(ex, "[AgentChatPage] Failed to persist chat order for agent {AgentGuid}: {Message}",
 					agent.Guid, ex.Message);
 			}
+		}
+	}
+
+	void ReloadAgent()
+	{
+		if (agent == null) return;
+		try
+		{
+			agent = Agent.Load(agent.Guid, KVData);
+		}
+		catch (Exception ex)
+		{
+			logger.LogWarning(ex, "[AgentChatPage] Failed to reload agent {AgentGuid}: {Message}",
+				agent.Guid, ex.Message);
 		}
 	}
 	async Task Refresh()
