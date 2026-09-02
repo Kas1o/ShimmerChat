@@ -110,6 +110,7 @@
 	bool _isLoading;
 	string? _statusMessage;
 	bool _isError;
+	bool _disposed;
 	string _testInput = string.Empty;
 	EncodeResult? _encodeResult;
 
@@ -145,6 +146,9 @@
 			_isError = true;
 			return;
 		}
+
+		if (_isLoading)
+			return;
 
 		_isLoading = true;
 		_statusMessage = null;
@@ -182,6 +186,8 @@
 		finally
 		{
 			_isLoading = false;
+			if (!_disposed)
+				StateHasChanged();
 		}
 	}
 
@@ -231,6 +237,7 @@
 
 	public void Dispose()
 	{
+		_disposed = true;
 		_tokenizer?.Dispose();
 	}
 
