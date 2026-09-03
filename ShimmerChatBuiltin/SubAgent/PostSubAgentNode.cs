@@ -25,7 +25,10 @@ namespace ShimmerChatBuiltin.SubAgent
         [NodeProperty("prop.post_sub_agent.include_full_context", HintKey = "prop.post_sub_agent.include_full_context.hint")]
         public bool IncludeFullContext { get; set; } = false;
 
-        [NodeProperty("prop.post_sub_agent.shared_guid", HintKey = "prop.post_sub_agent.shared_guid.hint")]
+		[NodeProperty("prop.post_sub_agent.ai_output_as", HintKey = "prop.post_sub_agent.ai_output_as.hint")]
+		public PromptBuilder.From AIOutputAs { get; set; } = PromptBuilder.From.assistant;
+
+		[NodeProperty("prop.post_sub_agent.shared_guid", HintKey = "prop.post_sub_agent.shared_guid.hint")]
         public bool SharedGuid { get; set; } = false;
 
         public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
@@ -82,7 +85,14 @@ namespace ShimmerChatBuiltin.SubAgent
             chatMessages.Add(new Message
             {
                 message = new ChatMessage { Content = context.Env.ResponseText },
-                sender = Sender.User,
+                sender = AIOutputAs switch
+                {
+                    PromptBuilder.From.system => Sender.System,
+                    PromptBuilder.From.assistant => Sender.AI,
+                    PromptBuilder.From.user => Sender.User,
+                    PromptBuilder.From.tool_result => Sender.ToolResult,
+                    var x => x.ToString()
+                },
                 timestamp = DateTime.Now
             });
 
