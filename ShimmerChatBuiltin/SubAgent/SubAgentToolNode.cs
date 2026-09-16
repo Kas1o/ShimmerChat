@@ -42,7 +42,7 @@ namespace ShimmerChatBuiltin.SubAgent
                     kvData,
                     p.ToolRegistry, p.ChatGuid, p.AgentGuid,
                     p.Serializer, p.LocService, p.DebugOutput,
-                    p.PostGenerationManager);
+                    p.PostGenerationManager, p.Services);
                 context.Env.Transient.Tools.Add(tool);
             }
 

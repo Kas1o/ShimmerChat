@@ -35,12 +35,22 @@
 	[Parameter]
 	public Guid AgentGuid { get; set; }
 
+	/// <summary>
+	/// 宿主上下文：向内暴露当前 Chat / Agent 活对象、消息存储与页面能力方法。
+	/// 容器不接收页面实例，只接收这份契约，避免把页面引用泄漏给插件。
+	/// </summary>
+	[Parameter]
+	public ShimmerChatLib.Panel.ChatPanelContext? PanelContext { get; set; }
+
 	#pragma warning disable CS8974
 	private Dictionary<string, object> Parameters => new Dictionary<string, object>
 	{
+		// 旧参数：保持既有面板零改动迁移。
 		["ChatGuid"] = ChatGuid,
 		["AgentGuid"] = AgentGuid,
-		["EventHandlerReg"] = RegisterEventHandler
+		["EventHandlerReg"] = RegisterEventHandler,
+		// 新参数：面板通过契约访问活对象与页面能力。
+		["PanelContext"] = PanelContext!
 	};
 	#pragma warning restore CS8974
 
@@ -60,7 +70,8 @@
 		_isExpanded = !_isExpanded;
 	}
 
-	private void RegisterEventHandler(ShimmerChatLib.Panel.IChatPanelEventHandler eventHandler)
+	/// <summary>供宿主页面或面板登记事件处理器。</summary>
+	public void RegisterEventHandler(ShimmerChatLib.Panel.IChatPanelEventHandler eventHandler)
 	{
 		if(eventHandler != null)
 			EventHandlers.Add(eventHandler);

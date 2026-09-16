@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace ShimmerChatLib.Panel
 {
@@ -61,7 +61,8 @@ namespace ShimmerChatLib.Panel
 		/// 实现需要包含特殊参数：（[Parameter]）
 		/// Guid ChatGuid { get; set; }
 		/// Guid AgentGuid { get; set; }
-		/// Action<IChatPanelEventHandler> EventHandlerReg { get; set; }
+		/// Action&lt;IChatPanelEventHandler&gt; EventHandlerReg { get; set; }
+		/// ChatPanelContext PanelContext { get; set; }   // 推荐：活对象 + 页面能力契约
 		/// </summary>
 		Chat 
 	}

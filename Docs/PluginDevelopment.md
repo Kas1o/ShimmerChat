@@ -507,14 +507,37 @@ public class MyModifier : IMessageRenderModifier
 ```razor
 @attribute [PluginPanelAttribute("panel.my_chat_panel", "panel.my_chat_panel.desc",
     PanelDisplayPlace.Chat)]
-@* 自动注入 ChatGuid, AgentGuid, EventHandlerReg *@
+@* 自动注入 ChatGuid, AgentGuid, EventHandlerReg, PanelContext *@
 
 @code {
     [Parameter] public Guid ChatGuid { get; set; }
     [Parameter] public Guid AgentGuid { get; set; }
     [Parameter] public Action<IChatPanelEventHandler> EventHandlerReg { get; set; } = null!;
+
+    // 推荐：活对象 + 页面能力契约（不传页面实例）
+    [Parameter] public ChatPanelContext? PanelContext { get; set; }
 }
 ```
+
+#### ChatPanelContext（推荐的宿主访问方式）
+
+宿主页面只向内暴露 `ChatPanelContext` 这一份契约，**不会把页面对象引用交给插件**。
+其中 `Chat` / `Agent` 是页面正在使用的**同一实例**（不是快照），因此读写即时可见，
+不会出现「面板数据与页面不同步」的问题。
+
+| 成员 | 说明 |
+|------|------|
+| `Chat` / `Agent` | 当前对话与 Agent 活对象 |
+| `MessageStore` | `IMessageStoreService`，面板自行增删消息时使用 |
+| `Draft` / `DraftKey` / `DraftStore` | 由宿主按对话缓存的输入草稿，折叠或切回不丢失 |
+| `IsGenerating()` | 页面是否存在活跃生成 |
+| `RequestRefreshAsync()` | 请求宿主重绘界面 |
+| `SendUserMessageAsync(text)` / `SendAsync(text)` | 面板内直接发送消息并启动生成 |
+| `InsertIntoInputAsync(text, append)` | 写入聊天主输入框（不发送） |
+| `RegisterEventHandler(handler)` | 等价 `EventHandlerReg` |
+
+`IChatPanelEventHandler` 的方法都有默认空实现，新面板只需覆写关心的事件；
+另有 `SendUserMessageFromPanelAsync` 与 `InsertIntoInputAsync` 两个可选能力。
 
 ### PanelDisplayPlace 对照
 
@@ -522,7 +545,9 @@ public class MyModifier : IMessageRenderModifier
 |----|------|---------|
 | `Settings` | 全局设置页 | 无额外参数 |
 | `Agent` | Agent 编辑页 | `AgentGuid`, `EventHandlerReg` |
-| `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg` |
+| `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg`, `PanelContext` |
+
+> 关于「面板内输入并直接发送」的完整实现示例，见 [MCP 集成](McpIntegration.md) 中的 `McpChatPanel`。
 
 ---
 

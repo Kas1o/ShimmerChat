@@ -11,6 +11,7 @@
 @inject IKVDataService KVData
 @inject IMessageStoreService messageStore
 @inject ILocService Loc
+@inject IPanelDraftStore PanelDrafts
 @inject NavigationManager navigation
 @inject ILogger<AgentChatPage> logger
 @implements IAsyncDisposable
@@ -89,7 +90,7 @@
 			}
 		</div>
 	</div>
-	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.Guid" ChatGuid="chat.Guid" @ref="ChatPluginPanelContainer"/>
+	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.Guid" ChatGuid="chat.Guid" PanelContext="PanelContext" @ref="ChatPluginPanelContainer"/>
 }
 
 @if(chat == null)
@@ -132,6 +133,103 @@
 	bool isUserAtBottom = true;
 
 	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
+
+	private ShimmerChatLib.Panel.ChatPanelContext? _panelContext;
+	#endregion
+
+	#region 插件面板宿主契约
+
+	/// <summary>
+	/// 交给聊天插件面板的宿主上下文。页面只暴露这份契约，不传页面实例；
+	/// Chat / Agent 为页面正在使用的同一实例，因此面板读写即时可见。
+	/// </summary>
+	private ShimmerChatLib.Panel.ChatPanelContext? PanelContext => BuildPanelContext();
+
+	private ShimmerChatLib.Panel.ChatPanelContext? BuildPanelContext()
+	{
+		if (chat == null || agent == null) return null;
+
+		// Chat/Agent 变化（切换对话）时重建，保证面板拿到的是当前对话对象。
+		var key = $"{chat.Guid:N}|{agent.Guid:N}";
+		if (_panelContext != null && string.Equals(_panelContext.DraftKey, key, StringComparison.Ordinal))
+			return _panelContext;
+
+		_panelContext = new ShimmerChatLib.Panel.ChatPanelContext
+		{
+			Chat = chat,
+			Agent = agent,
+			MessageStore = messageStore,
+			DraftStore = PanelDrafts,
+			IsGenerating = () => session is { IsActive: true },
+			RequestRefreshAsync = () => InvokeAsync(StateHasChanged),
+			SendUserMessageAsync = SendUserMessageFromPanelAsync,
+			InsertIntoInputAsync = InsertIntoInputFromPanelAsync,
+			RegisterEventHandler = handler => ChatPluginPanelContainer?.RegisterEventHandler(handler)
+		};
+
+		return _panelContext;
+	}
+
+	/// <summary>
+	/// 面板在自己的界面内发送消息：与输入框回车走同一条路径
+	/// （写入 Chat → 持久化 → 通知会话与面板 → 启动生成）。
+	/// </summary>
+	private async Task<bool> SendUserMessageFromPanelAsync(string text)
+	{
+		if (chat == null || agent == null) return false;
+
+		if (session is { IsActive: true })
+		{
+			logger.LogInformation("[AgentChatPage] Panel send ignored: generation is already active.");
+			return false;
+		}
+
+		var message = new ShimmerChatLib.Message
+		{
+			message = new SharperLLM.Util.ChatMessage { Content = text },
+			timestamp = DateTime.Now,
+			sender = ShimmerChatLib.Sender.User
+		};
+
+		chat.AddMessage(message);
+		chat.SaveMessage(messageStore, message);
+		session?.NotifyUserMessageAdded(message);
+
+		GetDirty();
+		await InvokeAsync(StateHasChanged);
+
+		ReloadAgent();
+		sessionService.CancelPreviousGeneration(ChatGuid);
+		session = sessionService.GetOrCreateSession(ChatGuid, AgentGuid);
+		SubscribeToSession(session);
+		sessionService.StartGeneration(session, agent, chat, throwExceptionInsteadOfPopupErrorMessage);
+
+		return true;
+	}
+
+	/// <summary>面板请求把文本写入主输入框（不发送）。</summary>
+	private async Task<bool> InsertIntoInputFromPanelAsync(string text, bool append)
+	{
+		if (string.IsNullOrEmpty(text)) return false;
+
+		if (!append || string.IsNullOrWhiteSpace(inputText))
+			inputText = text;
+		else
+			inputText = inputText.TrimEnd() + "\n" + text;
+
+		await InvokeAsync(StateHasChanged);
+
+		try
+		{
+			await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
+		}
+		catch (Exception ex)
+		{
+			logger.LogDebug(ex, "[AgentChatPage] Input insert post-processing skipped.");
+		}
+
+		return true;
+	}
 	#endregion
 
 	#region 样式
