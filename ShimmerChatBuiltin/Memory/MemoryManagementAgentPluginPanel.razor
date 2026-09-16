@@ -26,7 +26,14 @@
 
 @code {
     [Parameter] public Guid AgentGuid { get; set; }
-    [Parameter] public Action<IChatPanelEventHandler> EventHandlerReg { get; set; } = null!;
+    [Parameter] public Action<IChatPanelEventHandler>? EventHandlerReg { get; set; }
+
+    /// <summary>
+    /// Agent 级宿主契约：活 Agent 对象 + 基础设施（不传页面实例）。
+    /// 占位参数，当前面板逻辑仍只依赖 AgentGuid，后续迁移时可直接使用
+    /// <c>PanelContext.Agent</c> / <c>PanelContext.Draft</c>。
+    /// </summary>
+    [Parameter] public AgentPanelContext? PanelContext { get; set; }
 
     bool queryFinished;
     bool exists;

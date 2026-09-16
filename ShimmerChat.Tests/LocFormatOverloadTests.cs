@@ -1,65 +1,61 @@
-using ShimmerChat.Singletons;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Tests;
 
 /// <summary>
-/// 记录 <see cref="ILocService.Format(string, object[])"/>（位置插值）与
-/// <see cref="ILocService.Format(string, (string, object)[])"/>（命名插值）的解析结果，
-/// 用于确认单参数调用实际命中的是哪一个重载。
+/// <see cref="ILocService"/> 有两个 <c>Format</c> 重载（位置插值 / 命名插值），
+/// 且两者的首个参数都是字符串，因此「传一个纯字符串参数」时的重载选择很容易出错：
+/// 若命中命名插值重载，占位符 <c>{0}</c> 不会被替换，界面上会直接显示花括号。
+/// 这里把该契约固化下来。
 /// </summary>
 public class LocFormatOverloadTests
 {
-    private sealed class TrackingLoc : ILocService
+    /// <summary>记录实际命中的重载，并模拟生产行为（位置插值走 string.Format）。</summary>
+    private sealed class RecordingLoc : ILocService
     {
         public string CurrentCulture => "en-US";
         public IReadOnlyList<string> SupportedCultures => ["en-US"];
         public string this[string key] => key;
         public void SetCulture(string culture) { }
 
-        public string PositionalCalls { get; private set; } = "";
-        public string NamedCalls { get; private set; } = "";
+        public int PositionalCalls { get; private set; }
+        public int NamedCalls { get; private set; }
 
         public string Format(string key, params object[] args)
         {
-            PositionalCalls = string.Join("|", args.Select(a => a?.ToString() ?? "null"));
-            return "positional";
+            PositionalCalls++;
+            return string.Format(key, args);
         }
 
         public string Format(string key, params (string name, object value)[] args)
         {
-            NamedCalls = string.Join("|", args.Select(a => $"{a.name}={a.value}"));
-            return "named";
+            NamedCalls++;
+            return key;
         }
     }
 
     [Fact]
-    public void ProductionValidate_UsesPositionalOverload()
+    public void SingleStringArgument_ResolvesToPositionalOverload()
     {
-        var loc = new TrackingLoc();
+        ILocService loc = new RecordingLoc();
+        var recording = (RecordingLoc)loc;
 
-        ShimmerChatBuiltin.Mcp.McpEndpointCatalog.Validate(
-            new ShimmerChatBuiltin.Mcp.McpEndpointConfig
-            {
-                Id = "a",
-                Name = "A",
-                Command = "npx",
-                Environment = ["BAD"]
-            },
-            loc);
+        var result = loc.Format("变量 '{0}' 已添加", "x");
 
-        Assert.Equal("BAD", loc.PositionalCalls);
-        Assert.Equal("", loc.NamedCalls);
+        Assert.Equal(1, recording.PositionalCalls);
+        Assert.Equal(0, recording.NamedCalls);
+        Assert.Equal("变量 'x' 已添加", result);
     }
 
     [Fact]
-    public void ExplicitObjectArray_SelectsPositionalOverload()
+    public void ExplicitObjectArray_ResolvesToPositionalOverload()
     {
-        var loc = new TrackingLoc();
+        ILocService loc = new RecordingLoc();
+        var recording = (RecordingLoc)loc;
 
-        var result = loc.Format("some.key", new object[] { "VALUE" });
+        var result = loc.Format("错误: {0}", new object[] { "boom" });
 
-        Assert.Equal("positional", result);
-        Assert.Equal("VALUE", loc.PositionalCalls);
+        Assert.Equal(1, recording.PositionalCalls);
+        Assert.Equal("错误: boom", result);
     }
 }

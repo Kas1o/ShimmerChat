@@ -19,6 +19,7 @@
 @inject IGenerationProviderRegistry ProviderRegistry
 @inject GenerationProviderHostService ProviderHost
 @inject ILogger<AgentPage> logger
+@inject IPanelDraftStore PanelDrafts
 
 @if(agent != null)
 {
@@ -583,8 +584,44 @@
         {
             if (handler != null)
                 _agentEventHandlers.Add(handler);
-        })
+        }),
+        // 新参数：Agent 级面板可通过契约访问活对象与基础设施（不传页面实例）。
+        ["PanelContext"] = AgentPanelContext!
     };
+
+    /// <summary>
+    /// 交给 Agent 级插件面板的宿主契约。Agent 为页面正在使用的同一实例，
+    /// 因此面板读写即时可见；Agent 编辑页没有当前对话，Chat 为 null。
+    /// </summary>
+    private ShimmerChatLib.Panel.AgentPanelContext? AgentPanelContext
+    {
+        get
+        {
+            if (agent == null) return null;
+
+            if (_agentPanelContext != null
+                && string.Equals(_agentPanelContext.DraftKey, $"agent:{agent.Guid:N}", StringComparison.Ordinal))
+                return _agentPanelContext;
+
+            _agentPanelContext = new ShimmerChatLib.Panel.AgentPanelContext
+            {
+                Agent = agent,
+                Chat = null,
+                MessageStore = messageStore,
+                DraftStore = PanelDrafts,
+                RequestRefreshAsync = () => InvokeAsync(StateHasChanged),
+                RegisterEventHandler = handler =>
+                {
+                    if (handler != null)
+                        _agentEventHandlers.Add(handler);
+                }
+            };
+
+            return _agentPanelContext;
+        }
+    }
+
+    private ShimmerChatLib.Panel.AgentPanelContext? _agentPanelContext;
 
     List<ShimmerChatLib.Panel.IChatPanelEventHandler> _agentEventHandlers = [];
     string Name

@@ -471,7 +471,11 @@
     private Dictionary<string, object> SubAgentPluginParameters => new()
     {
         ["AgentGuid"] = selectedConfig?.Guid ?? Guid.Empty,
-        ["EventHandlerReg"] = (Action<IChatPanelEventHandler>)(handler => { })
+        ["EventHandlerReg"] = (Action<IChatPanelEventHandler>)(handler => { }),
+        // 本宿主在「子代理配置」上下文中渲染 Agent 面板，只有 SubAgentConfig，
+        // 并不存在活的 Agent 实例，因此不提供 AgentPanelContext。
+        // 面板必须容忍 PanelContext 为 null 并退回按 Guid 自行加载的行为。
+        ["PanelContext"] = null!
     };
 
     void CreatePrivateTree()

@@ -494,13 +494,33 @@ public class MyModifier : IMessageRenderModifier
 ```razor
 @attribute [PluginPanelAttribute("panel.my_agent_panel", "panel.my_agent_panel.desc",
     PanelDisplayPlace.Agent)]
-@* 自动注入 AgentGuid 和 EventHandler *@
+@* 自动注入 AgentGuid, EventHandlerReg, PanelContext *@
 
 @code {
     [Parameter] public Guid AgentGuid { get; set; }
-    [Parameter] public Action<IChatPanelEventHandler> EventHandlerReg { get; set; } = null!;
+    [Parameter] public Action<IChatPanelEventHandler>? EventHandlerReg { get; set; }
+
+    // 推荐：活 Agent 对象 + 基础设施（不传页面实例）
+    [Parameter] public AgentPanelContext? PanelContext { get; set; }
 }
 ```
+
+#### AgentPanelContext
+
+与 `ChatPanelContext` 对应，供 `PanelDisplayPlace.Agent` 面板使用：
+
+| 成员 | 说明 |
+|------|------|
+| `Agent` | 当前 Agent 活对象（与页面同一实例） |
+| `Chat` | Agent 编辑页没有当前对话，**为 null** |
+| `MessageStore` | `IMessageStoreService` |
+| `Draft` / `DraftKey` / `DraftStore` | 按 Agent 缓存的输入草稿 |
+| `RequestRefreshAsync()` | 请求宿主重绘 |
+| `RegisterEventHandler(handler)` | 等价 `EventHandlerReg` |
+
+> **可能为 null**：并非每个渲染 Agent 面板的宿主都持有活的 Agent 实例
+> （例如 `SubAgentConfigurationPanel` 在子代理配置上下文中渲染 Agent 面板）。
+> 面板必须容忍 `PanelContext == null` 并退回按 `AgentGuid` 自行加载的行为。
 
 ### 对话级面板
 
@@ -544,8 +564,8 @@ public class MyModifier : IMessageRenderModifier
 | 值 | 位置 | 注入参数 |
 |----|------|---------|
 | `Settings` | 全局设置页 | 无额外参数 |
-| `Agent` | Agent 编辑页 | `AgentGuid`, `EventHandlerReg` |
-| `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg`, `PanelContext` |
+| `Agent` | Agent 编辑页 | `AgentGuid`, `EventHandlerReg`, `PanelContext`(`AgentPanelContext?`) |
+| `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg`, `PanelContext`(`ChatPanelContext?`) |
 
 > 关于「面板内输入并直接发送」的完整实现示例，见 [MCP 集成](McpIntegration.md) 中的 `McpChatPanel`。
 
