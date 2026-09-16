@@ -500,27 +500,44 @@ public class MyModifier : IMessageRenderModifier
     [Parameter] public Guid AgentGuid { get; set; }
     [Parameter] public Action<IChatPanelEventHandler>? EventHandlerReg { get; set; }
 
-    // 推荐：活 Agent 对象 + 基础设施（不传页面实例）
+    // 宿主契约基类（不传页面实例）
     [Parameter] public AgentPanelContext? PanelContext { get; set; }
 }
 ```
 
-#### AgentPanelContext
+#### AgentPanelContext 的两种宿主
 
-与 `ChatPanelContext` 对应，供 `PanelDisplayPlace.Agent` 面板使用：
+「Agent 作用域」有两个语义不同的宿主，差异**在类型层面**表达，不用 null 字段当哨兵值：
+
+| 类型 | 宿主 | 独有成员 |
+|------|------|----------|
+| `LiveAgentPanelContext` | Agent 编辑器（`AgentPage`） | `Agent`（活对象）、`ChatGuids` |
+| `SubAgentPanelContext`（内置插件定义） | 子代理配置编辑器 | `Config`（`SubAgentConfig`） |
+
+公共成员（定义在抽象基类 `AgentPanelContext` 上）：
 
 | 成员 | 说明 |
 |------|------|
-| `Agent` | 当前 Agent 活对象（与页面同一实例） |
-| `Chat` | Agent 编辑页没有当前对话，**为 null** |
+| `TargetGuid` | 当前编辑目标的 Guid |
 | `MessageStore` | `IMessageStoreService` |
-| `Draft` / `DraftKey` / `DraftStore` | 按 Agent 缓存的输入草稿 |
+| `Draft` / `DraftKey` / `DraftStore` | 按编辑目标缓存的输入草稿 |
 | `RequestRefreshAsync()` | 请求宿主重绘 |
 | `RegisterEventHandler(handler)` | 等价 `EventHandlerReg` |
 
-> **可能为 null**：并非每个渲染 Agent 面板的宿主都持有活的 Agent 实例
-> （例如 `SubAgentConfigurationPanel` 在子代理配置上下文中渲染 Agent 面板）。
-> 面板必须容忍 `PanelContext == null` 并退回按 `AgentGuid` 自行加载的行为。
+需要 Agent 实体的面板应对 `LiveAgentPanelContext` 做类型判断：
+
+```csharp
+if (PanelContext is LiveAgentPanelContext live)
+{
+    var agent = live.Agent;   // 与页面同一实例
+}
+```
+
+> 需要**对话对象**的面板不应放在 Agent 作用域：Agent 配置页没有当前对话。
+> 这类面板应使用 `ChatPanelContext` 并注册为 `PanelDisplayPlace.Chat`。
+
+> **参数必须声明**：宿主必然传入 `PanelContext` / `EventHandlerReg`，
+> `DynamicComponent` 在缺少已声明参数时会抛异常，因此每个面板都必须声明这些 `[Parameter]`。
 
 ### 对话级面板
 
@@ -564,8 +581,8 @@ public class MyModifier : IMessageRenderModifier
 | 值 | 位置 | 注入参数 |
 |----|------|---------|
 | `Settings` | 全局设置页 | 无额外参数 |
-| `Agent` | Agent 编辑页 | `AgentGuid`, `EventHandlerReg`, `PanelContext`(`AgentPanelContext?`) |
-| `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg`, `PanelContext`(`ChatPanelContext?`) |
+| `Agent` | Agent 编辑页 / 子代理配置编辑器 | `AgentGuid`, `EventHandlerReg`, `PanelContext`(`AgentPanelContext`) |
+| `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg`, `PanelContext`(`ChatPanelContext`) |
 
 > 关于「面板内输入并直接发送」的完整实现示例，见 [MCP 集成](McpIntegration.md) 中的 `McpChatPanel`。
 

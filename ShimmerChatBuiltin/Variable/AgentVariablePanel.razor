@@ -109,9 +109,11 @@
     public Action<IChatPanelEventHandler>? EventHandlerReg { get; set; }
 
     /// <summary>
-    /// Agent 级宿主契约：活 Agent 对象 + 基础设施（不传页面实例）。
-    /// 占位参数，当前面板逻辑仍只依赖 AgentGuid，后续迁移时可直接使用
+    /// Agent 作用域宿主契约：活 Agent 对象 + 基础设施（不传页面实例）。
+    /// 占位参数，当前面板逻辑仍只依赖 AgentGuid；后续迁移时可以对
+    /// <see cref="LiveAgentPanelContext"/> 做类型判断后直接使用
     /// <c>PanelContext.Agent</c> / <c>PanelContext.Draft</c>。
+    /// 宿主必然提供该参数，面板必须声明，否则 DynamicComponent 会因缺少参数报错。
     /// </summary>
     [Parameter]
     public AgentPanelContext? PanelContext { get; set; }

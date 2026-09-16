@@ -585,28 +585,29 @@
             if (handler != null)
                 _agentEventHandlers.Add(handler);
         }),
-        // 新参数：Agent 级面板可通过契约访问活对象与基础设施（不传页面实例）。
-        ["PanelContext"] = AgentPanelContext!
+        // 新参数：Agent 级面板通过契约访问活对象与基础设施（不传页面实例）。
+        // 本宿主是 Agent 配置页且 agent 已加载，因此提供 LiveAgentPanelContext；
+        // 面板必须声明该参数，否则 DynamicComponent 会因缺少参数而报错。
+        ["PanelContext"] = LiveAgentPanelContext!
     };
 
     /// <summary>
     /// 交给 Agent 级插件面板的宿主契约。Agent 为页面正在使用的同一实例，
-    /// 因此面板读写即时可见；Agent 编辑页没有当前对话，Chat 为 null。
+    /// 因此面板读写即时可见；Agent 配置页没有当前对话，如需对话数据请改用聊天侧栏面板。
     /// </summary>
-    private ShimmerChatLib.Panel.AgentPanelContext? AgentPanelContext
+    private ShimmerChatLib.Panel.LiveAgentPanelContext? LiveAgentPanelContext
     {
         get
         {
             if (agent == null) return null;
 
-            if (_agentPanelContext != null
-                && string.Equals(_agentPanelContext.DraftKey, $"agent:{agent.Guid:N}", StringComparison.Ordinal))
+            if (_agentPanelContext != null && _agentPanelContext.Agent.Guid == agent.Guid)
                 return _agentPanelContext;
 
-            _agentPanelContext = new ShimmerChatLib.Panel.AgentPanelContext
+            _agentPanelContext = new ShimmerChatLib.Panel.LiveAgentPanelContext
             {
+                TargetGuid = agent.Guid,
                 Agent = agent,
-                Chat = null,
                 MessageStore = messageStore,
                 DraftStore = PanelDrafts,
                 RequestRefreshAsync = () => InvokeAsync(StateHasChanged),
@@ -621,7 +622,7 @@
         }
     }
 
-    private ShimmerChatLib.Panel.AgentPanelContext? _agentPanelContext;
+    private ShimmerChatLib.Panel.LiveAgentPanelContext? _agentPanelContext;
 
     List<ShimmerChatLib.Panel.IChatPanelEventHandler> _agentEventHandlers = [];
     string Name

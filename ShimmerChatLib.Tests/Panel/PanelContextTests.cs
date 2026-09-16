@@ -126,31 +126,39 @@ public class ChatPanelContextTests
 
 public class AgentPanelContextTests
 {
-    [Fact]
-    public void DraftKey_IsScopedToAgent()
+    private static LiveAgentPanelContext CreateLiveContext(Agent? agent = null)
     {
-        var agent = Agent.Create("agent", "");
-        var context = new AgentPanelContext
+        var target = agent ?? Agent.Create("agent", "");
+        return new LiveAgentPanelContext
         {
-            Agent = agent,
-            Chat = null,
+            TargetGuid = target.Guid,
+            Agent = target,
             MessageStore = null!,
             DraftStore = new StubDraftStore(),
             RequestRefreshAsync = () => Task.CompletedTask,
             RegisterEventHandler = _ => { }
         };
-
-        Assert.Equal($"agent:{agent.Guid:N}", context.DraftKey);
-        Assert.Null(context.Chat);
     }
 
     [Fact]
-    public void Draft_IsPersistedByHostStore()
+    public void LiveAgentContext_DraftKey_IsScopedToAgent()
+    {
+        var agent = Agent.Create("agent", "");
+        var context = CreateLiveContext(agent);
+
+        Assert.Equal($"agent:{agent.Guid:N}", context.DraftKey);
+        Assert.Equal($"agent:{agent.Guid:N}", $"agent:{context.TargetGuid:N}");
+    }
+
+    [Fact]
+    public void LiveAgentContext_Draft_IsPersistedByHostStore()
     {
         var store = new StubDraftStore();
-        var context = new AgentPanelContext
+        var agent = Agent.Create("agent", "");
+        var context = new LiveAgentPanelContext
         {
-            Agent = Agent.Create("agent", ""),
+            TargetGuid = agent.Guid,
+            Agent = agent,
             MessageStore = null!,
             DraftStore = store,
             RequestRefreshAsync = () => Task.CompletedTask,
@@ -160,5 +168,25 @@ public class AgentPanelContextTests
         context.Draft = "agent draft";
 
         Assert.Equal("agent draft", store[context.DraftKey]);
+    }
+
+    [Fact]
+    public void LiveAgentContext_ExposesLiveAgentInstance()
+    {
+        var agent = Agent.Create("agent", "");
+        var context = CreateLiveContext(agent);
+
+        Assert.Same(agent, context.Agent);
+        Assert.Equal(agent.Guid, context.TargetGuid);
+    }
+
+    [Fact]
+    public void Contexts_AreDistinguishedByType_NotByNullableFields()
+    {
+        var context = CreateLiveContext();
+
+        // 基类不暴露 Agent 实体：需要 Agent 的面板必须对 LiveAgentPanelContext 做类型判断。
+        Assert.IsAssignableFrom<AgentPanelContext>(context);
+        Assert.IsType<LiveAgentPanelContext>(context);
     }
 }
