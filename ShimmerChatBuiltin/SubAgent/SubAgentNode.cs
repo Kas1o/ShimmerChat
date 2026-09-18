@@ -55,8 +55,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 PostGenerationManager = context.Env.Persistent.PostGenerationManager,
                 Chat = new Chat { Name = "sub", Guid = context.Env.Persistent.ChatGuid },
                 Agent = CreateVirtualAgent(config,
-                    SharedGuid ? context.Env.Persistent.AgentGuid : config.Guid),
-                Services = context.Env.Persistent.Services
+                    SharedGuid ? context.Env.Persistent.AgentGuid : config.Guid)
             };
 
             var subEnv = new PreGenerationEnv(persistent);
@@ -164,11 +163,6 @@ namespace ShimmerChatBuiltin.SubAgent
                 return NodeResult.Failure(NodeErrorCodes.ServiceError,
                     $"[SubAgent Error: {ex.Message}]", nodeId: Id, nodeName: Name);
             }
-            finally
-            {
-                // 释放子代理生成期间注册的会话级资源（如 MCP 连接）。
-                await DisposeSubEnvResourcesAsync(persistent, context.Env.Persistent.DebugOutput);
-            }
 
             // 5. 输出格式化，注入父级上下文
             var mode = !string.IsNullOrWhiteSpace(OutputMode) ? OutputMode : config.OutputMode;
@@ -192,22 +186,6 @@ namespace ShimmerChatBuiltin.SubAgent
             }
 
             return NodeResult.SuccessResult();
-        }
-
-        private static async Task DisposeSubEnvResourcesAsync(PersistentEnv persistent, IDebugOutputService debug)
-        {
-            if (persistent.Resources.Count == 0) return;
-
-            try
-            {
-                await persistent.Resources.DisposeAsync();
-            }
-            catch (Exception ex)
-            {
-                // 子代理收尾失败不应影响父级生成，但必须留痕。
-                debug.Write("SubAgentNode", "ResourceCleanup",
-                    $"[SubAgentNode] Generation-scoped resource cleanup failed: {ex}");
-            }
         }
 
         private static IPreGenerationNode? ResolveTree(SubAgentConfig config, IKVDataService kvData, IPreGenerationNodeSerializer serializer)

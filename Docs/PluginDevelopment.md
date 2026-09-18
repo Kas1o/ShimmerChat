@@ -584,8 +584,6 @@ if (PanelContext is LiveAgentPanelContext live)
 | `Agent` | Agent 编辑页 / 子代理配置编辑器 | `AgentGuid`, `EventHandlerReg`, `PanelContext`(`AgentPanelContext`) |
 | `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg`, `PanelContext`(`ChatPanelContext`) |
 
-> 关于「面板内输入并直接发送」的完整实现示例，见 [MCP 集成](McpIntegration.md) 中的 `McpChatPanel`。
-
 ---
 
 ## 8. 本地化

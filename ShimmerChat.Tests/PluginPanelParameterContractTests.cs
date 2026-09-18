@@ -72,8 +72,6 @@ public class PluginPanelParameterContractTests
         var types = discovered.Select(t => t.FullName).ToList();
 
         // 若新增面板而这里没跟上，说明发现逻辑退化了（而不是面板漏适配）。
-        Assert.Contains("ShimmerChatBuiltin.Mcp.McpToolsetPage", types);
-        Assert.Contains("ShimmerChatBuiltin.Mcp.McpChatPanel", types);
         Assert.Contains("ShimmerChatBuiltin.Variable.VariablePanel", types);
         Assert.Contains("ShimmerChatBuiltin.Variable.AgentVariablePanel", types);
         Assert.Contains("ShimmerChatBuiltin.Memory.MemoryManagementAgentPluginPanel", types);
@@ -84,7 +82,7 @@ public class PluginPanelParameterContractTests
         Assert.Contains("ShimmerChatBuiltin.Example.ExamplePanel", types);
 
         // 数量守卫：反射加载失败会静默丢类型，从而让契约测试失去意义。
-        Assert.Equal(14, discovered.Count);
+        Assert.Equal(12, discovered.Count);
     }
 
     [Theory]

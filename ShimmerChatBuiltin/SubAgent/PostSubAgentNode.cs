@@ -60,8 +60,7 @@ namespace ShimmerChatBuiltin.SubAgent
                 PostGenerationManager = context.Env.Persistent.PostGenerationManager,
                 Chat = new Chat { Name = "sub", Guid = context.Env.Persistent.ChatGuid },
                 Agent = CreateVirtualAgent(config,
-                    SharedGuid ? context.Env.Persistent.AgentGuid : config.Guid),
-                Services = context.Env.Persistent.Services
+                    SharedGuid ? context.Env.Persistent.AgentGuid : config.Guid)
             };
 
             var subEnv = new PreGenerationEnv(persistent);
@@ -187,22 +186,6 @@ namespace ShimmerChatBuiltin.SubAgent
             {
                 return Fail(NodeErrorCodes.ServiceError,
                     $"[SubAgent Error: {ex.Message}]");
-            }
-            finally
-            {
-                // 释放子代理生成期间注册的会话级资源（如 MCP 连接）。
-                if (persistent.Resources.Count > 0)
-                {
-                    try
-                    {
-                        await persistent.Resources.DisposeAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        context.Env.Persistent.DebugOutput.Write("PostSubAgentNode", "ResourceCleanup",
-                            $"[PostSubAgentNode] Generation-scoped resource cleanup failed: {ex}");
-                    }
-                }
             }
 
             // 5. 输出格式化，写回 ResponseText
