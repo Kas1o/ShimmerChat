@@ -249,6 +249,8 @@ public class GenerationSessionService
                 msg.GenerationState = MessageGenerationState.Completed;
             }
 
+            _logger.LogError(ex.StackTrace);
+
             if (throwExceptionInsteadOfPopup)
                 throw;
 
