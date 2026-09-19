@@ -489,6 +489,7 @@
 
 	private async void OnSessionError(string message, string title)
 	{
+		logger.LogError(title + message);
 		await popupService.ShowAsync(message, title);
 	}
 
