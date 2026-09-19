@@ -493,14 +493,16 @@
 		await popupService.ShowAsync(message, title);
 	}
 
-	private void OnSessionAgentMessageCompleted(Message msg)
+	private async void OnSessionAgentMessageCompleted(Message msg)
 	{
-		ChatPluginPanelContainer?.OnAgentMessage(msg);
+		// 会话事件在后台生成线程触发，须切回渲染线程再通知面板，
+		// 否则面板处理器与渲染线程的登记操作并发，可能破坏集合。
+		await InvokeAsync(() => ChatPluginPanelContainer?.OnAgentMessage(msg));
 	}
 
-	private void OnSessionToolResultAdded(Message msg)
+	private async void OnSessionToolResultAdded(Message msg)
 	{
-		ChatPluginPanelContainer?.OnToolCallResult(msg);
+		await InvokeAsync(() => ChatPluginPanelContainer?.OnToolCallResult(msg));
 	}
 
 	private async void OnSessionGenerationCompleted()
