@@ -55,7 +55,6 @@
 /* ── Messages area ────────────────────────────── */
 .chat-messages {
     flex: 1; overflow-y: auto; overflow-x: hidden;
-    scroll-behavior: smooth;
 }
 .chat-messages-inner {
     max-width: 768px; margin: 0 auto;

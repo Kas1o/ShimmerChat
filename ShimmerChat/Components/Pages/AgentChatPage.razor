@@ -286,10 +286,10 @@
 	{
 		try
 		{
-			bool atBottom = await JS.InvokeAsync<bool>("isScrolledToBottom", ChatMainElement, 50);
-			if (isUserAtBottom != atBottom)
+			bool following = await JS.InvokeAsync<bool>("isChatAutoFollowing", ChatMainElement);
+			if (isUserAtBottom != following)
 			{
-				isUserAtBottom = atBottom;
+				isUserAtBottom = following;
 				await InvokeAsync(StateHasChanged);
 			}
 		}
@@ -299,7 +299,7 @@
 	{
 		try
 		{
-			await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+			await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement, true);
 			isUserAtBottom = true;
 			await InvokeAsync(StateHasChanged);
 		}
