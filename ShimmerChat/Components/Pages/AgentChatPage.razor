@@ -299,7 +299,7 @@
 	{
 		try
 		{
-			await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement, true);
+			await JS.InvokeVoidAsync("scrollToBottomManual", ChatMainElement);
 			isUserAtBottom = true;
 			await InvokeAsync(StateHasChanged);
 		}

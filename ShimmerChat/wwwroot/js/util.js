@@ -72,110 +72,121 @@ window.requestNotificationPermission = async () => {
 
 // ─── Chat auto-scroll ─────────────────────────────
 
-// 聊天消息区的“自动跟随”状态由 JS 维护。
-// 只有真实的用户滚动输入（滚轮 / 触摸 / 方向键）才会关闭自动跟随；
-// 程序化滚动（自动滚到底部、点击回到底部按钮）和内容增长都不会。
-// 否则平滑滚动产生的中间 scroll 事件会被当成用户上滑，把自动跟随自己关掉，
-// 导致生成时卡在某个位置永远滚不到底部 —— 该问题在非 100% 缩放下被放大。
+// 聊天消息区的“自动跟随”状态由 JS 维护，规则：
+//   * 每次 scroll 后按“是否在底部附近”更新跟随状态。这样滚轮、触摸、
+//     拖动滚动条、键盘都能正确生效。
+//   * 自动跟随的滚动只在仍处于跟随状态时执行，绝不会把用户的上滑拉回底部，
+//     否则用户会“难以离开跟随状态”。
+//   * 用户主动点击「回到底部」使用平滑滚动；平滑动画自身的中间 scroll 事件
+//     通过 animating 标记忽略，避免被误判为上滑而关闭跟随。
 window.chatScroll = (function () {
     // 距底部不超过该像素数即视为“已回到底部”，并恢复自动跟随
     var BOTTOM_THRESHOLD = 50;
 
+    // 平滑滚动的最长等待时间，超过后即使没到底也结束动画标记
+    var MANUAL_ANIMATION_TIMEOUT_MS = 800;
+
     var states = new WeakMap();
-
-    function getState(element) {
-        var state = states.get(element);
-        if (state) return state;
-
-        state = { following: true, userScrolled: false, scheduled: false };
-        states.set(element, state);
-
-        var markUserScrolled = function () {
-            state.userScrolled = true;
-            scheduleRecompute(element, state);
-        };
-
-        element.addEventListener('wheel', markUserScrolled, { passive: true });
-        element.addEventListener('touchstart', markUserScrolled, { passive: true });
-        element.addEventListener('touchmove', markUserScrolled, { passive: true });
-        element.addEventListener('keydown', function (e) {
-            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
-                e.key === 'PageUp' || e.key === 'PageDown' ||
-                e.key === 'Home' || e.key === 'End') {
-                markUserScrolled();
-            }
-        });
-
-        return state;
-    }
 
     function atBottom(element) {
         return element.scrollHeight - element.scrollTop - element.clientHeight <= BOTTOM_THRESHOLD;
     }
 
-    function recompute(element, state) {
-        if (atBottom(element)) {
-            state.following = true;
-            state.userScrolled = false;
-        } else if (state.userScrolled) {
-            state.following = false;
-        }
-    }
+    function getState(element) {
+        var state = states.get(element);
+        if (state) return state;
 
-    function scheduleRecompute(element, state) {
-        if (state.scheduled) return;
-        state.scheduled = true;
-        requestAnimationFrame(function () {
-            state.scheduled = false;
-            recompute(element, state);
-        });
+        state = { following: true, animating: false };
+        states.set(element, state);
+
+        // 用户接管滚动时立即取消「回到底部」的平滑动画，
+        // 让随后的 scroll 事件按真实位置决定是否跟随。
+        var cancelManualAnimation = function () { state.animating = false; };
+        element.addEventListener('wheel', cancelManualAnimation, { passive: true });
+        element.addEventListener('touchstart', cancelManualAnimation, { passive: true });
+        element.addEventListener('touchmove', cancelManualAnimation, { passive: true });
+
+        element.addEventListener('scroll', function () {
+            if (state.animating) return;
+            state.following = atBottom(element);
+        }, { passive: true });
+
+        return state;
     }
 
     return {
         // 当前是否应保持自动跟随
         isFollowing: function (element) {
             var state = getState(element);
-            recompute(element, state);
+            if (!state.animating) {
+                state.following = atBottom(element);
+            }
             return state.following;
         },
-        // smooth=true 用于用户主动点击「回到底部」；自动跟随应使用即时滚动
-        scrollToBottom: function (element, smooth) {
+
+        // 自动跟随：仅在仍处于跟随状态时滚到底部。
+        // 即时滚动，并在后续帧重新校正，以处理内容在滚动目标计算完成后
+        // 继续增长，以及非整数缩放下的最大滚动偏移偏差。
+        scrollToBottom: function (element) {
             var state = getState(element);
-            state.following = true;
-            state.userScrolled = false;
+            if (!state.following) return;
 
-            if (smooth) {
-                element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
-                return;
-            }
-
-            // 即时滚动，并在后续帧重新校正，以处理内容在滚动目标计算完成后
-            // 继续增长，以及非整数缩放下的最大滚动偏移偏差。
             var pin = function () { element.scrollTop = element.scrollHeight; };
             pin();
             requestAnimationFrame(function () {
                 pin();
                 requestAnimationFrame(pin);
             });
+        },
+
+        // 用户主动回到底部：无论当前状态如何都恢复跟随并使用平滑滚动
+        scrollToBottomManual: function (element) {
+            var state = getState(element);
+            state.following = true;
+            state.animating = true;
+            element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+
+            var deadline = Date.now() + MANUAL_ANIMATION_TIMEOUT_MS;
+            var settle = function () {
+                if (atBottom(element) || Date.now() > deadline) {
+                    state.animating = false;
+                    state.following = true;
+                } else {
+                    requestAnimationFrame(settle);
+                }
+            };
+            requestAnimationFrame(settle);
         }
     };
 })();
 
-// 滚动到底部。smooth=true 时使用平滑滚动（用户主动回到底部）；
-// 自动跟随生成应省略 smooth，使用即时滚动。
-window.scrollToBottom = function (element, smooth) {
+// 自动跟随滚到底部（用户在别处时不会强制拉回）
+window.scrollToBottom = function (element) {
     if (!element) {
         console.error('scrollToBottom: element is null');
         return;
     }
     try {
-        window.chatScroll.scrollToBottom(element, smooth === true);
+        window.chatScroll.scrollToBottom(element);
     } catch (error) {
         console.error('Error scrolling to bottom:', error);
     }
 };
 
-// 聊天区是否应保持自动跟随（由 chatScroll 维护，区分用户滚动与程序化滚动）
+// 用户主动点击「回到底部」
+window.scrollToBottomManual = function (element) {
+    if (!element) {
+        console.error('scrollToBottomManual: element is null');
+        return;
+    }
+    try {
+        window.chatScroll.scrollToBottomManual(element);
+    } catch (error) {
+        console.error('Error scrolling to bottom:', error);
+    }
+};
+
+// 聊天区是否应保持自动跟随（由 chatScroll 维护）
 window.isChatAutoFollowing = function (element) {
     try {
         if (!element) return true;
