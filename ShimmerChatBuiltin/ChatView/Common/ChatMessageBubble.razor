@@ -103,7 +103,7 @@
 		}
 	}
 
-	@if (CurrentMessageContent?.toolCalls is { Count: > 0 })
+	@if (ShowToolCalls && CurrentMessageContent?.toolCalls is { Count: > 0 })
 	{
 		<ToolCallDetails message="message" />
 	}
@@ -132,6 +132,13 @@
 	/// </summary>
 	[Parameter]
 	public bool ShowRegenerate { get; set; }
+
+	/// <summary>
+	/// 是否在正文下方内联展示该消息的工具调用。
+	/// 聚合界面把工具调用分离到折叠的活动块中，因此对正文块传 false。
+	/// </summary>
+	[Parameter]
+	public bool ShowToolCalls { get; set; } = true;
 
 	/// <summary>
 	/// 工具结果折叠标题的覆盖值（聚合界面用工具名替代默认的「详细内容」）。

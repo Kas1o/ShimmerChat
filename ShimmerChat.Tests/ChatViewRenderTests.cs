@@ -173,6 +173,38 @@ public class ChatViewRenderTests
     }
 
     [Fact]
+    public async Task AggregatedChatView_MovesToolCallsOfATextMessageIntoTheActivityBelow()
+    {
+        // mes1{正文 + 工具调用} mes2{工具结果} mes3{工具调用} mes4{工具结果} mes5{正文}
+        var chat = BuildChat(
+            UserMessage("ask"),
+            AssistantMessage("let me check", ("c1", "read_file")),
+            ToolResultMessage("file body", "c1"),
+            AssistantMessage("", ("c2", "grep")),
+            ToolResultMessage("grep body", "c2"),
+            AssistantMessage("final answer"));
+
+        var html = await RenderAsync<AggregatedChatView>(BuildContext(chat));
+
+        CountOccurrences(html, "chat-turn\"").Should().Be(1);
+        CountOccurrences(html, "<details class=\"chat-activity\">").Should().Be(1);
+
+        // 排版顺序：mes1 的正文 → 工具调用活动（含 mes1 自己的调用）→ 最终回答
+        int textIndex = html.IndexOf("let me check", StringComparison.Ordinal);
+        int activityIndex = html.IndexOf("<details class=\"chat-activity\"", StringComparison.Ordinal);
+        int answerIndex = html.IndexOf("final answer", StringComparison.Ordinal);
+
+        textIndex.Should().BeGreaterThanOrEqualTo(0);
+        activityIndex.Should().BeGreaterThan(textIndex);
+        answerIndex.Should().BeGreaterThan(activityIndex);
+
+        // 工具调用的参数只在活动块内出现，正文气泡不再内联
+        html.IndexOf("<summary class=\"tc-summary\">", StringComparison.Ordinal).Should().BeGreaterThan(activityIndex);
+        html.IndexOf("read_file", StringComparison.Ordinal).Should().BeGreaterThan(activityIndex);
+        html.IndexOf("grep", StringComparison.Ordinal).Should().BeGreaterThan(activityIndex);
+    }
+
+    [Fact]
     public async Task AggregatedChatView_SplitsOnUserMessages()
     {
         var chat = BuildChat(

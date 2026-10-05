@@ -2,19 +2,20 @@
 @inject ILocService Loc
 
 @*
-	折叠的工具调用活动块：把回合内连续「无输出」的步骤（正文为空，只有思考与工具调用）
-	合并成一块默认折叠的内容，使界面保持整洁；展开后仍是完整的思考、参数与返回内容。
+	工具调用活动块：把回合内的工具调用交互合并成一块可折叠内容。
+	无论一次还是多次调用（包括周围没有其它调用的单独调用）都归入这里，
+	使界面保持「正文 + 一行工具活动」的整洁形态；展开后仍是完整的思考、参数与返回内容。
 *@
 
-<details class="chat-activity">
+<details class="chat-activity" open="@Block.IsOpen">
 	<summary class="chat-activity-summary">
 		<span class="chat-activity-title">🔧 @Loc["chatview.agg.tool_activity"]</span>
-		<span class="chat-activity-meta">@Loc.Format("chatview.agg.tool_activity_meta", Steps.Count, ToolCount)</span>
+		<span class="chat-activity-meta">@Loc.Format("chatview.agg.tool_activity_meta", Block.Interactions.Count, Block.ToolCount)</span>
 	</summary>
 	<div class="chat-activity-body">
-		@foreach (var step in Steps)
+		@foreach (var interaction in Block.Interactions)
 		{
-			<ChatTurnStepView Context="Context" Step="step" />
+			<ChatToolInteractionView Context="Context" Interaction="interaction" />
 		}
 	</div>
 </details>
@@ -22,7 +23,5 @@
 @code {
 	[Parameter, EditorRequired] public ChatViewContext Context { get; set; } = default!;
 
-	[Parameter, EditorRequired] public IReadOnlyList<ChatTurnStep> Steps { get; set; } = [];
-
-	private int ToolCount => Steps.Sum(s => s.ToolCount);
+	[Parameter, EditorRequired] public ChatToolActivityBlock Block { get; set; } = default!;
 }

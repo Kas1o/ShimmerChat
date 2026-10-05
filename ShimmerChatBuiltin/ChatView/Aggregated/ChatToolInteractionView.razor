@@ -1,0 +1,36 @@
+@using ShimmerChatLib.ChatView
+@using ShimmerChatBuiltin.ChatView.Common
+
+@*
+	活动块里的一次工具调用交互：AI 消息（思考 + 工具调用），及其触发的工具结果。
+	分段不带发送者行（气泡头由回合统一渲染），操作条落在分段末尾。
+*@
+
+@if (Interaction.Assistant is not null)
+{
+	<ChatMessageBubble Context="Context"
+		message="Interaction.Assistant"
+		ShowSender="false"
+		ShowActions="true"
+		ShowToolCalls="true" />
+}
+
+@foreach (var toolResult in Interaction.ToolResults)
+{
+	<ChatMessageBubble Context="Context"
+		message="toolResult.Message"
+		ShowSender="false"
+		ShowActions="true"
+		ShowToolCalls="true"
+		ToolResultTitleOverride="@ToolTitle(toolResult)" />
+}
+
+@code {
+	[Parameter, EditorRequired] public ChatViewContext Context { get; set; } = default!;
+
+	[Parameter, EditorRequired] public ChatToolInteraction Interaction { get; set; } = default!;
+
+	/// <summary>工具结果折叠标题：有工具名时用工具名，否则回退到默认标题。</summary>
+	private static string? ToolTitle(ChatToolResult toolResult)
+		=> string.IsNullOrEmpty(toolResult.ToolName) ? null : $"🔧 {toolResult.ToolName}";
+}

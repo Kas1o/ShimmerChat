@@ -1,18 +1,19 @@
 @using ShimmerChatLib.ChatView
+@using ShimmerChatBuiltin.ChatView.Common
 @inject ILocService Loc
 
 @*
 	聚合回合气泡：连续的 AI / 工具结果消息合并显示在同一个气泡里，
-	气泡头只出现一次（Agent 名 + 步骤概览），内部按「展开步骤 / 折叠活动块」渲染。
+	气泡头只出现一次（Agent 名 + 概览），内部按「正文块 / 折叠的工具活动块」渲染。
 *@
 
 <article class="chat-msg chat-msg-ai chat-turn">
 	<div class="chat-msg-head">
 		<span class="chat-msg-sender">
 			@Context.Agent.Name
-			@if (IsMultiStep)
+			@if (ShowMeta)
 			{
-				<span class="chat-turn-badge">@Loc.Format("chatview.agg.turn_meta", StepCount, ToolCount)</span>
+				<span class="chat-turn-badge">@Loc.Format("chatview.agg.turn_meta", AssistantCount, ToolCount)</span>
 			}
 			@if (IsStreaming)
 			{
@@ -25,14 +26,19 @@
 		@for (int i = 0; i < Unit.Blocks.Count; i++)
 		{
 			var block = Unit.Blocks[i];
-			if (block.IsActivity)
+			if (block is ChatToolActivityBlock activity)
 			{
-				<ChatActivityView Context="Context" Steps="block.Steps" />
+				<ChatActivityView Context="Context" Block="activity" />
 			}
-			else
+			else if (block is ChatTextBlock text)
 			{
-				@* 回合的收尾步骤是「回答」，允许在此重新生成 / 续写 *@
-				<ChatTurnStepView Context="Context" Step="block.Steps[0]" ShowRegenerate="@(i == Unit.Blocks.Count - 1)" />
+				@* 正文块：工具调用已在活动块中，这里不再重复内联 *@
+				<ChatMessageBubble Context="Context"
+					message="text.Assistant"
+					ShowSender="false"
+					ShowActions="true"
+					ShowToolCalls="false"
+					ShowRegenerate="@IsLastTextBlock(i)" />
 			}
 		}
 	</div>
@@ -43,11 +49,22 @@
 
 	[Parameter, EditorRequired] public ChatDisplayUnit Unit { get; set; } = default!;
 
-	private int StepCount => Unit.Blocks.Sum(b => b.Steps.Count);
+	private int AssistantCount => Unit.Messages.Count(m => m.sender == Sender.AI);
 
-	private int ToolCount => Unit.Blocks.Sum(b => b.ToolCount);
+	private int ToolCount => Unit.Blocks.OfType<ChatToolActivityBlock>().Sum(b => b.ToolCount);
 
-	private bool IsMultiStep => StepCount > 1;
+	private bool ShowMeta => AssistantCount > 1 || ToolCount > 0;
 
 	private bool IsStreaming => Unit.Messages.Any(m => m.IsStreaming);
+
+	/// <summary>重新生成 / 续写只在回合的最后一个正文块（即回答）上提供。</summary>
+	private bool IsLastTextBlock(int index)
+	{
+		for (int i = Unit.Blocks.Count - 1; i >= 0; i--)
+		{
+			if (Unit.Blocks[i] is ChatTextBlock)
+				return i == index;
+		}
+		return false;
+	}
 }

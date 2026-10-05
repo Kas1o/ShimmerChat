@@ -6,39 +6,45 @@ namespace ShimmerChatBuiltin.ChatView.Aggregated;
 public sealed record ChatToolResult(Message Message, string? ToolName);
 
 /// <summary>
-/// 聚合回合中的一个步骤：一条 AI 消息，及其紧随其后的工具结果消息。
+/// 一次工具调用交互：一条 AI 消息的<strong>工具调用部分</strong>，及其紧随其后的工具结果。
+/// <see cref="Assistant"/> 为 null 表示对应的 AI 消息已不存在（例如被单独删除），只剩工具结果。
 /// </summary>
-public sealed record ChatTurnStep
+public sealed record ChatToolInteraction
 {
-	/// <summary>该步骤的 AI 消息；为 null 表示 AI 消息已不存在（例如被单独删除），只剩工具结果。</summary>
 	public required Message? Assistant { get; init; }
 
-	/// <summary>该步骤的 AI 消息触发的工具结果。</summary>
 	public required IReadOnlyList<ChatToolResult> ToolResults { get; init; }
 
-	/// <summary>
-	/// 该步骤没有可见输出（正文为空，只有思考 / 工具调用），应默认折叠。
-	/// 正在生成中的步骤、以及回合的最后一步永远不折叠，避免流式内容被藏起来。
-	/// </summary>
-	public required bool IsSilent { get; init; }
-
-	/// <summary>该步骤的工具调用次数。</summary>
+	/// <summary>本次交互的工具调用次数。</summary>
 	public int ToolCount => Assistant?.CurrentVersion?.toolCalls?.Count ?? ToolResults.Count;
+
+	/// <summary>本次交互仍在生成中（用于让活动块默认展开，展示实时进度）。</summary>
+	public bool IsGenerating => Assistant?.IsGenerating ?? false;
 }
 
+/// <summary>聚合回合内的显示块。</summary>
+public abstract record ChatTurnBlock;
+
+/// <summary>正文块：AI 消息的思考与正文（工具调用已在活动块中，不在此重复展示）。</summary>
+public sealed record ChatTextBlock(Message Assistant) : ChatTurnBlock;
+
 /// <summary>
-/// 聚合回合内的显示块：要么是一个需要展开的步骤，要么是连续无输出步骤合并成的折叠活动块。
+/// 工具调用活动块：连续的「工具调用交互」。
+/// <para>
+/// 只要消息带有工具调用（哪怕周围没有其它工具调用）就归入此块，不再内联在正文气泡里，
+/// 因此界面始终是「正文 + 一行可折叠的工具活动」。默认折叠；
+/// 其中仍有交互在生成时默认展开，避免把实时进度藏起来。
+/// </para>
 /// </summary>
-public sealed record ChatTurnBlock
+public sealed record ChatToolActivityBlock : ChatTurnBlock
 {
-	/// <summary>true = 折叠的工具调用活动块（由连续的无输出步骤合并而成）。</summary>
-	public required bool IsActivity { get; init; }
+	public required IReadOnlyList<ChatToolInteraction> Interactions { get; init; }
 
-	/// <summary>该显示块包含的步骤（活动块可能含多个）。</summary>
-	public required IReadOnlyList<ChatTurnStep> Steps { get; init; }
+	/// <summary>该活动块的工具调用总次数。</summary>
+	public int ToolCount => Interactions.Sum(i => i.ToolCount);
 
-	/// <summary>该显示块的工具调用次数。</summary>
-	public int ToolCount => Steps.Sum(s => s.ToolCount);
+	/// <summary>是否默认展开。</summary>
+	public bool IsOpen => Interactions.Any(i => i.IsGenerating);
 }
 
 /// <summary>
@@ -60,8 +66,10 @@ public sealed record ChatDisplayUnit
 /// 聚合对话界面的分组规则（纯逻辑，便于测试）：
 /// <list type="bullet">
 /// <item>连续的 AI / 工具结果消息合并成一个回合（一个气泡）。</item>
-/// <item>回合内，正文为空、只有思考与工具调用的步骤默认合并折叠成一块「工具调用活动」。</item>
-/// <item>回合的最后一步永不折叠，保证用户总能看到结果（含流式输出）。</item>
+/// <item>AI 消息的正文与它的工具调用<strong>分开显示</strong>：正文留在气泡里，
+/// 工具调用（连同其工具结果）一律并入折叠的「工具调用活动」块，
+/// 因此一条既有正文又调用工具的 AI 消息，其调用会与后续调用合并进下方同一个活动块。</item>
+/// <item>连续的交互合并成一块活动；被正文隔开的交互各自成块。</item>
 /// </list>
 /// </summary>
 public static class ChatTurnGrouping
@@ -89,15 +97,12 @@ public static class ChatTurnGrouping
 				index++;
 
 			var run = messages.Skip(start).Take(index - start).ToList();
-			// 只有延伸到消息列表末尾的回合才拥有「最后一步」的特权：
-			// 中途被用户消息截断的回合，其尾部静默步骤仍然折叠。
-			bool runTouchesTail = index >= messages.Count;
 
 			units.Add(new ChatDisplayUnit
 			{
 				Messages = run,
 				IsTurn = true,
-				Blocks = BuildBlocks(run, runTouchesTail)
+				Blocks = BuildBlocks(run)
 			});
 		}
 
@@ -108,43 +113,11 @@ public static class ChatTurnGrouping
 	private static bool IsAggregatable(Message message)
 		=> message.sender == Sender.AI || message.sender == Sender.ToolResult;
 
-	private static IReadOnlyList<ChatTurnBlock> BuildBlocks(IReadOnlyList<Message> run, bool runTouchesTail)
-	{
-		var steps = BuildSteps(run);
-
-		if (runTouchesTail && steps.Count > 0 && steps[^1].IsSilent)
-			steps[^1] = steps[^1] with { IsSilent = false };
-
-		var blocks = new List<ChatTurnBlock>();
-		var pendingActivity = new List<ChatTurnStep>();
-
-		foreach (var step in steps)
-		{
-			if (step.IsSilent)
-			{
-				pendingActivity.Add(step);
-				continue;
-			}
-
-			FlushActivity(blocks, pendingActivity);
-			blocks.Add(new ChatTurnBlock { IsActivity = false, Steps = [step] });
-		}
-
-		FlushActivity(blocks, pendingActivity);
-		return blocks;
-	}
-
-	private static void FlushActivity(List<ChatTurnBlock> blocks, List<ChatTurnStep> pending)
-	{
-		if (pending.Count == 0) return;
-		blocks.Add(new ChatTurnBlock { IsActivity = true, Steps = pending.ToList() });
-		pending.Clear();
-	}
-
-	private static List<ChatTurnStep> BuildSteps(IReadOnlyList<Message> run)
+	private static IReadOnlyList<ChatTurnBlock> BuildBlocks(IReadOnlyList<Message> run)
 	{
 		var toolNames = BuildToolNameMap(run);
-		var steps = new List<ChatTurnStep>();
+		var blocks = new List<ChatTurnBlock>();
+		var pendingActivity = new List<ChatToolInteraction>();
 		int index = 0;
 
 		while (index < run.Count)
@@ -163,40 +136,53 @@ public static class ChatTurnGrouping
 				index++;
 			}
 
+			var toolCalls = assistant?.CurrentVersion?.toolCalls;
+
 			// Id 缺失或对不上时（部分 API 不回传稳定 Id），按顺序回退到该 AI 消息的工具调用名
-			if (assistant?.CurrentVersion?.toolCalls is { Count: > 0 } calls)
+			if (toolCalls is { Count: > 0 })
 			{
 				for (int i = 0; i < results.Count; i++)
 				{
-					if (results[i].ToolName == null && i < calls.Count)
-						results[i] = results[i] with { ToolName = calls[i].name };
+					if (results[i].ToolName == null && i < toolCalls.Count)
+						results[i] = results[i] with { ToolName = toolCalls[i].name };
 				}
 			}
 
-			steps.Add(new ChatTurnStep
+			bool hasContent = !string.IsNullOrWhiteSpace(assistant?.CurrentVersion?.Content);
+			bool isToolInteraction = toolCalls is { Count: > 0 } || results.Count > 0;
+
+			if (hasContent)
 			{
-				Assistant = assistant,
-				ToolResults = results,
-				IsSilent = IsSilentStep(assistant, results)
-			});
+				// 正文自成一块；它的工具调用留给下方的活动块（先冲刷已有的活动）
+				FlushActivity(blocks, pendingActivity);
+				blocks.Add(new ChatTextBlock(assistant!));
+			}
+			else if (!isToolInteraction && assistant != null)
+			{
+				// 既无正文也无工具调用的 AI 消息（如被中止的生成）仍然显示，避免消息凭空消失
+				FlushActivity(blocks, pendingActivity);
+				blocks.Add(new ChatTextBlock(assistant));
+			}
+
+			if (isToolInteraction)
+			{
+				pendingActivity.Add(new ChatToolInteraction
+				{
+					Assistant = assistant,
+					ToolResults = results
+				});
+			}
 		}
 
-		return steps;
+		FlushActivity(blocks, pendingActivity);
+		return blocks;
 	}
 
-	/// <summary>正文为空的工具调用步骤视为「无输出」。生成中 / 后处理中的消息保持展开。</summary>
-	private static bool IsSilentStep(Message? assistant, IReadOnlyList<ChatToolResult> results)
+	private static void FlushActivity(List<ChatTurnBlock> blocks, List<ChatToolInteraction> pending)
 	{
-		if (assistant == null)
-			return results.Count > 0;
-
-		if (assistant.IsGenerating)
-			return false;
-
-		if (!string.IsNullOrWhiteSpace(assistant.CurrentVersion?.Content))
-			return false;
-
-		return assistant.CurrentVersion?.toolCalls is { Count: > 0 };
+		if (pending.Count == 0) return;
+		blocks.Add(new ChatToolActivityBlock { Interactions = pending.ToList() });
+		pending.Clear();
 	}
 
 	private static Dictionary<string, string> BuildToolNameMap(IReadOnlyList<Message> run)

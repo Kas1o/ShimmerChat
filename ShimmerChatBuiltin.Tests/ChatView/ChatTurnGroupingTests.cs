@@ -6,8 +6,8 @@ namespace ShimmerChatBuiltin.Tests.ChatView;
 
 /// <summary>
 /// 聚合对话界面的分组规则测试。
-/// 规则：连续的 AI / 工具结果消息合并为一个回合；回合内「无输出」（正文为空，
-/// 只有思考与工具调用）的步骤默认合并折叠；回合最后一步永不折叠。
+/// 规则：连续的 AI / 工具结果消息合并为一个回合；AI 消息的正文与工具调用分离——
+/// 正文留在气泡里，工具调用（无论一次还是多次、周围有没有别的调用）统一并入折叠的活动块。
 /// </summary>
 public class ChatTurnGroupingTests
 {
@@ -39,6 +39,21 @@ public class ChatTurnGroupingTests
         message = new ChatMessage { Content = content, id = id }
     };
 
+    private static ChatDisplayUnit SingleTurn(IReadOnlyList<Message> messages)
+        => ChatTurnGrouping.Build(messages).Single(u => u.IsTurn);
+
+    private static ChatTextBlock AsText(ChatTurnBlock block)
+    {
+        block.Should().BeOfType<ChatTextBlock>();
+        return (ChatTextBlock)block;
+    }
+
+    private static ChatToolActivityBlock AsActivity(ChatTurnBlock block)
+    {
+        block.Should().BeOfType<ChatToolActivityBlock>();
+        return (ChatToolActivityBlock)block;
+    }
+
     [Fact]
     public void Build_MergesConsecutiveAssistantAndToolMessagesIntoOneTurn()
     {
@@ -56,7 +71,6 @@ public class ChatTurnGroupingTests
 
         units[1].IsTurn.Should().BeTrue();
         units[1].Messages.Should().HaveCount(3);
-        units[1].Blocks.Should().HaveCount(2);
 
         units[2].IsTurn.Should().BeFalse();
     }
@@ -75,46 +89,59 @@ public class ChatTurnGroupingTests
     }
 
     [Fact]
-    public void Build_KeepsLastStepOfTurnExpanded()
+    public void Build_SplitsToolCallsOutOfAnAssistantMessageWithContent()
     {
-        var units = ChatTurnGrouping.Build([
-            UserMessage("do it"),
-            Assistant("", null, ("t1", "read_file")),
-            ToolResult("r1", "t1"),
-            Assistant("", null, ("t2", "read_file")),
-            ToolResult("r2", "t2")
+        // mes1{正文 + 工具调用} mes2{工具结果} mes3{工具调用} mes4{工具结果} mes5{正文}
+        var turn = SingleTurn([
+            Assistant("let me check", "thinking", ("c1", "read_file")),
+            ToolResult("body", "c1"),
+            Assistant("", null, ("c2", "grep")),
+            ToolResult("matches", "c2"),
+            Assistant("here is the answer")
         ]);
 
-        var turn = units.Single(u => u.IsTurn);
+        turn.Blocks.Should().HaveCount(3);
 
-        // 倒数第二步仍然折叠（无输出），最后一步强制展开，避免用户看不到结果
-        turn.Blocks.Should().HaveCount(2);
-        turn.Blocks[0].IsActivity.Should().BeTrue();
-        turn.Blocks[0].Steps.Should().HaveCount(1);
-        turn.Blocks[1].IsActivity.Should().BeFalse();
-        turn.Blocks[1].Steps.Single().IsSilent.Should().BeFalse();
+        // mes1 的正文单独成块
+        AsText(turn.Blocks[0]).Assistant.CurrentVersion!.Content.Should().Be("let me check");
+
+        // mes1 的工具调用被剥离出来，与 mes3 的调用合并进下方同一块活动
+        var activity = AsActivity(turn.Blocks[1]);
+        activity.Interactions.Should().HaveCount(2);
+        activity.ToolCount.Should().Be(2);
+        activity.Interactions[0].Assistant!.CurrentVersion!.Content.Should().Be("let me check");
+        activity.Interactions[0].ToolResults.Single().ToolName.Should().Be("read_file");
+        activity.Interactions[1].Assistant!.CurrentVersion!.Content.Should().Be("");
+        activity.Interactions[1].ToolResults.Single().ToolName.Should().Be("grep");
+
+        // 最终回答仍然是正文块
+        AsText(turn.Blocks[2]).Assistant.CurrentVersion!.Content.Should().Be("here is the answer");
     }
 
     [Fact]
-    public void Build_DoesNotCollapseTurnThatIsNotAtTheEndOfChat()
+    public void Build_CollectsIsolatedToolInteractionIntoActivity()
     {
-        // 回合被后续用户消息截断时不享受「最后一步」特权，静默步骤全部折叠
-        var units = ChatTurnGrouping.Build([
-            Assistant("", null, ("t1", "read_file")),
-            ToolResult("r1", "t1"),
-            UserMessage("next")
+        // 周围没有其它工具调用的单独一次调用同样归入活动块（正文气泡不再内联工具调用）
+        var turn = SingleTurn([
+            Assistant("first answer"),
+            Assistant("", null, ("c1", "read_file")),
+            ToolResult("body", "c1"),
+            Assistant("second answer")
         ]);
 
-        var turn = units.Single(u => u.IsTurn);
-        turn.Blocks.Should().HaveCount(1);
-        turn.Blocks[0].IsActivity.Should().BeTrue();
-        turn.Blocks[0].Steps.Single().IsSilent.Should().BeTrue();
+        turn.Blocks.Should().HaveCount(3);
+        AsText(turn.Blocks[0]);
+        AsText(turn.Blocks[2]);
+
+        var activity = AsActivity(turn.Blocks[1]);
+        activity.Interactions.Should().HaveCount(1);
+        activity.ToolCount.Should().Be(1);
     }
 
     [Fact]
-    public void Build_MergesConsecutiveSilentStepsIntoOneActivityBlock()
+    public void Build_MergesConsecutiveToolInteractionsIntoOneActivityBlock()
     {
-        var units = ChatTurnGrouping.Build([
+        var turn = SingleTurn([
             Assistant("", "thinking 1", ("t1", "read_file")),
             ToolResult("r1", "t1"),
             Assistant("", "thinking 2", ("t2", "grep")),
@@ -122,88 +149,82 @@ public class ChatTurnGroupingTests
             Assistant("final answer")
         ]);
 
-        var turn = units.Single(u => u.IsTurn);
-
         turn.Blocks.Should().HaveCount(2);
-        turn.Blocks[0].IsActivity.Should().BeTrue();
-        turn.Blocks[0].Steps.Should().HaveCount(2);
-        turn.Blocks[0].ToolCount.Should().Be(2);
 
-        // 最后一个块是正文回答，保持展开
-        turn.Blocks[1].IsActivity.Should().BeFalse();
-        turn.Blocks[1].Steps.Single().Assistant!.CurrentVersion!.Content.Should().Be("final answer");
+        var activity = AsActivity(turn.Blocks[0]);
+        activity.Interactions.Should().HaveCount(2);
+        activity.ToolCount.Should().Be(2);
+
+        AsText(turn.Blocks[1]);
     }
 
     [Fact]
-    public void Build_KeepsStepWithVisibleContentExpanded()
+    public void Build_ActivityIsOpenWhileGenerating()
     {
-        var units = ChatTurnGrouping.Build([
-            Assistant("let me check", null, ("t1", "read_file")),
-            ToolResult("r1", "t1"),
-            Assistant("answer")
-        ]);
+        var generating = Assistant("", "thinking", ("t1", "read_file"));
+        generating.GenerationState = MessageGenerationState.Generating;
 
-        var turn = units.Single(u => u.IsTurn);
-        turn.Blocks.Should().HaveCount(2);
-        turn.Blocks[0].IsActivity.Should().BeFalse();
-        turn.Blocks[0].Steps.Single().Assistant!.CurrentVersion!.Content.Should().Be("let me check");
-        turn.Blocks[0].Steps.Single().ToolResults.Single().Message.CurrentVersion!.Content.Should().Be("r1");
+        AsActivity(SingleTurn([generating, ToolResult("body", "t1")]).Blocks.Single())
+            .IsOpen.Should().BeTrue();
+
+        generating.GenerationState = MessageGenerationState.Completed;
+        AsActivity(SingleTurn([generating, ToolResult("body", "t1")]).Blocks.Single())
+            .IsOpen.Should().BeFalse("生成结束后活动块自动折叠，保持画面整洁");
     }
 
     [Fact]
-    public void Build_KeepsStreamingStepExpanded()
+    public void Build_KeepsAssistantWithoutContentAndWithoutToolCallsVisible()
     {
-        var streaming = Assistant("", "thinking", ("t1", "read_file"));
-        streaming.GenerationState = MessageGenerationState.Generating;
+        var turn = SingleTurn([Assistant(""), Assistant("answer")]);
 
-        var units = ChatTurnGrouping.Build([
-            streaming,
-            Assistant("previous answer")
+        turn.Blocks.Should().HaveCount(2);
+        AsText(turn.Blocks[0]);
+        AsText(turn.Blocks[1]);
+    }
+
+    [Fact]
+    public void Build_TurnWithOnlyToolInteractionsHasJustTheActivityBlock()
+    {
+        var turn = SingleTurn([
+            Assistant("", null, ("t1", "read_file")),
+            ToolResult("r1", "t1")
         ]);
 
-        var turn = units.Single(u => u.IsTurn);
-        turn.Blocks.Should().HaveCount(2);
-        turn.Blocks[0].IsActivity.Should().BeFalse();
-        turn.Blocks[0].Steps.Single().IsSilent.Should().BeFalse();
+        AsActivity(turn.Blocks.Single()).Interactions.Should().HaveCount(1);
     }
 
     [Fact]
     public void Build_ResolvesToolNameFromToolCallId()
     {
-        var units = ChatTurnGrouping.Build([
+        var turn = SingleTurn([
             Assistant("", null, ("call-1", "read_file")),
             ToolResult("content", "call-1")
         ]);
 
-        var toolResult = units.Single(u => u.IsTurn).Blocks.Single().Steps.Single().ToolResults.Single();
-
-        toolResult.ToolName.Should().Be("read_file");
+        AsActivity(turn.Blocks.Single()).Interactions.Single()
+            .ToolResults.Single().ToolName.Should().Be("read_file");
     }
 
     [Fact]
     public void Build_FallsBackToPositionalToolNameWhenIdsAreMissing()
     {
-        var units = ChatTurnGrouping.Build([
+        var turn = SingleTurn([
             Assistant("", null, ("", "write_file")),
             ToolResult("ok", "")
         ]);
 
-        var toolResult = units.Single(u => u.IsTurn).Blocks.Single().Steps.Single().ToolResults.Single();
-
-        toolResult.ToolName.Should().Be("write_file");
+        AsActivity(turn.Blocks.Single()).Interactions.Single()
+            .ToolResults.Single().ToolName.Should().Be("write_file");
     }
 
     [Fact]
-    public void Build_LeavesToolNameNullWhenItCannotBeResolved()
+    public void Build_KeepsOrphanToolResultsInActivityWithoutAssistant()
     {
-        var units = ChatTurnGrouping.Build([
-            ToolResult("orphan result", "unknown-id")
-        ]);
+        var interaction = AsActivity(SingleTurn([ToolResult("orphan result", "unknown-id")]).Blocks.Single())
+            .Interactions.Single();
 
-        var toolResult = units.Single(u => u.IsTurn).Blocks.Single().Steps.Single().ToolResults.Single();
-
-        toolResult.ToolName.Should().BeNull();
-        units.Single(u => u.IsTurn).Blocks.Single().Steps.Single().Assistant.Should().BeNull();
+        interaction.Assistant.Should().BeNull();
+        interaction.ToolResults.Single().ToolName.Should().BeNull();
     }
 
     [Fact]

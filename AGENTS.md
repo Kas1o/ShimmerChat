@@ -323,7 +323,7 @@ public class ContextSegment
 - `IChatViewRegistry`：扫描所有实现，提供 `GetAll()` / `GetById(id)` / `GetDefault()`。Agent 未指定界面时用默认界面（声明 `IsDefault = true` 的那个）；指定了未注册的 Id 时宿主回退到默认界面**并显示警告条 + 记录错误日志**，不静默修补。
 - `ChatViewShell`（ShimmerChatLib/Components）：可复用的对话界面外壳（顶栏、消息滚动区、输入区、滚动跟随、内联样式），界面只需提供消息区渲染；插件界面亦可复用它。
 
-内置界面（ShimmerChatBuiltin/ChatView）：`standard`（逐条消息一个气泡）与 `aggregated`（把一次 ToolCallLoop 的连续 AI / 工具消息合并进同一气泡，无输出的工具调用步骤默认折叠）。
+内置界面（ShimmerChatBuiltin/ChatView）：`standard`（逐条消息一个气泡）与 `aggregated`（把一次 ToolCallLoop 的连续 AI / 工具消息合并进同一气泡）。聚合界面把 AI 消息的正文与工具调用**分离**：正文留在气泡里，工具调用（无论一次还是多次、周围有没有别的调用）统一并入折叠的「工具调用活动」块，生成中时该块默认展开、生成结束后自动折叠。
 
 ---
 
