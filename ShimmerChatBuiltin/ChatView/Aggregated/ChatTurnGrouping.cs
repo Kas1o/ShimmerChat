@@ -15,6 +15,12 @@ public sealed record ChatToolInteraction
 
 	public required IReadOnlyList<ChatToolResult> ToolResults { get; init; }
 
+	/// <summary>
+	/// 该 AI 消息的思考与正文已经作为回合的正文块单独渲染，
+	/// 因此本次交互只展示它的工具调用，避免同一条消息渲染两遍。
+	/// </summary>
+	public required bool AssistantTextSeparated { get; init; }
+
 	/// <summary>本次交互的工具调用次数。</summary>
 	public int ToolCount => Assistant?.CurrentVersion?.toolCalls?.Count ?? ToolResults.Count;
 
@@ -169,7 +175,9 @@ public static class ChatTurnGrouping
 				pendingActivity.Add(new ChatToolInteraction
 				{
 					Assistant = assistant,
-					ToolResults = results
+					ToolResults = results,
+					// 正文已成块时，交互里只放工具调用，避免正文重复渲染
+					AssistantTextSeparated = hasContent
 				});
 			}
 		}

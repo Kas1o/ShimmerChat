@@ -2,17 +2,27 @@
 @using ShimmerChatBuiltin.ChatView.Common
 
 @*
-	活动块里的一次工具调用交互：AI 消息（思考 + 工具调用），及其触发的工具结果。
-	分段不带发送者行（气泡头由回合统一渲染），操作条落在分段末尾。
+	活动块里的一次工具调用交互：本次调用（工具卡片）及其触发的工具结果。
+	当该 AI 消息的思考与正文已作为回合的正文块渲染时，这里只渲染工具调用本身，
+	否则（正文为空的纯调用消息）渲染整条消息 —— 一条消息的正文永远只出现一次。
 *@
 
 @if (Interaction.Assistant is not null)
 {
-	<ChatMessageBubble Context="Context"
-		message="Interaction.Assistant"
-		ShowSender="false"
-		ShowActions="true"
-		ShowToolCalls="true" />
+	if (Interaction.AssistantTextSeparated)
+	{
+		<div class="chat-msg chat-msg-ai chat-msg-toolonly">
+			<ToolCallDetails message="Interaction.Assistant" />
+		</div>
+	}
+	else
+	{
+		<ChatMessageBubble Context="Context"
+			message="Interaction.Assistant"
+			ShowSender="false"
+			ShowActions="true"
+			ShowToolCalls="true" />
+	}
 }
 
 @foreach (var toolResult in Interaction.ToolResults)

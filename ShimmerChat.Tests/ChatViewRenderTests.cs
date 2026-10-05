@@ -189,6 +189,10 @@ public class ChatViewRenderTests
         CountOccurrences(html, "chat-turn\"").Should().Be(1);
         CountOccurrences(html, "<details class=\"chat-activity\">").Should().Be(1);
 
+        // 同一条消息的正文只渲染一次：一次在正文块里，活动块里只剩它的工具调用
+        CountOccurrences(html, "let me check").Should().Be(1);
+        CountOccurrences(html, "final answer").Should().Be(1);
+
         // 排版顺序：mes1 的正文 → 工具调用活动（含 mes1 自己的调用）→ 最终回答
         int textIndex = html.IndexOf("let me check", StringComparison.Ordinal);
         int activityIndex = html.IndexOf("<details class=\"chat-activity\"", StringComparison.Ordinal);

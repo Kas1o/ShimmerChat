@@ -41,6 +41,11 @@
 	}
 	.chat-turn .chat-msg-tool .chat-msg-tool-summary { color: var(--su-warning); }
 
+	/* 正文已单独渲染时的分段只放工具卡片，去掉 toolcalls 自带的分隔线，避免多一条线 */
+	.chat-turn .chat-msg-toolonly .toolcalls {
+		margin-top: 0; padding-top: 0; border-top: none;
+	}
+
 	/* ── 折叠的工具调用活动 ────────────────────────── */
 	.chat-activity {
 		border: var(--su-border-size) solid var(--su-border-0);

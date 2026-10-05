@@ -114,6 +114,11 @@ public class ChatTurnGroupingTests
         activity.Interactions[1].Assistant!.CurrentVersion!.Content.Should().Be("");
         activity.Interactions[1].ToolResults.Single().ToolName.Should().Be("grep");
 
+        // 正文已单独成块的消息，其交互里只能渲染工具调用（否则正文会渲染两遍）
+        activity.Interactions[0].AssistantTextSeparated.Should().BeTrue();
+        // 正文为空的消息整条都在活动块里
+        activity.Interactions[1].AssistantTextSeparated.Should().BeFalse();
+
         // 最终回答仍然是正文块
         AsText(turn.Blocks[2]).Assistant.CurrentVersion!.Content.Should().Be("here is the answer");
     }
