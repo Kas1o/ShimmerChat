@@ -1,0 +1,53 @@
+@using ShimmerChatLib.ChatView
+@inject ILocService Loc
+
+@*
+	聚合回合气泡：连续的 AI / 工具结果消息合并显示在同一个气泡里，
+	气泡头只出现一次（Agent 名 + 步骤概览），内部按「展开步骤 / 折叠活动块」渲染。
+*@
+
+<article class="chat-msg chat-msg-ai chat-turn">
+	<div class="chat-msg-head">
+		<span class="chat-msg-sender">
+			@Context.Agent.Name
+			@if (IsMultiStep)
+			{
+				<span class="chat-turn-badge">@Loc.Format("chatview.agg.turn_meta", StepCount, ToolCount)</span>
+			}
+			@if (IsStreaming)
+			{
+				<span class="chat-msg-streaming">@Loc["msg.streaming"]</span>
+			}
+		</span>
+	</div>
+
+	<div class="chat-turn-body">
+		@for (int i = 0; i < Unit.Blocks.Count; i++)
+		{
+			var block = Unit.Blocks[i];
+			if (block.IsActivity)
+			{
+				<ChatActivityView Context="Context" Steps="block.Steps" />
+			}
+			else
+			{
+				@* 回合的收尾步骤是「回答」，允许在此重新生成 / 续写 *@
+				<ChatTurnStepView Context="Context" Step="block.Steps[0]" ShowRegenerate="@(i == Unit.Blocks.Count - 1)" />
+			}
+		}
+	</div>
+</article>
+
+@code {
+	[Parameter, EditorRequired] public ChatViewContext Context { get; set; } = default!;
+
+	[Parameter, EditorRequired] public ChatDisplayUnit Unit { get; set; } = default!;
+
+	private int StepCount => Unit.Blocks.Sum(b => b.Steps.Count);
+
+	private int ToolCount => Unit.Blocks.Sum(b => b.ToolCount);
+
+	private bool IsMultiStep => StepCount > 1;
+
+	private bool IsStreaming => Unit.Messages.Any(m => m.IsStreaming);
+}

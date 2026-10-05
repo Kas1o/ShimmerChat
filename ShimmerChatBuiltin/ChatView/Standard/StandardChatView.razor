@@ -1,0 +1,39 @@
+@using ShimmerChatLib.ChatView
+@using ShimmerChatBuiltin.ChatView.Common
+@inject IKVDataService KVData
+@implements IChatView
+@attribute [ChatView("standard", "chatview.standard", DescriptionKey = "chatview.standard.desc", Icon = "💬", Order = 0, IsDefault = true)]
+
+@*
+	标准对话界面：逐条消息渲染，一条消息一个气泡。
+	这是 ShimmerChat 2.0 之前的唯一界面，迁移到内置库后与其它界面（含插件界面）等价。
+*@
+
+<ChatViewShell ViewContext="Context" RootClass="chatview-standard">
+	@if (virtualize)
+	{
+		<Virtualize Items="Context.Chat.Messages" Context="message">
+			<ChatMessageBubble Context="Context" message="message" />
+		</Virtualize>
+	}
+	else
+	{
+		@foreach (var message in Context.Messages)
+		{
+			<ChatMessageBubble Context="Context" message="message" />
+		}
+	}
+</ChatViewShell>
+
+@code {
+	[Parameter, EditorRequired]
+	public ChatViewContext Context { get; set; } = default!;
+
+	private bool virtualize;
+
+	protected override void OnInitialized()
+	{
+		if (bool.TryParse(KVData.Read("App", "virtualize"), out var virt))
+			virtualize = virt;
+	}
+}

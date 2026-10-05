@@ -71,11 +71,12 @@ ShimmerChat/
 | `Models/` | UI 模型（`Theme`、`PopupOptions` 等） |
 | `Interface/` | 所有服务接口（`IGenerationManagerV2`、`IPluginLoaderService`、`IKVDataService` 等） |
 | `Generation/` | **生成管线核心**：`IPreGenerationNode`、`IPostGenerationNode`、`IRenderModifierNode`、`ITreeNode`、`PreGenerationEnv`、`GenerationTreeExecutor`、`ToolCallLoop`、`IToolV2`、`IToolRegistry`、节点元数据 Attribute 等 |
-| `Components/` | 跨项目共享的 Blazor 组件 |
+| `ChatView/` | **对话界面系统**：`IChatView`、`ChatViewContext`、`ChatViewAttribute`、`IChatViewRegistry` |
+| `Components/` | 跨项目共享的 Blazor 组件（含 `ChatViewShell` 对话界面外壳） |
 | `Panel/` | 插件面板基础设施 |
 | `Context/` | 共享上下文 |
 | `Chat.cs` | 聊天对象模型 |
-| `Agent.cs` | 代理对象模型（含 `PreGenerationTreeJson`、`PostGenerationTreeJson`、`RenderModifierTreeJson`） |
+| `Agent.cs` | 代理对象模型（含 `PreGenerationTreeJson`、`PostGenerationTreeJson`、`RenderModifierTreeJson`、`ChatViewId`） |
 | `Message.cs` | 消息模型（多版本支持） |
 | `Sender.cs` | 发送者枚举 |
 
@@ -86,7 +87,7 @@ Blazor Server 宿主 + 所有服务实现 + UI 页面。
 | 目录 | 职责 |
 |------|------|
 | `Singletons/` | 所有服务的具体实现 |
-| `Components/Pages/` | Blazor 页面 |
+| `Components/Pages/` | Blazor 页面（`AgentChatPage` 只是会话宿主，对话区由 `IChatView` 渲染） |
 | `Components/Layout/` | 布局组件 |
 | `Components/SubComponents/` | 可复用子组件 |
 | `wwwroot/` | 静态资源（CSS、JS、图标） |
@@ -99,6 +100,7 @@ Blazor Server 宿主 + 所有服务实现 + UI 页面。
 | 目录 | 职责 |
 |------|------|
 | `Generation/Nodes/` | 22 个内置节点（SequenceNode、FragmentNode、CallNode、APISelectNode、ToolPresetNode 等） |
+| `ChatView/` | 内置对话界面（`Standard/` 标准、`Aggregated/` 聚合）及其消息渲染组件 |
 | `API/` | API 配置面板 |
 | `DynPrompt/` | 动态提示系统 |
 | `FileSystem/` | 文件系统工具集 |
@@ -312,6 +314,17 @@ public class ContextSegment
 
 **Agent 格式迁移。** 将 1.0 版本的 Agent 数据迁移到 2.0 格式（`PreGenerationTreeJson` 节点树）。启动时自动执行。
 
+### 5.17 IChatView / IChatViewRegistry / ChatViewRegistry
+
+**对话界面系统。** 每个 Agent 可通过 `Agent.ChatViewId` 选用不同的对话界面（气泡样式、消息合并方式等），与主题系统、消息渲染管线互不影响。
+
+- `IChatView`（ShimmerChatLib）：对话界面契约。实现它的 Blazor 组件 + `[ChatView("id", "name.key")]` 即被自动发现，必须声明 `[Parameter] ChatViewContext Context`。
+- `ChatViewContext`：宿主契约。暴露活对象（`Chat` / `Agent`、`Messages`）、生成状态与宿主能力（发送 / 停止 / 删除 / 重新生成 / 续写 / 持久化 / 返回），界面不持有页面引用。宿主在 `Chat` / `Agent` 实例被替换时重建上下文。
+- `IChatViewRegistry`：扫描所有实现，提供 `GetAll()` / `GetById(id)` / `GetDefault()`。Agent 未指定界面时用默认界面（声明 `IsDefault = true` 的那个）；指定了未注册的 Id 时宿主回退到默认界面**并显示警告条 + 记录错误日志**，不静默修补。
+- `ChatViewShell`（ShimmerChatLib/Components）：可复用的对话界面外壳（顶栏、消息滚动区、输入区、滚动跟随、内联样式），界面只需提供消息区渲染；插件界面亦可复用它。
+
+内置界面（ShimmerChatBuiltin/ChatView）：`standard`（逐条消息一个气泡）与 `aggregated`（把一次 ToolCallLoop 的连续 AI / 工具消息合并进同一气泡，无输出的工具调用步骤默认折叠）。
+
 ---
 
 ## 6. 快速参考
@@ -325,6 +338,14 @@ public class ContextSegment
 5. （可选）在 `Locales/` 中添加对应的本地化条目。
 6. 节点自动出现在对应管线编辑器的添加菜单中，无需手动注册。
 
+### 添加新对话界面的步骤
+
+1. 创建 `.razor` 组件，`@implements IChatView`，声明 `[Parameter] ChatViewContext Context`。
+2. 标记 `@attribute [ChatView("my.view", "chatview.my", DescriptionKey = "chatview.my.desc")]`（`Id` 是持久化标识，不要随重命名改动；如需作为默认界面则加 `IsDefault = true`）。
+3. 用 `<ChatViewShell ViewContext="Context">…消息区…</ChatViewShell>` 复用外壳与样式，或在组件内自行组织布局。
+4. 在 `Locales/` 中补齐 `NameKey` / `DescriptionKey`。
+5. 界面自动出现在 Agent 设置页的「对话界面」选择列表中，无需手动注册。
+
 ### 关键接口总览
 
 | 接口 | 所在库 | 注册方式 |
@@ -335,7 +356,9 @@ public class ContextSegment
 | `IAutoCreateToolV2` | ShimmerChatLib | 自动发现 |
 | `IPluginInitializer` | ShimmerChatLib | 自动发现 |
 | `IMessageRenderModifier` | ShimmerChatLib | 自动发现 |
+| `IChatView` | ShimmerChatLib | 自动发现（`IChatViewRegistry`） |
 | `IPluginLoaderService` | ShimmerChatLib | Singleton |
+| `IChatViewRegistry` | ShimmerChatLib | Singleton |
 | `IGenerationManagerV2` | ShimmerChatLib | Singleton |
 | `IPostGenerationManager` | ShimmerChatLib | Singleton |
 | `IRenderModifierManager` | ShimmerChatLib | Singleton |

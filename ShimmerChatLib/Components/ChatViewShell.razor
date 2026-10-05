@@ -1,0 +1,551 @@
+@using ShimmerChatLib.ChatView
+@inject IJSRuntime JS
+@inject ILocService Loc
+@inject IKVDataService KVData
+@inject IPopupService PopupService
+@implements IDisposable
+
+@*
+	对话界面的通用外壳：顶栏（返回 / 生成阶段）、消息滚动区、输入区与滚动跟随。
+	具体界面通过 ChildContent 提供消息区渲染，从而只需关心「消息怎么显示」。
+	样式随组件内联输出，因此界面不依赖宿主的 scoped CSS 资源。
+*@
+
+<style>
+	/* ── Chat surface layout ───────────────────────── */
+	.chat-page {
+		display: flex; flex-direction: column;
+		height: 100%; overflow: hidden;
+		background: var(--su-surface-0);
+		position: relative;
+	}
+
+	/* ── Top bar ──────────────────────────────────── */
+	.chat-topbar {
+		display: flex; align-items: center;
+		padding: 0 var(--su-space-4);
+		height: 48px; flex-shrink: 0;
+		border-bottom: var(--su-border-size) solid var(--su-border-0);
+		background: var(--su-surface-1);
+	}
+	.chat-back {
+		display: flex; align-items: center; gap: var(--su-space-2);
+		border: none; background: none;
+		font-family: var(--su-font-sans); font-size: var(--su-font-md); font-weight: 500;
+		color: var(--su-text-0); cursor: pointer;
+		padding: var(--su-space-1) var(--su-space-2);
+		border-radius: var(--su-radius-sm);
+		transition: background var(--su-transition);
+	}
+	.chat-back:hover { background: var(--su-surface-3); }
+
+	/* ── Generation phase indicator ────────────────── */
+	.generation-phase {
+		display: inline-flex; align-items: center; gap: 6px;
+		margin-left: auto;
+		padding: 2px 10px;
+		border-radius: var(--su-radius-full);
+		font-size: var(--su-font-sm); font-weight: 500;
+		color: var(--su-text-1);
+		background: var(--su-surface-2);
+		border: var(--su-border-size) solid var(--su-border-0);
+	}
+	.phase-dot {
+		width: 6px; height: 6px; border-radius: 50%;
+		background: var(--su-accent);
+		animation: phase-pulse 1.4s ease-in-out infinite;
+	}
+	.phase-post .phase-dot { background: var(--su-warning, #f0a030); }
+	.phase-pre .phase-dot { background: var(--su-text-2); }
+	@@keyframes phase-pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.35; }
+	}
+
+	/* ── Messages area ────────────────────────────── */
+	.chat-messages {
+		flex: 1; overflow-y: auto; overflow-x: hidden;
+	}
+	.chat-messages-inner {
+		max-width: 768px; margin: 0 auto;
+		padding: var(--su-space-6) var(--su-space-4) var(--su-space-4);
+		display: flex; flex-direction: column;
+	}
+
+	/* ── Scroll-to-bottom button ──────────────────── */
+	.chat-scroll-btn {
+		position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+		z-index: 50;
+		width: 36px; height: 36px; border-radius: 50%;
+		border: var(--su-border-size) solid var(--su-border-0);
+		background: var(--su-surface-1);
+		color: var(--su-text-1); cursor: pointer;
+		display: flex; align-items: center; justify-content: center;
+		box-shadow: var(--su-shadow-md);
+		transition: background var(--su-transition), color var(--su-transition);
+	}
+	.chat-scroll-btn:hover { background: var(--su-surface-3); color: var(--su-text-0); }
+
+	/* ── Input area ───────────────────────────────── */
+	.chat-input {
+		flex-shrink: 0; width: 100%; max-width: 768px; margin: 0 auto;
+		padding: var(--su-space-4) var(--su-space-4) var(--su-space-6);
+		display: grid;
+		grid-template-columns: 1fr auto;
+		align-items: end;
+		gap: var(--su-space-2);
+	}
+	.chat-input textarea {
+		padding: var(--su-space-3) var(--su-space-4);
+		font-family: var(--su-font-sans); font-size: var(--su-font-base);
+		color: var(--su-text-0);
+		background: var(--su-surface-1);
+		border: var(--su-border-size) solid var(--su-border-0);
+		border-radius: var(--su-radius-lg);
+		resize: none; outline: none;
+		line-height: 1.5; overflow-y: auto;
+		box-shadow: var(--su-shadow-sm);
+		transition: border-color var(--su-transition), box-shadow var(--su-transition);
+	}
+	.chat-input textarea:focus {
+		border-color: var(--su-accent);
+		box-shadow: 0 0 0 3px var(--su-accent-soft);
+	}
+	.chat-input textarea::placeholder { color: var(--su-text-2); }
+	.chat-input-send, .chat-input-stop {
+		width: 38px; height: 38px; flex-shrink: 0;
+		border: none; border-radius: 50%;
+		cursor: pointer;
+		display: flex; align-items: center; justify-content: center;
+		transition: background var(--su-transition), transform var(--su-transition);
+	}
+	.chat-input-send { background: var(--su-accent); color: #fff; }
+	.chat-input-send:hover:not(:disabled) { background: var(--su-accent-hover); transform: scale(1.05); }
+	.chat-input-send:disabled { opacity: 0.35; cursor: not-allowed; }
+	.chat-input-stop { background: var(--su-danger); color: #fff; }
+	.chat-input-stop:hover { opacity: 0.9; }
+
+	/* ── Message bubble ───────────────────────────── */
+	.chat-msg {
+		margin: var(--su-space-2) 0;
+		max-width: 85%;
+		animation: msgIn 0.2s ease-out;
+	}
+	@@keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+	.chat-msg-user {
+		align-self: flex-end;
+		background: var(--su-accent);
+		color: #fff;
+		border-radius: var(--su-radius-lg) var(--su-radius-sm) var(--su-radius-lg) var(--su-radius-lg);
+		padding: var(--su-space-3) var(--su-space-4);
+	}
+	.chat-msg-user .chat-msg-head { color: rgba(255,255,255,0.7); font-size: var(--su-font-xs); }
+	.chat-msg-user .chat-msg-body { color: #fff; }
+	.chat-msg-user .chat-msg-act { color: rgba(255,255,255,0.6); }
+	.chat-msg-user .chat-msg-act:hover { color: #fff; background: rgba(255,255,255,0.15); }
+	.chat-msg-user .chat-msg-act-del:hover { color: #fff; background: rgba(255,255,255,0.25); }
+
+	.chat-msg-ai {
+		align-self: flex-start;
+		background: var(--su-surface-1);
+		border: var(--su-border-size) solid var(--su-border-0);
+		border-radius: var(--su-radius-lg);
+		padding: var(--su-space-4);
+		box-shadow: var(--su-shadow-sm);
+	}
+
+	.chat-msg-tool {
+		align-self: flex-start; max-width: 90%;
+		background: var(--su-surface-1);
+		border: var(--su-border-size) solid var(--su-border-0);
+		border-left: 3px solid var(--su-warning);
+		border-radius: 0 var(--su-radius-md) var(--su-radius-md) 0;
+		padding: var(--su-space-3) var(--su-space-4);
+		font-size: var(--su-font-sm);
+	}
+	.chat-msg-tool .chat-msg-head {
+		color: var(--su-warning); font-size: var(--su-font-xs); margin-bottom: var(--su-space-1);
+	}
+	.chat-msg-tool .chat-msg-sender { color: var(--su-warning); }
+	.chat-msg-tool .chat-msg-body { color: var(--su-text-0); }
+	.chat-msg-tool .chat-msg-body pre { background: var(--su-surface-3); font-size: var(--su-font-xs); }
+
+	/* ── Tool result collapsible ───────────────────── */
+	.chat-msg-tool-result { margin: 0; }
+	.chat-msg-tool-summary {
+		cursor: pointer; user-select: none;
+		color: var(--su-text-2); font-size: var(--su-font-xs); font-weight: 500;
+		list-style: none;
+	}
+	.chat-msg-tool-summary::-webkit-details-marker { display: none; }
+	.chat-msg-tool-result .chat-msg-body { margin-top: var(--su-space-2); }
+
+	/* ── Message header ────────────────────────────── */
+	.chat-msg-head {
+		display: flex; align-items: center; justify-content: space-between;
+		margin-bottom: var(--su-space-2);
+		font-size: var(--su-font-sm); font-weight: 500;
+		color: var(--su-text-1);
+		user-select: none;
+	}
+	.chat-msg-sender { display: flex; align-items: center; gap: var(--su-space-2); }
+	/* 合并气泡内的分段没有发送者行，操作条右对齐 */
+	.chat-msg-head-right { justify-content: flex-end; }
+	.chat-msg-ver {
+		font-size: var(--su-font-xs);
+		background: var(--su-surface-3); color: var(--su-text-2);
+		padding: 0 6px; border-radius: 8px;
+	}
+	.chat-msg-ver-btn {
+		border: none; background: none; cursor: pointer;
+		color: var(--su-text-2); font-size: var(--su-font-xs); padding: 0 2px;
+	}
+	.chat-msg-ver-btn:hover:not(:disabled) { color: var(--su-accent); }
+	.chat-msg-ver-btn:disabled { opacity: 0.3; cursor: default; }
+	.chat-msg-streaming { font-size: var(--su-font-xs); color: var(--su-accent); font-style: italic; }
+
+	/* ── Action buttons ────────────────────────────── */
+	.chat-msg-actions { display: flex; gap: 2px; }
+	.chat-msg-act {
+		border: none; background: none; cursor: pointer;
+		color: var(--su-text-2); font-size: var(--su-font-xs);
+		padding: 2px 6px; border-radius: var(--su-radius-sm);
+		transition: color var(--su-transition), background var(--su-transition);
+	}
+	.chat-msg-act:hover { color: var(--su-accent); background: var(--su-surface-3); }
+	.chat-msg-act-del:hover { color: var(--su-danger); }
+
+	/* 无气泡头时（聚合界面内的分段）操作条置于内容之后 */
+	.chat-msg-foot {
+		display: flex; align-items: center; justify-content: flex-end;
+		margin-top: var(--su-space-2);
+		opacity: 0.55;
+		transition: opacity var(--su-transition);
+	}
+	.chat-msg-foot:hover { opacity: 1; }
+
+	/* ── Message body ──────────────────────────────── */
+	.chat-msg-body {
+		font-size: var(--su-font-base); line-height: 1.65;
+		color: var(--su-text-0);
+		word-break: break-word;
+	}
+	.chat-msg-body p { margin: 0 0 var(--su-space-2); }
+	.chat-msg-body p:last-child { margin-bottom: 0; }
+	.chat-msg-body pre {
+		background: var(--su-surface-3); border-radius: var(--su-radius-md);
+		padding: var(--su-space-3); overflow-x: auto;
+		font-family: var(--su-font-mono); font-size: var(--su-font-sm);
+	}
+	.chat-msg-body code {
+		font-family: var(--su-font-mono); font-size: var(--su-font-sm);
+		background: var(--su-surface-3); padding: 1px 5px; border-radius: 3px;
+	}
+
+	/* ── Thinking section ──────────────────────────── */
+	.chat-msg-thinking {
+		margin-bottom: var(--su-space-3);
+		font-size: var(--su-font-sm); color: var(--su-text-1);
+	}
+	.chat-msg-thinking summary {
+		cursor: pointer; color: var(--su-text-2); user-select: none;
+	}
+	.chat-msg-thinking-body {
+		margin-top: var(--su-space-2); padding: var(--su-space-3);
+		background: var(--su-surface-3); border-radius: var(--su-radius-md);
+		border-left: 2px solid var(--su-border-0);
+		font-size: var(--su-font-sm); color: var(--su-text-1);
+		overflow-x: auto; word-break: break-word;
+	}
+
+	/* ── Typing cursor ─────────────────────────────── */
+	.chat-msg-cursor {
+		display: inline-block; animation: cursorBlink 1s infinite;
+		font-weight: bold; color: var(--su-accent);
+	}
+	@@keyframes cursorBlink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+	/* ── Edit mode ─────────────────────────────────── */
+	.chat-msg-edit { display: flex; flex-direction: column; gap: var(--su-space-1); }
+	.chat-msg-edit label { font-size: var(--su-font-xs); color: var(--su-text-1); }
+
+	/* ── Inline tool calls ─────────────────────────── */
+	.toolcalls {
+		display: flex; flex-direction: column; gap: 2px;
+		margin-top: var(--su-space-3); padding-top: var(--su-space-3);
+		border-top: var(--su-border-size) solid var(--su-border-1);
+	}
+	.tc-item {
+		font-size: var(--su-font-sm);
+		border: var(--su-border-size) solid var(--su-border-0);
+		border-radius: var(--su-radius-md);
+		overflow: hidden;
+	}
+	.tc-item[open] { border-color: var(--su-accent); }
+	.tc-summary {
+		display: flex; align-items: center;
+		padding: var(--su-space-2) var(--su-space-3);
+		cursor: pointer; user-select: none;
+		background: var(--su-surface-3);
+		transition: background var(--su-transition);
+	}
+	.tc-summary:hover { background: var(--su-border-1); }
+	.tc-summary::-webkit-details-marker { display: none; }
+	.tc-badge {
+		display: inline-flex; align-items: center; gap: 4px;
+		padding: 1px 8px;
+		background: var(--su-accent); color: #fff;
+		border-radius: var(--su-radius-sm);
+		font-family: var(--su-font-mono); font-size: var(--su-font-xs); font-weight: 600;
+	}
+	.tc-badge::before { content: '🔧'; font-size: 10px; }
+	.tc-args {
+		padding: var(--su-space-3);
+		background: var(--su-surface-1);
+		font-size: var(--su-font-xs);
+	}
+</style>
+
+<div class="chat-page @RootClass" style="@BackgroundStyle">
+	<div class="chat-topbar">
+		<button class="chat-back" @onclick="NavigateBackAsync" title="@Loc["chat.back_to_agent"]">← @ViewContext.Agent.Name</button>
+		@if (currentPhase is not null)
+		{
+			<span class="generation-phase @($"phase-{currentPhase}")">
+				<span class="phase-dot"></span>
+				@PhaseLabel
+			</span>
+		}
+	</div>
+
+	<div class="chat-messages" @ref="ChatMainElement" @onscroll="OnChatScroll">
+		<div class="chat-messages-inner">
+			@ChildContent
+		</div>
+	</div>
+
+	@if (!isUserAtBottom)
+	{
+		<button class="chat-scroll-btn" @onclick="ScrollToBottomManually" title="@Loc["chat.scroll_to_bottom"]">
+			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+				<path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+			</svg>
+		</button>
+	}
+
+	<div class="chat-input">
+		<textarea @ref="inputArea"
+			value="@inputText" @oninput="OnInputResize"
+			@onkeydown="@(e => CheckEnter(e))"
+			placeholder="@Loc["chat.input_placeholder"]"
+			rows="1"></textarea>
+		@if (ViewContext.IsGenerating())
+		{
+			<button class="chat-input-stop" @onclick="StopGenerationAsync" title="@Loc["chat.stop_generation"]">
+				<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>
+			</button>
+		}
+		else
+		{
+			<button class="chat-input-send" @onclick="SendAsync" disabled="@(string.IsNullOrWhiteSpace(inputText))" title="@Loc["chat.send"]">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+			</button>
+		}
+	</div>
+</div>
+
+@code {
+	/// <summary>宿主上下文。与具体界面对应，由宿主的 DynamicComponent 传入。</summary>
+	[Parameter, EditorRequired]
+	public ChatViewContext ViewContext { get; set; } = default!;
+
+	/// <summary>消息区内容。由具体界面提供。</summary>
+	[Parameter]
+	public RenderFragment? ChildContent { get; set; }
+
+	/// <summary>界面根元素追加的类名，便于具体界面用自己的样式作用域。</summary>
+	[Parameter]
+	public string? RootClass { get; set; }
+
+	ElementReference ChatMainElement;
+	ElementReference inputArea;
+
+	string inputText = "";
+	bool autoScrollDown = true;
+	bool isUserAtBottom = true;
+	bool _hasRendered;
+	bool _skipNextInput;
+
+	private ChatViewContext? _subscribedContext;
+	private Func<string, bool, Task<bool>>? _inputInsertHandler;
+
+	private string? currentPhase => ViewContext.GenerationPhase();
+
+	private string PhaseLabel => currentPhase switch
+	{
+		"pre" => Loc["chat.phase_pre"],
+		"gen" => Loc["chat.phase_gen"],
+		"post" => Loc["chat.phase_post"],
+		_ => ""
+	};
+
+	/// <summary>Agent 背景图的内联样式；无背景图时返回 null，保持默认主题背景。</summary>
+	private string? BackgroundStyle => ViewContext.Agent.BackgroundGuid != null
+		? $"background-image: url('/userimages/{ViewContext.Agent.BackgroundGuid}.png'); background-size: cover; background-position: center;"
+		: null;
+
+	protected override void OnInitialized()
+	{
+		if (bool.TryParse(KVData.Read("App", "auto_scroll_down"), out var autoscroll))
+			autoScrollDown = autoscroll;
+	}
+
+	protected override void OnParametersSet()
+	{
+		// 上下文替换（切换对话 / 宿主重新加载 Agent）时迁移订阅，
+		// 并把输入框写入能力重新登记到新的上下文上。
+		if (!ReferenceEquals(_subscribedContext, ViewContext))
+		{
+			if (_subscribedContext != null)
+			{
+				_subscribedContext.ScrollToBottomRequested -= OnScrollToBottomRequested;
+				if (_inputInsertHandler != null && ReferenceEquals(_subscribedContext.InputInsertHandler, _inputInsertHandler))
+					_subscribedContext.InputInsertHandler = null;
+			}
+
+			_subscribedContext = ViewContext;
+			if (_subscribedContext != null)
+			{
+				_subscribedContext.ScrollToBottomRequested += OnScrollToBottomRequested;
+				_inputInsertHandler = InsertIntoInputAsync;
+				_subscribedContext.InputInsertHandler = _inputInsertHandler;
+			}
+		}
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+			_hasRendered = true;
+
+		if (_hasRendered && autoScrollDown)
+		{
+			await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+			_hasRendered = false;
+		}
+	}
+
+	public void Dispose()
+	{
+		if (_subscribedContext == null) return;
+
+		_subscribedContext.ScrollToBottomRequested -= OnScrollToBottomRequested;
+		if (_inputInsertHandler != null && ReferenceEquals(_subscribedContext.InputInsertHandler, _inputInsertHandler))
+			_subscribedContext.InputInsertHandler = null;
+		_subscribedContext = null;
+	}
+
+	private void OnScrollToBottomRequested()
+	{
+		if (!autoScrollDown || !isUserAtBottom) return;
+
+		// 宿主可能从后台生成线程触发该事件，JS 互操作必须切回渲染上下文。
+		_ = InvokeAsync(ScrollToBottomAsync);
+	}
+
+	private async Task ScrollToBottomAsync()
+	{
+		try { await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement); }
+		catch (Exception) { /* 元素尚未渲染或电路已断开：忽略滚动请求 */ }
+	}
+
+	private async Task NavigateBackAsync() => await ViewContext.NavigateBackAsync();
+
+	private async void OnInputResize(ChangeEventArgs e)
+	{
+		if (_skipNextInput) { _skipNextInput = false; return; }
+		inputText = e.Value?.ToString() ?? string.Empty;
+		await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
+	}
+
+	private async Task CheckEnter(KeyboardEventArgs e)
+	{
+		if (e.Key == "Enter" && !e.ShiftKey && !ViewContext.IsGenerating())
+		{
+			_skipNextInput = true;
+			await SendAsync();
+		}
+	}
+
+	private async Task SendAsync()
+	{
+		// 允许空输入：宿主会跳过新增用户消息、直接重新生成（与 Enter 空输入的老行为一致）。
+		var text = inputText;
+		inputText = "";
+		await ViewContext.SendAsync(text);
+	}
+
+	private async Task StopGenerationAsync()
+	{
+		var postProcessing = ViewContext.Messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.PostProcessing);
+		if (postProcessing != null)
+		{
+			var confirmed = await PopupService.ShowAsync(
+				Loc["chat.stop_post_processing_warn"],
+				Loc["chat.stop_warn_title"], showCancel: true);
+			if (!confirmed) return;
+		}
+
+		await ViewContext.StopGenerationAsync();
+	}
+
+	private async Task OnChatScroll()
+	{
+		try
+		{
+			bool following = await JS.InvokeAsync<bool>("isChatAutoFollowing", ChatMainElement);
+			if (isUserAtBottom != following)
+			{
+				isUserAtBottom = following;
+				await InvokeAsync(StateHasChanged);
+			}
+		}
+		catch (Exception) { /* 元素已卸载或电路断开：忽略滚动状态探测 */ }
+	}
+
+	private async Task ScrollToBottomManually()
+	{
+		try
+		{
+			await JS.InvokeVoidAsync("scrollToBottomManual", ChatMainElement);
+			isUserAtBottom = true;
+			await InvokeAsync(StateHasChanged);
+		}
+		catch (Exception) { /* 元素已卸载或电路断开：忽略滚动请求 */ }
+	}
+
+	/// <summary>供插件面板经 ChatPanelContext 写入输入框（不发送）。</summary>
+	private async Task<bool> InsertIntoInputAsync(string text, bool append)
+	{
+		if (string.IsNullOrEmpty(text)) return false;
+
+		if (!append || string.IsNullOrWhiteSpace(inputText))
+			inputText = text;
+		else
+			inputText = inputText.TrimEnd() + "\n" + text;
+
+		await InvokeAsync(StateHasChanged);
+
+		try
+		{
+			await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
+		}
+		catch (Exception)
+		{
+			// 输入框尚未渲染或电路已断开：文本已写入状态，无需额外处理
+		}
+
+		return true;
+	}
+}

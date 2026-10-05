@@ -1,4 +1,11 @@
 {
+  "chatview.standard": "标准界面",
+  "chatview.standard.desc": "每条消息一个气泡，逐条顺序显示，与 2.0 之前的界面一致。",
+  "chatview.aggregated": "聚合界面",
+  "chatview.aggregated.desc": "把一次工具调用循环里的连续 AI / 工具消息合并到同一个气泡中，无输出的工具调用步骤默认折叠。",
+  "chatview.agg.tool_activity": "工具调用活动",
+  "chatview.agg.tool_activity_meta": "{0} 个步骤 · {1} 次工具调用",
+  "chatview.agg.turn_meta": "{0} 个步骤 · {1} 次工具调用",
   "tool.read_file": "读取文件",
   "tool.read_file.desc": "读取本地文件系统中的文件内容",
   "tool.write_file": "写入文件",

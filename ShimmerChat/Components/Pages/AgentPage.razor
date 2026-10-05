@@ -5,6 +5,7 @@
 @using ShimmerChatBuiltin.NodeBasic.PreGeneration
 @using ShimmerChatBuiltin.NodeBasic.Render
 @using ShimmerChatLib.Generation
+@using ShimmerChatLib.ChatView
 @using ShimmerChatLib.Models
 @inject NavigationManager navigation
 @inject IKVDataService kvDataService
@@ -17,6 +18,7 @@
 @inject ILocService Loc
 @inject IGenerationEventStore EventStore
 @inject IGenerationProviderRegistry ProviderRegistry
+@inject IChatViewRegistry ChatViewRegistry
 @inject GenerationProviderHostService ProviderHost
 @inject ILogger<AgentPage> logger
 @inject IPanelDraftStore PanelDrafts
@@ -543,6 +545,29 @@
                     }
 
                     <div class="settings-group">
+                        <h4><i class="bi bi-window-stack"></i> @Loc["agent.section_chat_view"]</h4>
+                        <div class="settings-field">
+                            <label>@Loc["agent.label_chat_view"]</label>
+                            <select class="shimmer-input" style="max-width:320px;" value="@ChatViewId" @onchange="OnChatViewChanged">
+                                <option value="">@Loc["agent.chat_view_default"]</option>
+                                @foreach (var view in _chatViews)
+                                {
+                                    <option value="@view.Id">@view.Icon @Loc[view.NameKey]</option>
+                                }
+                                @if (UnknownChatViewId is not null)
+                                {
+                                    <option value="@UnknownChatViewId">@Loc.Format("agent.chat_view_unknown", UnknownChatViewId)</option>
+                                }
+                            </select>
+                            <p class="gen-config-hint">@Loc["agent.chat_view_hint"]</p>
+                            @if (SelectedChatViewDescription is not null)
+                            {
+                                <p class="gen-config-hint">@Loc[SelectedChatViewDescription]</p>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
                         <h4><i class="bi bi-puzzle"></i> @Loc["agent.section_plugins"]</h4>
                         <ShimmerChatLib.Components.PluginPanelContainer
                             PanelDisplayPlace="ShimmerChatLib.Panel.PanelDisplayPlace.Agent"
@@ -662,6 +687,40 @@
             }
         }
     }
+
+    #region 对话界面
+
+    private List<ChatViewInfo> _chatViews = new();
+
+    /// <summary>当前选中的对话界面 Id；空表示使用默认界面。</summary>
+    string ChatViewId => agent?.ChatViewId ?? string.Empty;
+
+    /// <summary>Agent 指定了但未注册的界面 Id（用于在选项中明确提示，而不是静默替换）。</summary>
+    private string? UnknownChatViewId =>
+        agent != null && !string.IsNullOrEmpty(agent.ChatViewId) && ChatViewRegistry.GetById(agent.ChatViewId) == null
+            ? agent.ChatViewId
+            : null;
+
+    private string? SelectedChatViewDescription => ChatViewRegistry.GetById(agent?.ChatViewId)?.DescriptionKey;
+
+    private void LoadChatViews()
+    {
+        _chatViews = ChatViewRegistry.GetAll().ToList();
+        if (_chatViews.Count == 0)
+        {
+            logger.LogError("[AgentPage] 未发现任何对话界面实现，聊天页将无法渲染对话区。");
+        }
+    }
+
+    void OnChatViewChanged(ChangeEventArgs e)
+    {
+        if (agent == null) return;
+
+        var value = e.Value?.ToString();
+        agent.ChatViewId = string.IsNullOrWhiteSpace(value) ? null : value;
+        agent.Save(kvDataService);
+    }
+    #endregion
 
     string TagsString
     {
@@ -965,6 +1024,7 @@
         // ShimmerChat 2.0: tools are now managed via GenerationManager + ToolManager
         LoadPresets();
         LoadGenerationEvents();
+        LoadChatViews();
 
         var swTags = Stopwatch.StartNew();
         LoadAllTags();

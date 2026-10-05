@@ -73,6 +73,12 @@ namespace ShimmerChatLib
         public string? RenderModifierTreeJson { get; set; }
 
         /// <summary>
+        /// 此智能体使用的对话界面 Id（<see cref="ShimmerChatLib.ChatView.ChatViewAttribute.Id"/>）。
+        /// null / 空表示使用默认对话界面。
+        /// </summary>
+        public string? ChatViewId { get; set; }
+
+        /// <summary>
         /// 仅用户可见的介绍文本
         /// </summary>
 		public string UserIntro { get; set; } = "";

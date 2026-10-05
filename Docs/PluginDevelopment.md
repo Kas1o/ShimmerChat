@@ -584,6 +584,51 @@ if (PanelContext is LiveAgentPanelContext live)
 | `Agent` | Agent 编辑页 / 子代理配置编辑器 | `AgentGuid`, `EventHandlerReg`, `PanelContext`(`AgentPanelContext`) |
 | `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg`, `PanelContext`(`ChatPanelContext`) |
 
+### 对话界面（IChatView）
+
+面板挂在聊天页的侧栏，而**对话界面**替换的是聊天页的消息区与输入区本身。
+实现 `IChatView` 的组件会在插件加载时被自动发现，并出现在 Agent 设置页的「对话界面」选择列表中，
+由 `Agent.ChatViewId` 持久化选择（为空表示使用默认界面）。
+
+```razor
+@implements IChatView
+@attribute [ChatView("my.view", "chatview.my", DescriptionKey = "chatview.my.desc")]
+
+@* 宿主只注入 Context 一个参数；推荐复用内置外壳（顶栏、消息区、输入区、滚动跟随） *@
+<ChatViewShell ViewContext="Context">
+    @foreach (var message in Context.Messages)
+    {
+        @* 自己的消息渲染 *@
+    }
+</ChatViewShell>
+
+@code {
+    [Parameter] public ChatViewContext Context { get; set; } = default!;
+}
+```
+
+`ChatViewContext` 提供活对象与宿主能力（不传页面实例）：
+
+| 成员 | 说明 |
+|------|------|
+| `Chat` / `Agent` / `Messages` | 与宿主同一实例的活对象，读写即时可见 |
+| `IsGenerating()` / `GenerationPhase()` | 生成状态（每次读取取宿主实时值） |
+| `SendAsync(text)` / `StopGenerationAsync()` | 发送消息（启动生成）/ 停止生成 |
+| `DeleteMessageAsync` / `DeleteMessagesFromAsync` | 删除单条 / 从此处删除后续消息 |
+| `RegenerateFromAsync` / `ContinueFromAsync` | 重新生成 / 续写 |
+| `MarkDirty()` / `RequestRefreshAsync()` | 持久化 / 请求宿主重绘 |
+| `NavigateBackAsync()` | 返回 Agent 页面 |
+| `ScrollToBottomRequested` | 宿主请求滚动到底部（是否顺从用户滚动由界面决定） |
+| `InputInsertHandler` | 供面板 `InsertIntoInputAsync` 写入输入框，由界面登记 |
+
+注意：
+
+- 组件必须声明 `[Parameter] ChatViewContext Context`，且不要声明其它 `[Parameter]`——宿主只传这一个。
+- `Id` 是持久化标识，已发布的界面不要修改它；重命名组件类型不影响它。
+- 声明 `IsDefault = true` 的界面会成为「未指定界面」时的默认界面（仅应有一个）。
+- 界面指定的 `Id` 未注册时（例如插件被移除），宿主会回退到默认界面并显示警告、记录错误日志。
+- 消息的 Markdown→HTML 渲染仍走 `IMessageDisplayService`（可注入），与渲染修改管线保持独立。
+
 ---
 
 ## 8. 本地化

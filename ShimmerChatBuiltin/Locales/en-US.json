@@ -1,4 +1,11 @@
 {
+  "chatview.standard": "Standard",
+  "chatview.standard.desc": "One bubble per message, rendered in order (same as the pre-2.0 interface).",
+  "chatview.aggregated": "Aggregated",
+  "chatview.aggregated.desc": "Merges consecutive assistant/tool messages of a single tool-call loop into one bubble; steps without output are collapsed by default.",
+  "chatview.agg.tool_activity": "Tool activity",
+  "chatview.agg.tool_activity_meta": "{0} steps · {1} tool calls",
+  "chatview.agg.turn_meta": "{0} steps · {1} tool calls",
   "tool.read_file": "Read File",
   "tool.read_file.desc": "Read a file's content from the local file system",
   "tool.write_file": "Write File",

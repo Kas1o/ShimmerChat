@@ -1,0 +1,94 @@
+@using ShimmerChatLib.ChatView
+@using ShimmerChatBuiltin.ChatView.Common
+@implements IChatView
+@attribute [ChatView("aggregated", "chatview.aggregated", DescriptionKey = "chatview.aggregated.desc", Icon = "🧩", Order = 1)]
+
+@*
+	聚合对话界面：把一次 ToolCallLoop 里的连续 AI / 工具结果消息合并到一个气泡中，
+	其中连续「无输出」（仅思考与工具调用）的步骤默认折叠为一块工具调用活动。
+	与标准界面共享同一套外壳与消息渲染，只是消息区的组织方式不同。
+*@
+
+<style>
+	/* ── 聚合回合 ──────────────────────────────────── */
+	.chatview-aggregated .chat-turn { max-width: 92%; }
+	.chat-turn-badge {
+		font-size: var(--su-font-xs); font-weight: 500;
+		color: var(--su-text-2);
+		background: var(--su-surface-3);
+		border-radius: 8px; padding: 0 6px;
+	}
+	.chat-turn-body { display: flex; flex-direction: column; }
+
+	/* 分段共用外层气泡：去掉各自的卡片外壳，只保留分隔线 */
+	.chat-turn .chat-msg {
+		background: transparent; border: none; box-shadow: none;
+		padding: 0; margin: 0; max-width: 100%;
+		animation: none;
+	}
+	.chat-turn .chat-msg + .chat-msg,
+	.chat-turn .chat-msg + .chat-activity,
+	.chat-turn .chat-activity + .chat-msg {
+		margin-top: var(--su-space-3); padding-top: var(--su-space-3);
+		border-top: var(--su-border-size) dashed var(--su-border-1);
+	}
+	.chat-turn .chat-msg-foot { opacity: 0.5; }
+	.chat-turn .chat-msg-head-right { margin-bottom: var(--su-space-1); }
+	.chat-turn .chat-msg-tool {
+		border-left: 2px solid var(--su-warning);
+		padding-left: var(--su-space-3);
+		border-radius: 0 var(--su-radius-md) var(--su-radius-md) 0;
+	}
+	.chat-turn .chat-msg-tool .chat-msg-tool-summary { color: var(--su-warning); }
+
+	/* ── 折叠的工具调用活动 ────────────────────────── */
+	.chat-activity {
+		border: var(--su-border-size) solid var(--su-border-0);
+		border-radius: var(--su-radius-md);
+		background: var(--su-surface-3);
+		overflow: hidden;
+	}
+	.chat-activity-summary {
+		display: flex; align-items: center; gap: var(--su-space-2);
+		padding: var(--su-space-2) var(--su-space-3);
+		cursor: pointer; user-select: none;
+		font-size: var(--su-font-sm); color: var(--su-text-1);
+		transition: background var(--su-transition);
+	}
+	.chat-activity-summary:hover { background: var(--su-border-1); }
+	.chat-activity-summary::-webkit-details-marker { display: none; }
+	.chat-activity-title { font-weight: 500; }
+	.chat-activity-meta {
+		margin-left: auto;
+		font-size: var(--su-font-xs); color: var(--su-text-2);
+	}
+	.chat-activity-body {
+		display: flex; flex-direction: column;
+		padding: var(--su-space-3);
+		background: var(--su-surface-1);
+		border-top: var(--su-border-size) solid var(--su-border-0);
+	}
+	.chat-turn .chat-activity-body .chat-msg + .chat-msg {
+		margin-top: var(--su-space-2); padding-top: var(--su-space-2);
+		border-top: var(--su-border-size) dashed var(--su-border-1);
+	}
+</style>
+
+<ChatViewShell ViewContext="Context" RootClass="chatview-aggregated">
+	@foreach (var unit in ChatTurnGrouping.Build(Context.Messages))
+	{
+		if (unit.IsTurn)
+		{
+			<ChatTurnView Context="Context" Unit="unit" />
+		}
+		else
+		{
+			<ChatMessageBubble Context="Context" message="unit.Messages[0]" />
+		}
+	}
+</ChatViewShell>
+
+@code {
+	[Parameter, EditorRequired]
+	public ChatViewContext Context { get; set; } = default!;
+}

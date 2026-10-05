@@ -1,6 +1,8 @@
 @using Newtonsoft.Json.Linq
 @inject IKVDataService KVData
 
+@* 消息内联的工具调用列表（折叠展示参数）。 *@
+
 <div class="toolcalls">
     @foreach (var tc in message?.message?.toolCalls ?? [])
     {
@@ -11,7 +13,7 @@
             @if (!string.IsNullOrEmpty(tc.arguments))
             {
                 <div class="tc-args">
-                    <JsonTreeView Token="ParseArgs(tc.arguments)" DefaultExpandLevel="1" />
+                    <ShimmerChatLib.Components.JsonTreeView Token="ParseArgs(tc.arguments)" DefaultExpandLevel="1" />
                 </div>
             }
         </details>

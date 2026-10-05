@@ -1,5 +1,7 @@
-﻿@using Newtonsoft.Json.Linq
+@using Newtonsoft.Json.Linq
 @inject ILocService Loc
+
+@* JSON 折叠树。原本位于宿主项目的 SubComponents，因对话界面（内置 / 插件）也需要它而移到共享库。 *@
 
 <div class="json-tree-node su-ms-2">
     @if (Token is JObject jObject)

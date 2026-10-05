@@ -1,0 +1,249 @@
+@using ShimmerChatLib.ChatView
+@using SharperLLM.Util
+@inject IJSRuntime JS
+@inject ILocService Loc
+@inject IKVDataService KVData
+@inject IMessageStoreService MessageStore
+@inject IMessageDisplayService MessageDisplayService
+@implements IDisposable
+
+@*
+	单条消息气泡。内置对话界面共用：标准界面直接逐条渲染，
+	聚合界面把它当作合并气泡里的一个分段（ShowSender=false）。
+	样式由 ChatViewShell 内联输出，因此这里不附带 .razor.css。
+*@
+
+<div class="chat-msg @MsgClass">
+	@if (ShowSender || ShowActions)
+	{
+		<div class="chat-msg-head @(ShowSender ? null : "chat-msg-head-right")">
+			@if (ShowSender)
+			{
+				<span class="chat-msg-sender">
+					@sender
+					@if (message.HasMultipleVersions)
+					{
+						<span class="chat-msg-ver">@(message.CurrentVersionIndex + 1)/@message.Versions.Count</span>
+						<button class="chat-msg-ver-btn" @onclick="() => NavigateToPreviousVersion()" disabled="@(message.CurrentVersionIndex <= 0)">◂</button>
+						<button class="chat-msg-ver-btn" @onclick="() => NavigateToNextVersion()" disabled="@(message.CurrentVersionIndex >= message.Versions.Count - 1)">▸</button>
+					}
+					@if (message.IsStreaming)
+					{
+						<span class="chat-msg-streaming">@Loc["msg.streaming"]</span>
+					}
+				</span>
+			}
+			@if (ShowActions)
+			{
+				<span class="chat-msg-actions">
+					@if (!ShowSender && message.HasMultipleVersions)
+					{
+						<span class="chat-msg-ver">@(message.CurrentVersionIndex + 1)/@message.Versions.Count</span>
+						<button class="chat-msg-ver-btn" @onclick="() => NavigateToPreviousVersion()" disabled="@(message.CurrentVersionIndex <= 0)">◂</button>
+						<button class="chat-msg-ver-btn" @onclick="() => NavigateToNextVersion()" disabled="@(message.CurrentVersionIndex >= message.Versions.Count - 1)">▸</button>
+					}
+					@if ((ShowSender || ShowRegenerate) && message.sender == ShimmerChatLib.Sender.AI && !message.IsStreaming)
+					{
+						<button class="chat-msg-act" @onclick="RegenerateFromThisMessage">@Loc["BUTTON_REGENERATE"]</button>
+						if (IsContinuationEnabled())
+						{
+							<button class="chat-msg-act" @onclick="ContinueFromThisMessage">@Loc["BUTTON_CONTINUE"]</button>
+						}
+					}
+					<button class="chat-msg-act" @onclick="CopyContentToClipboard">@Loc["BUTTON_COPY"]</button>
+					@if (!message.IsStreaming)
+					{
+						<button class="chat-msg-act" @onclick="EnterEditMode">@Loc["BUTTON_EDIT"]</button>
+					}
+					<button class="chat-msg-act chat-msg-act-del" @onclick="OnDeleteClick" title="@Loc["BUTTON_DELETE_FROM_TIP"]">@Loc["BUTTON_DELETE"]</button>
+				</span>
+			}
+		</div>
+	}
+
+	@if (isEditMode)
+	{
+		<div class="chat-msg-edit">
+			<label>@Loc["msg.label_thinking"]</label>
+			<textarea @bind="editThinking" rows="3" class="su-input su-mb-2"></textarea>
+			<label>@Loc["msg.label_content"]</label>
+			<textarea @bind="editContent" rows="4" class="su-input su-mb-2"></textarea>
+			<button class="su-btn su-btn-success su-btn-sm" @onclick="SaveEdit">@Loc["BUTTON_SAVE"]</button>
+			<button class="su-btn su-btn-sm" @onclick="CancelEdit">@Loc["BUTTON_CANCEL"]</button>
+		</div>
+	}
+	else
+	{
+		@if (!string.IsNullOrEmpty(CurrentMessageContent?.thinking))
+		{
+			<details class="chat-msg-thinking" open="@(!_thinkingCollapsed)">
+				<summary>@Loc["msg.thinking"]</summary>
+				<div class="chat-msg-thinking-body">@DisplayThinking</div>
+			</details>
+		}
+
+		@if (message.sender == ShimmerChatLib.Sender.ToolResult)
+		{
+			<details class="chat-msg-tool-result" open="@(!_toolResultCollapsed)">
+				<summary class="chat-msg-tool-summary">@ToolResultTitle</summary>
+				<div class="chat-msg-body">
+					@DisplayContent
+				</div>
+			</details>
+		}
+		else
+		{
+			<div class="chat-msg-body">
+				@DisplayContent
+				@if (message.IsStreaming)
+				{
+					<span class="chat-msg-cursor">▌</span>
+				}
+			</div>
+		}
+	}
+
+	@if (CurrentMessageContent?.toolCalls is { Count: > 0 })
+	{
+		<ToolCallDetails message="message" />
+	}
+</div>
+
+@code {
+	/// <summary>宿主上下文，由所属对话界面提供。</summary>
+	[Parameter, EditorRequired]
+	public ChatViewContext Context { get; set; } = default!;
+
+	/// <summary>要渲染的消息。</summary>
+	[Parameter, EditorRequired]
+	public ShimmerChatLib.Message message { get; set; } = default!;
+
+	/// <summary>是否显示发送者与单条消息操作（聚合界面的分段设为 false）。</summary>
+	[Parameter]
+	public bool ShowSender { get; set; } = true;
+
+	/// <summary>是否显示操作条（复制 / 编辑 / 删除等）。</summary>
+	[Parameter]
+	public bool ShowActions { get; set; } = true;
+
+	/// <summary>
+	/// 紧凑模式（<see cref="ShowSender"/> = false）下是否仍然显示重新生成 / 续写。
+	/// 由聚合界面在回合的收尾步骤上开启，否则合并气泡里将无法重新生成回答。
+	/// </summary>
+	[Parameter]
+	public bool ShowRegenerate { get; set; }
+
+	/// <summary>
+	/// 工具结果折叠标题的覆盖值（聚合界面用工具名替代默认的「详细内容」）。
+	/// null 时使用默认本地化标题。
+	/// </summary>
+	[Parameter]
+	public string? ToolResultTitleOverride { get; set; }
+
+	private bool isEditMode = false;
+	private string editContent = string.Empty;
+	private string editThinking = string.Empty;
+
+	private ChatMessage CurrentMessageContent => message.CurrentVersion;
+	private string stringContent => CurrentMessageContent?.Content ?? string.Empty;
+	private MarkupString DisplayContent => MessageDisplayService.Render(stringContent, Context.Chat, Context.Agent);
+	private MarkupString DisplayThinking => MessageDisplayService.Render(CurrentMessageContent?.thinking ?? string.Empty, Context.Chat, Context.Agent);
+
+	private string ToolResultTitle => string.IsNullOrEmpty(ToolResultTitleOverride)
+		? Loc["ToolResultDetail"]
+		: ToolResultTitleOverride!;
+
+	private string MsgClass => message.sender switch
+	{
+		ShimmerChatLib.Sender.User => "chat-msg-user",
+		ShimmerChatLib.Sender.ToolResult => "chat-msg-tool",
+		_ => "chat-msg-ai"
+	};
+
+	private string sender => message.sender switch
+	{
+		ShimmerChatLib.Sender.User => KVData.Read("User", "username") ?? Loc["msg.default_user"],
+		ShimmerChatLib.Sender.AI => Context.Agent.Name,
+		ShimmerChatLib.Sender.ToolResult => Loc["ToolResult"],
+		var other => other
+	};
+
+	protected override void OnInitialized() { base.OnInitialized(); SubscribeToMessageEvents(); }
+	protected override void OnParametersSet() { base.OnParametersSet(); SubscribeToMessageEvents(); }
+
+	private void SubscribeToMessageEvents()
+	{
+		message.ContentChanged -= HandleContentChanged;
+		message.StreamingStateChanged -= HandleStreamingStateChanged;
+		message.VersionChanged -= HandleVersionChanged;
+		message.ContentChanged += HandleContentChanged;
+		message.StreamingStateChanged += HandleStreamingStateChanged;
+		message.VersionChanged += HandleVersionChanged;
+	}
+
+	private void HandleContentChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
+	private void HandleStreamingStateChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
+	private void HandleVersionChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
+
+	public void Dispose()
+	{
+		if (message != null)
+		{
+			message.ContentChanged -= HandleContentChanged;
+			message.StreamingStateChanged -= HandleStreamingStateChanged;
+			message.VersionChanged -= HandleVersionChanged;
+		}
+	}
+
+	private void NavigateToPreviousVersion() { if (message.CurrentVersionIndex > 0) { message.CurrentVersionIndex--; Context.MarkDirty(); } }
+	private void NavigateToNextVersion() { if (message.CurrentVersionIndex < message.Versions.Count - 1) { message.CurrentVersionIndex++; Context.MarkDirty(); } }
+
+	private async Task DeleteThisMessage() => await Context.DeleteMessageAsync(message);
+	private async Task OnDeleteClick(MouseEventArgs e)
+	{
+		if (e.ShiftKey) await Context.DeleteMessagesFromAsync(message);
+		else await Context.DeleteMessageAsync(message);
+	}
+	private async Task RegenerateFromThisMessage() => await Context.RegenerateFromAsync(message);
+	private async Task ContinueFromThisMessage() => await Context.ContinueFromAsync(message);
+
+	private bool IsContinuationEnabled()
+	{
+		var value = KVData.Read("MiscSettings", "enableContinue") ?? "false";
+		return bool.TryParse(value, out var enabled) && enabled;
+	}
+
+	private bool _thinkingCollapsed
+	{
+		get
+		{
+			var value = KVData.Read("App", "thinking_collapsed") ?? "true";
+			return !bool.TryParse(value, out var b) || b;
+		}
+	}
+
+	private bool _toolResultCollapsed
+	{
+		get
+		{
+			var value = KVData.Read("App", "toolresult_collapsed") ?? "true";
+			return !bool.TryParse(value, out var b) || b;
+		}
+	}
+
+	private async Task CopyContentToClipboard() => await JS.InvokeVoidAsync("copyTextToClipboard", stringContent);
+
+	private void EnterEditMode()
+	{
+		if (isEditMode || message.IsStreaming) { CancelEdit(); return; }
+		isEditMode = true; editContent = stringContent; editThinking = CurrentMessageContent?.thinking ?? string.Empty;
+	}
+
+	private void SaveEdit()
+	{
+		if (CurrentMessageContent != null) { CurrentMessageContent.Content = editContent; CurrentMessageContent.thinking = editThinking; }
+		isEditMode = false; Context.Chat.SaveMessage(MessageStore, message); Context.MarkDirty();
+	}
+
+	private void CancelEdit() => isEditMode = false;
+}

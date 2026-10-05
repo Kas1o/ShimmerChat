@@ -1,8 +1,7 @@
 @page "/agent/{AgentGuid}/{ChatGuid}"
 @using ShimmerChatLib
+@using ShimmerChatLib.ChatView
 @using ShimmerChatLib.Generation
-@using System.Collections.ObjectModel
-@using System.Threading
 @using Microsoft.JSInterop
 
 @inject GenerationSessionService sessionService
@@ -12,84 +11,39 @@
 @inject IMessageStoreService messageStore
 @inject ILocService Loc
 @inject IPanelDraftStore PanelDrafts
+@inject IChatViewRegistry ChatViews
 @inject NavigationManager navigation
 @inject ILogger<AgentChatPage> logger
 @implements IAsyncDisposable
 
+@*
+	对话页宿主。
+	本页只负责与「界面无关」的部分：会话生命周期、消息持久化、插件面板、通知，
+	以及为当前对话界面提供 ChatViewContext；消息区与输入区由 Agent 选定的
+	对话界面（IChatView）渲染，因此同一 Agent 可以拥有完全不同的对话外观。
+*@
 
 @if (chat != null)
 {
-	<PageTitle> @($"{agent!.Name} | {chat.Name}")</PageTitle>
-	<div class="chat-page" style="@ChatPageBackgroundStyle">
-		<div class="chat-topbar">
-			<button class="chat-back" @onclick="BackToAgentPage">← @agent!.Name</button>
-			@if (session != null && session.Phase != null)
-			{
-				<span class="generation-phase @($"phase-{session.Phase}")">
-					<span class="phase-dot"></span>
-					@switch (session.Phase)
-					{
-						case "pre":
-							@Loc["chat.phase_pre"]
-							break;
-						case "gen":
-							@Loc["chat.phase_gen"]
-							break;
-						case "post":
-							@Loc["chat.phase_post"]
-							break;
-					}
-				</span>
-			}
-		</div>
+	<PageTitle>@($"{agent!.Name} | {chat.Name}")</PageTitle>
 
-		<div class="chat-messages" @ref="ChatMainElement" @onscroll="OnChatScroll">
-			<div class="chat-messages-inner">
-				@if (virtualize)
-				{
-					<Virtualize Items="messages" Context="message">
-						<ShimmerChat.Components.SubComponents.Message Delete="async () => await DeleteMessage(message)" RegenerateFrom="async () => await RegenerateFromMessage(message)" ContinueFrom="async () => await ContinueFromMessage(message)" DeleteFrom="async () => await DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
-					</Virtualize>
-				}
-				else
-				{
-					@foreach (var message in messages)
-					{
-						<ShimmerChat.Components.SubComponents.Message Delete="async () => await DeleteMessage(message)" RegenerateFrom="async () => await RegenerateFromMessage(message)" ContinueFrom="async () => await ContinueFromMessage(message)" DeleteFrom="async () => await DeleteMessagesFrom(message)" message="message" MakeDirty="GetDirty" AgentName="@agent.Name" Chat="@chat" Agent="@agent" />
-					}
-				}
-			</div>
+	@if (UnresolvedChatViewId != null)
+	{
+		<div class="chat-view-warning">
+			<i class="bi bi-exclamation-triangle"></i>
+			<span>@Loc.Format("chat.chat_view_missing", UnresolvedChatViewId)</span>
 		</div>
+	}
 
-		@if (!isUserAtBottom)
-		{
-			<button class="chat-scroll-btn" @onclick="ScrollToBottomManually">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-					<path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
-				</svg>
-			</button>
-		}
+	@if (CurrentView != null)
+	{
+		<DynamicComponent Type="CurrentView.ComponentType" Parameters="ViewParameters" />
+	}
+	else
+	{
+		<div class="chat-view-missing">@Loc["chat.chat_view_none"]</div>
+	}
 
-		<div class="chat-input">
-			<textarea @ref="inputArea"
-				value="@inputText" @oninput="OnInputResize"
-				@onkeydown="@(e => CheckEnter(e))"
-				placeholder="@Loc["chat.input_placeholder"]"
-				rows="1"></textarea>
-			@if (session != null && session.IsActive)
-			{
-				<button class="chat-input-stop" @onclick="OnClickStopGenerationButton">
-					<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>
-				</button>
-			}
-			else
-			{
-				<button class="chat-input-send" @onclick="OnClickSendButton" disabled="@(string.IsNullOrWhiteSpace(inputText))">
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
-				</button>
-			}
-		</div>
-	</div>
 	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.Guid" ChatGuid="chat.Guid" PanelContext="PanelContext" @ref="ChatPluginPanelContainer"/>
 }
 
@@ -109,9 +63,6 @@
 
 	#region 成员
 
-	ElementReference ChatMainElement;
-	ElementReference inputArea;
-
 	/// <summary>
 	/// 当前生成会话。为 null 表示没有活跃会话。离开页面后会话继续在后台运行。
 	/// </summary>
@@ -120,21 +71,78 @@
 	private Agent? agent;
 	private Chat? chat;
 
-	/// <summary>
-	/// 当前显示的消息列表。会话活跃时指向 session.Chat.Messages，否则指向本地加载的 chat.Messages。
-	/// </summary>
-	ObservableCollection<Message> messages = new();
-
-	string inputText { get; set; } = "";
-
 	bool throwExceptionInsteadOfPopupErrorMessage = false;
-	bool autoScrollDown = true;
-	bool virtualize = false;
-	bool isUserAtBottom = true;
 
 	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
 
 	private ShimmerChatLib.Panel.ChatPanelContext? _panelContext;
+	private ChatViewContext? _viewContext;
+	#endregion
+
+	#region 对话界面
+
+	/// <summary>
+	/// 当前 Agent 选定的对话界面。未指定时使用默认界面；
+	/// 指定了未注册的 Id 时同样回退到默认界面，但界面上的警告条会明示这一点。
+	/// </summary>
+	private ChatViewInfo? CurrentView => agent == null
+		? null
+		: ChatViews.GetById(agent.ChatViewId) ?? ChatViews.GetDefault();
+
+	/// <summary>Agent 指定了但未注册的界面 Id（null 表示无需提示）。</summary>
+	private string? UnresolvedChatViewId => agent != null
+		&& !string.IsNullOrEmpty(agent.ChatViewId)
+		&& ChatViews.GetById(agent.ChatViewId) == null
+			? agent.ChatViewId
+			: null;
+
+	/// <summary>
+	/// 交给对话界面的宿主契约。Chat / Agent 是页面正在使用的同一实例，
+	/// 因此界面看到的数据始终与页面同步；实例被替换（切换对话、重新加载 Agent）时重建。
+	/// </summary>
+	private ChatViewContext? ViewContext
+	{
+		get
+		{
+			if (chat == null || agent == null) return null;
+
+			if (_viewContext != null
+				&& ReferenceEquals(_viewContext.Chat, chat)
+				&& ReferenceEquals(_viewContext.Agent, agent))
+				return _viewContext;
+
+			_viewContext = BuildChatViewContext(chat, agent);
+			return _viewContext;
+		}
+	}
+
+	#pragma warning disable CS8974
+	private Dictionary<string, object> ViewParameters => new()
+	{
+		["Context"] = ViewContext!
+	};
+	#pragma warning restore CS8974
+
+	private ChatViewContext BuildChatViewContext(Chat currentChat, Agent currentAgent) => new()
+	{
+		Chat = currentChat,
+		Agent = currentAgent,
+		IsGenerating = () => session is { IsActive: true },
+		GenerationPhase = () => session?.Phase,
+		SendAsync = SendUserMessageAsync,
+		StopGenerationAsync = StopGenerationAsync,
+		DeleteMessageAsync = DeleteMessage,
+		DeleteMessagesFromAsync = DeleteMessagesFrom,
+		RegenerateFromAsync = RegenerateFromMessage,
+		ContinueFromAsync = ContinueFromMessage,
+		MarkDirty = GetDirty,
+		RequestRefreshAsync = () => InvokeAsync(StateHasChanged),
+		NavigateBackAsync = () =>
+		{
+			navigation.NavigateTo($"/agent/{AgentGuid}");
+			return Task.CompletedTask;
+		}
+	};
 	#endregion
 
 	#region 插件面板宿主契约
@@ -184,131 +192,34 @@
 			return false;
 		}
 
-		var message = new ShimmerChatLib.Message
-		{
-			message = new SharperLLM.Util.ChatMessage { Content = text },
-			timestamp = DateTime.Now,
-			sender = ShimmerChatLib.Sender.User
-		};
-
-		chat.AddMessage(message);
-		chat.SaveMessage(messageStore, message);
-		session?.NotifyUserMessageAdded(message);
-
-		GetDirty();
-		await InvokeAsync(StateHasChanged);
-
-		ReloadAgent();
-		sessionService.CancelPreviousGeneration(ChatGuid);
-		session = sessionService.GetOrCreateSession(ChatGuid, AgentGuid);
-		SubscribeToSession(session);
-		sessionService.StartGeneration(session, agent, chat, throwExceptionInsteadOfPopupErrorMessage);
-
+		await SendUserMessageAsync(text);
 		return true;
 	}
-
-	/// <summary>面板请求把文本写入主输入框（不发送）。</summary>
-	private async Task<bool> InsertIntoInputFromPanelAsync(string text, bool append)
-	{
-		if (string.IsNullOrEmpty(text)) return false;
-
-		if (!append || string.IsNullOrWhiteSpace(inputText))
-			inputText = text;
-		else
-			inputText = inputText.TrimEnd() + "\n" + text;
-
-		await InvokeAsync(StateHasChanged);
-
-		try
-		{
-			await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
-		}
-		catch (Exception ex)
-		{
-			logger.LogDebug(ex, "[AgentChatPage] Input insert post-processing skipped.");
-		}
-
-		return true;
-	}
-	#endregion
-
-	#region 样式
 
 	/// <summary>
-	/// Agent 背景图的内联样式。无背景图（<see cref="Agent.BackgroundGuid"/> 为 null）时返回 null，
-	/// 保持默认主题背景。
+	/// 面板请求把文本写入主输入框（不发送）。输入框属于当前对话界面，
+	/// 因此这里把请求转交给界面；界面未挂载输入框时返回 false。
 	/// </summary>
-	string? ChatPageBackgroundStyle => agent?.BackgroundGuid != null
-		? $"background-image: url('/userimages/{agent.BackgroundGuid}.png'); background-size: cover; background-position: center;"
-		: null;
+	private async Task<bool> InsertIntoInputFromPanelAsync(string text, bool append)
+	{
+		var context = ViewContext;
+		if (context == null) return false;
+		return await context.RequestInputInsertAsync(text, append);
+	}
 	#endregion
 
 	#region 交互
-	private bool _skipNextInput;
-
-	private async void OnInputResize(ChangeEventArgs e)
+	private async Task StopGenerationAsync()
 	{
-		if (_skipNextInput) { _skipNextInput = false; return; }
-		inputText = e.Value?.ToString() ?? string.Empty;
-		await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
-	}
-	async Task CheckEnter(KeyboardEventArgs e)
-	{
-		if (e.Key == "Enter" && !e.ShiftKey && (session == null || !session.IsActive))
-		{
-			_skipNextInput = true;
-			await Send();
-		}
-	}
-	async Task OnClickStopGenerationButton()
-	{
-		if (session == null) return;
-
-		var postProcessing = messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.PostProcessing);
-		if (postProcessing != null)
-		{
-			var confirmed = await popupService.ShowAsync(
-				Loc["chat.stop_post_processing_warn"],
-				Loc["chat.stop_warn_title"], showCancel: true);
-			if (!confirmed) return;
-		}
 		await sessionService.StopGeneration(ChatGuid);
-	}
-	async Task OnClickSendButton()
-	{
-		await Send();
-	}
-	void BackToAgentPage()
-	{
-		navigation.NavigateTo($"/agent/{AgentGuid}");
-	}
-	async Task OnChatScroll()
-	{
-		try
-		{
-			bool following = await JS.InvokeAsync<bool>("isChatAutoFollowing", ChatMainElement);
-			if (isUserAtBottom != following)
-			{
-				isUserAtBottom = following;
-				await InvokeAsync(StateHasChanged);
-			}
-		}
-		catch (Exception) { }
-	}
-	async Task ScrollToBottomManually()
-	{
-		try
-		{
-			await JS.InvokeVoidAsync("scrollToBottomManual", ChatMainElement);
-			isUserAtBottom = true;
-			await InvokeAsync(StateHasChanged);
-		}
-		catch (Exception) { }
 	}
 	#endregion
 
 	#region 逻辑
-	async Task Send()
+	/// <summary>
+	/// 发送用户消息并启动生成。空文本表示不新增用户消息，仅重新生成。
+	/// </summary>
+	async Task SendUserMessageAsync(string text)
 	{
 		if (chat == null || agent == null)
 			return;
@@ -320,11 +231,11 @@
 		sessionService.CancelPreviousGeneration(ChatGuid);
 
 		// 添加用户消息
-		if (!string.IsNullOrWhiteSpace(inputText) && inputText.Trim().Length > 0)
+		if (!string.IsNullOrWhiteSpace(text))
 		{
 			var message = new Message()
 			{
-				message = new SharperLLM.Util.ChatMessage { Content = inputText },
+				message = new SharperLLM.Util.ChatMessage { Content = text },
 				timestamp = DateTime.Now,
 				sender = ShimmerChatLib.Sender.User
 			};
@@ -335,7 +246,6 @@
 			session?.NotifyUserMessageAdded(message);
 			ChatPluginPanelContainer?.OnUserMessage(message);
 
-			inputText = "";
 			GetDirty();
 		}
 
@@ -357,7 +267,9 @@
 	}
 	async Task DeleteMessagesFrom(Message message)
 	{
-		var count = messages.Count - messages.IndexOf(message) - 1;
+		if (chat == null) return;
+
+		var count = chat.Messages.Count - chat.Messages.IndexOf(message) - 1;
 		var confirmed = await popupService.ShowAsync(
 			string.Format(Loc["POPUP_DELETE_FROM"], count),
 			Loc["POPUP_DELETE_FROM_TITLE"], showCancel: true);
@@ -366,21 +278,23 @@
 		if (message.IsGenerating)
 			await sessionService.StopGeneration(ChatGuid);
 
-		var idx = messages.IndexOf(message);
+		var idx = chat.Messages.IndexOf(message);
 		if (idx < 0) return;
-		for (int i = messages.Count - 1; i >= idx; i--)
-			chat?.DeleteMessage(messageStore, messages[i]);
+		for (int i = chat.Messages.Count - 1; i >= idx; i--)
+			chat.DeleteMessage(messageStore, chat.Messages[i]);
 		GetDirty();
 		await Refresh();
 	}
 	async Task RegenerateFromMessage(Message message)
 	{
+		if (chat == null) return;
+
 		await sessionService.StopGeneration(ChatGuid);
 
 		// 重新读取 Agent，确保在其它连接中编辑的节点树 / 渲染树立即生效
 		ReloadAgent();
 
-		int messageIndex = messages.IndexOf(message);
+		int messageIndex = chat.Messages.IndexOf(message);
 		if (messageIndex == -1) return;
 
 		var currentContent = message.CurrentVersion?.Content ?? "";
@@ -400,29 +314,31 @@
 
 		message.GenerationState = MessageGenerationState.Regenerating;
 
-		for (int i = messages.Count - 1; i > messageIndex; i--)
+		for (int i = chat.Messages.Count - 1; i > messageIndex; i--)
 		{
-			messages.RemoveAt(i);
+			chat.Messages.RemoveAt(i);
 		}
 
-		chat?.SaveAllMessages(messageStore);
+		chat.SaveAllMessages(messageStore);
 		GetDirty();
 		await Refresh();
 
 		// 启动后台生成
 		session = sessionService.GetOrCreateSession(ChatGuid, AgentGuid);
 		SubscribeToSession(session);
-		sessionService.StartGeneration(session, agent!, chat!, throwExceptionInsteadOfPopupErrorMessage);
+		sessionService.StartGeneration(session, agent!, chat, throwExceptionInsteadOfPopupErrorMessage);
 	}
 
 	async Task ContinueFromMessage(Message message)
 	{
+		if (chat == null) return;
+
 		await sessionService.StopGeneration(ChatGuid);
 
 		// 重新读取 Agent，确保在其它连接中编辑的节点树 / 渲染树立即生效
 		ReloadAgent();
 
-		int messageIndex = messages.IndexOf(message);
+		int messageIndex = chat.Messages.IndexOf(message);
 		if (messageIndex == -1) return;
 		if (message.sender != ShimmerChatLib.Sender.AI) return;
 
@@ -433,7 +349,7 @@
 		// 启动后台续写
 		session = sessionService.GetOrCreateSession(ChatGuid, AgentGuid);
 		SubscribeToSession(session);
-		sessionService.StartContinuation(session, agent!, chat!, message, throwExceptionInsteadOfPopupErrorMessage);
+		sessionService.StartContinuation(session, agent!, chat, message, throwExceptionInsteadOfPopupErrorMessage);
 	}
 	#endregion
 
@@ -475,16 +391,13 @@
 		await InvokeAsync(StateHasChanged);
 	}
 
-	private async void OnSessionScrollRequested()
+	/// <summary>
+	/// 滚动到底部的请求转发给当前对话界面：是否真的滚动（用户是否在底部、
+	/// 是否启用自动滚动）由界面自行决定。
+	/// </summary>
+	private void OnSessionScrollRequested()
 	{
-		if (autoScrollDown && isUserAtBottom)
-		{
-			try
-			{
-				await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
-			}
-			catch (Exception) { }
-		}
+		_viewContext?.NotifyScrollToBottom();
 	}
 
 	private async void OnSessionError(string message, string title)
@@ -525,14 +438,6 @@
 		{
 			throwExceptionInsteadOfPopupErrorMessage = result;
 		}
-		if (bool.TryParse(KVData.Read("App", "auto_scroll_down"), out var autoscroll))
-		{
-			autoScrollDown = autoscroll;
-		}
-		if (bool.TryParse(KVData.Read("App", "virtualize"), out var virt))
-		{
-			virtualize = virt;
-		}
 	}
 
 	/// <summary>
@@ -571,7 +476,7 @@
 
 		agent = null;
 		chat = null;
-		messages = new ObservableCollection<Message>();
+		_viewContext = null;
 
 		if (Guid.TryParse(AgentGuid, out var guid))
 		{
@@ -589,14 +494,12 @@
 						{
 							// 复用会话的 Chat 引用，确保看到最新消息
 							chat = existingSession.Chat;
-							messages = chat.Messages;
 							SubscribeToSession(existingSession);
 						}
 						else
 						{
 							chat = Chat.LoadAndMigrate(chatGuid, KVData, messageStore);
 							chat.LoadAllMessages(messageStore);
-							messages = chat.Messages;
 
 							// 清理旧的非活跃会话
 							sessionService.CleanupSession(ChatGuid);
@@ -609,27 +512,25 @@
 			{
 				agent = null;
 				chat = null;
-				messages = new ObservableCollection<Message>();
 			}
 		}
+
+		WarnIfChatViewMissing();
 
 		await base.OnParametersSetAsync();
 	}
 
-	private bool _hasRendered;
-
-	protected override async Task OnAfterRenderAsync(bool firstRender)
+	/// <summary>
+	/// Agent 指定的对话界面未注册时（插件被移除等）明确记录，避免只表现为「界面变了」。
+	/// </summary>
+	private void WarnIfChatViewMissing()
 	{
-		if (firstRender)
-		{
-			_hasRendered = true;
-		}
+		if (agent == null || string.IsNullOrEmpty(agent.ChatViewId)) return;
+		if (ChatViews.GetById(agent.ChatViewId) != null) return;
 
-		if (_hasRendered && autoScrollDown && chat != null)
-		{
-			await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
-			_hasRendered = false;
-		}
+		logger.LogError(
+			"[AgentChatPage] Agent {AgentGuid} 指定的对话界面 '{ChatViewId}' 未注册，已回退到默认界面。",
+			agent.Guid, agent.ChatViewId);
 	}
 
 	public async ValueTask DisposeAsync()
@@ -656,7 +557,7 @@
 			if (!notificationsEnabled)
 				return;
 
-			var aiMessage = messages.LastOrDefault(m => m.sender == ShimmerChatLib.Sender.AI);
+			var aiMessage = chat?.Messages.LastOrDefault(m => m.sender == ShimmerChatLib.Sender.AI);
 			if (aiMessage != null && !string.IsNullOrEmpty(aiMessage.CurrentVersion?.Content))
 			{
 				var notificationOptions = new
@@ -703,6 +604,7 @@
 		try
 		{
 			agent = Agent.Load(agent.Guid, KVData);
+			WarnIfChatViewMissing();
 		}
 		catch (Exception ex)
 		{

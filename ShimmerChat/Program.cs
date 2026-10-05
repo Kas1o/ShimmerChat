@@ -1,5 +1,6 @@
 using ShimmerChat.Components;
 using ShimmerChat.Singletons;
+using ShimmerChatLib.ChatView;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib;
 using ShimmerChatLib.Interface;
@@ -60,6 +61,7 @@ builder.Services.AddSingleton<IProviderTriggerService>(sp => sp.GetRequiredServi
 builder.Services.AddHostedService(sp => sp.GetRequiredService<GenerationProviderHostService>());
 
 builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
+builder.Services.AddSingleton<IChatViewRegistry, ChatViewRegistry>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
 builder.Services.AddSingleton<IPopupService, PopupService>(); // TODO: 大概需要改成 Scoped。
