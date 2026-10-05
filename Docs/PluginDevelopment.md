@@ -111,16 +111,18 @@ git clone https://github.com/Kas1o/ShimmerChat.git
   "name": "MyCoolPlugin",
   "version": "1.0.0",
   "description": "一个示例插件",
-  "assembly": "MyCoolPlugin.dll"
+  "assembly": "MyCoolPlugin.dll",
+  "static": "www"
 }
 ```
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
-| `name` | 是 | 插件名称 |
-| `assembly` | 是 | 入口程序集文件名，相对于插件目录 |
+| `name` | 是 | 插件名称，同时作为 `/pluginstatic/` 下的 URL 段 |
+| `assembly` | 否 | 入口程序集文件名，相对于插件目录（纯静态插件可省略） |
 | `version` | 否 | 版本号 |
 | `description` | 否 | 描述 |
+| `static` | 否 | 静态资源目录，相对于插件目录；声明后可通过 `/pluginstatic/{name}/...` 访问 |
 
 ### 部署
 
@@ -155,8 +157,39 @@ ShimmerChat/
     └── MyCoolPlugin/
         ├── plugin.json
         ├── MyCoolPlugin.dll
-        └── SomeDependency.dll     ← ALC 自动解析
+        ├── SomeDependency.dll     ← ALC 自动解析
+        └── www/                   ← static 字段指定的静态资源目录
+            ├── index.html
+            └── js/app.js
 ```
+
+### 静态资源（static 字段）
+
+在 `plugin.json` 中声明 `static` 字段后，插件目录下的子目录会通过 HTTP 暴露：
+
+```
+/pluginstatic/MyCoolPlugin/index.html   →  Plugins/MyCoolPlugin/www/index.html
+/pluginstatic/MyCoolPlugin/js/app.js    →  Plugins/MyCoolPlugin/www/js/app.js
+```
+
+- URL 段取自 `name` 字段（只保留 ASCII 字母数字与 `- _ .`，非法时回退插件目录名）。
+- 静态目录必须是插件目录的**严格子目录**，指向插件根目录或目录外路径（如 `../`）会被拒绝并记录错误。
+- 目录不存在时仅禁用该插件的静态资源，插件本身照常加载。
+- 纯静态插件（无程序集）允许：省略 `assembly`，只提供 `name` + `static`。
+- 两个插件使用相同的 `name` 时，后者的静态资源被跳过（记录错误）。
+
+静态文件需要在构建时复制到插件目录，在 `.csproj` 中配置：
+
+```xml
+<ItemGroup>
+  <Content Include="www\**">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+  </Content>
+</ItemGroup>
+```
+
+> 提示：`UseStaticFiles` 默认不提供默认文档。若想让 `/pluginstatic/MyCoolPlugin/` 直接返回 `index.html`，需在插件页面中用 JS 重定向，或在插件初始化器里另行处理。
 
 ---
 
@@ -461,35 +494,95 @@ public class MyModifier : IMessageRenderModifier
 ```razor
 @attribute [PluginPanelAttribute("panel.my_agent_panel", "panel.my_agent_panel.desc",
     PanelDisplayPlace.Agent)]
-@* 自动注入 AgentGuid 和 EventHandler *@
+@* 自动注入 AgentGuid, EventHandlerReg, PanelContext *@
 
 @code {
     [Parameter] public Guid AgentGuid { get; set; }
-    [Parameter] public Action<IChatPanelEventHandler> EventHandlerReg { get; set; } = null!;
+    [Parameter] public Action<IChatPanelEventHandler>? EventHandlerReg { get; set; }
+
+    // 宿主契约基类（不传页面实例）
+    [Parameter] public AgentPanelContext? PanelContext { get; set; }
 }
 ```
+
+#### AgentPanelContext 的两种宿主
+
+「Agent 作用域」有两个语义不同的宿主，差异**在类型层面**表达，不用 null 字段当哨兵值：
+
+| 类型 | 宿主 | 独有成员 |
+|------|------|----------|
+| `LiveAgentPanelContext` | Agent 编辑器（`AgentPage`） | `Agent`（活对象）、`ChatGuids` |
+| `SubAgentPanelContext`（内置插件定义） | 子代理配置编辑器 | `Config`（`SubAgentConfig`） |
+
+公共成员（定义在抽象基类 `AgentPanelContext` 上）：
+
+| 成员 | 说明 |
+|------|------|
+| `TargetGuid` | 当前编辑目标的 Guid |
+| `MessageStore` | `IMessageStoreService` |
+| `Draft` / `DraftKey` / `DraftStore` | 按编辑目标缓存的输入草稿 |
+| `RequestRefreshAsync()` | 请求宿主重绘 |
+| `RegisterEventHandler(handler)` | 等价 `EventHandlerReg` |
+
+需要 Agent 实体的面板应对 `LiveAgentPanelContext` 做类型判断：
+
+```csharp
+if (PanelContext is LiveAgentPanelContext live)
+{
+    var agent = live.Agent;   // 与页面同一实例
+}
+```
+
+> 需要**对话对象**的面板不应放在 Agent 作用域：Agent 配置页没有当前对话。
+> 这类面板应使用 `ChatPanelContext` 并注册为 `PanelDisplayPlace.Chat`。
+
+> **参数必须声明**：宿主必然传入 `PanelContext` / `EventHandlerReg`，
+> `DynamicComponent` 在缺少已声明参数时会抛异常，因此每个面板都必须声明这些 `[Parameter]`。
 
 ### 对话级面板
 
 ```razor
 @attribute [PluginPanelAttribute("panel.my_chat_panel", "panel.my_chat_panel.desc",
     PanelDisplayPlace.Chat)]
-@* 自动注入 ChatGuid, AgentGuid, EventHandlerReg *@
+@* 自动注入 ChatGuid, AgentGuid, EventHandlerReg, PanelContext *@
 
 @code {
     [Parameter] public Guid ChatGuid { get; set; }
     [Parameter] public Guid AgentGuid { get; set; }
     [Parameter] public Action<IChatPanelEventHandler> EventHandlerReg { get; set; } = null!;
+
+    // 推荐：活对象 + 页面能力契约（不传页面实例）
+    [Parameter] public ChatPanelContext? PanelContext { get; set; }
 }
 ```
+
+#### ChatPanelContext（推荐的宿主访问方式）
+
+宿主页面只向内暴露 `ChatPanelContext` 这一份契约，**不会把页面对象引用交给插件**。
+其中 `Chat` / `Agent` 是页面正在使用的**同一实例**（不是快照），因此读写即时可见，
+不会出现「面板数据与页面不同步」的问题。
+
+| 成员 | 说明 |
+|------|------|
+| `Chat` / `Agent` | 当前对话与 Agent 活对象 |
+| `MessageStore` | `IMessageStoreService`，面板自行增删消息时使用 |
+| `Draft` / `DraftKey` / `DraftStore` | 由宿主按对话缓存的输入草稿，折叠或切回不丢失 |
+| `IsGenerating()` | 页面是否存在活跃生成 |
+| `RequestRefreshAsync()` | 请求宿主重绘界面 |
+| `SendUserMessageAsync(text)` / `SendAsync(text)` | 面板内直接发送消息并启动生成 |
+| `InsertIntoInputAsync(text, append)` | 写入聊天主输入框（不发送） |
+| `RegisterEventHandler(handler)` | 等价 `EventHandlerReg` |
+
+`IChatPanelEventHandler` 的方法都有默认空实现，新面板只需覆写关心的事件；
+另有 `SendUserMessageFromPanelAsync` 与 `InsertIntoInputAsync` 两个可选能力。
 
 ### PanelDisplayPlace 对照
 
 | 值 | 位置 | 注入参数 |
 |----|------|---------|
 | `Settings` | 全局设置页 | 无额外参数 |
-| `Agent` | Agent 编辑页 | `AgentGuid`, `EventHandlerReg` |
-| `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg` |
+| `Agent` | Agent 编辑页 / 子代理配置编辑器 | `AgentGuid`, `EventHandlerReg`, `PanelContext`(`AgentPanelContext`) |
+| `Chat` | 聊天页侧栏 | `ChatGuid`, `AgentGuid`, `EventHandlerReg`, `PanelContext`(`ChatPanelContext`) |
 
 ---
 

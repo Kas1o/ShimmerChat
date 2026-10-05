@@ -13,7 +13,7 @@ namespace ShimmerChat.Singletons
         private static readonly Assembly HostAssembly = typeof(Program).Assembly;
         private static readonly Assembly LibAssembly = typeof(IPluginInitializer).Assembly;
         private readonly IServiceProvider _serviceProvider;
-        private readonly List<AssemblyLoadContext> _pluginContexts = new();
+        private readonly List<PluginLoadContext> _pluginContexts = new();
         private readonly ILogger<PluginLoaderServiceV1> _logger;
 
         public PluginLoaderServiceV1(IServiceProvider serviceProvider, ILogger<PluginLoaderServiceV1> logger)
@@ -63,6 +63,34 @@ namespace ShimmerChat.Singletons
                     _logger.LogError(ex, "Plugin initializer {TypeName} failed: {Message}", type.FullName, ex.Message);
                 }
             }
+        }
+
+        /// <summary>
+        /// 收集所有声明了 "static" 字段的插件的静态资源映射，用于注册 /pluginstatic/{name} 静态文件路由。
+        /// URL 段重复时后者跳过（记录错误，不静默覆盖）。
+        /// </summary>
+        public IReadOnlyList<PluginStaticFileMapping> GetStaticFileMappings()
+        {
+            var mappings = new List<PluginStaticFileMapping>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var ctx in _pluginContexts)
+            {
+                if (string.IsNullOrEmpty(ctx.UrlName) || string.IsNullOrEmpty(ctx.StaticDirPath))
+                    continue;
+
+                if (!seen.Add(ctx.UrlName))
+                {
+                    _logger.LogError(
+                        "[PluginStatic] Duplicate plugin URL segment '{Segment}'; second plugin's static resources are skipped.",
+                        ctx.UrlName);
+                    continue;
+                }
+
+                mappings.Add(new PluginStaticFileMapping(ctx.UrlName, ctx.StaticDirPath!));
+            }
+
+            return mappings;
         }
 
         public List<Type> GetImplementingTypes(Type interfaceType)
@@ -168,4 +196,7 @@ namespace ShimmerChat.Singletons
             return types;
         }
     }
+
+    /// <summary>插件静态资源映射：/pluginstatic/{UrlSegment}/... → StaticDirPath。</summary>
+    public sealed record PluginStaticFileMapping(string UrlSegment, string StaticDirPath);
 }

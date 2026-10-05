@@ -39,7 +39,7 @@ namespace ShimmerChat.Singletons
             if (string.IsNullOrEmpty(content))
                 return (content, new List<RenderChangeRecord>());
 
-            IRenderModifierNode? root = ResolveRoot(agent)
+            IRenderModifierNode? root = ResolveRoot(agent, chat)
                 ?? CreateFallbackRoot();
 
             var env = new RenderEnv(content, _serializer, _kvData, chat, agent);
@@ -71,8 +71,14 @@ namespace ShimmerChat.Singletons
             }
         }
 
-        private IRenderModifierNode? ResolveRoot(Agent? agent)
+        private IRenderModifierNode? ResolveRoot(Agent? agent, Chat? chat = null)
         {
+            // 生成提供器渲染树覆盖：优先使用触发时盖印在 Chat 上的覆盖树
+            if (!string.IsNullOrEmpty(chat?.SourceRenderModifierTreeJson))
+            {
+                return _serializer.Deserialize(chat.SourceRenderModifierTreeJson) as IRenderModifierNode;
+            }
+
             if (agent != null && !string.IsNullOrEmpty(agent.RenderModifierTreeJson))
                 return _serializer.Deserialize(agent.RenderModifierTreeJson) as IRenderModifierNode;
 

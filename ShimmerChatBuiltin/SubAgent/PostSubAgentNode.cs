@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Newtonsoft.Json;
 using SharperLLM.Util;
 using ShimmerChatLib;
@@ -24,7 +25,10 @@ namespace ShimmerChatBuiltin.SubAgent
         [NodeProperty("prop.post_sub_agent.include_full_context", HintKey = "prop.post_sub_agent.include_full_context.hint")]
         public bool IncludeFullContext { get; set; } = false;
 
-        [NodeProperty("prop.post_sub_agent.shared_guid", HintKey = "prop.post_sub_agent.shared_guid.hint")]
+		[NodeProperty("prop.post_sub_agent.ai_output_as", HintKey = "prop.post_sub_agent.ai_output_as.hint")]
+		public PromptBuilder.From AIOutputAs { get; set; } = PromptBuilder.From.assistant;
+
+		[NodeProperty("prop.post_sub_agent.shared_guid", HintKey = "prop.post_sub_agent.shared_guid.hint")]
         public bool SharedGuid { get; set; } = false;
 
         public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
@@ -81,11 +85,18 @@ namespace ShimmerChatBuiltin.SubAgent
             chatMessages.Add(new Message
             {
                 message = new ChatMessage { Content = context.Env.ResponseText },
-                sender = Sender.User,
+                sender = AIOutputAs switch
+                {
+                    PromptBuilder.From.system => Sender.System,
+                    PromptBuilder.From.assistant => Sender.AI,
+                    PromptBuilder.From.user => Sender.User,
+                    PromptBuilder.From.tool_result => Sender.ToolResult,
+                    var x => x.ToString()
+                },
                 timestamp = DateTime.Now
             });
 
-            subEnv.Transient.SharedState["ChatMessages"] = chatMessages;
+            persistent.Chat.Messages = new ObservableCollection<Message>(chatMessages);
 
             // 2. 执行 SubAgent 修饰器树
             try
@@ -140,7 +151,7 @@ namespace ShimmerChatBuiltin.SubAgent
             }
 
             // 环境重建函数：每次工具调用后重执行修饰器树。
-            // 接收对话增量（assistant + tool_result），与种子消息合并后注入 SharedState。
+            // 接收对话增量（assistant + tool_result），与种子消息合并后写入虚拟 Chat 的 Messages。
             Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = async (conversation) =>
             {
                 var fullChatMessages = new List<Message>();
@@ -152,8 +163,8 @@ namespace ShimmerChatBuiltin.SubAgent
                     timestamp = DateTime.Now
                 }));
 
+                persistent.Chat.Messages = new ObservableCollection<Message>(fullChatMessages);
                 var newEnv = new PreGenerationEnv(persistent);
-                newEnv.Transient.SharedState["ChatMessages"] = fullChatMessages;
                 var newCtx = new PreNodeExecutionContext(newEnv, context.CancellationToken);
                 await rootNode.ExecuteAsync(newCtx);
                 return newEnv.Transient.Fragments.ToList();

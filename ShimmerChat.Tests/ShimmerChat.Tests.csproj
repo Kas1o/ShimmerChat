@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShimmerChat\ShimmerChat.csproj" />
+    <ProjectReference Include="..\ShimmerChatBuiltin\ShimmerChatBuiltin.csproj" />
   </ItemGroup>
 
 </Project>

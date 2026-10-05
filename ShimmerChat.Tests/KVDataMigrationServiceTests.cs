@@ -2,6 +2,7 @@ using FluentAssertions;
 using LiteDB;
 using Microsoft.Extensions.Logging;
 using ShimmerChat.Singletons;
+using System.IO;
 
 namespace ShimmerChat.Tests;
 
@@ -140,6 +141,81 @@ public class KVDataMigrationServiceTests : IDisposable
     {
         var count = _migrationService.SyncStorages();
         count.Should().Be(0);
+    }
+
+    /// <summary>
+    /// 直接插入带有显式 Value: null 字段的文档，模拟 LiteDB 中真实存在的 null 值条目
+    /// （BulkWrite(null) 会被 LiteDB 省略字段，反序列化后为空字符串而非 null）
+    /// </summary>
+    private void InsertRawNullValueEntry(string spaceId, string key)
+    {
+        _database.GetCollection("kvdata").Insert(new BsonDocument
+        {
+            ["_id"] = ObjectId.NewObjectId(),
+            ["SpaceId"] = spaceId,
+            ["Key"] = key,
+            ["Value"] = BsonValue.Null
+        });
+    }
+
+    [Fact]
+    public void MigrateToLocalFileStorage_SkipsNullValueEntriesAndContinues()
+    {
+        _liteDB.Write("s1", "k1", "v1");
+        InsertRawNullValueEntry("s2", "null_key");
+        _liteDB.Write("s3", "k1", "v3");
+
+        var count = _migrationService.MigrateToLocalFileStorage();
+
+        count.Should().Be(2);
+        _localFile.Read("s1", "k1").Should().Be("v1");
+        _localFile.Read("s3", "k1").Should().Be("v3");
+        _localFile.Read("s2", "null_key").Should().BeNull();
+    }
+
+    [Fact]
+    public void MigrateToLocalFileStorage_WithNullValueEntry_ClearSourceStillClears()
+    {
+        _liteDB.Write("s1", "k1", "v1");
+        InsertRawNullValueEntry("s2", "null_key");
+
+        var count = _migrationService.MigrateToLocalFileStorage(clearSource: true);
+
+        count.Should().Be(1);
+        _localFile.Read("s1", "k1").Should().Be("v1");
+        // null 是合法数据状态（非失败），不阻止清源；null 条目无法迁入文件存储，随源清空
+        _liteDB.GetAllKeys("s1").Should().BeEmpty();
+        _liteDB.GetAllKeys("s2").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SyncStorages_SkipsNullValueEntriesFromLiteDB()
+    {
+        _liteDB.Write("s1", "litedb_only", "litedb_val");
+        InsertRawNullValueEntry("s2", "null_key");
+
+        var count = _migrationService.SyncStorages();
+
+        count.Should().Be(1);
+        _localFile.Read("s1", "litedb_only").Should().Be("litedb_val");
+        _localFile.Read("s2", "null_key").Should().BeNull();
+    }
+
+    [Fact]
+    public void MigrateToLocalFileStorage_WriteFailure_ThrowsAndPreservesSource()
+    {
+        _liteDB.Write("s1", "k1", "v1");
+        _liteDB.Write("s2", "k2", "v2");
+        // 在目标文件存储中创建一个与数据文件同名的目录，使 File.WriteAllText 必然失败
+        Directory.CreateDirectory(Path.Combine(_localFile.RootPath, "s2", "k2.json"));
+
+        var act = () => _migrationService.MigrateToLocalFileStorage(clearSource: true);
+
+        // 迁移失败必须抛异常（fail-fast），调用方不得写入迁移标记
+        act.Should().Throw<InvalidOperationException>();
+        // 源数据保留：即使请求了 clearSource，失败时也不得清空 LiteDB
+        _liteDB.GetAllKeys("s1").Should().Contain("k1");
+        _liteDB.GetAllKeys("s2").Should().Contain("k2");
     }
 
     [Fact]

@@ -1,0 +1,214 @@
+@using Newtonsoft.Json
+@using ShimmerChatLib.Generation
+@inject ILocService Loc
+
+<div class="config-node-editor">
+    <div class="config-mode-bar">
+        <button class="config-mode-btn @(_isEditMode ? "config-mode-btn-active" : "")"
+                @onclick="() => _isEditMode = true">@Loc["editor.config.mode_edit"]</button>
+        <button class="config-mode-btn @(!_isEditMode ? "config-mode-btn-active" : "")"
+                @onclick="() => _isEditMode = false">@Loc["editor.config.mode_config"]</button>
+    </div>
+
+    @if (_parseError)
+    {
+        <div class="config-parse-error" title="@_parseErrorDetail">⚠ @Loc["editor.config.parse_error"]</div>
+    }
+    else if (_isEditMode)
+    {
+        <div class="config-edit">
+            @foreach (var item in _items)
+            {
+                <div class="config-item">
+                    <input class="ge-input config-name" value="@item.Name"
+                           placeholder="@Loc["editor.config.name"]"
+                           title="@Loc["editor.config.name"]"
+                           @oninput="e => OnNameChanged(item, e)" />
+                    <input class="ge-input config-key" value="@item.Key"
+                           placeholder="@Loc["editor.config.key.placeholder"]"
+                           title="@Loc["editor.config.key.hint"]"
+                           @oninput="e => OnKeyChanged(item, e)" />
+                    <select class="ge-select config-type" value="@item.ValueType.ToString()"
+                            @onchange="e => OnTypeChanged(item, e)">
+                        <option value="@SetValueType.String">@Loc["prop.set_value.value_type.string"]</option>
+                        <option value="@SetValueType.Int">@Loc["prop.set_value.value_type.int"]</option>
+                        <option value="@SetValueType.Float">@Loc["prop.set_value.value_type.float"]</option>
+                        <option value="@SetValueType.Bool">@Loc["prop.set_value.value_type.bool"]</option>
+                    </select>
+
+                    @if (item.ValueType == SetValueType.Bool)
+                    {
+                        <input type="checkbox" class="ge-check config-default-check"
+                               checked="@(bool.TryParse(item.DefaultValue, out var db) && db)"
+                               title="@Loc["editor.config.default"]"
+                               @onchange="e => OnBoolDefaultChanged(item, e)" />
+                    }
+                    else
+                    {
+                        <input type="@(item.ValueType == SetValueType.Int || item.ValueType == SetValueType.Float ? "number" : "text")"
+                               step="@(item.ValueType == SetValueType.Float ? "0.1" : null)"
+                               class="ge-input config-default"
+                               value="@item.DefaultValue"
+                               placeholder="@Loc["editor.config.default"]"
+                               title="@Loc["editor.config.default"]"
+                               @oninput="e => OnDefaultChanged(item, e)" />
+                    }
+
+                    <button class="config-remove" @onclick="() => RemoveItem(item)"
+                            title="@Loc["editor.config.remove"]">✕</button>
+                </div>
+            }
+            @if (_items.Count == 0)
+            {
+                <div class="config-empty">@Loc["editor.config.empty"]</div>
+            }
+            <button class="config-add" @onclick="AddItem">+ @Loc["editor.config.add_item"]</button>
+        </div>
+    }
+    else
+    {
+        <div class="config-values">
+            @foreach (var item in _items)
+            {
+                <div class="config-value-row">
+                    <div class="config-value-meta">
+                        <span class="config-value-name">@(string.IsNullOrWhiteSpace(item.Name) ? item.Key : item.Name)</span>
+                        @if (!string.IsNullOrWhiteSpace(item.Key))
+                        {
+                            <span class="config-value-key">@item.Key</span>
+                        }
+                    </div>
+                    <div class="config-value-input">
+                        @if (item.ValueType == SetValueType.Bool)
+                        {
+                            <input type="checkbox" class="ge-check"
+                                   checked="@EffectiveBool(item)"
+                                   title="@Loc["editor.config.value"]"
+                                   @onchange="e => OnBoolValueChanged(item, e)" />
+                        }
+                        else
+                        {
+                            <input type="@(item.ValueType == SetValueType.Int || item.ValueType == SetValueType.Float ? "number" : "text")"
+                                   step="@(item.ValueType == SetValueType.Float ? "0.1" : null)"
+                                   class="ge-input"
+                                   value="@item.Value"
+                                   placeholder="@item.DefaultValue"
+                                   title="@Loc["editor.config.value"]"
+                                   @oninput="e => OnValueChanged(item, e)" />
+                        }
+                    </div>
+                </div>
+            }
+            @if (_items.Count == 0)
+            {
+                <div class="config-empty">@Loc["editor.config.empty"]</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public ConfigNode Node { get; set; } = default!;
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
+
+    private List<ConfigItem> _items = new();
+    private string _loadedJson = "";
+    private bool _parseError;
+    private string _parseErrorDetail = "";
+    private bool _isEditMode = true;
+
+    protected override void OnParametersSet()
+    {
+        if (Node == null) return;
+        if (Node.ItemsJson != _loadedJson)
+            Reload();
+    }
+
+    private void Reload()
+    {
+        _loadedJson = Node.ItemsJson;
+        _parseError = false;
+        _parseErrorDetail = "";
+        _items = new List<ConfigItem>();
+
+        if (string.IsNullOrWhiteSpace(Node.ItemsJson)) return;
+
+        try
+        {
+            _items = JsonConvert.DeserializeObject<List<ConfigItem>>(Node.ItemsJson) ?? new List<ConfigItem>();
+        }
+        catch (Exception ex)
+        {
+            _parseError = true;
+            _parseErrorDetail = ex.Message;
+        }
+    }
+
+    private void Flush()
+    {
+        Node.ItemsJson = JsonConvert.SerializeObject(_items);
+        _loadedJson = Node.ItemsJson;
+    }
+
+    private void AddItem()
+    {
+        _items.Add(new ConfigItem());
+        Flush();
+    }
+
+    private void RemoveItem(ConfigItem item)
+    {
+        _items.Remove(item);
+        Flush();
+    }
+
+    private void OnNameChanged(ConfigItem item, ChangeEventArgs e)
+    {
+        item.Name = e.Value?.ToString() ?? "";
+        Flush();
+    }
+
+    private void OnKeyChanged(ConfigItem item, ChangeEventArgs e)
+    {
+        item.Key = e.Value?.ToString() ?? "";
+        Flush();
+    }
+
+    private void OnTypeChanged(ConfigItem item, ChangeEventArgs e)
+    {
+        if (Enum.TryParse<SetValueType>(e.Value?.ToString(), out var type))
+            item.ValueType = type;
+        Flush();
+    }
+
+    private void OnDefaultChanged(ConfigItem item, ChangeEventArgs e)
+    {
+        item.DefaultValue = e.Value?.ToString() ?? "";
+        Flush();
+    }
+
+    private void OnBoolDefaultChanged(ConfigItem item, ChangeEventArgs e)
+    {
+        item.DefaultValue = e.Value is bool b && b ? "true" : "false";
+        Flush();
+    }
+
+    private void OnValueChanged(ConfigItem item, ChangeEventArgs e)
+    {
+        item.Value = e.Value?.ToString() ?? "";
+        Flush();
+    }
+
+    private void OnBoolValueChanged(ConfigItem item, ChangeEventArgs e)
+    {
+        item.Value = e.Value is bool b && b ? "true" : "false";
+        Flush();
+    }
+
+    private static bool EffectiveBool(ConfigItem item)
+    {
+        if (bool.TryParse(item.Value, out var v)) return v;
+        return bool.TryParse(item.DefaultValue, out var d) && d;
+    }
+}

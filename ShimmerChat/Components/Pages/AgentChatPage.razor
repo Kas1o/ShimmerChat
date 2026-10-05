@@ -11,6 +11,7 @@
 @inject IKVDataService KVData
 @inject IMessageStoreService messageStore
 @inject ILocService Loc
+@inject IPanelDraftStore PanelDrafts
 @inject NavigationManager navigation
 @inject ILogger<AgentChatPage> logger
 @implements IAsyncDisposable
@@ -19,7 +20,7 @@
 @if (chat != null)
 {
 	<PageTitle> @($"{agent!.Name} | {chat.Name}")</PageTitle>
-	<div class="chat-page">
+	<div class="chat-page" style="@ChatPageBackgroundStyle">
 		<div class="chat-topbar">
 			<button class="chat-back" @onclick="BackToAgentPage">← @agent!.Name</button>
 			@if (session != null && session.Phase != null)
@@ -89,7 +90,7 @@
 			}
 		</div>
 	</div>
-	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.Guid" ChatGuid="chat.Guid" @ref="ChatPluginPanelContainer"/>
+	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.Guid" ChatGuid="chat.Guid" PanelContext="PanelContext" @ref="ChatPluginPanelContainer"/>
 }
 
 @if(chat == null)
@@ -132,6 +133,114 @@
 	bool isUserAtBottom = true;
 
 	ShimmerChat.Components.SubComponents.ChatPluginPanelContainer? ChatPluginPanelContainer;
+
+	private ShimmerChatLib.Panel.ChatPanelContext? _panelContext;
+	#endregion
+
+	#region 插件面板宿主契约
+
+	/// <summary>
+	/// 交给聊天插件面板的宿主上下文。页面只暴露这份契约，不传页面实例；
+	/// Chat / Agent 为页面正在使用的同一实例，因此面板读写即时可见。
+	/// </summary>
+	private ShimmerChatLib.Panel.ChatPanelContext? PanelContext => BuildPanelContext();
+
+	private ShimmerChatLib.Panel.ChatPanelContext? BuildPanelContext()
+	{
+		if (chat == null || agent == null) return null;
+
+		// Chat/Agent 变化（切换对话）时重建，保证面板拿到的是当前对话对象。
+		var key = $"{chat.Guid:N}|{agent.Guid:N}";
+		if (_panelContext != null && string.Equals(_panelContext.DraftKey, key, StringComparison.Ordinal))
+			return _panelContext;
+
+		_panelContext = new ShimmerChatLib.Panel.ChatPanelContext
+		{
+			Chat = chat,
+			Agent = agent,
+			MessageStore = messageStore,
+			DraftStore = PanelDrafts,
+			IsGenerating = () => session is { IsActive: true },
+			RequestRefreshAsync = () => InvokeAsync(StateHasChanged),
+			SendUserMessageAsync = SendUserMessageFromPanelAsync,
+			InsertIntoInputAsync = InsertIntoInputFromPanelAsync,
+			RegisterEventHandler = handler => ChatPluginPanelContainer?.RegisterEventHandler(handler)
+		};
+
+		return _panelContext;
+	}
+
+	/// <summary>
+	/// 面板在自己的界面内发送消息：与输入框回车走同一条路径
+	/// （写入 Chat → 持久化 → 通知会话与面板 → 启动生成）。
+	/// </summary>
+	private async Task<bool> SendUserMessageFromPanelAsync(string text)
+	{
+		if (chat == null || agent == null) return false;
+
+		if (session is { IsActive: true })
+		{
+			logger.LogInformation("[AgentChatPage] Panel send ignored: generation is already active.");
+			return false;
+		}
+
+		var message = new ShimmerChatLib.Message
+		{
+			message = new SharperLLM.Util.ChatMessage { Content = text },
+			timestamp = DateTime.Now,
+			sender = ShimmerChatLib.Sender.User
+		};
+
+		chat.AddMessage(message);
+		chat.SaveMessage(messageStore, message);
+		session?.NotifyUserMessageAdded(message);
+
+		GetDirty();
+		await InvokeAsync(StateHasChanged);
+
+		ReloadAgent();
+		sessionService.CancelPreviousGeneration(ChatGuid);
+		session = sessionService.GetOrCreateSession(ChatGuid, AgentGuid);
+		SubscribeToSession(session);
+		sessionService.StartGeneration(session, agent, chat, throwExceptionInsteadOfPopupErrorMessage);
+
+		return true;
+	}
+
+	/// <summary>面板请求把文本写入主输入框（不发送）。</summary>
+	private async Task<bool> InsertIntoInputFromPanelAsync(string text, bool append)
+	{
+		if (string.IsNullOrEmpty(text)) return false;
+
+		if (!append || string.IsNullOrWhiteSpace(inputText))
+			inputText = text;
+		else
+			inputText = inputText.TrimEnd() + "\n" + text;
+
+		await InvokeAsync(StateHasChanged);
+
+		try
+		{
+			await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
+		}
+		catch (Exception ex)
+		{
+			logger.LogDebug(ex, "[AgentChatPage] Input insert post-processing skipped.");
+		}
+
+		return true;
+	}
+	#endregion
+
+	#region 样式
+
+	/// <summary>
+	/// Agent 背景图的内联样式。无背景图（<see cref="Agent.BackgroundGuid"/> 为 null）时返回 null，
+	/// 保持默认主题背景。
+	/// </summary>
+	string? ChatPageBackgroundStyle => agent?.BackgroundGuid != null
+		? $"background-image: url('/userimages/{agent.BackgroundGuid}.png'); background-size: cover; background-position: center;"
+		: null;
 	#endregion
 
 	#region 交互
@@ -177,10 +286,10 @@
 	{
 		try
 		{
-			bool atBottom = await JS.InvokeAsync<bool>("isScrolledToBottom", ChatMainElement, 50);
-			if (isUserAtBottom != atBottom)
+			bool following = await JS.InvokeAsync<bool>("isChatAutoFollowing", ChatMainElement);
+			if (isUserAtBottom != following)
 			{
-				isUserAtBottom = atBottom;
+				isUserAtBottom = following;
 				await InvokeAsync(StateHasChanged);
 			}
 		}
@@ -190,7 +299,7 @@
 	{
 		try
 		{
-			await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+			await JS.InvokeVoidAsync("scrollToBottomManual", ChatMainElement);
 			isUserAtBottom = true;
 			await InvokeAsync(StateHasChanged);
 		}
@@ -203,6 +312,9 @@
 	{
 		if (chat == null || agent == null)
 			return;
+
+		// 重新读取 Agent，确保在其它连接中编辑的节点树 / 渲染树立即生效
+		ReloadAgent();
 
 		// 取消之前的生成
 		sessionService.CancelPreviousGeneration(ChatGuid);
@@ -265,6 +377,9 @@
 	{
 		await sessionService.StopGeneration(ChatGuid);
 
+		// 重新读取 Agent，确保在其它连接中编辑的节点树 / 渲染树立即生效
+		ReloadAgent();
+
 		int messageIndex = messages.IndexOf(message);
 		if (messageIndex == -1) return;
 
@@ -303,6 +418,9 @@
 	async Task ContinueFromMessage(Message message)
 	{
 		await sessionService.StopGeneration(ChatGuid);
+
+		// 重新读取 Agent，确保在其它连接中编辑的节点树 / 渲染树立即生效
+		ReloadAgent();
 
 		int messageIndex = messages.IndexOf(message);
 		if (messageIndex == -1) return;
@@ -371,17 +489,20 @@
 
 	private async void OnSessionError(string message, string title)
 	{
+		logger.LogError(title + message);
 		await popupService.ShowAsync(message, title);
 	}
 
-	private void OnSessionAgentMessageCompleted(Message msg)
+	private async void OnSessionAgentMessageCompleted(Message msg)
 	{
-		ChatPluginPanelContainer?.OnAgentMessage(msg);
+		// 会话事件在后台生成线程触发，须切回渲染线程再通知面板，
+		// 否则面板处理器与渲染线程的登记操作并发，可能破坏集合。
+		await InvokeAsync(() => ChatPluginPanelContainer?.OnAgentMessage(msg));
 	}
 
-	private void OnSessionToolResultAdded(Message msg)
+	private async void OnSessionToolResultAdded(Message msg)
 	{
-		ChatPluginPanelContainer?.OnToolCallResult(msg);
+		await InvokeAsync(() => ChatPluginPanelContainer?.OnToolCallResult(msg));
 	}
 
 	private async void OnSessionGenerationCompleted()
@@ -414,6 +535,35 @@
 		}
 	}
 
+	/// <summary>
+	/// 生成提供器创建的 Chat 不在 Agent.ChatGuids 中（记录在事件的
+	/// GeneratedChatGuids），通过 Chat 自身盖印的 ProviderSource 识别，
+	/// 允许从事件管理界面/提供者筛选列表直接打开。
+	/// </summary>
+	/// <remarks>
+	/// Chat 的来源身份（是否提供器生成）不会变化，缓存于页面实例避免
+	/// 每次参数变化都重新读取并反序列化 Chat。
+	/// </remarks>
+	private readonly Dictionary<Guid, bool> _providerChatCache = new();
+
+	private bool IsProviderGeneratedChat(Guid chatGuid)
+	{
+		if (_providerChatCache.TryGetValue(chatGuid, out var cached))
+			return cached;
+
+		bool isProvider;
+		try
+		{
+			isProvider = Chat.Load(chatGuid, KVData)?.ProviderSource != null;
+		}
+		catch (InvalidOperationException)
+		{
+			isProvider = false;
+		}
+		_providerChatCache[chatGuid] = isProvider;
+		return isProvider;
+	}
+
 	protected override async Task OnParametersSetAsync()
 	{
 		// 先取消旧会话订阅
@@ -430,7 +580,8 @@
 				agent = Agent.Load(guid, KVData);
 				if (agent != null)
 				{
-					if (Guid.TryParse(ChatGuid, out var chatGuid) && agent.ChatGuids.Contains(chatGuid))
+					if (Guid.TryParse(ChatGuid, out var chatGuid)
+						&& (agent.ChatGuids.Contains(chatGuid) || IsProviderGeneratedChat(chatGuid)))
 					{
 						// 检查是否有活跃的生成会话（从其他页面返回）
 						var existingSession = sessionService.GetSession(ChatGuid);
@@ -533,8 +684,30 @@
 		chat.Save(KVData);
 		if (agent != null)
 		{
-			agent.MoveChatToTop(chat.Guid);
-			agent.Save(KVData);
+			// 只更新 ChatGuids 顺序，避免整对象 Save 覆盖其它连接（如 Agent 编辑器）的并发编辑。
+			try
+			{
+				Agent.Update(agent.Guid, KVData, a => a.MoveChatToTop(chat.Guid));
+			}
+			catch (Exception ex)
+			{
+				logger.LogWarning(ex, "[AgentChatPage] Failed to persist chat order for agent {AgentGuid}: {Message}",
+					agent.Guid, ex.Message);
+			}
+		}
+	}
+
+	void ReloadAgent()
+	{
+		if (agent == null) return;
+		try
+		{
+			agent = Agent.Load(agent.Guid, KVData);
+		}
+		catch (Exception ex)
+		{
+			logger.LogWarning(ex, "[AgentChatPage] Failed to reload agent {AgentGuid}: {Message}",
+				agent.Guid, ex.Message);
 		}
 	}
 	async Task Refresh()

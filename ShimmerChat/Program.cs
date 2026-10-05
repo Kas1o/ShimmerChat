@@ -52,14 +52,21 @@ builder.Services.AddSingleton<IPostGenerationManagerService, PostGenerationManag
 builder.Services.AddSingleton<RenderModifierNodeSerializer>();
 builder.Services.AddSingleton<IRenderModifierManager, RenderModifierManager>();
 
+// 生成提供器系统（Agent 级生成事件：CRON / Hook / 聊天软件集成等）
+builder.Services.AddSingleton<IGenerationProviderRegistry, GenerationProviderRegistry>();
+builder.Services.AddSingleton<IGenerationEventStore, GenerationEventStore>();
+builder.Services.AddSingleton<GenerationProviderHostService>();
+builder.Services.AddSingleton<IProviderTriggerService>(sp => sp.GetRequiredService<GenerationProviderHostService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<GenerationProviderHostService>());
+
 builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
 builder.Services.AddSingleton<IPopupService, PopupService>(); // TODO: 大概需要改成 Scoped。
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();
+builder.Services.AddScoped<IPanelDraftStore, PanelDraftStore>();
 builder.Services.AddScoped<IThemeService, ThemeServiceV2>();
 builder.Services.AddSingleton<ILocService, LocService>();
-builder.Services.AddSingleton<IDebugOutputService, DebugOutputService>();
 
 var app = builder.Build();
 
@@ -71,6 +78,9 @@ ExecuteAgentMigration(app);
 
 // 执行插件初始化
 ExecutePluginInitializers(app);
+
+// 注册插件静态资源：/pluginstatic/{pluginName}/... → Plugins/{plugin}/www
+RegisterPluginStaticFiles(app);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -139,6 +149,36 @@ static void ExecutePluginInitializers(WebApplication app)
     }
 }
 
+// 为在 plugin.json 中声明了 "static" 字段的插件注册静态文件中间件
+static void RegisterPluginStaticFiles(WebApplication app)
+{
+    try
+    {
+        var loader = app.Services.GetRequiredService<IPluginLoaderService>() as PluginLoaderServiceV1;
+        var mappings = loader?.GetStaticFileMappings() ?? [];
+
+        foreach (var mapping in mappings)
+        {
+            if (!Directory.Exists(mapping.StaticDirPath))
+            {
+                Console.WriteLine($"[PluginStatic] {mapping.UrlSegment}: directory missing, skipped.");
+                continue;
+            }
+
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new PhysicalFileProvider(mapping.StaticDirPath),
+                RequestPath = $"/pluginstatic/{mapping.UrlSegment}"
+            });
+            Console.WriteLine($"[PluginStatic] /pluginstatic/{mapping.UrlSegment}/ -> {mapping.StaticDirPath}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[PluginStatic] Failed to register plugin static resources: {ex.Message}");
+    }
+}
+
 // 配置 KV 数据存储服务
 static void ConfigureKVDataStorage(WebApplicationBuilder builder)
 {
@@ -168,19 +208,27 @@ static void ConfigureKVDataStorage(WebApplicationBuilder builder)
     builder.Services.AddSingleton<LiteDBKVData>();
     builder.Services.AddSingleton<IKVDataMigrationService, KVDataMigrationService>();
 
-    // 根据配置注册 IKVDataService 和 IMessageStoreService 的实现
+    // 始终注册两种 DebugOutput 实现
+    builder.Services.AddSingleton<LiteDBDebugOutputService>();
+    builder.Services.AddSingleton<FileSystemDebugOutputService>();
+
+    // 根据配置注册 IKVDataService、IMessageStoreService 和 IDebugOutputService 的实现
     switch (config.GetStorageType())
     {
         case KVStorageType.LiteDB:
             Console.WriteLine("Using LiteDB for KV data storage");
+            Console.WriteLine("Using LiteDB for debug output");
             builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LiteDBKVData>());
             builder.Services.AddSingleton<IMessageStoreService>(sp => sp.GetRequiredService<LiteDBMessageStoreService>());
+            builder.Services.AddSingleton<IDebugOutputService>(sp => sp.GetRequiredService<LiteDBDebugOutputService>());
             break;
         case KVStorageType.LocalFileStorage:
         default:
             Console.WriteLine("Using LocalFileStorage for KV data storage");
+            Console.WriteLine("Using FileSystem for debug output");
             builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LocalFileStorageKVData>());
             builder.Services.AddSingleton<IMessageStoreService>(sp => sp.GetRequiredService<FileMessageStoreService>());
+            builder.Services.AddSingleton<IDebugOutputService>(sp => sp.GetRequiredService<FileSystemDebugOutputService>());
             break;
     }
 }
@@ -272,6 +320,9 @@ static void ExecuteAutoMigration(WebApplication app)
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Error during auto-migration: {ex.Message}");
+        Console.WriteLine($"Error during auto-migration: {ex}");
+        // 迁移失败属于数据完整性问题：不写迁移标记、中止启动，
+        // 避免应用在数据不一致的状态下运行
+        throw;
     }
 }

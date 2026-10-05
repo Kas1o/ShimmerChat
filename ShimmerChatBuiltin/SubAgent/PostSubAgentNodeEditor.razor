@@ -1,4 +1,5 @@
 @using Newtonsoft.Json
+@using SharperLLM.Util
 @using ShimmerChatBuiltin.SubAgent
 @inject ShimmerChatLib.Interface.IKVDataService KVData
 @inject ILocService Loc
@@ -56,6 +57,19 @@
                     <option value="LastMessage">LastMessage</option>
                     <option value="FullJson">FullJson</option>
                     <option value="None">None</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="ge-field">
+            <label class="ge-label" title="@Loc["prop.post_sub_agent.ai_output_as.hint"]">
+                @Loc["prop.post_sub_agent.ai_output_as"]
+            </label>
+            <div class="ge-value">
+                <select class="ge-select" @bind="Node.AIOutputAs" style="width: 100%; max-width: 400px;">
+                    <option value="@PromptBuilder.From.assistant">Assistant</option>
+                    <option value="@PromptBuilder.From.system">System</option>
+                    <option value="@PromptBuilder.From.user">User</option>
                 </select>
             </div>
         </div>

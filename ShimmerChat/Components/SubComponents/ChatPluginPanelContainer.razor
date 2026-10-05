@@ -35,12 +35,22 @@
 	[Parameter]
 	public Guid AgentGuid { get; set; }
 
+	/// <summary>
+	/// 宿主上下文：向内暴露当前 Chat / Agent 活对象、消息存储与页面能力方法。
+	/// 容器不接收页面实例，只接收这份契约，避免把页面引用泄漏给插件。
+	/// </summary>
+	[Parameter]
+	public ShimmerChatLib.Panel.ChatPanelContext? PanelContext { get; set; }
+
 	#pragma warning disable CS8974
 	private Dictionary<string, object> Parameters => new Dictionary<string, object>
 	{
+		// 旧参数：保持既有面板零改动迁移。
 		["ChatGuid"] = ChatGuid,
 		["AgentGuid"] = AgentGuid,
-		["EventHandlerReg"] = RegisterEventHandler
+		["EventHandlerReg"] = RegisterEventHandler,
+		// 新参数：面板通过契约访问活对象与页面能力。
+		["PanelContext"] = PanelContext!
 	};
 	#pragma warning restore CS8974
 
@@ -60,33 +70,53 @@
 		_isExpanded = !_isExpanded;
 	}
 
-	private void RegisterEventHandler(ShimmerChatLib.Panel.IChatPanelEventHandler eventHandler)
+	/// <summary>供宿主页面或面板登记事件处理器。</summary>
+	public void RegisterEventHandler(ShimmerChatLib.Panel.IChatPanelEventHandler eventHandler)
 	{
-		if(eventHandler != null)
-			EventHandlers.Add(eventHandler);
+		if (eventHandler == null)
+			return;
+
+		// 面板在每次 OnParametersSet 都会重新登记（DynamicComponent 每次渲染
+		// 都重设参数），若不去重会随渲染无限累积、同一处理器被重复调用。
+		// 登记发生在渲染线程，通知可能来自后台生成线程，故用锁保护。
+		lock (_eventHandlersLock)
+		{
+			if (!EventHandlers.Contains(eventHandler))
+				EventHandlers.Add(eventHandler);
+		}
 	}
 
+	readonly object _eventHandlersLock = new();
 	List<ShimmerChatLib.Panel.IChatPanelEventHandler> EventHandlers = [];
+
+	/// <summary>
+	/// 在锁内取快照后枚举，避免后台生成线程枚举时渲染线程登记新处理器
+	/// 触发 "Collection was modified"。
+	/// </summary>
+	private void NotifyEventHandlers(Action<ShimmerChatLib.Panel.IChatPanelEventHandler> action)
+	{
+		ShimmerChatLib.Panel.IChatPanelEventHandler[] snapshot;
+		lock (_eventHandlersLock)
+		{
+			snapshot = EventHandlers.ToArray();
+		}
+
+		foreach (var handler in snapshot)
+		{
+			action(handler);
+		}
+	}
 
 	public void OnToolCallResult(ShimmerChatLib.Message message)
 	{
-		foreach(var handler in EventHandlers)
-		{
-			handler.OnToolCallResult(message);
-		}
+		NotifyEventHandlers(h => h.OnToolCallResult(message));
 	}
 	public void OnUserMessage(ShimmerChatLib.Message message)
 	{
-		foreach (var handler in EventHandlers)
-		{
-			handler.OnUserMessage(message);
-		}
+		NotifyEventHandlers(h => h.OnUserMessage(message));
 	}
 	public void OnAgentMessage(ShimmerChatLib.Message message)
 	{
-		foreach (var handler in EventHandlers)
-		{
-			handler.OnAgentMessage(message);
-		}
+		NotifyEventHandlers(h => h.OnAgentMessage(message));
 	}
 }

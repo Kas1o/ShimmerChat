@@ -74,14 +74,44 @@ namespace ShimmerChat.Singletons
         public int MigrateToLocalFileStorage(bool clearSource = false)
         {
             int count = 0;
+            int skippedNull = 0;
 
             foreach (var spaceId in _liteDBStorage.GetAllSpaceIds())
             {
                 foreach (var entry in _liteDBStorage.GetAllEntries(spaceId))
                 {
-                    _localFileStorage.Write(entry.SpaceId, entry.Key, entry.Value);
-                    count++;
+                    // LiteDB 中可能存在 Value 为 null 的条目（如从未赋值的 apikey）。
+                    // null 是合法数据状态（键存在、值未赋值），文件存储不支持 null 值，
+                    // 直接跳过即可，不计为失败。
+                    if (entry.Value == null)
+                    {
+                        skippedNull++;
+                        continue;
+                    }
+
+                    try
+                    {
+                        _localFileStorage.Write(entry.SpaceId, entry.Key, entry.Value);
+                        count++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex,
+                            "Failed to migrate entry: SpaceId={SpaceId}, Key={Key}",
+                            entry.SpaceId, entry.Key);
+                        // 迁移失败立即中止：异常向上传播 → 不写迁移标记 → 下次启动重试；源数据保持完整
+                        throw new InvalidOperationException(
+                            $"Migration to LocalFileStorage failed at entry SpaceId={entry.SpaceId}, Key={entry.Key} after {count} entries migrated",
+                            ex);
+                    }
                 }
+            }
+
+            if (skippedNull > 0)
+            {
+                _logger.LogInformation(
+                    "Skipped {Skipped} entries with null value during migration (null is a valid state, file storage cannot hold it)",
+                    skippedNull);
             }
 
             if (clearSource)
@@ -100,6 +130,7 @@ namespace ShimmerChat.Singletons
         public int SyncStorages()
         {
             int count = 0;
+            int skippedNull = 0;
 
             // 从 LocalFileStorage 同步到 LiteDB
             foreach (var spaceId in _localFileStorage.GetAllSpaceIds())
@@ -120,6 +151,13 @@ namespace ShimmerChat.Singletons
             {
                 foreach (var entry in _liteDBStorage.GetAllEntries(spaceId))
                 {
+                    // null 是合法数据状态（键存在、值未赋值），文件存储不支持 null 值，直接跳过
+                    if (entry.Value == null)
+                    {
+                        skippedNull++;
+                        continue;
+                    }
+
                     var existing = _localFileStorage.Read(entry.SpaceId, entry.Key);
                     if (existing == null)
                     {
@@ -127,6 +165,13 @@ namespace ShimmerChat.Singletons
                         count++;
                     }
                 }
+            }
+
+            if (skippedNull > 0)
+            {
+                _logger.LogInformation(
+                    "Skipped {Skipped} entries with null value during sync (null is a valid state, file storage cannot hold it)",
+                    skippedNull);
             }
 
             _logger.LogInformation("Synced {Count} entries between storages", count);

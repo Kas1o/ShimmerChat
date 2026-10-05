@@ -122,7 +122,16 @@
     public Guid AgentGuid { get; set; }
 
     [Parameter]
-    public Action<IChatPanelEventHandler> EventHandlerReg { get;set; }
+    public Action<IChatPanelEventHandler>? EventHandlerReg { get;set; }
+
+    /// <summary>
+    /// 对话级宿主契约：活 Chat / Agent 对象与页面能力（不传页面实例）。
+    /// 占位参数，当前面板逻辑仍只依赖 ChatGuid / AgentGuid，
+    /// 后续迁移时可直接使用 <c>PanelContext.Chat</c> / <c>PanelContext.Draft</c>，
+    /// 从而去掉「按 Guid 重新加载」带来的快照不同步问题。
+    /// </summary>
+    [Parameter]
+    public ChatPanelContext? PanelContext { get; set; }
 
     private VariableSet _variables = new();
     private VariableScope _selectedScope = VariableScope.Chat;

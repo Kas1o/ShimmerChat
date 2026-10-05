@@ -38,6 +38,24 @@ namespace ShimmerChatLib
 		public string LastMessagePreview { get; set; } = string.Empty;
 		public int MessageCount { get; set; }
 
+		/// <summary>
+		/// 来源提供器类型名。null = 用户直接对话；
+		/// 非 null = 由生成提供器（CRON、Hook 等）创建的会话。
+		/// </summary>
+		public string? ProviderSource { get; set; }
+
+		/// <summary>
+		/// 来源生成事件 Id（与 <see cref="ProviderSource"/> 配套）
+		/// </summary>
+		public string? SourceEventId { get; set; }
+
+		/// <summary>
+		/// 触发时由提供器盖印的渲染修改树覆盖 JSON（null = 继承 Agent）。
+		/// 随 Chat 持久化，保证后续渲染始终使用生成时的树，
+		/// 不受事件配置后续修改影响。
+		/// </summary>
+		public string? SourceRenderModifierTreeJson { get; set; }
+
 		public Chat()
 		{
 			Messages = new ObservableCollection<Message>();

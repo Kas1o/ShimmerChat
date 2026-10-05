@@ -45,8 +45,11 @@
     [Parameter] public string Label { get; set; } = "";
     [Parameter] public ITreeNode? SlotNode { get; set; }
     [Parameter] public int Depth { get; set; }
-    [Parameter] public Action<ITreeNode>? OnSet { get; set; }
-    [Parameter] public Action? OnClear { get; set; }
+    // 用 EventCallback 而非 Action：槽位内容变更后需让父组件（IfNodeEditor / GenericNodeEditor）
+    // 自动重渲染以更新 SlotNode 参数。否则 SlotNode 参数保持旧值，
+    // 新增/删除/拖放节点都不会刷新（条件节点无自动刷新的根因）。
+    [Parameter] public EventCallback<ITreeNode?> OnSet { get; set; }
+    [Parameter] public EventCallback OnClear { get; set; }
     [Parameter] public Action<ITreeNode>? CopyMe { get; set; }
 
     [CascadingParameter] private TreeDragContext? DragContext { get; set; }
@@ -84,34 +87,34 @@
         _showAddPicker = false;
     }
 
-    private void AddChild(Type type)
+    private async Task AddChild(Type type)
     {
         _showAddPicker = false;
         var instance = EditorContext?.CreateNode(type);
         if (instance != null)
-            OnSet?.Invoke(instance);
-        InvokeAsync(StateHasChanged);
+            await OnSet.InvokeAsync(instance);
+        await InvokeAsync(StateHasChanged);
     }
 
-    private void PasteNode()
+    private async Task PasteNode()
     {
         var node = EditorContext?.Paste();
         if (node != null)
         {
-            OnSet?.Invoke(node);
-            InvokeAsync(StateHasChanged);
+            await OnSet.InvokeAsync(node);
+            await InvokeAsync(StateHasChanged);
         }
     }
 
-    private void RemoveSlot(ITreeNode _)
+    private void RemoveSlot(ITreeNode node)
     {
-        OnClear?.Invoke();
+        _ = OnClear.InvokeAsync();
         InvokeAsync(StateHasChanged);
     }
 
     private async Task RemoveSlotAsync()
     {
-        OnClear?.Invoke();
+        await OnClear.InvokeAsync();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -141,7 +144,7 @@
 
         try
         {
-            OnSet?.Invoke(dragged);
+            await OnSet.InvokeAsync(dragged);
             await DragContext.RemoveFromSource();
             DragContext.EndDrag();
         }

@@ -17,9 +17,11 @@ namespace ShimmerChatLib.Interface
         /// <param name="preFragments">前生成管线构建的 Fragments</param>
         /// <param name="persistentEnv">持久化环境</param>
         /// <param name="ct">取消令牌</param>
+        /// <param name="overrides">管线树覆盖（生成提供器场景），非空时替代 Agent 的后生成树</param>
         /// <returns>处理后的响应消息，失败时返回原始消息</returns>
         Task<ChatMessage> ExecuteAsync(Agent agent, ChatMessage responseMessage,
             IReadOnlyList<ContextSegment> preFragments,
-            PersistentEnv persistentEnv, CancellationToken ct = default);
+            PersistentEnv persistentEnv, CancellationToken ct = default,
+            PipelineTreeOverrides? overrides = null);
     }
 }

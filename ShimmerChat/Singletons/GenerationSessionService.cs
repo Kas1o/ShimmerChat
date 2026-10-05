@@ -126,9 +126,12 @@ public class GenerationSessionService
 
     /// <summary>
     /// 启动普通生成。会话持有 Chat/Agent 引用，消息操作直接作用在 Chat.Messages 上。
+    /// overrides 非空时用其树 JSON 替代 Agent 的管线树（生成提供器场景）。
+    /// externalCt 非空时与会话取消令牌链接：外部令牌取消（如提供器停止）会同时取消本次生成。
     /// </summary>
     public void StartGeneration(GenerationSession session, Agent agent, Chat chat,
-        bool throwExceptionInsteadOfPopup = false)
+        bool throwExceptionInsteadOfPopup = false, PipelineTreeOverrides? overrides = null,
+        CancellationToken externalCt = default)
     {
         if (session.IsActive)
         {
@@ -140,6 +143,7 @@ public class GenerationSessionService
         session.Chat = chat;
         session.Agent = agent;
         session.ResetCts();
+        session.LinkExternalToken(externalCt);
         session.IsActive = true;
         session.Phase = "pre";
         session.NotifyStateChanged();
@@ -147,7 +151,7 @@ public class GenerationSessionService
         var ct = session.Cts.Token;
         session.RunningTask = Task.Run(() =>
             RunGenerationLoop(session, agent, chat, continuationMessage: null,
-                throwExceptionInsteadOfPopup, ct));
+                throwExceptionInsteadOfPopup, overrides, ct));
     }
 
     /// <summary>
@@ -173,7 +177,7 @@ public class GenerationSessionService
         var ct = session.Cts.Token;
         session.RunningTask = Task.Run(() =>
             RunGenerationLoop(session, agent, chat, continuationMessage,
-                throwExceptionInsteadOfPopup, ct));
+                throwExceptionInsteadOfPopup, overrides: null, ct));
     }
 
     // ---- 生成主循环 ----
@@ -184,9 +188,15 @@ public class GenerationSessionService
         Chat chat,
         Message? continuationMessage,
         bool throwExceptionInsteadOfPopup,
+        PipelineTreeOverrides? overrides,
         CancellationToken ct)
     {
         string? originalContent = continuationMessage?.CurrentVersion?.Content;
+
+        // 每次开始新一轮生成都重新从持久化读取 Agent，避免长期驻留的对话页
+        // 持有过期副本，导致在其它连接中编辑的节点树 / 后处理树不生效。
+        agent = ReloadAgent(agent);
+        session.Agent = agent;
 
         try
         {
@@ -224,6 +234,7 @@ public class GenerationSessionService
                     session.NotifyStateChanged();
                     return Task.CompletedTask;
                 },
+                overrides: overrides,
                 cancellationToken: ct);
         }
         catch (OperationCanceledException)
@@ -237,6 +248,8 @@ public class GenerationSessionService
             {
                 msg.GenerationState = MessageGenerationState.Completed;
             }
+
+            _logger.LogError(ex.StackTrace);
 
             if (throwExceptionInsteadOfPopup)
                 throw;
@@ -252,6 +265,21 @@ public class GenerationSessionService
             GetDirty(chat, agent);
             session.NotifyStateChanged();
             session.NotifyGenerationCompleted();
+        }
+    }
+
+    private Agent ReloadAgent(Agent agent)
+    {
+        try
+        {
+            return Agent.Load(agent.Guid, _kvData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "[GenerationSessionService] Failed to reload agent {AgentGuid}, using in-memory copy: {Message}",
+                agent.Guid, ex.Message);
+            return agent;
         }
     }
 
@@ -383,7 +411,22 @@ public class GenerationSessionService
     {
         chat.LastModifyTime = DateTime.Now;
         chat.Save(_kvData);
-        agent.MoveChatToTop(chat.Guid);
-        agent.Save(_kvData);
+
+        // 提供器生成的 Chat 不在 Agent.ChatGuids 中（记录在事件的 GeneratedChatGuids），
+        // MoveChatToTop 对它是无操作，无需因此整写 Agent
+        if (chat.ProviderSource != null)
+            return;
+
+        // 只更新 ChatGuids 顺序，避免整对象 Save 覆盖其它连接（如 Agent 编辑器）的并发编辑。
+        try
+        {
+            Agent.Update(agent.Guid, _kvData, a => a.MoveChatToTop(chat.Guid));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "[GenerationSessionService] Failed to persist chat order for agent {AgentGuid}: {Message}",
+                agent.Guid, ex.Message);
+        }
     }
 }

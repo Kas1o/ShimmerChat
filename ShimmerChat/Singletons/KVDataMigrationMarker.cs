@@ -44,8 +44,8 @@ namespace ShimmerChat.Singletons
                 if (marker == null)
                     return false;
 
-                return marker.SourceStorage.Equals(sourceType.ToString(), StringComparison.OrdinalIgnoreCase)
-                    && marker.TargetStorage.Equals(targetType.ToString(), StringComparison.OrdinalIgnoreCase);
+                return string.Equals(marker.SourceStorage, sourceType.ToString(), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(marker.TargetStorage, targetType.ToString(), StringComparison.OrdinalIgnoreCase);
             }
             catch
             {

@@ -5,7 +5,8 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
 {
     /// <summary>
-    /// 从 SharedState["ChatMessages"] 读取对话消息列表，追加到 TransientEnv.Fragments。
+    /// 从 PersistentEnv.Chat.Messages 实时读取对话消息，追加到 TransientEnv.Fragments。
+    /// 直接读取 Chat 对象而非快照副本，树执行期间对 chat.Messages 的修改立即可见。
     /// 替代 GenerationManagerV2 中硬编码的 AppendChatHistory，让消息注入逻辑可配置。
     /// </summary>
     [NodeInfo("node.append_chat_messages", Icon = "💬", Color = "var(--node-fragment)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.append_chat_messages.desc")]
@@ -16,13 +17,9 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
-            var sharedState = context.Env.Transient.SharedState;
-            if (!sharedState.TryGetValue("ChatMessages", out var obj) || obj is not List<Message> messages)
-                return Task.FromResult(NodeResult.SuccessResult());
-
             var fragments = context.Env.Transient.Fragments;
 
-            foreach (var msg in messages)
+            foreach (var msg in context.Env.Persistent.Chat.Messages)
             {
                 if (msg.GenerationState == MessageGenerationState.Regenerating)
                     continue;
