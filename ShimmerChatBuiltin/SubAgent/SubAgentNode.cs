@@ -20,7 +20,7 @@ namespace ShimmerChatBuiltin.SubAgent
         public string OutputMode { get; set; } = "";
 
         [NodeProperty("prop.sub_agent.max_iterations", HintKey = "prop.sub_agent.max_iterations.hint")]
-        public int MaxIterations { get; set; } = 50;
+        public int MaxIterations { get; set; } = Int32.MaxValue;
 
         [NodeProperty("prop.sub_agent.shared_guid", HintKey = "prop.sub_agent.shared_guid.hint")]
         public bool SharedGuid { get; set; } = false;

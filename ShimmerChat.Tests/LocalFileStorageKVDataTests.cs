@@ -11,14 +11,16 @@ public class LocalFileStorageKVDataTests : IDisposable
 
     public LocalFileStorageKVDataTests()
     {
-        _kvData = new LocalFileStorageKVData(Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalFileStorageKVData>.Instance);
-        _kvDataRoot = _kvData.RootPath;
+        _kvDataRoot = Path.Combine(Path.GetTempPath(), "ShimmerChatTests", nameof(LocalFileStorageKVDataTests), Guid.NewGuid().ToString("N"));
+        _kvData = new LocalFileStorageKVData(Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalFileStorageKVData>.Instance, _kvDataRoot);
         _kvData.ClearAll();
     }
 
     public void Dispose()
     {
         _kvData.ClearAll();
+        if (Directory.Exists(_kvDataRoot))
+            Directory.Delete(_kvDataRoot, true);
     }
 
     [Fact]

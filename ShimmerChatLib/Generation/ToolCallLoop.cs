@@ -14,7 +14,7 @@ public class ToolCallLoop
         IChatCompletionClient api,
         IReadOnlyList<Tool> toolDefinitions,
         IToolCallLoopHost host,
-        int maxRounds = 50,
+        int maxRounds = Int32.MaxValue,
         bool continueOnToolError = false,
         CancellationToken ct = default)
     {

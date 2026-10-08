@@ -198,7 +198,7 @@ namespace ShimmerChatBuiltin.SubAgent
             try
             {
                 await loop.RunAsync(api, toolDefs, host,
-                    maxRounds: 50,
+                    maxRounds: Int32.MaxValue,
                     continueOnToolError: true,
                     ct: CancellationToken.None);
             }

@@ -11,19 +11,20 @@ public class KVDataMigrationServiceTests : IDisposable
     private readonly LiteDatabase _database;
     private readonly LiteDBKVData _liteDB;
     private readonly TestLocalFileStorage _localFile;
+    private readonly string _localFileRoot;
     private readonly KVDataMigrationService _migrationService;
 
-    private class TestLocalFileStorage(ILogger<LocalFileStorageKVData> logger)
-        : LocalFileStorageKVData(logger)
+    private class TestLocalFileStorage(ILogger<LocalFileStorageKVData> logger, string rootPath)
+        : LocalFileStorageKVData(logger, rootPath)
     {
-        public new string RootPath => base.RootPath;
     }
 
     public KVDataMigrationServiceTests()
     {
         _database = new LiteDatabase(":memory:");
         _liteDB = new LiteDBKVData(_database, Microsoft.Extensions.Logging.Abstractions.NullLogger<LiteDBKVData>.Instance);
-        _localFile = new TestLocalFileStorage(Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalFileStorageKVData>.Instance);
+        _localFileRoot = Path.Combine(Path.GetTempPath(), "ShimmerChatTests", nameof(KVDataMigrationServiceTests), Guid.NewGuid().ToString("N"));
+        _localFile = new TestLocalFileStorage(Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalFileStorageKVData>.Instance, _localFileRoot);
         _localFile.ClearAll();
         _migrationService = new KVDataMigrationService(_localFile, _liteDB, Microsoft.Extensions.Logging.Abstractions.NullLogger<KVDataMigrationService>.Instance);
     }
@@ -32,6 +33,8 @@ public class KVDataMigrationServiceTests : IDisposable
     {
         _database.Dispose();
         _localFile.ClearAll();
+        if (Directory.Exists(_localFileRoot))
+            Directory.Delete(_localFileRoot, true);
     }
 
     [Fact]
