@@ -132,6 +132,10 @@
 <button class="su-btn su-btn-primary" style="margin:16px 5px;" @onclick="SaveAll"
         disabled="@((_isAgentMode && _eventConfigError != null) || (!_isAgentMode && _activePreset?.Id == DefaultPresetId))">@Loc["Save"]</button>
 
+<!-- 浮动保存按钮：节点树较长时无需滚动到底部 -->
+<button class="ne-floating-save su-btn su-btn-primary" @onclick="SaveAll"
+        disabled="@((_isAgentMode && _eventConfigError != null) || (!_isAgentMode && _activePreset?.Id == DefaultPresetId))">@Loc["Save"]</button>
+
 @code {
     [Parameter] [SupplyParameterFromQuery] public string? agent { get; set; }
     [Parameter] [SupplyParameterFromQuery] public string? evt { get; set; }

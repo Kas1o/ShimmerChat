@@ -334,3 +334,15 @@
     outline: 1px dashed var(--su-accent);
     outline-offset: -1px;
 }
+
+/* ── Floating Save Button（三个节点编辑页面共用） ── */
+
+/* 固定在视口右下角，节点树很长时无需滚动到底部即可保存 */
+.ne-floating-save {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 900;
+    min-width: 96px;
+    box-shadow: var(--su-shadow-lg);
+}
