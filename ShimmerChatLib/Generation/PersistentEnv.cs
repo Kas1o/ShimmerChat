@@ -28,6 +28,12 @@ namespace ShimmerChatLib.Generation
         /// </summary>
         public required Agent Agent { get; init; }
 
+        /// <summary>
+        /// 图像附件解析服务。消息里的图像附件只有经过它才能变成请求可用的 Base64
+        /// （SharperLLM 侧不读文件），因此注入历史消息的节点依赖此字段。
+        /// </summary>
+        public IImageAttachmentService? ImageAttachments { get; init; }
+
         /// <summary>从 Chat 实例派生</summary>
         public Guid ChatGuid => Chat.Guid;
 

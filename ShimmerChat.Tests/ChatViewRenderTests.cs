@@ -27,6 +27,16 @@ public class ChatViewRenderTests
         message = new ChatMessage { Content = content }
     };
 
+    private static Message UserMessageWithImages(string content, int imageCount) => new()
+    {
+        sender = Sender.User,
+        timestamp = DateTime.Now,
+        message = new ChatMessage { Content = content },
+        Images = Enumerable.Range(0, imageCount)
+            .Select(_ => MessageImage.FromBase64("AAAA", "image/png"))
+            .ToList()
+    };
+
     private static Message AssistantMessage(string content, params (string id, string name)[] toolCalls) => new()
     {
         sender = Sender.AI,
@@ -62,6 +72,7 @@ public class ChatViewRenderTests
         IsGenerating = () => false,
         GenerationPhase = () => null,
         SendAsync = _ => Task.CompletedTask,
+        SendWithImagesAsync = (_, _) => Task.CompletedTask,
         StopGenerationAsync = () => Task.CompletedTask,
         DeleteMessageAsync = _ => Task.CompletedTask,
         DeleteMessagesFromAsync = _ => Task.CompletedTask,
@@ -112,11 +123,15 @@ public class ChatViewRenderTests
         var kv = new Mock<IKVDataService>();
         kv.Setup(k => k.Read(It.IsAny<string>(), It.IsAny<string>())).Returns((string?)null);
 
+        var images = new Mock<IImageAttachmentService>();
+        images.Setup(i => i.GetDisplayUrl(It.IsAny<MessageImage>())).Returns("/userimages/rendered.png");
+
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(display.Object);
         services.AddSingleton(loc.Object);
         services.AddSingleton(kv.Object);
+        services.AddSingleton(images.Object);
         services.AddSingleton(Mock.Of<IMessageStoreService>());
         services.AddSingleton(Mock.Of<IPopupService>());
         services.AddSingleton(Mock.Of<IJSRuntime>());
@@ -206,6 +221,26 @@ public class ChatViewRenderTests
         html.IndexOf("<summary class=\"tc-summary\">", StringComparison.Ordinal).Should().BeGreaterThan(activityIndex);
         html.IndexOf("read_file", StringComparison.Ordinal).Should().BeGreaterThan(activityIndex);
         html.IndexOf("grep", StringComparison.Ordinal).Should().BeGreaterThan(activityIndex);
+    }
+
+    [Fact]
+    public async Task StandardChatView_RendersEveryAttachedImage()
+    {
+        var html = await RenderAsync<StandardChatView>(
+            BuildContext(BuildChat(UserMessageWithImages("look at these", 2), AssistantMessage("nice"))));
+
+        CountOccurrences(html, "class=\"chat-msg-image\"").Should().Be(2);
+        CountOccurrences(html, "/userimages/rendered.png").Should().Be(2);
+        html.Should().Contain("look at these");
+    }
+
+    [Fact]
+    public async Task AggregatedChatView_RendersAttachedImagesOfUserMessages()
+    {
+        var html = await RenderAsync<AggregatedChatView>(
+            BuildContext(BuildChat(UserMessageWithImages("look at this", 1), AssistantMessage("nice"))));
+
+        CountOccurrences(html, "class=\"chat-msg-image\"").Should().Be(1);
     }
 
     [Fact]

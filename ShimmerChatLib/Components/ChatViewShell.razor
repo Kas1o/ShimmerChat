@@ -1,8 +1,11 @@
+@using Microsoft.Extensions.Logging
 @using ShimmerChatLib.ChatView
 @inject IJSRuntime JS
 @inject ILocService Loc
 @inject IKVDataService KVData
 @inject IPopupService PopupService
+@inject IImageAttachmentService ImageAttachments
+@inject ILogger<ChatViewShell> Logger
 @implements IDisposable
 
 @*
@@ -87,11 +90,13 @@
 	.chat-scroll-btn:hover { background: var(--su-surface-3); color: var(--su-text-0); }
 
 	/* ── Input area ───────────────────────────────── */
-	.chat-input {
+	.chat-input-wrap {
 		flex-shrink: 0; width: 100%; max-width: 768px; margin: 0 auto;
+	}
+	.chat-input {
 		padding: var(--su-space-4) var(--su-space-4) var(--su-space-6);
 		display: grid;
-		grid-template-columns: 1fr auto;
+		grid-template-columns: auto 1fr auto;
 		align-items: end;
 		gap: var(--su-space-2);
 	}
@@ -119,6 +124,59 @@
 		display: flex; align-items: center; justify-content: center;
 		transition: background var(--su-transition), transform var(--su-transition);
 	}
+	/* ── Image attachment (upload button + previews) ── */
+	.chat-input-attach {
+		position: relative; flex-shrink: 0;
+		width: 38px; height: 38px;
+		border: var(--su-border-size) solid var(--su-border-0);
+		border-radius: 50%;
+		background: var(--su-surface-1);
+		color: var(--su-text-2); cursor: pointer;
+		display: flex; align-items: center; justify-content: center;
+		transition: color var(--su-transition), background var(--su-transition), border-color var(--su-transition);
+	}
+	.chat-input-attach:hover { color: var(--su-accent); border-color: var(--su-accent); }
+	/* 真正的 file input 覆盖整个按钮：无需 JS 触发点击，鼠标 / 触屏 / 键盘都能用 */
+	.chat-input-attach input[type=file] {
+		position: absolute; inset: 0; width: 100%; height: 100%;
+		opacity: 0; cursor: pointer;
+	}
+	.chat-input-attachments {
+		display: flex; flex-wrap: wrap; align-items: center;
+		gap: var(--su-space-2);
+		padding: var(--su-space-4) var(--su-space-4) 0;
+	}
+	.chat-attachment {
+		position: relative;
+		width: 64px; height: 64px;
+		border: var(--su-border-size) solid var(--su-border-0);
+		border-radius: var(--su-radius-md);
+		background: var(--su-surface-1);
+		overflow: hidden;
+	}
+	.chat-attachment img { width: 100%; height: 100%; object-fit: cover; display: block; }
+	.chat-attachment-remove {
+		position: absolute; top: 2px; right: 2px;
+		width: 18px; height: 18px; border: none; border-radius: 50%;
+		background: rgba(0, 0, 0, 0.55); color: #fff;
+		font-size: 12px; line-height: 1; cursor: pointer;
+		display: flex; align-items: center; justify-content: center;
+	}
+	.chat-attachment-remove:hover { background: var(--su-danger); }
+	.chat-attachment-hint { font-size: var(--su-font-xs); color: var(--su-text-2); }
+
+	/* ── Images inside a message bubble ─────────────── */
+	.chat-msg-images {
+		display: flex; flex-wrap: wrap; gap: var(--su-space-2);
+		margin-bottom: var(--su-space-2);
+	}
+	.chat-msg-image {
+		display: block;
+		max-width: 240px; max-height: 240px;
+		border-radius: var(--su-radius-md);
+	}
+	.chat-msg-image-missing { font-size: var(--su-font-xs); color: var(--su-danger); }
+
 	.chat-input-send { background: var(--su-accent); color: #fff; }
 	.chat-input-send:hover:not(:disabled) { background: var(--su-accent-hover); transform: scale(1.05); }
 	.chat-input-send:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -334,24 +392,59 @@
 		</button>
 	}
 
-	<div class="chat-input">
-		<textarea @ref="inputArea"
-			value="@inputText" @oninput="OnInputResize"
-			@onkeydown="@(e => CheckEnter(e))"
-			placeholder="@Loc["chat.input_placeholder"]"
-			rows="1"></textarea>
-		@if (ViewContext.IsGenerating())
+	<div class="chat-input-wrap">
+		@if (pendingImages.Count > 0 || uploadingImages)
 		{
-			<button class="chat-input-stop" @onclick="StopGenerationAsync" title="@Loc["chat.stop_generation"]">
-				<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>
-			</button>
+			<div class="chat-input-attachments">
+				@foreach (var image in pendingImages)
+				{
+					<div class="chat-attachment">
+						@if (ImageAttachments.GetDisplayUrl(image) is string previewUrl)
+						{
+							<img src="@previewUrl" alt="@Loc["chat.attached_image"]" />
+						}
+						<button type="button" class="chat-attachment-remove"
+							@onclick="() => RemovePendingImage(image)"
+							title="@Loc["chat.remove_image"]">×</button>
+					</div>
+				}
+				@if (uploadingImages)
+				{
+					<span class="chat-attachment-hint">@Loc["chat.image_uploading"]</span>
+				}
+			</div>
 		}
-		else
-		{
-			<button class="chat-input-send" @onclick="SendAsync" disabled="@(string.IsNullOrWhiteSpace(inputText))" title="@Loc["chat.send"]">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
-			</button>
-		}
+
+		<div class="chat-input">
+			<label class="chat-input-attach" title="@Loc["chat.attach_image"]">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+					<circle cx="8.5" cy="8.5" r="1.5"/>
+					<path d="M21 15l-5-5L5 21"/>
+				</svg>
+				<InputFile OnChange="OnImagesSelected"
+					multiple
+					accept="@SupportedImageAccept"
+					disabled="@ViewContext.IsGenerating()" />
+			</label>
+			<textarea @ref="inputArea"
+				value="@inputText" @oninput="OnInputResize"
+				@onkeydown="@(e => CheckEnter(e))"
+				placeholder="@Loc["chat.input_placeholder"]"
+				rows="1"></textarea>
+			@if (ViewContext.IsGenerating())
+			{
+				<button class="chat-input-stop" @onclick="StopGenerationAsync" title="@Loc["chat.stop_generation"]">
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>
+				</button>
+			}
+			else
+			{
+				<button class="chat-input-send" @onclick="SendAsync" disabled="@(!CanSend)" title="@Loc["chat.send"]">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+				</button>
+			}
+		</div>
 	</div>
 </div>
 
@@ -380,7 +473,27 @@
 	private ChatViewContext? _subscribedContext;
 	private Func<string, bool, Task<bool>>? _inputInsertHandler;
 
+	/// <summary>单条消息最多携带的图像数量。</summary>
+	private const int MaxImagesPerMessage = 5;
+
+	/// <summary>单张图像的字节上限（SignalR 已放开到 50MiB，这里只做合理限制）。</summary>
+	private const long MaxImageBytes = 20L * 1024 * 1024;
+
+	/// <summary>允许选择的图像格式，与 <see cref="IImageAttachmentService"/> 支持的格式一致。</summary>
+	private const string SupportedImageAccept = "image/png,image/jpeg,image/webp,image/gif";
+
+	private static readonly string[] SupportedImageTypes = SupportedImageAccept.Split(',');
+
+	/// <summary>已准备随下一条消息发送的图像附件（上传成功后立即生效）。</summary>
+	private readonly List<MessageImage> pendingImages = new();
+
+	private bool uploadingImages;
+
 	private string? currentPhase => ViewContext.GenerationPhase();
+
+	/// <summary>文本与图像都为空（或仍在上传）时不允许发送。</summary>
+	private bool CanSend => !uploadingImages
+		&& (!string.IsNullOrWhiteSpace(inputText) || pendingImages.Count > 0);
 
 	private string PhaseLabel => currentPhase switch
 	{
@@ -414,6 +527,9 @@
 					_subscribedContext.InputInsertHandler = null;
 			}
 
+			// 切换对话时丢弃待发送的图像，避免把它们发到另一个对话里
+			DiscardPendingImages();
+
 			_subscribedContext = ViewContext;
 			if (_subscribedContext != null)
 			{
@@ -438,6 +554,8 @@
 
 	public void Dispose()
 	{
+		DiscardPendingImages();
+
 		if (_subscribedContext == null) return;
 
 		_subscribedContext.ScrollToBottomRequested -= OnScrollToBottomRequested;
@@ -482,8 +600,95 @@
 	{
 		// 允许空输入：宿主会跳过新增用户消息、直接重新生成（与 Enter 空输入的老行为一致）。
 		var text = inputText;
+		var images = pendingImages.ToList();
 		inputText = "";
-		await ViewContext.SendAsync(text);
+		pendingImages.Clear();
+
+		if (images.Count > 0)
+			await ViewContext.SendWithImagesAsync(text, images);
+		else
+			await ViewContext.SendAsync(text);
+	}
+
+	/// <summary>
+	/// 处理用户选择的图像：逐个存储（按当前存储方式落盘或内联进消息），
+	/// 失败的图像会被跳过并明确提示，成功的图像加入待发送列表。
+	/// </summary>
+	private async Task OnImagesSelected(InputFileChangeEventArgs e)
+	{
+		IReadOnlyList<IBrowserFile> files;
+		try
+		{
+			files = e.GetMultipleFiles(MaxImagesPerMessage);
+		}
+		catch (InvalidOperationException)
+		{
+			await PopupService.ShowAsync(
+				Loc.Format("chat.image_count_exceeded", MaxImagesPerMessage),
+				Loc["chat.image_upload_failed_title"]);
+			return;
+		}
+
+		uploadingImages = true;
+		await InvokeAsync(StateHasChanged);
+
+		try
+		{
+			foreach (var file in files)
+			{
+				if (!SupportedImageTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
+				{
+					await PopupService.ShowAsync(
+						Loc.Format("chat.image_type_unsupported", file.ContentType),
+						Loc["chat.image_upload_failed_title"]);
+					continue;
+				}
+
+				if (file.Size > MaxImageBytes)
+				{
+					await PopupService.ShowAsync(
+						Loc.Format("chat.image_too_large", file.Name, MaxImageBytes / 1024 / 1024),
+						Loc["chat.image_upload_failed_title"]);
+					continue;
+				}
+
+				try
+				{
+					await using var stream = file.OpenReadStream(MaxImageBytes);
+					pendingImages.Add(await ImageAttachments.SaveAsync(stream, file.ContentType));
+				}
+				catch (Exception ex)
+				{
+					Logger.LogError(ex, "[ChatViewShell] Failed to store uploaded image {FileName} ({ContentType}).",
+						file.Name, file.ContentType);
+					await PopupService.ShowAsync(
+						Loc.Format("chat.image_upload_failed", file.Name),
+						Loc["chat.image_upload_failed_title"]);
+				}
+			}
+		}
+		finally
+		{
+			uploadingImages = false;
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private void RemovePendingImage(MessageImage image)
+	{
+		pendingImages.Remove(image);
+		ImageAttachments.DeleteStoredFile(image);
+	}
+
+	/// <summary>
+	/// 丢弃全部待发送图像（切换对话 / 界面卸载）并清理已落盘的文件：
+	/// 这些图像还没有被任何消息引用，留着就是永远没人用的孤儿文件。
+	/// </summary>
+	private void DiscardPendingImages()
+	{
+		foreach (var image in pendingImages)
+			ImageAttachments.DeleteStoredFile(image);
+		pendingImages.Clear();
 	}
 
 	private async Task StopGenerationAsync()

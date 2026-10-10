@@ -63,6 +63,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<GenerationProvider
 builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
 builder.Services.AddSingleton<IChatViewRegistry, ChatViewRegistry>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
+builder.Services.AddSingleton<IImageAttachmentService, ImageAttachmentService>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();
 builder.Services.AddSingleton<IPopupService, PopupService>(); // TODO: 大概需要改成 Scoped。
 builder.Services.AddSingleton<IMessageDisplayService, MessageDisplayServiceV1>();

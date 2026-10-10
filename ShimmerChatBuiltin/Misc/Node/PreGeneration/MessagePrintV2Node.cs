@@ -100,21 +100,24 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
                 AppendLabeledValue(sb, "  Content", displayValue, Colorize ? LabelColor : null, Colorize ? ContentColor : null, Colorize);
             }
 
-            if (!IgnoreNullProperties || !string.IsNullOrEmpty(message.ImageBase64))
+            if (!IgnoreNullProperties || message.Images is { Count: > 0 })
             {
                 string displayValue;
-                if (string.IsNullOrEmpty(message.ImageBase64))
+                if (message.Images is not { Count: > 0 })
                 {
                     displayValue = IgnoreNullProperties ? "" : "(null)";
                 }
                 else
                 {
-                    displayValue = $"[Image: {message.ImageBase64.Length} chars]";
+                    displayValue = string.Join(", ", message.Images.Select(image =>
+                        string.IsNullOrEmpty(image.Base64)
+                            ? $"[Image: {image.MimeType}, no data]"
+                            : $"[Image: {image.MimeType}, {image.Base64.Length} chars]"));
                 }
 
                 if (!string.IsNullOrEmpty(displayValue))
                 {
-                    AppendLabeledValue(sb, "  Image", displayValue, Colorize ? LabelColor : null, Colorize ? "\x1b[95m" : null, Colorize);
+                    AppendLabeledValue(sb, "  Images", displayValue, Colorize ? LabelColor : null, Colorize ? "\x1b[95m" : null, Colorize);
                 }
             }
 

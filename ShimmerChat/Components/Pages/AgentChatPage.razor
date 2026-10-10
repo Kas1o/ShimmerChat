@@ -129,7 +129,8 @@
 		Agent = currentAgent,
 		IsGenerating = () => session is { IsActive: true },
 		GenerationPhase = () => session?.Phase,
-		SendAsync = SendUserMessageAsync,
+		SendAsync = text => SendUserMessageAsync(text, null),
+		SendWithImagesAsync = SendUserMessageAsync,
 		StopGenerationAsync = StopGenerationAsync,
 		DeleteMessageAsync = DeleteMessage,
 		DeleteMessagesFromAsync = DeleteMessagesFrom,
@@ -192,7 +193,7 @@
 			return false;
 		}
 
-		await SendUserMessageAsync(text);
+		await SendUserMessageAsync(text, null);
 		return true;
 	}
 
@@ -217,9 +218,9 @@
 
 	#region 逻辑
 	/// <summary>
-	/// 发送用户消息并启动生成。空文本表示不新增用户消息，仅重新生成。
+	/// 发送用户消息并启动生成。文本与图像都为空表示不新增用户消息，仅重新生成。
 	/// </summary>
-	async Task SendUserMessageAsync(string text)
+	async Task SendUserMessageAsync(string text, IReadOnlyList<MessageImage>? images)
 	{
 		if (chat == null || agent == null)
 			return;
@@ -231,11 +232,12 @@
 		sessionService.CancelPreviousGeneration(ChatGuid);
 
 		// 添加用户消息
-		if (!string.IsNullOrWhiteSpace(text))
+		if (!string.IsNullOrWhiteSpace(text) || images is { Count: > 0 })
 		{
 			var message = new Message()
 			{
 				message = new SharperLLM.Util.ChatMessage { Content = text },
+				Images = images is { Count: > 0 } ? images.ToList() : null,
 				timestamp = DateTime.Now,
 				sender = ShimmerChatLib.Sender.User
 			};
@@ -301,6 +303,7 @@
 		var currentThinking = message.CurrentVersion?.thinking ?? "";
 		var currentToolCalls = message.CurrentVersion?.toolCalls;
 
+		// 图像附件挂在 Message 上（与版本无关），因此这里只搬运文本版本
 		if (!string.IsNullOrEmpty(currentContent))
 		{
 			var versionMessage = new SharperLLM.Util.ChatMessage

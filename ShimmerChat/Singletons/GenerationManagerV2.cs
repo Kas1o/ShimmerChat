@@ -26,6 +26,7 @@ namespace ShimmerChat.Singletons
         private readonly IPostGenerationManagerService _postManager;
         private readonly ILocService _locService;
         private readonly IDebugOutputService _debugOutput;
+        private readonly IImageAttachmentService _imageAttachments;
         private readonly GenerationTreeExecutor _executor = new();
         private readonly ToolCallLoop _loop = new();
         private readonly ILogger<GenerationManagerV2> _logger;
@@ -33,6 +34,7 @@ namespace ShimmerChat.Singletons
         public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry,
             IPreGenerationNodeSerializer serializer, IPostGenerationManagerService postManager,
             ILocService locService, IDebugOutputService debugOutput,
+            IImageAttachmentService imageAttachments,
             ILogger<GenerationManagerV2> logger)
         {
             _kvData = kvData;
@@ -41,6 +43,7 @@ namespace ShimmerChat.Singletons
             _postManager = postManager;
             _locService = locService;
             _debugOutput = debugOutput;
+            _imageAttachments = imageAttachments;
             _logger = logger;
             EnsureDefaultPreset();
         }
@@ -165,6 +168,7 @@ namespace ShimmerChat.Singletons
                 LocService = _locService,
                 DebugOutput = _debugOutput,
                 PostGenerationManager = _postManager,
+                ImageAttachments = _imageAttachments,
                 Chat = chat,
                 Agent = agent
             };

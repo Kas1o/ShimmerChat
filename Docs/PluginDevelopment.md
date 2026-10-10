@@ -613,7 +613,8 @@ if (PanelContext is LiveAgentPanelContext live)
 |------|------|
 | `Chat` / `Agent` / `Messages` | 与宿主同一实例的活对象，读写即时可见 |
 | `IsGenerating()` / `GenerationPhase()` | 生成状态（每次读取取宿主实时值） |
-| `SendAsync(text)` / `StopGenerationAsync()` | 发送消息（启动生成）/ 停止生成 |
+| `SendAsync(text)` / `SendWithImagesAsync(text, images)` | 发送消息（启动生成）；带图版本接收已持久化的 `MessageImage` 附件列表，文本可为空 |
+| `StopGenerationAsync()` | 停止生成 |
 | `DeleteMessageAsync` / `DeleteMessagesFromAsync` | 删除单条 / 从此处删除后续消息 |
 | `RegenerateFromAsync` / `ContinueFromAsync` | 重新生成 / 续写 |
 | `MarkDirty()` / `RequestRefreshAsync()` | 持久化 / 请求宿主重绘 |

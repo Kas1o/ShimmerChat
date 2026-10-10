@@ -5,6 +5,7 @@
 @inject IKVDataService KVData
 @inject IMessageStoreService MessageStore
 @inject IMessageDisplayService MessageDisplayService
+@inject IImageAttachmentService ImageAttachments
 @implements IDisposable
 
 @*
@@ -82,6 +83,23 @@
 			</details>
 		}
 
+		@if (CurrentImages.Count > 0)
+		{
+			<div class="chat-msg-images">
+				@foreach (var image in CurrentImages)
+				{
+					@if (ImageAttachments.GetDisplayUrl(image) is string imageUrl)
+					{
+						<img class="chat-msg-image" src="@imageUrl" alt="@Loc["chat.attached_image"]" loading="lazy" />
+					}
+					else
+					{
+						<span class="chat-msg-image-missing">@Loc["chat.image_unavailable"]</span>
+					}
+				}
+			</div>
+		}
+
 		@if (message.sender == ShimmerChatLib.Sender.ToolResult)
 		{
 			<details class="chat-msg-tool-result" open="@(!_toolResultCollapsed)">
@@ -153,6 +171,11 @@
 
 	private ChatMessage CurrentMessageContent => message.CurrentVersion;
 	private string stringContent => CurrentMessageContent?.Content ?? string.Empty;
+
+	/// <summary>消息携带的图像附件（无图像时为空）。附件与版本无关，切换版本不影响显示。</summary>
+	private IReadOnlyList<MessageImage> CurrentImages =>
+		(IReadOnlyList<MessageImage>?)message.Images ?? Array.Empty<MessageImage>();
+
 	private MarkupString DisplayContent => MessageDisplayService.Render(stringContent, Context.Chat, Context.Agent);
 	private MarkupString DisplayThinking => MessageDisplayService.Render(CurrentMessageContent?.thinking ?? string.Empty, Context.Chat, Context.Agent);
 

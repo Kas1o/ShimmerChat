@@ -46,6 +46,17 @@
 	<input type="text" class="su-input" id="username" @bind="_UserName" />
 </div>
 
+<div class="su-group">
+	<h4>@Loc["misc.image_settings"]</h4>
+
+	<label for="image-storage-mode">@Loc["misc.image_storage_mode"]</label>
+	<select class="su-input" id="image-storage-mode" @bind="_ImageStorageMode">
+		<option value="@nameof(ImageStorageMode.UserUploadImage)">@Loc["misc.image_storage_userupload"]</option>
+		<option value="@nameof(ImageStorageMode.MessageBase64)">@Loc["misc.image_storage_base64"]</option>
+	</select>
+	<p>@Loc["misc.image_storage_hint"]</p>
+</div>
+
 @code {
 	private bool _throwExceptionInsteadOfPopupErrorMessage
 	{
@@ -102,6 +113,18 @@
 		}
 	} = true;
 
+	/// <summary>图像存储方式；取枚举名字符串，与 <see cref="IImageAttachmentService"/> 读取的值一致。</summary>
+	private string _ImageStorageMode
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = nameof(ImageStorageMode.UserUploadImage);
+
 	private bool _thinkingCollapsed
 	{
 		get => field;
@@ -149,6 +172,7 @@
 		KVData.Write("App", "thinking_collapsed", _thinkingCollapsed ? "true" : "false");
 		KVData.Write("App", "toolcall_collapsed", _toolCallCollapsed ? "true" : "false");
 		KVData.Write("App", "toolresult_collapsed", _toolResultCollapsed ? "true" : "false");
+		KVData.Write("App", ImageAttachmentService.StorageModeKey, _ImageStorageMode);
 		KVData.Write("User", "username", _UserName);
 	}
 
@@ -181,6 +205,8 @@
 			_toolResultCollapsed = toolResultCollapsed;
 		}
 		_UserName = KVData.Read("User", "username") ?? "";
+		_ImageStorageMode = KVData.Read("App", ImageAttachmentService.StorageModeKey)
+			?? nameof(ImageStorageMode.UserUploadImage);
 		Initialized = true;
 	}
 

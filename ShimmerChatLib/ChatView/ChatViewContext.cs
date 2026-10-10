@@ -34,8 +34,15 @@ namespace ShimmerChatLib.ChatView
 		/// <summary>当前生成阶段 pre / gen / post；null 表示未在生成。</summary>
 		public required Func<string?> GenerationPhase { get; init; }
 
-		/// <summary>发送一条用户消息并启动生成（等价于用户在输入框回车）。</summary>
+		/// <summary>发送一条纯文本用户消息并启动生成（等价于用户在输入框回车）。</summary>
 		public required Func<string, Task> SendAsync { get; init; }
+
+		/// <summary>
+		/// 发送一条带图像的用户消息并启动生成。图像为空时等价于 <see cref="SendAsync"/>；
+		/// 文本为空但存在图像时同样发送（仅携带图像）。
+		/// 传入的是界面已持久化的图像附件，如何解析成请求内容由宿主负责。
+		/// </summary>
+		public required Func<string, IReadOnlyList<MessageImage>, Task> SendWithImagesAsync { get; init; }
 
 		/// <summary>停止当前生成。</summary>
 		public required Func<Task> StopGenerationAsync { get; init; }

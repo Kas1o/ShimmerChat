@@ -94,6 +94,12 @@ namespace ShimmerChatLib
         
         public required DateTime timestamp { get; set; } // The timestamp of the message
         public required string sender { get; set; } // The sender of the message
+
+        /// <summary>
+        /// 消息携带的图像附件（与版本无关：重新生成、切换版本都保留）。
+        /// 存储方式由 <c>IImageAttachmentService</c> 决定，可能是内联 Base64 或文件名引用。
+        /// </summary>
+        public List<MessageImage>? Images { get; set; } = null;
         
         // 生成状态属性（替代原来的 IsStreaming）
         private MessageGenerationState _generationState = MessageGenerationState.Completed;
