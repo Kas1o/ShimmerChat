@@ -78,6 +78,7 @@ public class ChatViewRenderTests
         DeleteMessagesFromAsync = _ => Task.CompletedTask,
         RegenerateFromAsync = _ => Task.CompletedTask,
         ContinueFromAsync = _ => Task.CompletedTask,
+        RenameAsync = _ => Task.FromResult(true),
         MarkDirty = () => { },
         RequestRefreshAsync = () => Task.CompletedTask,
         NavigateBackAsync = () => Task.CompletedTask
@@ -221,6 +222,34 @@ public class ChatViewRenderTests
         html.IndexOf("<summary class=\"tc-summary\">", StringComparison.Ordinal).Should().BeGreaterThan(activityIndex);
         html.IndexOf("read_file", StringComparison.Ordinal).Should().BeGreaterThan(activityIndex);
         html.IndexOf("grep", StringComparison.Ordinal).Should().BeGreaterThan(activityIndex);
+    }
+
+    [Fact]
+    public async Task ChatViewShell_ShowsChatTitleWithRenameAffordanceInTopbar()
+    {
+        var chat = BuildChat(UserMessage("hi"));
+        chat.Name = "My Chat";
+
+        var html = await RenderAsync<StandardChatView>(BuildContext(chat));
+
+        html.Should().Contain("class=\"chat-title\"");
+        html.Should().Contain("My Chat");
+        // 悬停提示即「重命名对话」，说明标题是可点击的重命名入口
+        html.Should().Contain("title=\"chat.rename\"");
+
+        // 未进入编辑态时不应渲染编辑框（内联样式里的同名选择器不算）
+        html.Should().NotContain("class=\"chat-title-input\"");
+    }
+
+    [Fact]
+    public async Task ChatViewShell_ShowsChatTitleInAggregatedViewTopbar()
+    {
+        var chat = BuildChat(UserMessage("ask"), AssistantMessage("answer"));
+        chat.Name = "Aggregated Chat";
+
+        var html = await RenderAsync<AggregatedChatView>(BuildContext(chat));
+
+        html.Should().Contain("Aggregated Chat");
     }
 
     [Fact]

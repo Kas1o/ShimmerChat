@@ -33,6 +33,7 @@
 	}
 	.chat-back {
 		display: flex; align-items: center; gap: var(--su-space-2);
+		min-width: 0; overflow: hidden;
 		border: none; background: none;
 		font-family: var(--su-font-sans); font-size: var(--su-font-md); font-weight: 500;
 		color: var(--su-text-0); cursor: pointer;
@@ -41,6 +42,40 @@
 		transition: background var(--su-transition);
 	}
 	.chat-back:hover { background: var(--su-surface-3); }
+	/* Agent 名称很长时收缩并省略，避免把中间的对话标题挤没 */
+	.chat-back-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+	/* ── Chat title (inline rename) ────────────────── */
+	.chat-title-area {
+		flex: 1; min-width: 0;
+		display: flex; justify-content: center;
+		padding: 0 var(--su-space-3);
+	}
+	.chat-title {
+		display: inline-flex; align-items: center; gap: var(--su-space-2);
+		max-width: 100%;
+		border: none; background: none; cursor: pointer;
+		font-family: var(--su-font-sans); font-size: var(--su-font-md); font-weight: 600;
+		color: var(--su-text-0);
+		padding: 2px var(--su-space-2);
+		border-radius: var(--su-radius-sm);
+		transition: background var(--su-transition);
+	}
+	.chat-title:hover { background: var(--su-surface-3); }
+	.chat-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	/* 编辑图标只在悬停时出现：标题本身仍然可以直接点击进入重命名 */
+	.chat-title-edit-icon { flex-shrink: 0; opacity: 0; transition: opacity var(--su-transition); }
+	.chat-title:hover .chat-title-edit-icon { opacity: 0.7; }
+	.chat-title-input {
+		width: 100%; max-width: 360px;
+		padding: 2px var(--su-space-2);
+		font-family: var(--su-font-sans); font-size: var(--su-font-md); font-weight: 600;
+		color: var(--su-text-0); background: var(--su-surface-1);
+		border: var(--su-border-size) solid var(--su-accent);
+		border-radius: var(--su-radius-sm);
+		outline: none;
+		box-shadow: 0 0 0 3px var(--su-accent-soft);
+	}
 
 	/* ── Generation phase indicator ────────────────── */
 	.generation-phase {
@@ -396,7 +431,34 @@
 
 <div class="chat-page @RootClass" @ref="pageElement" style="@BackgroundStyle">
 	<div class="chat-topbar">
-		<button class="chat-back" @onclick="NavigateBackAsync" title="@Loc["chat.back_to_agent"]">← @ViewContext.Agent.Name</button>
+		<button class="chat-back" @onclick="NavigateBackAsync" title="@Loc["chat.back_to_agent"]">
+			<span class="chat-back-text">← @ViewContext.Agent.Name</span>
+		</button>
+
+		@* 对话标题：点击标题就地重命名（Enter 提交 / Esc 取消），空名称由宿主拒绝 *@
+		<div class="chat-title-area">
+			@if (editingTitle)
+			{
+				<input class="chat-title-input" @ref="titleInput"
+					@bind="titleDraft" @bind:event="oninput"
+					@onkeydown="OnTitleKeyDown"
+					@onblur="CommitTitleAsync"
+					placeholder="@Loc["chat.rename_placeholder"]"
+					aria-label="@Loc["chat.rename"]" />
+			}
+			else
+			{
+				<button class="chat-title" @onclick="StartTitleEdit" title="@Loc["chat.rename"]">
+					<span class="chat-title-text">@ViewContext.Chat.Name</span>
+					<svg class="chat-title-edit-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
+						stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M12 20h9" />
+						<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+					</svg>
+				</button>
+			}
+		</div>
+
 		@if (currentPhase is not null)
 		{
 			<span class="generation-phase @($"phase-{currentPhase}")">
@@ -511,11 +573,23 @@
 	/// <summary>包含 file input 的元素（拖入 / 粘贴的文件由它交给 InputFile）。</summary>
 	ElementReference attachHost;
 
+	/// <summary>标题编辑框（仅在编辑态存在）。</summary>
+	ElementReference titleInput;
+
 	string inputText = "";
 	bool autoScrollDown = true;
 	bool isUserAtBottom = true;
 	bool _hasRendered;
 	bool _skipNextInput;
+
+	/// <summary>是否正在就地编辑对话标题。</summary>
+	bool editingTitle;
+
+	/// <summary>标题编辑框的草稿值。</summary>
+	string titleDraft = "";
+
+	/// <summary>已进入编辑态、等待渲染后聚焦编辑框。</summary>
+	bool focusTitlePending;
 
 	private ChatViewContext? _subscribedContext;
 	private Func<string, bool, Task<bool>>? _inputInsertHandler;
@@ -580,6 +654,9 @@
 			// 切换对话时丢弃待发送的图像，避免把它们发到另一个对话里
 			DiscardPendingImages();
 
+			// 标题编辑同样不能跨对话保留：否则提交时改的是新对话的名称
+			CancelTitleEdit();
+
 			_subscribedContext = ViewContext;
 			if (_subscribedContext != null)
 			{
@@ -596,6 +673,21 @@
 		{
 			_hasRendered = true;
 			await RegisterImageDropAsync();
+		}
+
+		if (editingTitle && focusTitlePending)
+		{
+			focusTitlePending = false;
+			try
+			{
+				await titleInput.FocusAsync();
+			}
+			catch (Exception ex)
+			{
+				// JS 属于边界层：编辑框已被卸载或电路已断开时记录完整错误，
+				// 用户仍可手动点击编辑框继续重命名。
+				Logger.LogError(ex, "[ChatViewShell] Failed to focus the chat title editor.");
+			}
 		}
 
 		if (_hasRendered && autoScrollDown)
@@ -667,6 +759,53 @@
 	}
 
 	private async Task NavigateBackAsync() => await ViewContext.NavigateBackAsync();
+
+	/// <summary>进入标题编辑态：草稿取当前对话名，渲染后由 OnAfterRenderAsync 聚焦。</summary>
+	private void StartTitleEdit()
+	{
+		titleDraft = ViewContext.Chat.Name;
+		editingTitle = true;
+		focusTitlePending = true;
+	}
+
+	private async Task OnTitleKeyDown(KeyboardEventArgs e)
+	{
+		if (e.Key == "Enter")
+			await CommitTitleAsync();
+		else if (e.Key == "Escape")
+			CancelTitleEdit();
+	}
+
+	private void CancelTitleEdit()
+	{
+		// 先退出编辑态：取消之后才触发的 blur 不会再提交
+		editingTitle = false;
+		focusTitlePending = false;
+		titleDraft = string.Empty;
+	}
+
+	/// <summary>
+	/// 提交标题修改。空名称由宿主拒绝（返回 false），此时保持原标题并明确提示用户；
+	/// 名称没有变化时不打扰宿主。
+	/// </summary>
+	private async Task CommitTitleAsync()
+	{
+		// Enter 提交后输入框被移除，紧随其后的 blur 不应重复提交
+		if (!editingTitle) return;
+		editingTitle = false;
+
+		var requested = titleDraft.Trim();
+		titleDraft = string.Empty;
+
+		if (string.Equals(requested, ViewContext.Chat.Name, StringComparison.Ordinal)) return;
+
+		if (!await ViewContext.RenameAsync(requested))
+		{
+			await PopupService.ShowAsync(
+				Loc["chat.rename_empty"],
+				Loc["chat.rename_failed_title"]);
+		}
+	}
 
 	private async void OnInputResize(ChangeEventArgs e)
 	{

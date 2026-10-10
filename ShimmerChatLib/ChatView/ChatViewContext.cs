@@ -59,6 +59,12 @@ namespace ShimmerChatLib.ChatView
 		/// <summary>从该消息继续生成（续写）。</summary>
 		public required Func<Message, Task> ContinueFromAsync { get; init; }
 
+		/// <summary>
+		/// 重命名当前对话并持久化（名称会去除首尾空白）。
+		/// 名称无效（为空或只含空白）时不做任何改动并返回 false，由界面提示用户。
+		/// </summary>
+		public required Func<string, Task<bool>> RenameAsync { get; init; }
+
 		/// <summary>标记对话已修改并持久化。</summary>
 		public required Action MarkDirty { get; init; }
 

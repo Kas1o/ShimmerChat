@@ -136,6 +136,7 @@
 		DeleteMessagesFromAsync = DeleteMessagesFrom,
 		RegenerateFromAsync = RegenerateFromMessage,
 		ContinueFromAsync = ContinueFromMessage,
+		RenameAsync = RenameChatAsync,
 		MarkDirty = GetDirty,
 		RequestRefreshAsync = () => InvokeAsync(StateHasChanged),
 		NavigateBackAsync = () =>
@@ -353,6 +354,30 @@
 		session = sessionService.GetOrCreateSession(ChatGuid, AgentGuid);
 		SubscribeToSession(session);
 		sessionService.StartContinuation(session, agent!, chat, message, throwExceptionInsteadOfPopupErrorMessage);
+	}
+
+	/// <summary>
+	/// 重命名当前对话并持久化。名称去除首尾空白后为空时拒绝修改（返回 false，
+	/// 由界面提示用户），而不是静默地把标题清空。
+	/// </summary>
+	private async Task<bool> RenameChatAsync(string name)
+	{
+		if (chat == null) return false;
+
+		var trimmed = (name ?? string.Empty).Trim();
+		if (trimmed.Length == 0)
+		{
+			logger.LogWarning("[AgentChatPage] Rejected empty name for chat {ChatGuid}.", chat.Guid);
+			return false;
+		}
+
+		if (string.Equals(chat.Name, trimmed, StringComparison.Ordinal))
+			return true;
+
+		chat.Name = trimmed;
+		GetDirty();
+		await Refresh();
+		return true;
 	}
 	#endregion
 

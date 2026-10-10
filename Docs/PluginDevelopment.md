@@ -594,7 +594,7 @@ if (PanelContext is LiveAgentPanelContext live)
 @implements IChatView
 @attribute [ChatView("my.view", "chatview.my", DescriptionKey = "chatview.my.desc")]
 
-@* 宿主只注入 Context 一个参数；推荐复用内置外壳（顶栏、消息区、输入区、滚动跟随、图像点选 / 拖入 / 粘贴） *@
+@* 宿主只注入 Context 一个参数；推荐复用内置外壳（顶栏及对话标题重命名、消息区、输入区、滚动跟随、图像点选 / 拖入 / 粘贴） *@
 <ChatViewShell ViewContext="Context">
     @foreach (var message in Context.Messages)
     {
@@ -617,6 +617,7 @@ if (PanelContext is LiveAgentPanelContext live)
 | `StopGenerationAsync()` | 停止生成 |
 | `DeleteMessageAsync` / `DeleteMessagesFromAsync` | 删除单条 / 从此处删除后续消息 |
 | `RegenerateFromAsync` / `ContinueFromAsync` | 重新生成 / 续写 |
+| `RenameAsync(name)` | 重命名当前对话并持久化；名称去除首尾空白后为空时返回 `false`（原标题不变），由界面提示用户 |
 | `MarkDirty()` / `RequestRefreshAsync()` | 持久化 / 请求宿主重绘 |
 | `NavigateBackAsync()` | 返回 Agent 页面 |
 | `ScrollToBottomRequested` | 宿主请求滚动到底部（是否顺从用户滚动由界面决定） |
