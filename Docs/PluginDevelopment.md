@@ -594,7 +594,7 @@ if (PanelContext is LiveAgentPanelContext live)
 @implements IChatView
 @attribute [ChatView("my.view", "chatview.my", DescriptionKey = "chatview.my.desc")]
 
-@* 宿主只注入 Context 一个参数；推荐复用内置外壳（顶栏、消息区、输入区、滚动跟随） *@
+@* 宿主只注入 Context 一个参数；推荐复用内置外壳（顶栏、消息区、输入区、滚动跟随、图像点选 / 拖入 / 粘贴） *@
 <ChatViewShell ViewContext="Context">
     @foreach (var message in Context.Messages)
     {

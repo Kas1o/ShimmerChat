@@ -6,7 +6,7 @@
 @inject IPopupService PopupService
 @inject IImageAttachmentService ImageAttachments
 @inject ILogger<ChatViewShell> Logger
-@implements IDisposable
+@implements IAsyncDisposable
 
 @*
 	对话界面的通用外壳：顶栏（返回 / 生成阶段）、消息滚动区、输入区与滚动跟随。
@@ -164,6 +164,35 @@
 	}
 	.chat-attachment-remove:hover { background: var(--su-danger); }
 	.chat-attachment-hint { font-size: var(--su-font-xs); color: var(--su-text-2); }
+
+	/* ── Drop-to-attach overlay ───────────────────── */
+	/* 拖动文件进入聊天区时（JS 给根元素加 .chat-drop-active）显示的投放提示层 */
+	.chat-drop-overlay {
+		display: none;
+		position: absolute; inset: var(--su-space-2); z-index: 60;
+		align-items: center; justify-content: center;
+		border: 2px dashed var(--su-accent);
+		border-radius: var(--su-radius-lg);
+		/* 不接收事件：投放落在下面的真实元素上，由拖放区的监听统一处理 */
+		pointer-events: none;
+	}
+	/* 遮罩单独一层，避免提示文字被一起调透明 */
+	.chat-drop-overlay::before {
+		content: ''; position: absolute; inset: 0;
+		background: var(--su-surface-0); opacity: 0.9;
+		border-radius: inherit;
+	}
+	.chat-page.chat-drop-active .chat-drop-overlay { display: flex; }
+	.chat-drop-hint {
+		position: relative;
+		display: flex; align-items: center; gap: var(--su-space-2);
+		padding: var(--su-space-2) var(--su-space-4);
+		background: var(--su-surface-1); color: var(--su-text-0);
+		border: var(--su-border-size) solid var(--su-accent);
+		border-radius: var(--su-radius-full);
+		box-shadow: var(--su-shadow-md);
+		font-size: var(--su-font-sm); font-weight: 500;
+	}
 
 	/* ── Images inside a message bubble ─────────────── */
 	.chat-msg-images {
@@ -365,7 +394,7 @@
 	}
 </style>
 
-<div class="chat-page @RootClass" style="@BackgroundStyle">
+<div class="chat-page @RootClass" @ref="pageElement" style="@BackgroundStyle">
 	<div class="chat-topbar">
 		<button class="chat-back" @onclick="NavigateBackAsync" title="@Loc["chat.back_to_agent"]">← @ViewContext.Agent.Name</button>
 		@if (currentPhase is not null)
@@ -416,7 +445,7 @@
 		}
 
 		<div class="chat-input">
-			<label class="chat-input-attach" title="@Loc["chat.attach_image"]">
+			<label class="chat-input-attach" @ref="attachHost" title="@Loc["chat.attach_image"]">
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
 					<circle cx="8.5" cy="8.5" r="1.5"/>
@@ -446,6 +475,18 @@
 			}
 		</div>
 	</div>
+
+	@* 拖动图像进入聊天区时的投放提示层：显示状态由 JS 在根元素上切换 class 控制 *@
+	<div class="chat-drop-overlay" aria-hidden="true">
+		<span class="chat-drop-hint">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+				<circle cx="8.5" cy="8.5" r="1.5"/>
+				<path d="M21 15l-5-5L5 21"/>
+			</svg>
+			@Loc["chat.drop_image_hint"]
+		</span>
+	</div>
 </div>
 
 @code {
@@ -464,6 +505,12 @@
 	ElementReference ChatMainElement;
 	ElementReference inputArea;
 
+	/// <summary>拖放区根元素（接收拖入的图像）。</summary>
+	ElementReference pageElement;
+
+	/// <summary>包含 file input 的元素（拖入 / 粘贴的文件由它交给 InputFile）。</summary>
+	ElementReference attachHost;
+
 	string inputText = "";
 	bool autoScrollDown = true;
 	bool isUserAtBottom = true;
@@ -472,6 +519,9 @@
 
 	private ChatViewContext? _subscribedContext;
 	private Func<string, bool, Task<bool>>? _inputInsertHandler;
+
+	/// <summary>拖放 / 粘贴监听在 JS 侧的注册键：注销时按它定位，不依赖元素引用。</summary>
+	private readonly string _imageDropKey = Guid.NewGuid().ToString("N");
 
 	/// <summary>单条消息最多携带的图像数量。</summary>
 	private const int MaxImagesPerMessage = 5;
@@ -543,7 +593,10 @@
 	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{
 		if (firstRender)
+		{
 			_hasRendered = true;
+			await RegisterImageDropAsync();
+		}
 
 		if (_hasRendered && autoScrollDown)
 		{
@@ -552,9 +605,44 @@
 		}
 	}
 
-	public void Dispose()
+	/// <summary>
+	/// 注册「拖入 / 粘贴图像」：JS 侧把文件写回隐藏的 file input 并派发 change，
+	/// 因此这两条入口与「点击选择文件」复用同一套校验、落盘与提示。
+	/// </summary>
+	private async Task RegisterImageDropAsync()
+	{
+		try
+		{
+			await JS.InvokeVoidAsync("chatImageDrop.attach", _imageDropKey, pageElement, attachHost);
+		}
+		catch (Exception ex)
+		{
+			// JS 属于边界层：脚本缺失或电路断开时记录完整错误。
+			// 拖入 / 粘贴不可用，点击选择文件与其它功能不受影响。
+			Logger.LogError(ex, "[ChatViewShell] Failed to register image drop/paste handling.");
+		}
+	}
+
+	public async ValueTask DisposeAsync()
 	{
 		DiscardPendingImages();
+
+		try
+		{
+			await JS.InvokeVoidAsync("chatImageDrop.detach", _imageDropKey);
+		}
+		catch (JSDisconnectedException)
+		{
+			// 电路已断开：监听随页面一起消失，无需清理
+		}
+		catch (ObjectDisposedException)
+		{
+			// JS 运行时已释放：同上
+		}
+		catch (Exception ex)
+		{
+			Logger.LogError(ex, "[ChatViewShell] Failed to unregister image drop/paste handling.");
+		}
 
 		if (_subscribedContext == null) return;
 
@@ -611,11 +699,21 @@
 	}
 
 	/// <summary>
-	/// 处理用户选择的图像：逐个存储（按当前存储方式落盘或内联进消息），
+	/// 处理用户提供的图像（点击选择 / 拖入 / 粘贴都走这里）：逐个存储（按当前存储方式落盘或内联进消息），
 	/// 失败的图像会被跳过并明确提示，成功的图像加入待发送列表。
 	/// </summary>
 	private async Task OnImagesSelected(InputFileChangeEventArgs e)
 	{
+		// 拖入 / 粘贴绕过了 disabled 的 file input，因此生成过程中在这里统一拒绝：
+		// 明确提示，而不是把图像默默塞进待发送列表或直接丢弃。
+		if (ViewContext.IsGenerating())
+		{
+			await PopupService.ShowAsync(
+				Loc["chat.image_attach_busy"],
+				Loc["chat.image_attach_busy_title"]);
+			return;
+		}
+
 		IReadOnlyList<IBrowserFile> files;
 		try
 		{

@@ -321,7 +321,7 @@ public class ContextSegment
 - `IChatView`（ShimmerChatLib）：对话界面契约。实现它的 Blazor 组件 + `[ChatView("id", "name.key")]` 即被自动发现，必须声明 `[Parameter] ChatViewContext Context`。
 - `ChatViewContext`：宿主契约。暴露活对象（`Chat` / `Agent`、`Messages`）、生成状态与宿主能力（发送 / 停止 / 删除 / 重新生成 / 续写 / 持久化 / 返回），界面不持有页面引用。宿主在 `Chat` / `Agent` 实例被替换时重建上下文。
 - `IChatViewRegistry`：扫描所有实现，提供 `GetAll()` / `GetById(id)` / `GetDefault()`。Agent 未指定界面时用默认界面（声明 `IsDefault = true` 的那个）；指定了未注册的 Id 时宿主回退到默认界面**并显示警告条 + 记录错误日志**，不静默修补。
-- `ChatViewShell`（ShimmerChatLib/Components）：可复用的对话界面外壳（顶栏、消息滚动区、输入区、滚动跟随、内联样式），界面只需提供消息区渲染；插件界面亦可复用它。
+- `ChatViewShell`（ShimmerChatLib/Components）：可复用的对话界面外壳（顶栏、消息滚动区、输入区、滚动跟随、内联样式、图像附件输入），界面只需提供消息区渲染；插件界面亦可复用它。输入区支持点选 / 拖入 / 粘贴图像：三条入口都把文件交给隐藏的 `InputFile`，共用同一套校验与落盘逻辑（`window.chatImageDrop`，实现在宿主的 `wwwroot/js/util.js`）。
 
 内置界面（ShimmerChatBuiltin/ChatView）：`standard`（逐条消息一个气泡）与 `aggregated`（把一次 ToolCallLoop 的连续 AI / 工具消息合并进同一气泡）。聚合界面把 AI 消息的正文与工具调用**分离**：正文留在气泡里，工具调用（无论一次还是多次、周围有没有别的调用）统一并入折叠的「工具调用活动」块，生成中时该块默认展开、生成结束后自动折叠。
 

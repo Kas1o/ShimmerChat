@@ -249,6 +249,214 @@ window.autoResizeTextarea = function (el) {
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
 };
 
+// ─── Chat image attachments: drop & paste ─────────
+
+// 聊天输入区接受「拖入图像」与「粘贴图像」：两者都先把文件写回隐藏的
+// <input type="file">（Blazor 的 InputFile），再派发一次原生 change 事件，
+// 于是它们与「点击选择文件」共用同一条上传流程 —— 格式 / 大小 / 数量校验、
+// 落盘与错误提示都只有一份实现。
+window.chatImageDrop = (function () {
+    // 拖动文件进入聊天区时加在拖放区上的类名，由 CSS 显示投放提示层
+    var ACTIVE_CLASS = 'chat-drop-active';
+
+    // 注册表：key → { zone, handlers }。key 由 .NET 侧生成并持有，
+    // 注销时只传 key，不依赖元素引用（组件释放时 DOM 可能已经被移除）。
+    var registrations = new Map();
+
+    var guard = null;
+
+    function isImage(type) {
+        return typeof type === 'string' && type.lastIndexOf('image/', 0) === 0;
+    }
+
+    // 拖动内容里是否含文件。页面内的文本 / 节点拖拽是 text/plain，不受影响。
+    function hasFileDrag(dataTransfer) {
+        if (!dataTransfer || !dataTransfer.types) return false;
+        for (var i = 0; i < dataTransfer.types.length; i++) {
+            if (dataTransfer.types[i] === 'Files') return true;
+        }
+        return false;
+    }
+
+    function contains(zone, node) {
+        return !!node && zone.contains(node);
+    }
+
+    // 把文件交给 InputFile 的 <input>：文件列表由本模块自己的 DataTransfer 构造，
+    // 不使用事件的拖拽数据（后者在事件返回后可能失效）。
+    // 生成过程中该 input 处于 disabled，这里仍然写入并派发 change：
+    // 「生成中不能添加图像」由 .NET 侧明确提示，而不是把用户拖入的图像悄悄丢掉。
+    function feed(inputHost, files) {
+        if (files.length === 0) return;
+
+        var input = inputHost ? inputHost.querySelector('input[type=file]') : null;
+        if (!input) {
+            console.error('[chatImageDrop] The chat shell has no <input type="file"> to receive the images.');
+            return;
+        }
+
+        var transfer = new DataTransfer();
+        for (var i = 0; i < files.length; i++) transfer.items.add(files[i]);
+
+        try {
+            input.files = transfer.files;
+        } catch (error) {
+            console.error('[chatImageDrop] The browser refused the dropped/pasted file list.', error);
+            return;
+        }
+
+        if (!input.files || input.files.length === 0) {
+            // 赋值被静默忽略：明确报错，绝不假装图像已经进入上传流程
+            console.error('[chatImageDrop] The browser ignored the dropped/pasted file list.');
+            return;
+        }
+
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // 剪贴板中的图像文件。只有剪贴板里确实存在图像时本模块才接管，
+    // 普通文本粘贴完全不受影响。
+    //
+    // 剪贴板同时带文本与图像时（例如从网页复制）以图像为准：否则会把图像的
+    // 文件名 / URL 一起粘进输入框。非图像的文件不会被粘贴进来，因为纯文本
+    // 输入框本来就没有它们的粘贴表示。
+    function clipboardImages(clipboard) {
+        var files = [];
+        if (!clipboard) return files;
+
+        if (clipboard.files) {
+            for (var i = 0; i < clipboard.files.length; i++) {
+                if (isImage(clipboard.files[i].type)) files.push(clipboard.files[i]);
+            }
+        }
+
+        if (files.length === 0 && clipboard.items) {
+            for (var j = 0; j < clipboard.items.length; j++) {
+                var item = clipboard.items[j];
+                if (item.kind !== 'file' || !isImage(item.type)) continue;
+                var file = item.getAsFile();
+                if (file) files.push(file);
+            }
+        }
+
+        return files;
+    }
+
+    // 文件被拖到聊天区之外时阻止浏览器直接打开它（那会把整个应用页面替换掉）。
+    // 只在拖动内容确实含文件时拦截，页面内的文本 / 节点拖拽不受影响；
+    // 没有任何聊天界面时卸载拦截，其它页面的行为保持原样。
+    function installGuard() {
+        if (guard) return;
+
+        var onDragOver = function (e) {
+            if (hasFileDrag(e.dataTransfer)) e.preventDefault();
+        };
+        var onDrop = function (e) {
+            if (hasFileDrag(e.dataTransfer)) e.preventDefault();
+        };
+
+        document.addEventListener('dragover', onDragOver);
+        document.addEventListener('drop', onDrop);
+        guard = { onDragOver: onDragOver, onDrop: onDrop };
+    }
+
+    function uninstallGuard() {
+        if (!guard) return;
+
+        document.removeEventListener('dragover', guard.onDragOver);
+        document.removeEventListener('drop', guard.onDrop);
+        guard = null;
+    }
+
+    function register(key, zone, inputHost) {
+        var handlers = {};
+
+        handlers.dragenter = function (e) {
+            if (!hasFileDrag(e.dataTransfer)) return;
+            zone.classList.add(ACTIVE_CLASS);
+        };
+
+        handlers.dragover = function (e) {
+            if (!hasFileDrag(e.dataTransfer)) return;
+            // 必须阻止默认行为，否则浏览器不会把拖放区当作可投放目标
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+            // 幂等：拖动过程中若被误判为「已离开」，这里立即恢复提示
+            zone.classList.add(ACTIVE_CLASS);
+        };
+
+        handlers.dragleave = function (e) {
+            // 进入子元素同样会触发 dragleave，此时 relatedTarget 仍在拖放区内
+            if (contains(zone, e.relatedTarget)) return;
+            zone.classList.remove(ACTIVE_CLASS);
+        };
+
+        handlers.drop = function (e) {
+            if (!hasFileDrag(e.dataTransfer)) return;
+            e.preventDefault();
+            zone.classList.remove(ACTIVE_CLASS);
+
+            // 拖入的文件全部交给 .NET 侧校验：不支持的格式会得到明确提示，
+            // 而不是在这里被静默过滤掉。
+            var files = e.dataTransfer && e.dataTransfer.files
+                ? Array.prototype.slice.call(e.dataTransfer.files)
+                : [];
+            feed(inputHost, files);
+        };
+
+        // 粘贴监听挂在拖放区上：输入框聚焦时粘贴事件由它冒泡上来，
+        // 焦点在消息区等其它位置时也能直接粘贴图像。
+        handlers.paste = function (e) {
+            var files = clipboardImages(e.clipboardData);
+            if (files.length === 0) return;
+            e.preventDefault();
+            feed(inputHost, files);
+        };
+
+        zone.addEventListener('dragenter', handlers.dragenter);
+        zone.addEventListener('dragover', handlers.dragover);
+        zone.addEventListener('dragleave', handlers.dragleave);
+        zone.addEventListener('drop', handlers.drop);
+        zone.addEventListener('paste', handlers.paste);
+
+        registrations.set(key, { zone: zone, handlers: handlers });
+        installGuard();
+    }
+
+    function unregister(key) {
+        var registration = registrations.get(key);
+        if (!registration) return;
+
+        var zone = registration.zone;
+        var handlers = registration.handlers;
+        zone.removeEventListener('dragenter', handlers.dragenter);
+        zone.removeEventListener('dragover', handlers.dragover);
+        zone.removeEventListener('dragleave', handlers.dragleave);
+        zone.removeEventListener('drop', handlers.drop);
+        zone.removeEventListener('paste', handlers.paste);
+        zone.classList.remove(ACTIVE_CLASS);
+
+        registrations.delete(key);
+        if (registrations.size === 0) uninstallGuard();
+    }
+
+    return {
+        // key：调用方持有的标识；zone：拖放区根元素；inputHost：含 <InputFile> 的元素
+        attach: function (key, zone, inputHost) {
+            if (!key || !zone) {
+                console.error('[chatImageDrop] attach requires a key and a drop zone.');
+                return;
+            }
+            if (registrations.has(key)) return;
+            register(key, zone, inputHost);
+        },
+
+        detach: function (key) {
+            unregister(key);
+        }
+    };
+})();
+
 // ─── Node Picker scroll helpers ──────────────────
 
 /**

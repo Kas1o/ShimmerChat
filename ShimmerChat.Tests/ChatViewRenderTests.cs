@@ -224,6 +224,18 @@ public class ChatViewRenderTests
     }
 
     [Fact]
+    public async Task StandardChatView_RendersImageDropTargetAndAttachInput()
+    {
+        var html = await RenderAsync<StandardChatView>(BuildContext(BuildChat(UserMessage("hi"))));
+
+        // 拖入图像的投放提示层（显示状态由 JS 切换 class 控制），以及点选 / 拖入 / 粘贴共用的 file input
+        html.Should().Contain("<div class=\"chat-drop-overlay\"");
+        html.Should().Contain("chat.drop_image_hint");
+        html.Should().Contain("accept=\"image/png,image/jpeg,image/webp,image/gif\"");
+        html.Should().Contain("type=\"file\"");
+    }
+
+    [Fact]
     public async Task StandardChatView_RendersEveryAttachedImage()
     {
         var html = await RenderAsync<StandardChatView>(
