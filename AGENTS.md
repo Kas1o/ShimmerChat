@@ -108,6 +108,7 @@ Blazor Server 宿主 + 所有服务实现 + UI 页面。
 | `Variable/` | 变量管理 |
 | `SubAgent/` | 子代理节点 |
 | `RegexModifier/` | 消息显示修改器 |
+| `WebSearch/` | 联网搜索：五个服务方（DeepSeek / Tavily / Brave / Exa / SerpApi）、自动搜索节点、搜索 + 抓取工具、设置面板 |
 
 ### 3.5 src-tauri — 桌面发布
 
@@ -220,6 +221,8 @@ public class ContextSegment
 | `IfNode` / `AdvancedIfNode` | 条件分支 |
 | `SubAgentNode` | 嵌套子代理调用 |
 | `DynPromptNode` | 动态模板提示 |
+| `WebSearchAutoNode` | 按输入内容（或固定查询词）自动联网搜索，结果追加到 Fragments 末尾；可选先用当前 API 把输入改写成搜索词 |
+| `WebSearchToolSetNode` | 加入 `web_search` 工具，并在服务方支持抓取时加入 `web_fetch` 工具 |
 
 ### 4.6 Tool 系统
 
@@ -324,6 +327,17 @@ public class ContextSegment
 - `ChatViewShell`（ShimmerChatLib/Components）：可复用的对话界面外壳（顶栏含对话标题与就地重命名、消息滚动区、输入区、滚动跟随、内联样式、图像附件输入），界面只需提供消息区渲染；插件界面亦可复用它。输入区支持点选 / 拖入 / 粘贴图像：三条入口都把文件交给隐藏的 `InputFile`，共用同一套校验与落盘逻辑（`window.chatImageDrop`，实现在宿主的 `wwwroot/js/util.js`）。
 
 内置界面（ShimmerChatBuiltin/ChatView）：`standard`（逐条消息一个气泡）与 `aggregated`（把一次 ToolCallLoop 的连续 AI / 工具消息合并进同一气泡）。聚合界面把 AI 消息的正文与工具调用**分离**：正文留在气泡里，工具调用（无论一次还是多次、周围有没有别的调用）统一并入折叠的「工具调用活动」块，生成中时该块默认展开、生成结束后自动折叠。
+
+### 5.18 联网搜索（WebSearch）
+
+**多服务方联网搜索。** 全部实现位于 `ShimmerChatBuiltin/WebSearch/`，配置持久化于 KVData `WebSearch/Config`，面板为 `WebSearchPanel`（Settings > 联网搜索，含 API Key、默认条数、超时、正文长度、语言 / 地区与真实连接测试）。
+
+- `WebSearchProviderCatalog`：五个服务方的**唯一事实来源**（名称、文档地址、默认 BaseUrl，以及 `SupportsContent` / `SupportsFetch` 能力标记），界面与节点都读它。
+- `IWebSearchProvider` / `WebSearchProviderBase`：服务方契约与公共 HTTP 层（超时、鉴权头、JSON 解析、错误信息提取）。实现为 `DeepSeekSearchProvider`（`/v1/tools/search` + `/v1/tools/fetch`）、`TavilySearchProvider`（`/search` + `/extract`）、`BraveSearchProvider`（`/res/v1/web/search`，无抓取）、`ExaSearchProvider`（`/search` + `/contents`）、`SerpApiSearchProvider`（`/search.json`，无抓取）。
+- `WebSearchProviderFactory.Resolve(config, kind)`：`kind` 为 `FromSettings` 时使用配置中的默认服务；失败以 `WebSearchResolutionError`（`UnknownProvider` / `ApiKeyMissing`）返回，**不抛异常也不静默回落到别的服务**，由节点本地化后汇报、工具转成英文错误文本。
+- `WebSearchConfigManager.Load` 校验取值（提供方、超时、条数、正文长度、BaseUrl 必须是绝对 http(s) 地址），非法即返回错误说明；面板保存走同一 `Validate`。
+- 节点：`WebSearchAutoNode`（按输入内容或固定查询词搜索，结果作为片段追加到 Fragments 末尾；可选 LLM 改写查询词；`OnFailure` 决定失败是终止生成还是记录 DebugOutput 后跳过）、`WebSearchToolSetNode`（加入 `web_search`，并在服务方支持抓取时加入 `web_fetch`）。
+- 工具：`WebSearchToolV2` / `WebFetchToolV2`（`IAutoCreateToolV2`，可被 ToolManager 直接勾选）。搜索参数统一来自设置面板；抓取请求由服务方服务器发起，本进程不直连目标站点。
 
 ---
 

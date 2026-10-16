@@ -80,9 +80,10 @@ public class PluginPanelParameterContractTests
         Assert.Contains("ShimmerChatBuiltin.API.ApiSettingsPage", types);
         Assert.Contains("ShimmerChatBuiltin.Misc.ToolManager", types);
         Assert.Contains("ShimmerChatBuiltin.Example.ExamplePanel", types);
+        Assert.Contains("ShimmerChatBuiltin.WebSearch.WebSearchPanel", types);
 
         // 数量守卫：反射加载失败会静默丢类型，从而让契约测试失去意义。
-        Assert.Equal(12, discovered.Count);
+        Assert.Equal(13, discovered.Count);
     }
 
     [Theory]

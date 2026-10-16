@@ -1,0 +1,377 @@
+@attribute [PluginPanelAttribute("panel.web_search", "panel.web_search.desc", PanelDisplayPlace.Settings, Order = 3)]
+
+@using System.Net.Http
+@using ShimmerChatBuiltin.WebSearch
+@inject IKVDataService KVData
+@inject ILocService Loc
+
+<div class="shimmer-content su-p-4">
+    <h2 class="su-text-lg su-font-bold su-mb-4">@Loc["panel_websearch.title"]</h2>
+    <p class="su-text-2 su-mb-4">@Loc["panel_websearch.desc"]</p>
+
+    <div class="su-group">
+        <h3 class="su-text-lg su-font-bold">@Loc["panel_websearch.global"]</h3>
+        <div class="su-row su-gap-4">
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_websearch.active_provider"]</label>
+                <select class="su-select su-w-full" @bind="_activeProvider">
+                    @foreach (var descriptor in WebSearchProviderCatalog.All)
+                    {
+                        <option value="@descriptor.Kind">@Loc[descriptor.NameKey]</option>
+                    }
+                </select>
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_websearch.active_provider_hint"]</p>
+            </div>
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_websearch.max_results"]</label>
+                <input type="number" class="su-input su-w-full" @bind="_maxResults" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_websearch.max_results_hint"]</p>
+            </div>
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_websearch.timeout"]</label>
+                <input type="number" class="su-input su-w-full" @bind="_timeoutSeconds" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_websearch.timeout_hint"]</p>
+            </div>
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_websearch.max_content_chars"]</label>
+                <input type="number" class="su-input su-w-full" @bind="_maxContentChars" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_websearch.max_content_chars_hint"]</p>
+            </div>
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_websearch.max_fetch_chars"]</label>
+                <input type="number" class="su-input su-w-full" @bind="_maxFetchChars" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_websearch.max_fetch_chars_hint"]</p>
+            </div>
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_websearch.language"]</label>
+                <input class="su-input su-w-full" @bind="_language" placeholder="@Loc["panel_websearch.language_placeholder"]" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_websearch.language_hint"]</p>
+            </div>
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_websearch.country"]</label>
+                <input class="su-input su-w-full" @bind="_country" placeholder="@Loc["panel_websearch.country_placeholder"]" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_websearch.country_hint"]</p>
+            </div>
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_websearch.include_content"]</label>
+                <div class="su-flex su-gap-2" style="align-items:center;">
+                    <input type="checkbox" @bind="_includeContent" />
+                    <span class="su-text-sm su-text-2">@Loc["panel_websearch.include_content_hint"]</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="su-group su-mt-4">
+        <h3 class="su-text-lg su-font-bold">@Loc["panel_websearch.providers"]</h3>
+        <p class="su-text-sm su-text-2">@Loc["panel_websearch.providers_desc"]</p>
+
+        @foreach (var descriptor in WebSearchProviderCatalog.All)
+        {
+            <div class="su-card su-mt-3">
+                <div class="su-card-body">
+                    <div class="su-flex su-flex-wrap su-gap-2" style="align-items:center;">
+                        <strong>@Loc[descriptor.NameKey]</strong>
+                        @if (descriptor.SupportsContent)
+                        {
+                            <span class="su-badge su-badge-success">@Loc["panel_websearch.badge_content"]</span>
+                        }
+                        @if (descriptor.SupportsFetch)
+                        {
+                            <span class="su-badge su-badge-accent">@Loc["panel_websearch.badge_fetch"]</span>
+                        }
+                        <a class="su-text-sm su-text-accent" href="@descriptor.DocsUrl" target="_blank" rel="noreferrer">
+                            @Loc["panel_websearch.docs"]
+                        </a>
+                    </div>
+                    <p class="su-text-sm su-text-2 su-mt-1">@Loc[descriptor.DescriptionKey]</p>
+
+                    <div class="su-row su-mt-2">
+                        <div class="su-col-6">
+                            <label class="su-label">@Loc["panel_websearch.api_key"]</label>
+                            <input type="password" class="su-input su-w-full" autocomplete="off"
+                                   @bind="_apiKeys[descriptor.Kind]" @bind:event="oninput" />
+                        </div>
+                        <div class="su-col-6">
+                            <label class="su-label">@Loc["panel_websearch.base_url"]</label>
+                            <input class="su-input su-w-full" placeholder="@descriptor.DefaultBaseUrl"
+                                   @bind="_baseUrls[descriptor.Kind]" @bind:event="oninput" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="su-group su-mt-4">
+        <h3 class="su-text-lg su-font-bold">@Loc["panel_websearch.test"]</h3>
+        <p class="su-text-sm su-text-2 su-mb-2">@Loc["panel_websearch.test_desc"]</p>
+        <div class="su-flex su-gap-3 su-flex-wrap" style="align-items:center;">
+            <select class="su-select" @bind="_testProvider">
+                @foreach (var descriptor in WebSearchProviderCatalog.All)
+                {
+                    <option value="@descriptor.Kind">@Loc[descriptor.NameKey]</option>
+                }
+            </select>
+            <input class="su-input su-flex-1" @bind="_testQuery" placeholder="@Loc["panel_websearch.test_placeholder"]" />
+            <button class="su-btn su-btn-primary" disabled="@_testing" @onclick="RunTestAsync">
+                @(_testing ? Loc["panel_websearch.testing"] : Loc["panel_websearch.test_run"])
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_testMessage))
+        {
+            <div class="su-alert @(_testFailed ? "su-alert-danger" : "su-alert-success") su-mt-2"
+                 style="padding:6px 10px;font-size:0.85em;white-space:pre-wrap;">@_testMessage</div>
+        }
+    </div>
+
+    <div class="su-mt-5 su-pt-3 su-border-top su-flex su-gap-3" style="align-items:center;">
+        <button class="su-btn su-btn-primary" @onclick="SaveConfig">@Loc["panel_websearch.save"]</button>
+        <button class="su-btn su-btn-outline" @onclick="ResetToDefaults">@Loc["panel_websearch.reset"]</button>
+        @if (!string.IsNullOrEmpty(_statusMessage))
+        {
+            <span class="su-badge @(_statusFailed ? "su-badge-danger" : "su-badge-success")">@_statusMessage</span>
+        }
+    </div>
+</div>
+
+@code {
+    private WebSearchProviderKind _activeProvider = WebSearchProviderKind.Tavily;
+    private WebSearchProviderKind _testProvider = WebSearchProviderKind.Tavily;
+    private string _maxResults = "";
+    private string _timeoutSeconds = "";
+    private string _maxContentChars = "";
+    private string _maxFetchChars = "";
+    private string _language = "";
+    private string _country = "";
+    private bool _includeContent;
+
+    private readonly Dictionary<WebSearchProviderKind, string> _apiKeys = [];
+    private readonly Dictionary<WebSearchProviderKind, string> _baseUrls = [];
+
+    private string _testQuery = "";
+    private string _testMessage = "";
+    private bool _testFailed;
+    private bool _testing;
+
+    private string _statusMessage = "";
+    private bool _statusFailed;
+
+    protected override void OnInitialized()
+    {
+        foreach (var descriptor in WebSearchProviderCatalog.All)
+        {
+            _apiKeys[descriptor.Kind] = "";
+            _baseUrls[descriptor.Kind] = "";
+        }
+
+        var (config, error) = WebSearchConfigManager.Load(KVData);
+        if (config == null)
+        {
+            ShowStatus(Loc.Format("panel_websearch.msg_load_failed", error ?? "unknown error"), failed: true);
+            return;
+        }
+
+        ApplyToForm(config);
+    }
+
+    private void ApplyToForm(WebSearchConfig config)
+    {
+        _activeProvider = config.ActiveProvider;
+        _testProvider = config.ActiveProvider;
+        _maxResults = config.MaxResults.ToString();
+        _timeoutSeconds = config.TimeoutSeconds.ToString();
+        _maxContentChars = config.MaxContentChars.ToString();
+        _maxFetchChars = config.MaxFetchChars.ToString();
+        _language = config.Language;
+        _country = config.Country;
+        _includeContent = config.IncludeContent;
+
+        foreach (var descriptor in WebSearchProviderCatalog.All)
+        {
+            var settings = config.GetProviderSettings(descriptor.Kind);
+            _apiKeys[descriptor.Kind] = settings.ApiKey;
+            _baseUrls[descriptor.Kind] = settings.BaseUrl;
+        }
+    }
+
+    /// <summary>把表单内容组装成配置。数值非法时返回 null 并给出提示，不做静默取默认值。</summary>
+    private WebSearchConfig? BuildConfig(out string? error)
+    {
+        error = null;
+
+        if (!int.TryParse(_maxResults, out var maxResults) ||
+            maxResults < WebSearchConfigManager.MinMaxResults || maxResults > WebSearchConfigManager.MaxMaxResults)
+        {
+            error = Loc.Format("panel_websearch.msg_invalid_max_results",
+                WebSearchConfigManager.MinMaxResults, WebSearchConfigManager.MaxMaxResults);
+            return null;
+        }
+
+        if (!int.TryParse(_timeoutSeconds, out var timeout) ||
+            timeout < WebSearchConfigManager.MinTimeoutSeconds || timeout > WebSearchConfigManager.MaxTimeoutSeconds)
+        {
+            error = Loc.Format("panel_websearch.msg_invalid_timeout",
+                WebSearchConfigManager.MinTimeoutSeconds, WebSearchConfigManager.MaxTimeoutSeconds);
+            return null;
+        }
+
+        if (!int.TryParse(_maxContentChars, out var maxContentChars) || maxContentChars < 0)
+        {
+            error = Loc["panel_websearch.msg_invalid_max_content_chars"];
+            return null;
+        }
+
+        if (!int.TryParse(_maxFetchChars, out var maxFetchChars) || maxFetchChars < 0)
+        {
+            error = Loc["panel_websearch.msg_invalid_max_fetch_chars"];
+            return null;
+        }
+
+        var config = new WebSearchConfig
+        {
+            ActiveProvider = _activeProvider,
+            MaxResults = maxResults,
+            TimeoutSeconds = timeout,
+            MaxContentChars = maxContentChars,
+            MaxFetchChars = maxFetchChars,
+            IncludeContent = _includeContent,
+            Language = _language.Trim(),
+            Country = _country.Trim()
+        };
+
+        foreach (var descriptor in WebSearchProviderCatalog.All)
+        {
+            config.Providers[descriptor.Kind] = new WebSearchProviderSettings
+            {
+                ApiKey = _apiKeys[descriptor.Kind].Trim(),
+                BaseUrl = _baseUrls[descriptor.Kind].Trim()
+            };
+        }
+
+        var validationError = WebSearchConfigManager.Validate(config);
+        if (validationError != null)
+        {
+            error = Loc.Format("panel_websearch.msg_invalid_config", validationError);
+            return null;
+        }
+
+        return config;
+    }
+
+    private void SaveConfig()
+    {
+        var config = BuildConfig(out var error);
+        if (config == null)
+        {
+            ShowStatus(error!, failed: true);
+            return;
+        }
+
+        try
+        {
+            WebSearchConfigManager.Save(KVData, config);
+            ShowStatus(Loc["panel_websearch.msg_saved"], failed: false);
+        }
+        catch (Exception ex)
+        {
+            ShowStatus(Loc.Format("panel_websearch.msg_save_failed", ex.Message), failed: true);
+        }
+    }
+
+    private void ResetToDefaults()
+    {
+        ApplyToForm(new WebSearchConfig());
+        ShowStatus(Loc["panel_websearch.msg_reset"], failed: false);
+    }
+
+    /// <summary>先按当前表单保存配置，再用选定的提供方真实跑一次搜索，验证 Key / 网络是否可用。</summary>
+    private async Task RunTestAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_testQuery))
+        {
+            _testFailed = true;
+            _testMessage = Loc["panel_websearch.msg_test_query_required"];
+            return;
+        }
+
+        var config = BuildConfig(out var error);
+        if (config == null)
+        {
+            _testFailed = true;
+            _testMessage = error!;
+            return;
+        }
+
+        WebSearchConfigManager.Save(KVData, config);
+
+        _testing = true;
+        _testFailed = false;
+        _testMessage = Loc["panel_websearch.msg_testing"];
+
+        try
+        {
+            var resolution = WebSearchProviderFactory.Resolve(config, _testProvider);
+            if (resolution.Provider == null)
+            {
+                _testFailed = true;
+                _testMessage = WebSearchProviderFactory.DescribeResolutionError(resolution);
+                return;
+            }
+
+            var provider = resolution.Provider;
+            var query = new WebSearchQuery
+            {
+                Query = _testQuery.Trim(),
+                MaxResults = config.MaxResults,
+                IncludeContent = config.IncludeContent,
+                MaxContentChars = config.MaxContentChars,
+                Language = string.IsNullOrWhiteSpace(_language) ? null : _language.Trim(),
+                Country = string.IsNullOrWhiteSpace(_country) ? null : _country.Trim()
+            };
+
+            var response = await provider.SearchAsync(query, CancellationToken.None);
+            if (!response.Success)
+            {
+                _testFailed = true;
+                _testMessage = Loc.Format("panel_websearch.msg_test_failed", response.Error)
+                    + (string.IsNullOrWhiteSpace(response.ErrorDetails) ? "" : "\n" + response.ErrorDetails);
+                return;
+            }
+
+            if (response.Results.Count == 0)
+            {
+                _testMessage = Loc["panel_websearch.msg_test_no_results"];
+                return;
+            }
+
+            var lines = response.Results
+                .Select((r, i) => $"[{i + 1}] {r.Title}\n    {r.Url}");
+
+            _testMessage = Loc.Format("panel_websearch.msg_test_ok", provider.DisplayName, response.Results.Count)
+                + "\n" + string.Join("\n", lines);
+        }
+        catch (Exception ex)
+        {
+            _testFailed = true;
+            _testMessage = Loc.Format("panel_websearch.msg_test_failed", ex.Message);
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+
+    private void ShowStatus(string message, bool failed)
+    {
+        _statusMessage = message;
+        _statusFailed = failed;
+        InvokeAsync(async () =>
+        {
+            await Task.Delay(4000);
+            _statusMessage = "";
+            StateHasChanged();
+        });
+    }
+}

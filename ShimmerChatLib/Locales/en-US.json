@@ -18,6 +18,7 @@
   "category.tool": "Tool",
   "category.preset": "Preset",
   "category.sub_agent": "SubAgent",
+  "category.web_search": "Web Search",
   "category.general": "General",
   "category.other": "Other"
 }
