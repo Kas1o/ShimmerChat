@@ -112,4 +112,26 @@ public class APISelectNodeTests : NodeTestBase
         result.Success.Should().BeFalse();
         result.Code.Should().Be(NodeErrorCodes.ApiUnavailable);
     }
+
+    [Fact]
+    public async Task OpenCodeGo_PassesChatGuidAsSessionHeader()
+    {
+        var chatGuid = Guid.NewGuid();
+        var configs = new List<ApiConfig>
+        {
+            new() { Name = "Go", Type = ApiConfigType.OpenCodeGo, OpenCodeGoApiKey = "k" },
+        };
+        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting"))
+            .Returns(JsonConvert.SerializeObject(configs));
+        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIGuid")).Returns(configs[0].Id.ToString());
+
+        TestChat.Guid = chatGuid;
+        var ctx = CreateContext();
+        var result = await new APISelectNode { APIGuid = null }.ExecuteAsync(ctx);
+
+        result.Success.Should().BeTrue();
+        var client = ctx.Env.Transient.API!.ChatClient
+            .Should().BeOfType<SharperLLM.API.OpenAIChatCompletionClient>().Subject;
+        client.CustomHeaders!["x-opencode-session"].Should().Be(chatGuid.ToString());
+    }
 }

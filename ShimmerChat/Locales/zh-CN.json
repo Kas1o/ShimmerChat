@@ -62,6 +62,9 @@
   "PseudoAPI Info Description": "此 API 类型不会执行任何 AI 生成，而是直接返回最后一段消息内容作为响应。它专为高级自定义的 Agentic 工作流而设计，普通用户无需使用。",
   "OpenAIText Warning Title": "注意：OpenAI 文本补全（/completions）",
   "OpenAIText Warning Description": "大部分 OpenAI 兼容端点已废弃 /completions 接口。如果此模式无法正常工作，请改用 OpenAI（chat）类型。仅当你的 API 明确支持 /completions 端点时才应使用此选项。",
+  "OpenCodeGo Info Title": "OpenCode Go（OpenAI 兼容）",
+  "OpenCodeGo Info Description": "订阅 OpenCode Go 后，在 OpenCode Console 复制 API Key 填入下方即可。请求走 OpenAI 兼容的 /chat/completions 路径，并自动附带 User-Agent 与 x-opencode-session（当前对话 Guid）请求头。仅 GLM / Kimi / DeepSeek / MiMo / LongCat / Hy 等模型在该路径上可用；Claude、Gemini、Qwen、MiniMax 等原生走 Anthropic / Google 路径的模型无法通过此类型使用。",
+  "API MODELS URL": "模型列表地址",
 
   "Text Completion Settings:": "文本补全设置：",
   "Create New Text Completion Setting Profile": "创建新文本补全设置",

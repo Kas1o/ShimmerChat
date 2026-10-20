@@ -47,6 +47,26 @@ namespace ShimmerChatBuiltin
 
 		#endregion
 
+		#region OpenCode Go
+		/// <summary>OpenCode Go 的 OpenAI 兼容对话接口前缀（官方文档给出的端点去掉 /chat/completions）。</summary>
+		public const string OpenCodeGoDefaultUrl = "https://opencode.ai/inference/go/openai/v1";
+
+		/// <summary>OpenCode Go 的模型列表接口（与对话接口不在同一路径前缀下）。</summary>
+		public const string OpenCodeGoDefaultModelsUrl = "https://opencode.ai/inference/go/v1/models";
+
+		/// <summary>OpenCode Go 要求客户端用自有 User-Agent 标识身份，而不是通用 HTTP 库名。</summary>
+		public const string OpenCodeGoUserAgent = "ShimmerChat/2.0";
+
+		public string? OpenCodeGoUrl { get; set; } = OpenCodeGoDefaultUrl;
+		public string? OpenCodeGoModelsUrl { get; set; } = OpenCodeGoDefaultModelsUrl;
+		public string? OpenCodeGoApiKey { get; set; } = "";
+		public string? OpenCodeGoModel { get; set; } = "glm-5.3-flash";
+		public bool OpenCodeGoStream { get; set; } = true;
+		public int OpenCodeGoCtx { get; set; } = 16384;
+		public bool OpenCodeGoAsIs { get; set; } = false;
+
+		#endregion OpenCode Go
+
 		#region OpenAIText
 		public string? OpenAITextUrl { get; set; } = "http://localhost:5001/api/v1";
 		public string? OpenAITextApiKey { get; set; } = "key";
@@ -64,10 +84,18 @@ namespace ShimmerChatBuiltin
 		{
 			ApiConfigType.OpenAI => OpenAIStream,
 			ApiConfigType.DeepSeek => DeepSeekStream,
+			ApiConfigType.OpenCodeGo => OpenCodeGoStream,
 			_ => false
 		};
 
-		public APISetting ToAPISetting()
+		/// <summary>
+		/// 转换为管线使用的 API 设置。
+		/// </summary>
+		/// <param name="sessionId">
+		/// 当前对话的稳定标识。OpenCode Go 会把它作为 <c>x-opencode-session</c> 发出，
+		/// 供上游做会话路由与 prompt 缓存；为 null 时不发送该头。
+		/// </param>
+		public APISetting ToAPISetting(string? sessionId = null)
 		{
 			switch (Type)
 			{
@@ -155,6 +183,29 @@ namespace ShimmerChatBuiltin
 						SupportsToolCalling = false
 					};
 
+				case ApiConfigType.OpenCodeGo:
+				{
+					// OpenCode Go 走 OpenAI 兼容路径，仅额外要求 User-Agent 与会话头。
+					var client = new OpenAIChatCompletionClient(
+						_url: string.IsNullOrWhiteSpace(OpenCodeGoUrl) ? OpenCodeGoDefaultUrl : OpenCodeGoUrl,
+						_apiKey: OpenCodeGoApiKey ?? throw new InvalidOperationException("OpenCode Go API key is required."),
+						_model: string.IsNullOrWhiteSpace(OpenCodeGoModel) ? "glm-5.3-flash" : OpenCodeGoModel,
+						_max_tokens: OpenCodeGoCtx,
+						_as_is: OpenCodeGoAsIs
+					)
+					{
+						ModelsUrl = string.IsNullOrWhiteSpace(OpenCodeGoModelsUrl) ? null : OpenCodeGoModelsUrl,
+						CustomHeaders = BuildOpenCodeGoHeaders(sessionId)
+					};
+
+					return new APISetting
+					{
+						ChatClient = client,
+						SupportsStreaming = OpenCodeGoStream,
+						SupportsToolCalling = true
+					};
+				}
+
 				case ApiConfigType.OpenAIText:
 					return new APISetting
 					{
@@ -180,6 +231,23 @@ namespace ShimmerChatBuiltin
 				default:
 					throw new InvalidOperationException($"Unsupported API type: {Type}");
 			}
+		}
+
+		/// <summary>
+		/// OpenCode Go 文档要求客户端用自有 User-Agent 标识身份，
+		/// 并用稳定的 <c>x-opencode-session</c> 标记每个对话（供上游路由与 prompt 缓存）。
+		/// </summary>
+		private static Dictionary<string, string> BuildOpenCodeGoHeaders(string? sessionId)
+		{
+			var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+			{
+				["User-Agent"] = OpenCodeGoUserAgent
+			};
+
+			if (!string.IsNullOrWhiteSpace(sessionId))
+				headers["x-opencode-session"] = sessionId;
+
+			return headers;
 		}
 
 		private SharperLLM.Util.PromptBuilder GetPromptTemplate()
@@ -234,6 +302,14 @@ namespace ShimmerChatBuiltin
 				OllamaUrl = OllamaUrl,
 				OllamaModel = OllamaModel,
 
+				OpenCodeGoUrl = OpenCodeGoUrl,
+				OpenCodeGoModelsUrl = OpenCodeGoModelsUrl,
+				OpenCodeGoApiKey = OpenCodeGoApiKey,
+				OpenCodeGoModel = OpenCodeGoModel,
+				OpenCodeGoStream = OpenCodeGoStream,
+				OpenCodeGoCtx = OpenCodeGoCtx,
+				OpenCodeGoAsIs = OpenCodeGoAsIs,
+
 				OpenAITextUrl = OpenAITextUrl,
 				OpenAITextApiKey = OpenAITextApiKey,
 				OpenAITextModel = OpenAITextModel,
@@ -252,6 +328,8 @@ namespace ShimmerChatBuiltin
 		OpenAI,
 		DeepSeek,
 		OpenAIText,
-		Pseudo
+		Pseudo,
+		// 新增类型必须追加在末尾：已保存的 API 配置可能把枚举存成序号。
+		OpenCodeGo
 	}
 }

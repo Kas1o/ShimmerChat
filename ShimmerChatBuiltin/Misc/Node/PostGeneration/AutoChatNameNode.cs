@@ -87,7 +87,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PostGeneration
                 return PostNodeResult.SuccessResult();
 
             // 4. 解析 API 配置
-            var apiSetting = ResolveAPI(kvData);
+            var apiSetting = ResolveAPI(kvData, chatGuid);
             if (apiSetting == null)
                 return Fail(NodeErrorCodes.ApiUnavailable, loc["node_err.api_no_settings"]);
 
@@ -183,7 +183,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PostGeneration
         /// <summary>
         /// 解析 API 配置（与 APISelectNode 相同的逻辑）
         /// </summary>
-        private static APISetting? ResolveAPI(IKVDataService kvData)
+        private static APISetting? ResolveAPI(IKVDataService kvData, Guid chatGuid)
         {
             var json = kvData.Read("ApiSettings", "apiSetting") ?? "[]";
             var settings = JsonConvert.DeserializeObject<List<ApiConfig>>(json) ?? [];
@@ -198,7 +198,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PostGeneration
 
             selectedConfig ??= settings[0];
 
-            return selectedConfig.ToAPISetting();
+            return selectedConfig.ToAPISetting(chatGuid.ToString());
         }
 
         /// <summary>

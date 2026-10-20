@@ -20,6 +20,11 @@ public abstract class NodeTestBase
     /// </summary>
     protected readonly Mock<IImageAttachmentService> ImageAttachmentsMock = new();
 
+    /// <summary>
+    /// 默认对话实例。测试需要在生成前预置 Guid 等状态时，直接改这个实例再构建上下文。
+    /// </summary>
+    protected Chat TestChat { get; } = new() { Name = "TestChat" };
+
     protected NodeTestBase()
     {
         ImageAttachmentsMock
@@ -38,7 +43,7 @@ public abstract class NodeTestBase
             LocService = LocMock.Object,
             DebugOutput = DebugOutputMock.Object,
             ImageAttachments = ImageAttachmentsMock.Object,
-            Chat = new Chat { Name = "TestChat" },
+            Chat = TestChat,
             Agent = Agent.Create("TestAgent", "")
         };
     }

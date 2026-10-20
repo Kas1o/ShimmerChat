@@ -62,6 +62,9 @@
   "PseudoAPI Info Description": "This API type does not perform any AI generation. Instead, it directly returns the last message content as the response. It is designed for advanced custom Agentic workflows and is not needed by regular users.",
   "OpenAIText Warning Title": "Note: OpenAI Text Completion (/completions)",
   "OpenAIText Warning Description": "Most OpenAI-compatible endpoints have deprecated the /completions API. If this mode doesn't work, switch to OpenAI (chat) type instead. Only use this if your API explicitly supports the /completions endpoint.",
+  "OpenCodeGo Info Title": "OpenCode Go (OpenAI-compatible)",
+  "OpenCodeGo Info Description": "Subscribe to OpenCode Go, then paste the API key from the OpenCode Console below. Requests use the OpenAI-compatible /chat/completions path and automatically carry a User-Agent plus an x-opencode-session header (the current chat GUID). Only models served on that path (GLM / Kimi / DeepSeek / MiMo / LongCat / Hy and similar) work with this type; models that are only served on the Anthropic / Google paths (Claude, Gemini, Qwen, MiniMax) are not available here.",
+  "API MODELS URL": "API Models URL",
 
   "Text Completion Settings:": "Text Completion Settings:",
   "Create New Text Completion Setting Profile": "Create New Text Completion Setting Profile",

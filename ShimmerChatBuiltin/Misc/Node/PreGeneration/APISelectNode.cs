@@ -49,7 +49,8 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
 
             selectedConfig ??= settings[0];
 
-            context.Env.Transient.API = selectedConfig.ToAPISetting();
+            // 部分服务方（如 OpenCode Go）要求每个对话一个稳定会话标识：用对话 Guid
+            context.Env.Transient.API = selectedConfig.ToAPISetting(context.Env.Persistent.ChatGuid.ToString());
 
             // 续写处理：检查 SharedState 中的 IsContinuation 标记
             if (context.Env.Transient.SharedState.TryGetValue("IsContinuation", out var isCont)

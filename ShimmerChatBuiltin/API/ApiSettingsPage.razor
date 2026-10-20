@@ -27,6 +27,7 @@
             <option value="@ApiConfigType.Kobold">kobold</option>
             <option value="@ApiConfigType.OpenAI">openai</option>
             <option value="@ApiConfigType.DeepSeek">deepseek</option>
+            <option value="@ApiConfigType.OpenCodeGo">opencode go</option>
             <option value="@ApiConfigType.Ollama">ollama</option>
             <option value="@ApiConfigType.OpenAIText">openai (text)</option>
             <option value="@ApiConfigType.Pseudo">pseudo</option>
@@ -254,6 +255,50 @@
                 </div>
             }
 
+            @if (topAPISetting.Type == ApiConfigType.OpenCodeGo)
+            {
+                <div class="su-alert su-alert-info" style="margin: 8px 0; padding: 12px; background-color: #e8f4fd; border: 1px solid #b6d4fe; border-radius: 4px;">
+                    <strong>@Loc["OpenCodeGo Info Title"]</strong><br />
+                    @Loc["OpenCodeGo Info Description"]
+                </div>
+                <label>@Loc["API URL"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.OpenCodeGoUrl" />
+                <label>@Loc["API MODELS URL"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.OpenCodeGoModelsUrl" />
+                <label>@Loc["API KEY"]</label>
+                <input type="password" class="shimmer-input" @bind="topAPISetting.OpenCodeGoApiKey" />
+                <label>@Loc["API MODEL"]</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input class="shimmer-input" style="flex: 1;" @bind="topAPISetting.OpenCodeGoModel" />
+                    <button class="su-btn su-btn-secondary" style="white-space: nowrap;"
+                            disabled="@_isLoadingOpenCodeGoModels" @onclick="FetchOpenCodeGoModels">
+                        @(_isLoadingOpenCodeGoModels ? Loc["Fetching..."] : Loc["Fetch Models"])
+                    </button>
+                </div>
+                @if (_openCodeGoModels is { Count: > 0 })
+                {
+                    <select class="su-select" style="width: 100%; margin-top: 4px;"
+                            @bind:get="_selectedOpenCodeGoModel"
+                            @bind:set="OnOpenCodeGoModelSelected">
+                        <option value="">-- @Loc["Select or type model"] --</option>
+                        @foreach (var m in _openCodeGoModels)
+                        {
+                            <option value="@m">@m</option>
+                        }
+                    </select>
+                }
+                @if (!string.IsNullOrEmpty(_openCodeGoModelError))
+                {
+                    <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px;">@_openCodeGoModelError</div>
+                }
+                <label>@Loc["API GENERATION LENGTH"]</label>
+                <input class="shimmer-input" @bind="topAPISetting.OpenCodeGoCtx" />
+                <label>@Loc["API ENABLE STREAM"]</label>
+                <input type="checkbox" @bind="topAPISetting.OpenCodeGoStream" />
+                <label>@Loc["API ASIS"]</label>
+                <input type="checkbox" @bind="topAPISetting.OpenCodeGoAsIs" />
+            }
+
             @if (topAPISetting.Type == ApiConfigType.OpenAIText)
             {
                 <label>@Loc["API URL"]</label>
@@ -357,6 +402,55 @@
         finally
         {
             _isLoadingDeepSeekModels = false;
+        }
+    }
+
+    // OpenCode Go model fetching
+    private List<string>? _openCodeGoModels;
+    private bool _isLoadingOpenCodeGoModels;
+    private string? _openCodeGoModelError;
+    private string _selectedOpenCodeGoModel = "";
+
+    private void OnOpenCodeGoModelSelected(string value)
+    {
+        _selectedOpenCodeGoModel = value;
+        if (!string.IsNullOrEmpty(value) && topAPISetting != null)
+        {
+            topAPISetting.OpenCodeGoModel = value;
+        }
+    }
+
+    private async Task FetchOpenCodeGoModels()
+    {
+        if (topAPISetting == null) return;
+        _openCodeGoModelError = null;
+        _isLoadingOpenCodeGoModels = true;
+        try
+        {
+            var client = new SharperLLM.API.OpenAIChatCompletionClient(
+                _url: string.IsNullOrWhiteSpace(topAPISetting.OpenCodeGoUrl)
+                    ? ApiConfig.OpenCodeGoDefaultUrl
+                    : topAPISetting.OpenCodeGoUrl,
+                _apiKey: topAPISetting.OpenCodeGoApiKey ?? "",
+                _model: string.IsNullOrWhiteSpace(topAPISetting.OpenCodeGoModel)
+                    ? "glm-5.3-flash"
+                    : topAPISetting.OpenCodeGoModel
+            )
+            {
+                ModelsUrl = string.IsNullOrWhiteSpace(topAPISetting.OpenCodeGoModelsUrl)
+                    ? null
+                    : topAPISetting.OpenCodeGoModelsUrl
+            };
+            _openCodeGoModels = await client.GetModelNameList();
+        }
+        catch (Exception ex)
+        {
+            _openCodeGoModelError = ex.Message;
+            _openCodeGoModels = null;
+        }
+        finally
+        {
+            _isLoadingOpenCodeGoModels = false;
         }
     }
 

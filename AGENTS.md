@@ -2,7 +2,7 @@
 
 ## 1. 项目简介
 
-ShimmerChat 是一个功能丰富的 AI 聊天应用，基于 **.NET 10 + Blazor Server**，支持多种 LLM API（OpenAI、Ollama、Kobold）接入。核心架构围绕 **三管线可编辑节点树（Pre / Post / Render）** 重构。
+ShimmerChat 是一个功能丰富的 AI 聊天应用，基于 **.NET 10 + Blazor Server**，支持多种 LLM API（OpenAI、DeepSeek、OpenCode Go、Ollama、Kobold）接入。核心架构围绕 **三管线可编辑节点树（Pre / Post / Render）** 重构。
 
 **目标用户：** 需要高度自定义 AI 生成管线的用户，可以通过可视化节点编辑器自由编排 system prompt、聊天历史注入、工具调用、子代理、后处理、渲染修改等全链路流程。
 
