@@ -39,6 +39,12 @@ public class SubAgentLoopHost : IToolCallLoopHost
     /// </summary>
     private readonly Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? _rebuildFragments;
 
+    /// <summary>
+    /// 增量消息回调：每条 assistant / tool_result 追加进对话增量后立即回调一次，
+    /// 供调用方把消息落盘（会话持久化）。null = 不落盘。
+    /// </summary>
+    private readonly Action<(ChatMessage Message, PromptBuilder.From From)>? _onMessageAppended;
+
     /// <summary>获取当前 PromptContext（重建后可能被替换），供输出格式化使用。</summary>
     public SubAgentPromptContext CurrentContext => (SubAgentPromptContext)_promptContext;
 
@@ -46,12 +52,14 @@ public class SubAgentLoopHost : IToolCallLoopHost
         SubAgentPromptContext promptContext,
         IToolExecutor toolExecutor,
         Func<ChatMessage, Task<ChatMessage>>? postProcessor = null,
-        Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = null)
+        Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = null,
+        Action<(ChatMessage Message, PromptBuilder.From From)>? onMessageAppended = null)
     {
         _promptContext = promptContext;
         _toolExecutor = toolExecutor;
         _postProcessor = postProcessor;
         _rebuildFragments = rebuildFragments;
+        _onMessageAppended = onMessageAppended;
     }
 
     public PromptBuilder BuildPromptBuilder(IReadOnlyList<Tool> toolDefinitions)
@@ -75,7 +83,9 @@ public class SubAgentLoopHost : IToolCallLoopHost
             catch { /* 失败时保留原始消息 */ }
         }
         _promptContext.AppendAssistantMessage(body);
-        _conversation.Add((SubAgentPromptContext.CloneChatMessage(body), PromptBuilder.From.assistant));
+        var appended = (SubAgentPromptContext.CloneChatMessage(body), PromptBuilder.From.assistant);
+        _conversation.Add(appended);
+        _onMessageAppended?.Invoke(appended);
         return true;
     }
 
@@ -85,7 +95,9 @@ public class SubAgentLoopHost : IToolCallLoopHost
     public async Task OnToolCompleteAsync(ToolCall toolCall, string result, CancellationToken ct)
     {
         _promptContext.AppendToolResult(toolCall.id ?? "", toolCall.name, result);
-        _conversation.Add((new ChatMessage { Content = result, id = toolCall.id ?? "" }, PromptBuilder.From.tool_result));
+        var appended = (new ChatMessage { Content = result, id = toolCall.id ?? "" }, PromptBuilder.From.tool_result);
+        _conversation.Add(appended);
+        _onMessageAppended?.Invoke(appended);
 
         if (_rebuildFragments == null)
             return;

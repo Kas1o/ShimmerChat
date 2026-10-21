@@ -17,6 +17,20 @@ namespace ShimmerChatBuiltin.SubAgent
 
         public string ConfigGuid { get; set; } = "";
 
+        /// <summary>
+        /// true（默认）= 子代理继承父级 AgentGuid；false = 用 <see cref="SubAgentConfig.Guid"/>
+        /// 作为独立 Agent 身份，语义与 <c>SubAgentNode.SharedGuid</c> 相同。
+        /// </summary>
+        [NodeProperty("prop.sub_agent_tool.shared_agent_guid", HintKey = "prop.sub_agent_tool.shared_agent_guid.hint")]
+        public bool SharedAgentGuid { get; set; } = true;
+
+        /// <summary>
+        /// true（默认）= 子代理继承父级 ChatGuid；false = 用会话 Id 作为独立 Chat 作用域，
+        /// 即变量/记忆等 Chat 级状态每个会话一份。
+        /// </summary>
+        [NodeProperty("prop.sub_agent_tool.shared_chat_guid", HintKey = "prop.sub_agent_tool.shared_chat_guid.hint")]
+        public bool SharedChatGuid { get; set; } = true;
+
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
@@ -46,7 +60,11 @@ namespace ShimmerChatBuiltin.SubAgent
                 context.Env.Transient.Tools.Add(tool);
             }
 
-            tool.AddSubAgent(config);
+            tool.AddSubAgent(config, new SubAgentToolOptions
+            {
+                SharedAgentGuid = SharedAgentGuid,
+                SharedChatGuid = SharedChatGuid
+            });
             return Task.FromResult(NodeResult.SuccessResult());
         }
 

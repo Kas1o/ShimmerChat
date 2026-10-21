@@ -45,6 +45,27 @@
                 }
             </div>
         </div>
+        <div class="ge-field">
+            <label class="ge-label" title="@Loc["prop.sub_agent_tool.shared_agent_guid.hint"]">
+                @Loc["prop.sub_agent_tool.shared_agent_guid"]
+            </label>
+            <div class="ge-value">
+                <input type="checkbox" class="ge-check"
+                       checked="@Node.SharedAgentGuid"
+                       @onchange="OnSharedAgentGuidChanged" />
+            </div>
+        </div>
+
+        <div class="ge-field">
+            <label class="ge-label" title="@Loc["prop.sub_agent_tool.shared_chat_guid.hint"]">
+                @Loc["prop.sub_agent_tool.shared_chat_guid"]
+            </label>
+            <div class="ge-value">
+                <input type="checkbox" class="ge-check"
+                       checked="@Node.SharedChatGuid"
+                       @onchange="OnSharedChatGuidChanged" />
+            </div>
+        </div>
     </div>
 }
 
@@ -64,5 +85,15 @@
     private void OnConfigChanged(ChangeEventArgs e)
     {
         Node.ConfigGuid = e.Value?.ToString() ?? "";
+    }
+
+    private void OnSharedAgentGuidChanged(ChangeEventArgs e)
+    {
+        Node.SharedAgentGuid = (bool)(e.Value ?? false);
+    }
+
+    private void OnSharedChatGuidChanged(ChangeEventArgs e)
+    {
+        Node.SharedChatGuid = (bool)(e.Value ?? false);
     }
 }

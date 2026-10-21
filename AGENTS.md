@@ -106,7 +106,7 @@ Blazor Server 宿主 + 所有服务实现 + UI 页面。
 | `FileSystem/` | 文件系统工具集 |
 | `Memory/` | 记忆系统 |
 | `Variable/` | 变量管理 |
-| `SubAgent/` | 子代理节点 |
+| `SubAgent/` | 子代理节点与工具；`Sessions/` 为 `subagent_call` 的私有会话存储（KVData 空间 `SubAgent`，含索引与会话级锁），`SubAgentSessionPanel` 是 Settings 里的会话 Viewer |
 | `RegexModifier/` | 消息显示修改器 |
 | `WebSearch/` | 联网搜索：五个服务方（DeepSeek / Tavily / Brave / Exa / SerpApi）、自动搜索节点、搜索 + 抓取工具、设置面板 |
 

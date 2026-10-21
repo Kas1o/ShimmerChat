@@ -1,0 +1,418 @@
+@attribute [PluginPanelAttribute("panel.sub_agent_sessions", "panel.sub_agent_sessions.desc", PanelDisplayPlace.Settings, Order = 4)]
+
+@using Microsoft.JSInterop
+@using ShimmerChatBuiltin.SubAgent.Sessions
+@using ShimmerChatLib
+@using ShimmerChatLib.Interface
+
+@inject IKVDataService KVData
+@inject ILocService Loc
+@inject IMessageDisplayService Display
+@inject IDebugOutputService DebugOutput
+@inject IJSRuntime JS
+
+<div class="sessions-panel shimmer-content">
+    <div class="sessions-header">
+        <div class="sessions-header-title">
+            <h2>@Loc["panel_sub_agent_sessions.title"]</h2>
+            <p class="su-text-2">@Loc["panel_sub_agent_sessions.desc"]</p>
+        </div>
+        <button class="su-btn su-btn-outline-primary" @onclick="LoadIndex">
+            <i class="bi bi-arrow-clockwise"></i> @Loc["panel_sub_agent_sessions.refresh"]
+        </button>
+    </div>
+
+    @if (_statusMessage.Length > 0)
+    {
+        <div class="su-alert @(_statusFailed ? "su-alert-danger" : "su-alert-success")" style="padding:6px 10px;font-size:0.85em;">@_statusMessage</div>
+    }
+
+    @if (_indexError != null)
+    {
+        <div class="su-alert su-alert-danger" style="padding:8px 12px;font-size:0.85em;">
+            <strong>@Loc["panel_sub_agent_sessions.index_error"]</strong> @_indexError
+        </div>
+    }
+
+    <div class="sessions-layout">
+        <!-- 一级：按 SubAgent 配置分组的会话列表 -->
+        <aside class="sessions-list-pane su-group">
+            <div class="sessions-list-header">
+                <span class="sessions-list-title"><i class="bi bi-chat-left-text"></i> @Loc["panel_sub_agent_sessions.list_title"]</span>
+                <span class="su-badge su-badge-accent">@_totalCount</span>
+            </div>
+
+            @if (_groups.Count == 0)
+            {
+                <div class="sessions-empty">
+                    <i class="bi bi-chat-left-text"></i>
+                    <p>@Loc["panel_sub_agent_sessions.empty"]</p>
+                    <p class="su-text-sm su-text-2">@Loc["panel_sub_agent_sessions.empty_hint"]</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var group in _groups)
+                {
+                    <div class="sessions-group">
+                        <div class="sessions-group-header">
+                            <span class="sessions-group-name">
+                                <i class="bi bi-robot"></i> @group.ConfigName
+                                <span class="su-badge su-badge-accent">@group.Sessions.Count</span>
+                            </span>
+                            <button class="sessions-icon-btn" title="@Loc["panel_sub_agent_sessions.delete_group"]"
+                                    @onclick="() => ShowDeleteGroupConfirmation(group)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+
+                        @foreach (var summary in group.Sessions)
+                        {
+                            var isActive = _selectedSummary?.Id == summary.Id;
+                            <div class="sessions-list-item @(isActive ? "active" : "")" @onclick="() => SelectSession(summary)">
+                                <div class="sessions-list-item-main">
+                                    <div class="sessions-list-item-title su-truncate">@summary.Title</div>
+                                    <div class="sessions-list-item-meta">
+                                        <span class="su-badge @StatusBadgeClass(summary.Status)">@StatusLabel(summary.Status)</span>
+                                        <span class="su-text-sm su-text-2">@summary.MessageCount @Loc["panel_sub_agent_sessions.messages_suffix"]</span>
+                                        <span class="su-text-sm su-text-2">@summary.UpdatedAt.ToString("MM-dd HH:mm")</span>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(summary.LastPreview))
+                                    {
+                                        <div class="sessions-list-item-preview su-truncate">@summary.LastPreview</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </aside>
+
+        <!-- 二级：会话详情 -->
+        <section class="sessions-detail-pane su-group">
+            @if (_selectedSummary == null)
+            {
+                <div class="sessions-empty">
+                    <i class="bi bi-arrow-left-circle"></i>
+                    <p>@Loc["panel_sub_agent_sessions.select_hint"]</p>
+                </div>
+            }
+            else if (_sessionLoadError != null)
+            {
+                <div class="su-alert su-alert-danger" style="padding:8px 12px;font-size:0.85em;">
+                    <strong>@Loc["panel_sub_agent_sessions.load_error"]</strong> @_sessionLoadError
+                </div>
+            }
+            else if (_selectedSession != null)
+            {
+                <div class="sessions-detail-header">
+                    <div class="sessions-detail-title">
+                        <h3>@_selectedSession.Title</h3>
+                        <div class="sessions-detail-meta">
+                            <span class="su-badge @StatusBadgeClass(_selectedSession.Status)">@StatusLabel(_selectedSession.Status)</span>
+                            <span class="su-text-sm su-text-2">
+                                @Loc["panel_sub_agent_sessions.meta_config"] @_selectedSession.ConfigName
+                            </span>
+                            <span class="su-text-sm su-text-2">
+                                @Loc["panel_sub_agent_sessions.meta_updated"] @_selectedSession.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                            </span>
+                        </div>
+                        <div class="sessions-detail-id">
+                            <code>@_selectedSession.Id</code>
+                            <button class="sessions-icon-btn" title="@Loc["panel_sub_agent_sessions.copy_id"]" @onclick="CopySessionIdAsync">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="sessions-detail-actions">
+                        <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="ExportSessionAsync">
+                            <i class="bi bi-download"></i> @Loc["panel_sub_agent_sessions.export"]
+                        </button>
+                        <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="() => _deleteSessionVisible = true">
+                            <i class="bi bi-trash"></i> @Loc["panel_sub_agent_sessions.delete"]
+                        </button>
+                    </div>
+                </div>
+
+                @if (_selectedSession.Status == SubAgentSessionStatus.Failed)
+                {
+                    <div class="su-alert su-alert-danger sessions-failure" style="padding:8px 12px;font-size:0.85em;">
+                        <div><strong>@_selectedSession.ErrorCode</strong></div>
+                        <div style="white-space:pre-wrap;">@_selectedSession.ErrorMessage</div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_selectedSession.OutputText))
+                {
+                    <div class="sessions-output">
+                        <div class="sessions-output-title">@Loc["panel_sub_agent_sessions.output"]</div>
+                        <div class="sessions-output-body">@Display.Render(_selectedSession.OutputText)</div>
+                    </div>
+                }
+
+                <div class="sessions-messages">
+                    @foreach (var message in _selectedSession.Messages)
+                    {
+                        var content = message.CurrentVersion;
+                        <div class="sessions-msg @SenderClass(message.sender)">
+                            <div class="sessions-msg-head">
+                                <span class="sessions-msg-role">@SenderLabel(message.sender)</span>
+                                <span class="sessions-msg-time">@message.timestamp.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                            </div>
+                            @if (content == null)
+                            {
+                                <div class="sessions-msg-body su-text-2">@Loc["panel_sub_agent_sessions.empty_message"]</div>
+                            }
+                            else
+                            {
+                                @if (!string.IsNullOrWhiteSpace(content.Content))
+                                {
+                                    <div class="sessions-msg-body">@Display.Render(content.Content)</div>
+                                }
+                                @if (content.toolCalls is { Count: > 0 })
+                                {
+                                    <details class="sessions-toolcalls">
+                                        <summary>@Loc.Format("panel_sub_agent_sessions.tool_calls", content.toolCalls.Count)</summary>
+                                        @foreach (var toolCall in content.toolCalls)
+                                        {
+                                            <div class="sessions-toolcall">
+                                                <code>@toolCall.name</code>
+                                                <pre>@toolCall.arguments</pre>
+                                            </div>
+                                        }
+                                    </details>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+</div>
+
+@if (_deleteSessionVisible && _selectedSession != null)
+{
+    <div class="su-modal-mask" @onclick="() => _deleteSessionVisible = false">
+        <div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
+            <h5>@Loc["panel_sub_agent_sessions.delete_title"]</h5>
+            <p class="su-mt-2">@Loc.Format("panel_sub_agent_sessions.delete_msg", _selectedSession.Title)</p>
+            <div class="su-modal-footer">
+                <button class="su-btn su-btn-secondary" @onclick="() => _deleteSessionVisible = false">@Loc["panel_sub_agent_sessions.cancel"]</button>
+                <button class="su-btn su-btn-danger" @onclick="DeleteSelectedSession">@Loc["panel_sub_agent_sessions.delete"]</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_deleteGroupVisible && _groupToDelete != null)
+{
+    <div class="su-modal-mask" @onclick="() => _deleteGroupVisible = false">
+        <div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
+            <h5>@Loc["panel_sub_agent_sessions.delete_group_title"]</h5>
+            <p class="su-mt-2">@Loc.Format("panel_sub_agent_sessions.delete_group_msg", _groupToDelete.ConfigName, _groupToDelete.Sessions.Count)</p>
+            <div class="su-modal-footer">
+                <button class="su-btn su-btn-secondary" @onclick="() => _deleteGroupVisible = false">@Loc["panel_sub_agent_sessions.cancel"]</button>
+                <button class="su-btn su-btn-danger" @onclick="DeleteGroup">@Loc["panel_sub_agent_sessions.delete"]</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private sealed class SessionGroup
+    {
+        public Guid ConfigGuid { get; init; }
+        public string ConfigName { get; init; } = "";
+        public List<SubAgentSessionSummary> Sessions { get; init; } = [];
+    }
+
+    private List<SessionGroup> _groups = [];
+    private int _totalCount;
+    private string? _indexError;
+
+    private SubAgentSessionSummary? _selectedSummary;
+    private SubAgentSession? _selectedSession;
+    private string? _sessionLoadError;
+
+    private bool _deleteSessionVisible;
+    private bool _deleteGroupVisible;
+    private SessionGroup? _groupToDelete;
+
+    private string _statusMessage = "";
+    private bool _statusFailed;
+
+    protected override void OnInitialized() => LoadIndex();
+
+    private void LoadIndex()
+    {
+        var (summaries, error) = SubAgentSessionStore.List(KVData, DebugOutput);
+        _indexError = error;
+        _totalCount = summaries.Count;
+
+        _groups = summaries
+            .GroupBy(s => s.ConfigGuid)
+            .Select(g => new SessionGroup
+            {
+                ConfigGuid = g.Key,
+                ConfigName = g.Select(s => s.ConfigName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? g.Key.ToString(),
+                Sessions = g.OrderByDescending(s => s.UpdatedAt).ToList()
+            })
+            .OrderBy(g => g.ConfigName, StringComparer.CurrentCulture)
+            .ToList();
+
+        // 已选中的会话可能已被删除或改名，按 Id 重新定位
+        if (_selectedSummary != null)
+        {
+            var relocated = summaries.FirstOrDefault(s => s.Id == _selectedSummary.Id);
+            if (relocated == null)
+            {
+                _selectedSummary = null;
+                _selectedSession = null;
+                _sessionLoadError = null;
+            }
+            else
+            {
+                _selectedSummary = relocated;
+            }
+        }
+    }
+
+    private void SelectSession(SubAgentSessionSummary summary)
+    {
+        _selectedSummary = summary;
+        _sessionLoadError = null;
+        _selectedSession = null;
+
+        var read = SubAgentSessionStore.Load(KVData, DebugOutput, summary.Id);
+        if (read.Status == SubAgentSessionLoadStatus.Ok)
+        {
+            _selectedSession = read.Session;
+        }
+        else if (read.Status == SubAgentSessionLoadStatus.NotFound)
+        {
+            _sessionLoadError = Loc["panel_sub_agent_sessions.loaded_missing"];
+        }
+        else
+        {
+            _sessionLoadError = read.Error;
+        }
+    }
+
+    private async Task CopySessionIdAsync()
+    {
+        if (_selectedSession == null)
+            return;
+
+        await JS.InvokeVoidAsync("copyTextToClipboard", _selectedSession.Id.ToString());
+        ShowStatus(Loc["panel_sub_agent_sessions.copied"], failed: false);
+    }
+
+    private async Task ExportSessionAsync()
+    {
+        if (_selectedSession == null)
+            return;
+
+        // 导出原始存储文本，保证与磁盘内容一致
+        var json = KVData.Read(SubAgentSessionStore.SpaceId, SubAgentSessionStore.SessionKey(_selectedSession.Id));
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            ShowStatus(Loc["panel_sub_agent_sessions.export_failed"], failed: true);
+            return;
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        using var stream = new MemoryStream(bytes);
+        using var streamRef = new DotNetStreamReference(stream);
+        await JS.InvokeVoidAsync("downloadFileFromStream", $"subagent-session-{_selectedSession.Id:N}.json", streamRef);
+    }
+
+    private void DeleteSelectedSession()
+    {
+        if (_selectedSession == null)
+            return;
+
+        var error = SubAgentSessionStore.Delete(KVData, DebugOutput, _selectedSession.Id);
+        _deleteSessionVisible = false;
+
+        if (error != null)
+        {
+            ShowStatus(Loc.Format("panel_sub_agent_sessions.delete_failed", error), failed: true);
+            return;
+        }
+
+        _selectedSummary = null;
+        _selectedSession = null;
+        _sessionLoadError = null;
+        LoadIndex();
+        ShowStatus(Loc["panel_sub_agent_sessions.deleted"], failed: false);
+    }
+
+    private void ShowDeleteGroupConfirmation(SessionGroup group)
+    {
+        _groupToDelete = group;
+        _deleteGroupVisible = true;
+    }
+
+    private void DeleteGroup()
+    {
+        if (_groupToDelete == null)
+            return;
+
+        var (deleted, error) = SubAgentSessionStore.DeleteAllForConfig(KVData, DebugOutput, _groupToDelete.ConfigGuid);
+        _deleteGroupVisible = false;
+        _groupToDelete = null;
+
+        if (error != null)
+            ShowStatus(Loc.Format("panel_sub_agent_sessions.delete_failed", error), failed: true);
+        else
+            ShowStatus(Loc.Format("panel_sub_agent_sessions.deleted_count", deleted), failed: false);
+
+        _selectedSummary = null;
+        _selectedSession = null;
+        LoadIndex();
+    }
+
+    private void ShowStatus(string message, bool failed)
+    {
+        _statusMessage = message;
+        _statusFailed = failed;
+        _ = InvokeAsync(async () =>
+        {
+            await Task.Delay(4000);
+            _statusMessage = "";
+            StateHasChanged();
+        });
+    }
+
+    private string StatusBadgeClass(SubAgentSessionStatus status) => status switch
+    {
+        SubAgentSessionStatus.Completed => "su-badge-success",
+        SubAgentSessionStatus.Failed => "su-badge-danger",
+        _ => "su-badge-accent"
+    };
+
+    private string StatusLabel(SubAgentSessionStatus status) => status switch
+    {
+        SubAgentSessionStatus.Completed => Loc["panel_sub_agent_sessions.status_completed"],
+        SubAgentSessionStatus.Failed => Loc["panel_sub_agent_sessions.status_failed"],
+        _ => Loc["panel_sub_agent_sessions.status_running"]
+    };
+
+    private string SenderClass(string sender) => sender switch
+    {
+        Sender.User => "sessions-msg-user",
+        Sender.AI => "sessions-msg-ai",
+        Sender.ToolResult => "sessions-msg-tool",
+        _ => "sessions-msg-system"
+    };
+
+    private string SenderLabel(string sender) => sender switch
+    {
+        Sender.User => Loc["panel_sub_agent_sessions.role_user"],
+        Sender.AI => Loc["panel_sub_agent_sessions.role_ai"],
+        Sender.ToolResult => Loc["panel_sub_agent_sessions.role_tool"],
+        _ => Loc["panel_sub_agent_sessions.role_system"]
+    };
+}

@@ -138,6 +138,36 @@ public class PreGenerationPreset
 | `SubAgentNode` | 嵌套子代理调用 |
 | `DynPromptNode` | 动态模板提示 |
 
+### 子智能体工具 `subagent_call` 的会话
+
+`SubAgentToolNode` 把子智能体配置注册进 `subagent_call` 工具。与 `SubAgentNode`
+（每次调用都是全新上下文）不同，**工具每次调用都会落成一条持久会话**：
+
+- **入参**：`subagent`（必填）、`task`（必填）、`session_id`（可选，续聊）、
+  `title`（可选，新会话标题；缺省取 task 首行前 60 字）。`chat_id` 作为 `session_id` 的别名被接受。
+- **出参信封**（始终 JSON）：
+  `{"ok":true,"session_id":"…","subagent":"…","status":"completed","message_count":12,"output":"…"}`；
+  失败时 `{"ok":false,"session_id":"…","code":"SESSION_NOT_FOUND","error":"…"}`。
+  落盘失败不会中断调用，但会带上 `"persisted":false` 与 `persist_error`。
+- **上下文**：续聊时载入会话历史 + 本次 `task`，**不注入父级 Fragments**（与工具既有行为一致）；
+  父级上下文只在 `SubAgentNode` 里注入。
+- **`output` 与 OutputMode**：`LastMessage` = 最终 AI 文本；`FullJson` = 整段交互的 JSON **字符串**，
+  即父级 prompt 里看到的是一段被转义的 JSON；`None` = 空字符串（仍返回 `session_id`）。
+- **错误码**：`INVALID_ARGUMENTS`、`SUBAGENT_REQUIRED`、`SUBAGENT_NOT_REGISTERED`、`TREE_NOT_FOUND`、
+  `INVALID_SESSION_ID`、`SESSION_NOT_FOUND`、`SESSION_OWNER_MISMATCH`、`SESSION_STORE_ERROR`、
+  `NO_API`、`TREE_FAILED`、`LOOP_FAILED`。
+- **存储**：KVData 空间 `SubAgent`，`sessions` 为索引、`session_{guid:N}` 为单会话全量 JSON；
+  不写入 `Chats` / 消息存储。查看、导出、删除见 Settings 的「SubAgent 会话」面板（`SubAgentSessionPanel`）。
+- **作用域开关**（`SubAgentToolNode` 属性，默认都继承父级）：
+
+  | 属性 | `true`（默认） | `false` |
+  |------|----------------|---------|
+  | `SharedAgentGuid` | 子代理继承父级 `AgentGuid` | 用配置 Guid 作独立 Agent 身份（同 `SubAgentNode.SharedGuid=false`） |
+  | `SharedChatGuid` | 子代理继承父级 `ChatGuid` | 每个会话用会话 Id 作独立 Chat 作用域（Chat 级变量、记忆按会话隔离） |
+
+  注意 `SubAgentNode` / `PostSubAgentNode` 只有一个 `SharedGuid`，它**只影响 AgentGuid**，
+  不涉及 ChatGuid；需要隔离 Chat 作用域时请使用工具节点上的 `SharedChatGuid`。
+
 ---
 
 ## 错误码
