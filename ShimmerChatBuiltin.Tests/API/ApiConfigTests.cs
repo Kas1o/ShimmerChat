@@ -122,4 +122,67 @@ public class ApiConfigTests
         config.OpenCodeGoStream = true;
         config.EnableStream.Should().BeTrue();
     }
+
+    [Fact]
+    public void OpenAI_ReasoningEchoDefaultsToFull()
+    {
+        var config = new ApiConfig { Type = ApiConfigType.OpenAI, OpenAIApiKey = "key" };
+
+        ResolveClient(config, null).ReasoningEchoMode.Should().Be(ReasoningEchoMode.Full);
+    }
+
+    [Fact]
+    public void OpenAI_ReasoningEchoModeIsConfigurable()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenAI,
+            OpenAIApiKey = "key",
+            OpenAIReasoningEchoMode = ReasoningEchoMode.None
+        };
+
+        ResolveClient(config, null).ReasoningEchoMode.Should().Be(ReasoningEchoMode.None);
+    }
+
+    [Fact]
+    public void DeepSeek_ReasoningEchoIsAlwaysFull()
+    {
+        var config = new ApiConfig { Type = ApiConfigType.DeepSeek, DeepSeekApiKey = "key" };
+
+        ResolveClient(config, null).ReasoningEchoMode.Should().Be(ReasoningEchoMode.Full);
+    }
+
+    [Fact]
+    public void Clone_CopiesOpenAIReasoningEchoMode()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenAI,
+            OpenAIReasoningEchoMode = ReasoningEchoMode.AfterLastUser
+        };
+
+        config.Clone().OpenAIReasoningEchoMode.Should().Be(ReasoningEchoMode.AfterLastUser);
+    }
+
+    [Fact]
+    public void OpenAI_ReasoningEchoModeSurvivesNewtonsoftRoundTrip()
+    {
+        var configs = new List<ApiConfig>
+        {
+            new() { Type = ApiConfigType.OpenAI, OpenAIReasoningEchoMode = ReasoningEchoMode.AfterLastUser }
+        };
+
+        var restored = JsonConvert.DeserializeObject<List<ApiConfig>>(JsonConvert.SerializeObject(configs));
+
+        restored![0].OpenAIReasoningEchoMode.Should().Be(ReasoningEchoMode.AfterLastUser);
+    }
+
+    [Fact]
+    public void OpenAI_MissingReasoningEchoModeDefaultsToFull()
+    {
+        // 旧配置没有该字段，反序列化后必须落到完整回传。
+        var restored = JsonConvert.DeserializeObject<List<ApiConfig>>("[{\"Type\":2}]");
+
+        restored![0].OpenAIReasoningEchoMode.Should().Be(ReasoningEchoMode.Full);
+    }
 }

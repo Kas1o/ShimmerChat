@@ -26,6 +26,12 @@ namespace ShimmerChatBuiltin
 		public bool OpenAIStream { get; set; } = true;
 		public int OpenAICtx { get; set; } = 16384;
 		public bool OpenAIAsIs { get; set; } = false;
+
+		/// <summary>
+		/// OpenAI 类型可配置的推理内容回传方式，默认为完整回传。
+		/// </summary>
+		public ReasoningEchoMode OpenAIReasoningEchoMode { get; set; } = ReasoningEchoMode.Full;
+
 		public string? OpenAICustomRequestBody { get; set; } = null;
 
 		#endregion OpenAI
@@ -120,7 +126,10 @@ namespace ShimmerChatBuiltin
 						_model: OpenAIModel ?? "gpt-4o",
 						_max_tokens: OpenAICtx,
 						_as_is: OpenAIAsIs
-					);
+					)
+					{
+						ReasoningEchoMode = OpenAIReasoningEchoMode
+					};
 
 					if (!string.IsNullOrWhiteSpace(OpenAICustomRequestBody))
 					{
@@ -156,6 +165,8 @@ namespace ShimmerChatBuiltin
 						_as_is: DeepSeekAsIs
 					)
 					{
+						// DeepSeek 固定完整回传：其推理 + 工具调用链需要完整 reasoning_content。
+						ReasoningEchoMode = ReasoningEchoMode.Full,
 						CustomRequestProperties = !string.IsNullOrEmpty(DeepSeekReasoningEffort)
 							? new Dictionary<string, object>
 							{
@@ -289,6 +300,7 @@ namespace ShimmerChatBuiltin
 				OpenAIStream = OpenAIStream,
 				OpenAICtx = OpenAICtx,
 				OpenAIAsIs = OpenAIAsIs,
+				OpenAIReasoningEchoMode = OpenAIReasoningEchoMode,
 				OpenAICustomRequestBody = OpenAICustomRequestBody,
 
 				DeepSeekUrl = DeepSeekUrl,

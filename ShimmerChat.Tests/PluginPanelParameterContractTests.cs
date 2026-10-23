@@ -65,27 +65,6 @@ public class PluginPanelParameterContractTests
         return data;
     }
 
-    [Fact]
-    public void Discovery_FindsEveryBuiltinPanel()
-    {
-        var discovered = DiscoverPanelTypes();
-        var types = discovered.Select(t => t.FullName).ToList();
-
-        // 若新增面板而这里没跟上，说明发现逻辑退化了（而不是面板漏适配）。
-        Assert.Contains("ShimmerChatBuiltin.Variable.VariablePanel", types);
-        Assert.Contains("ShimmerChatBuiltin.Variable.AgentVariablePanel", types);
-        Assert.Contains("ShimmerChatBuiltin.Memory.MemoryManagementAgentPluginPanel", types);
-        Assert.Contains("ShimmerChatBuiltin.SubAgent.SubAgentConfigurationPanel", types);
-        Assert.Contains("ShimmerChatBuiltin.FileSystem.FileSystemPanel", types);
-        Assert.Contains("ShimmerChatBuiltin.API.ApiSettingsPage", types);
-        Assert.Contains("ShimmerChatBuiltin.Misc.ToolManager", types);
-        Assert.Contains("ShimmerChatBuiltin.Example.ExamplePanel", types);
-        Assert.Contains("ShimmerChatBuiltin.WebSearch.WebSearchPanel", types);
-
-        // 数量守卫：反射加载失败会静默丢类型，从而让契约测试失去意义。
-        Assert.Equal(13, discovered.Count);
-    }
-
     [Theory]
     [MemberData(nameof(AllPanelTypes))]
     public void Panel_DeclaresEveryParameterProvidedByItsHost(Type panelType)

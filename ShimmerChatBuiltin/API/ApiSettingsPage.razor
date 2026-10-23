@@ -1,4 +1,5 @@
 @using ShimmerChatLib;
+@using SharperLLM.API;
 @using ShimmerChatLib.Panel
 @attribute [PluginPanelAttribute("panel.api_settings", "panel.api_settings.desc", PanelDisplayPlace.Settings, Order = 1)]
 @inject NavigationManager Navigation
@@ -203,6 +204,14 @@
                 <input type="checkbox" @bind="topAPISetting.OpenAIStream" />
                 <label>@Loc["API ASIS"]</label>
                 <input type="checkbox" @bind="topAPISetting.OpenAIAsIs" />
+                <div>
+                    <label>@Loc["API REASONING ECHO"]</label>
+                    <select class="shimmer-input" @bind="topAPISetting.OpenAIReasoningEchoMode">
+                        <option value="@ReasoningEchoMode.Full">@Loc["API REASONING ECHO FULL"]</option>
+                        <option value="@ReasoningEchoMode.AfterLastUser">@Loc["API REASONING ECHO AFTER LAST USER"]</option>
+                        <option value="@ReasoningEchoMode.None">@Loc["API REASONING ECHO NONE"]</option>
+                    </select>
+                </div>
                 <label>@Loc["API CUSTOM REQUEST BODY"]</label>
                 <textarea class="shimmer-input" rows="6" @bind="topAPISetting.OpenAICustomRequestBody"
                     placeholder="@Loc["API CUSTOM REQUEST BODY PLACEHOLDER"]"></textarea>
@@ -253,6 +262,8 @@
                         <option value="max">Max</option>
                     </select>
                 </div>
+                <label>@Loc["API REASONING ECHO"]</label>
+                <div style="font-style: italic; color: #666;">@Loc["API REASONING ECHO DEEPSEEK FIXED"]</div>
             }
 
             @if (topAPISetting.Type == ApiConfigType.OpenCodeGo)
