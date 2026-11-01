@@ -5,8 +5,8 @@ using SharperLLM.Util;
 namespace ShimmerChatLib.Generation;
 
 /// <summary>
-/// Tool Call 循环。纯逻辑，不读写外界状态。
-/// 负责流式累积、循环控制、错误处理；prompt 构建和工具执行委托给 IToolCallLoopHost。
+/// 生成轮次循环。纯逻辑，不读写外界状态：
+/// 负责流式累积与轮次上限；prompt 构建、工具执行、循环决策全部委托给 <see cref="IToolCallLoopHost"/>。
 /// </summary>
 public class ToolCallLoop
 {
@@ -15,7 +15,7 @@ public class ToolCallLoop
         IReadOnlyList<Tool> toolDefinitions,
         IToolCallLoopHost host,
         int maxRounds = Int32.MaxValue,
-        bool continueOnToolError = false,
+        bool streaming = true,
         CancellationToken ct = default)
     {
         for (int round = 0; round < maxRounds; round++)
@@ -30,34 +30,22 @@ public class ToolCallLoop
                 FinishReason = FinishReason.None
             };
 
-            await foreach (var chunk in api.GenerateStreamAsync(pb, ct))
+            if (streaming)
             {
-                Accumulate(chunk, accumulated);
+                await foreach (var chunk in api.GenerateStreamAsync(pb, ct))
+                {
+                    Accumulate(chunk, accumulated);
+                    await host.OnStreamDeltaAsync(accumulated, ct);
+                }
+            }
+            else
+            {
+                accumulated = await api.GenerateAsync(pb);
                 await host.OnStreamDeltaAsync(accumulated, ct);
             }
 
             if (!await host.OnAssistantCompleteAsync(accumulated, ct))
                 return;
-
-            if (accumulated.FinishReason != FinishReason.FunctionCall
-                || accumulated.Body.toolCalls == null
-                || accumulated.Body.toolCalls.Count == 0)
-                return;
-
-            foreach (var tc in accumulated.Body.toolCalls)
-            {
-                ct.ThrowIfCancellationRequested();
-                string result;
-                try
-                {
-                    result = await host.ExecuteToolAsync(tc, ct);
-                }
-                catch (Exception ex) when (continueOnToolError)
-                {
-                    result = $"[Tool error] {ex.Message}";
-                }
-                await host.OnToolCompleteAsync(tc, result, ct);
-            }
         }
     }
 

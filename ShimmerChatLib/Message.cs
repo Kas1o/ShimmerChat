@@ -92,8 +92,15 @@ namespace ShimmerChatLib
             }
         }
         
-        public required DateTime timestamp { get; set; } // The timestamp of the message
+        public required DateTime timestamp { get; set; } // The timestamp of the message (仅用于展示，不参与排序)
         public required string sender { get; set; } // The sender of the message
+
+        /// <summary>
+        /// 会话内顺序号。由 <see cref="Chat"/> 分配，保证唯一且等于消息在 <see cref="Chat.Messages"/> 中的索引；
+        /// -1 表示尚未分配（2.2 之前写入的老数据）。
+        /// 持久化后 store 按此字段排序，<see cref="timestamp"/> 不再承担排序职责。
+        /// </summary>
+        public long Order { get; set; } = -1;
 
         /// <summary>
         /// 消息携带的图像附件（与版本无关：重新生成、切换版本都保留）。

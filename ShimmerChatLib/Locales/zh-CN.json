@@ -20,5 +20,6 @@
   "category.sub_agent": "子智能体",
   "category.web_search": "联网搜索",
   "category.general": "通用",
+  "category.post": "后处理",
   "category.other": "其他"
 }

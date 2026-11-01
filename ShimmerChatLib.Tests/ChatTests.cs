@@ -82,7 +82,7 @@ public class ChatTests
         var chat = new Chat { Name = "Test" };
         var messages = new List<Message>
         {
-            new() { sender = Sender.User, timestamp = DateTime.UtcNow, Id = Guid.NewGuid() }
+            new() { sender = Sender.User, timestamp = DateTime.UtcNow, Id = Guid.NewGuid(), Order = 0 }
         };
         _msgStoreMock.Setup(m => m.GetMessageCount(chat.Guid)).Returns(1);
         _msgStoreMock.Setup(m => m.GetMessages(chat.Guid, 0, 1)).Returns(messages);
@@ -104,7 +104,7 @@ public class ChatTests
 
         var newMessages = new List<Message>
         {
-            new() { sender = Sender.AI, timestamp = DateTime.UtcNow, Id = Guid.NewGuid() }
+            new() { sender = Sender.AI, timestamp = DateTime.UtcNow, Id = Guid.NewGuid(), Order = 0 }
         };
         _msgStoreMock.Setup(m => m.GetMessageCount(chat.Guid)).Returns(1);
         _msgStoreMock.Setup(m => m.GetMessages(chat.Guid, 0, 1)).Returns(newMessages);
@@ -248,5 +248,156 @@ public class ChatTests
     {
         var chat = new Chat { Name = "Test" };
         chat.MessageCount.Should().Be(0);
+    }
+
+    // ---- 消息顺序（Order） ----
+
+    private static Message NewMessage(string sender = Sender.User) => new()
+    {
+        sender = sender,
+        timestamp = DateTime.UtcNow,
+        message = new SharperLLM.Util.ChatMessage { Content = "x" }
+    };
+
+    [Fact]
+    public void AddMessage_AssignsIncrementingOrder()
+    {
+        var chat = new Chat { Name = "Test" };
+
+        var m1 = NewMessage();
+        var m2 = NewMessage(Sender.AI);
+        chat.AddMessage(m1);
+        chat.AddMessage(m2);
+
+        m1.Order.Should().Be(0);
+        m2.Order.Should().Be(1);
+        chat.ValidateOrder().Should().BeNull();
+    }
+
+    [Fact]
+    public void AddMessage_PreservesExplicitOrder()
+    {
+        var chat = new Chat { Name = "Test" };
+        var msg = NewMessage();
+        msg.Order = 42;
+
+        chat.AddMessage(msg);
+
+        msg.Order.Should().Be(42);
+    }
+
+    [Fact]
+    public void InsertMessage_ReordersAndPersistsAll()
+    {
+        var chat = new Chat { Name = "Test" };
+        _msgStoreMock.Setup(m => m.GetLastMessagePreview(chat.Guid)).Returns("preview");
+
+        var m1 = NewMessage();
+        var m3 = NewMessage(Sender.AI);
+        chat.AddMessage(m1);
+        chat.AddMessage(m3);
+
+        var m2 = NewMessage(Sender.ToolResult);
+        chat.InsertMessage(_msgStoreMock.Object, 1, m2);
+
+        chat.Messages.Should().Equal(m1, m2, m3);
+        m1.Order.Should().Be(0);
+        m2.Order.Should().Be(1);
+        m3.Order.Should().Be(2);
+        chat.ValidateOrder().Should().BeNull();
+
+        // 全量重写：先清空再按集合顺序重新插入
+        _msgStoreMock.Verify(m => m.DeleteAllMessages(chat.Guid), Times.Once);
+        _msgStoreMock.Verify(m => m.InsertMessage(chat.Guid, It.IsAny<Message>()), Times.Exactly(3));
+    }
+
+    [Fact]
+    public void InsertMessage_OutOfRange_Throws()
+    {
+        var chat = new Chat { Name = "Test" };
+
+        var act = () => chat.InsertMessage(_msgStoreMock.Object, 1, NewMessage());
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void NormalizeOrder_RenumbersByCollectionOrder()
+    {
+        var chat = new Chat { Name = "Test" };
+        var a = NewMessage();
+        var b = NewMessage();
+        var c = NewMessage();
+        chat.Messages.Add(a);
+        chat.Messages.Add(b);
+        chat.Messages.Add(c);
+
+        chat.NormalizeOrder();
+
+        new[] { a.Order, b.Order, c.Order }.Should().Equal(0, 1, 2);
+    }
+
+    [Fact]
+    public void ValidateOrder_DetectsUnassigned()
+    {
+        var chat = new Chat { Name = "Test" };
+        chat.Messages.Add(NewMessage());
+
+        chat.ValidateOrder().Should().Contain("has no order assigned");
+    }
+
+    [Fact]
+    public void ValidateOrder_DetectsIndexMismatch()
+    {
+        var chat = new Chat { Name = "Test" };
+        var m1 = NewMessage();
+        var m2 = NewMessage();
+        chat.AddMessage(m1);
+        chat.AddMessage(m2);
+
+        // 绕过 Chat API 直接插入，导致顺序号与索引错位
+        chat.Messages.Insert(1, new Message { sender = Sender.User, timestamp = DateTime.UtcNow, Order = 99 });
+
+        chat.ValidateOrder().Should().Contain("expected 1");
+    }
+
+    [Fact]
+    public void LoadAllMessages_MigratesMissingOrder()
+    {
+        var chat = new Chat { Name = "Test" };
+        var messages = new List<Message>
+        {
+            new() { sender = Sender.User, timestamp = DateTime.UtcNow, Id = Guid.NewGuid() },
+            new() { sender = Sender.AI, timestamp = DateTime.UtcNow, Id = Guid.NewGuid() }
+        };
+        _msgStoreMock.Setup(m => m.GetMessageCount(chat.Guid)).Returns(2);
+        _msgStoreMock.Setup(m => m.GetMessages(chat.Guid, 0, 2)).Returns(messages);
+        _msgStoreMock.Setup(m => m.GetLastMessagePreview(chat.Guid)).Returns("preview");
+
+        chat.LoadAllMessages(_msgStoreMock.Object);
+
+        chat.Messages.Select(m => m.Order).Should().Equal(0, 1);
+        chat.ValidateOrder().Should().BeNull();
+        // 迁移后必须落库，否则下次加载又会走时间戳回退
+        _msgStoreMock.Verify(m => m.DeleteAllMessages(chat.Guid), Times.Once);
+        _msgStoreMock.Verify(m => m.InsertMessage(chat.Guid, It.IsAny<Message>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public void LoadAllMessages_AlreadyOrdered_DoesNotRewrite()
+    {
+        var chat = new Chat { Name = "Test" };
+        var messages = new List<Message>
+        {
+            new() { sender = Sender.User, timestamp = DateTime.UtcNow, Id = Guid.NewGuid(), Order = 0 }
+        };
+        _msgStoreMock.Setup(m => m.GetMessageCount(chat.Guid)).Returns(1);
+        _msgStoreMock.Setup(m => m.GetMessages(chat.Guid, 0, 1)).Returns(messages);
+        _msgStoreMock.Setup(m => m.GetLastMessagePreview(chat.Guid)).Returns("preview");
+
+        chat.LoadAllMessages(_msgStoreMock.Object);
+
+        _msgStoreMock.Verify(m => m.DeleteAllMessages(It.IsAny<Guid>()), Times.Never);
+        _msgStoreMock.Verify(m => m.InsertMessage(It.IsAny<Guid>(), It.IsAny<Message>()), Times.Never);
     }
 }

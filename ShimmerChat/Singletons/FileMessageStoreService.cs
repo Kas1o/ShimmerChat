@@ -11,14 +11,24 @@ namespace ShimmerChat.Singletons
         public class OrderEntry
         {
             public Guid MessageGuid { get; set; }
+
+            /// <summary>会话内顺序号。&lt; 0 表示 Order 字段出现前写入的老数据。</summary>
+            public long Order { get; set; } = -1;
+
+            /// <summary>仅用于老数据（Order 缺失）的回退排序。</summary>
             public DateTime Timestamp { get; set; }
         }
 
         public string RootPath => _root;
 
-        public FileMessageStoreService()
+        public FileMessageStoreService() : this(Path.Combine(AppContext.BaseDirectory, "ChatMessages"))
         {
-            _root = Path.Combine(AppContext.BaseDirectory, "ChatMessages");
+        }
+
+        /// <summary>指定根目录（测试用）。</summary>
+        public FileMessageStoreService(string root)
+        {
+            _root = root;
             if (!Directory.Exists(_root))
                 Directory.CreateDirectory(_root);
         }
@@ -31,7 +41,12 @@ namespace ShimmerChat.Singletons
             var chatDir = GetChatDir(chatGuid);
             var order = LoadOrder(chatDir);
 
-            order.Add(new OrderEntry { MessageGuid = message.Id, Timestamp = message.timestamp });
+            order.Add(new OrderEntry
+            {
+                MessageGuid = message.Id,
+                Order = message.Order,
+                Timestamp = message.timestamp
+            });
             SaveOrder(chatDir, order);
 
             SaveMessageFile(chatDir, message);
@@ -45,6 +60,18 @@ namespace ShimmerChat.Singletons
             if (File.Exists(msgPath))
             {
                 SaveMessageFile(chatDir, message);
+
+                // 索引条目必须与消息保持同步：Order 由 Chat 重排后会变化，
+                // Timestamp 是 Order 缺失时的回退依据。缺了这条同步，
+                // 同一操作在本实现与 LiteDB 实现下会得到不同顺序。
+                var order = LoadOrder(chatDir);
+                var entry = order.FirstOrDefault(x => x.MessageGuid == message.Id);
+                if (entry != null && (entry.Order != message.Order || entry.Timestamp != message.timestamp))
+                {
+                    entry.Order = message.Order;
+                    entry.Timestamp = message.timestamp;
+                    SaveOrder(chatDir, order);
+                }
             }
             else
             {
@@ -79,7 +106,7 @@ namespace ShimmerChat.Singletons
         {
             var chatDir = GetChatDir(chatGuid);
             var order = LoadOrder(chatDir);
-            var sorted = order.OrderBy(x => x.Timestamp).Skip(skip).Take(take).ToList();
+            var sorted = SortOrderEntries(order).Skip(skip).Take(take).ToList();
 
             var messages = new List<Message>();
             foreach (var entry in sorted)
@@ -95,6 +122,15 @@ namespace ShimmerChat.Singletons
             }
             return messages;
         }
+
+        /// <summary>
+        /// 会话内存在未分配顺序号的消息时整组回退到 timestamp 排序（等于 Order 出现前的行为），
+        /// 否则按 Order 排序。混合状态统一走回退，避免出现"一半有序一半乱"。
+        /// </summary>
+        private static IEnumerable<OrderEntry> SortOrderEntries(List<OrderEntry> order)
+            => order.Any(x => x.Order < 0)
+                ? order.OrderBy(x => x.Timestamp)
+                : order.OrderBy(x => x.Order);
 
         public int GetMessageCount(Guid chatGuid)
         {
@@ -119,7 +155,7 @@ namespace ShimmerChat.Singletons
         {
             var chatDir = GetChatDir(chatGuid);
             var order = LoadOrder(chatDir);
-            var lastEntry = order.OrderByDescending(x => x.Timestamp).FirstOrDefault();
+            var lastEntry = SortOrderEntries(order).LastOrDefault();
             if (lastEntry == null)
                 return string.Empty;
 

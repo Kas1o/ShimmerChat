@@ -99,9 +99,12 @@ namespace ShimmerChatLib
                     var legacy = JsonConvert.DeserializeObject<LegacyChatData>(chatJson);
                     if (legacy?.Messages != null && legacy.Messages.Count > 0)
                     {
-                        foreach (var msg in legacy.Messages)
+                        for (int i = 0; i < legacy.Messages.Count; i++)
                         {
+                            var msg = legacy.Messages[i];
                             if (msg.Id == Guid.Empty) msg.Id = Guid.NewGuid();
+                            // 旧格式没有顺序号，按原数组顺序直接赋值（InsertMessage 会原样保存）
+                            msg.Order = i;
                             messageStore.InsertMessage(guid, msg);
                         }
                         chat.LastMessagePreview = messageStore.GetLastMessagePreview(guid) ?? string.Empty;
@@ -130,7 +133,62 @@ namespace ShimmerChatLib
 
 		public void AddMessage(Message message)
 		{
+			if (message.Order < 0)
+			{
+				// 存在未迁移的老消息（Order < 0）时先整体补号，
+				// 否则新消息会和它们撞在同一个序号上，顺序就失去意义了。
+				if (Messages.Any(m => m.Order < 0))
+					NormalizeOrder();
+				message.Order = NextOrder();
+			}
 			Messages.Add(message);
+		}
+
+		/// <summary>
+		/// 在指定位置插入消息。插入后按集合顺序重编号并全量持久化——
+		/// 顺序权威来自 <see cref="Messages"/>，因此插入必然是一次全量重写（低频操作）。
+		/// </summary>
+		public void InsertMessage(IMessageStoreService messageStore, int index, Message message)
+		{
+			if (index < 0 || index > Messages.Count)
+				throw new ArgumentOutOfRangeException(nameof(index), index,
+					$"Insert index must be between 0 and {Messages.Count} for chat '{Guid}'.");
+
+			Messages.Insert(index, message);
+			NormalizeOrder();
+			SaveAllMessages(messageStore);
+		}
+
+		/// <summary>按当前集合顺序重编号为 0..N-1。</summary>
+		public void NormalizeOrder()
+		{
+			for (int i = 0; i < Messages.Count; i++)
+				Messages[i].Order = i;
+		}
+
+		/// <summary>
+		/// 校验顺序号：全部已分配且等于集合索引。返回 null 表示正常，
+		/// 否则返回问题描述。仅供宿主记录告警，不自动修复（自动重排会掩盖裸集合操作）。
+		/// </summary>
+		public string? ValidateOrder()
+		{
+			for (int i = 0; i < Messages.Count; i++)
+			{
+				var m = Messages[i];
+				if (m.Order < 0)
+					return $"message #{i} (id {m.Id}) has no order assigned";
+				if (m.Order != i)
+					return $"message #{i} (id {m.Id}) has order {m.Order}, expected {i}";
+			}
+			return null;
+		}
+
+		private long NextOrder()
+		{
+			long max = -1;
+			foreach (var m in Messages)
+				if (m.Order > max) max = m.Order;
+			return max + 1;
 		}
 
 		public void LoadAllMessages(IMessageStoreService messageStore)
@@ -146,6 +204,16 @@ namespace ShimmerChatLib
 				Messages.Add(msg);
 
 			LastMessagePreview = messageStore.GetLastMessagePreview(Guid) ?? string.Empty;
+
+			// 懒迁移：Order 出现前写入的数据没有顺序号，store 已按其 timestamp 还原出顺序，
+			// 这里在内存中补号并全量回写一次。此后该会话一律按 Order 排序。
+			if (Messages.Any(m => m.Order < 0))
+			{
+				NormalizeOrder();
+				SaveAllMessages(messageStore);
+				_logger?.LogInformation(
+					"Migrated message order for chat {ChatGuid} ({Count} messages)", Guid, Messages.Count);
+			}
 		}
 
 		public void SaveMessage(IMessageStoreService messageStore, Message message)

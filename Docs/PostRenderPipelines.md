@@ -6,7 +6,8 @@ ShimmerChat 2.0 新增两个后处理管线，分别在 LLM 响应后和消息�
 
 ## Post-Generation 管线
 
-在 LLM 生成响应后执行，对原始响应文本进行过滤、转换、富化等处理。
+在 LLM 生成响应后执行。它不只是"改一段文本"——后处理树就是**回合控制器**：
+节点可以改写本轮响应、直接增删改对话消息（并落库），并决定是否继续下一轮。
 
 ### IPostGenerationNode
 
@@ -32,30 +33,115 @@ public class PostNodeExecutionContext
 ```csharp
 public class PostGenerationEnv
 {
-    public string ResponseText { get; set; }                   // LLM 原始响应文本（节点可修改）
-    public ChatMessage ResponseMessage { get; }                // LLM 完整响应消息（含 toolCalls、thinking）
-    public IReadOnlyList<ContextSegment> PreFragments { get; } // 前生成 Fragments（只读）
-    public Dictionary<string, object> SharedState { get; }     // 节点间共享状态
-    public PersistentEnv Persistent { get; }                   // 持久化服务
-    public ITreeNodeSerializer Serializer { get; set; }        // 序列化器（CallNode 加载预设用）
+    // 本轮输出（权威来源：提交阶段会用它覆盖 CurrentMessage 的当前版本）
+    public string ResponseText { get; set; }
+    public ChatMessage ResponseMessage { get; private set; }
+    public void SetResponse(ChatMessage message);              // 整体替换响应（含 toolCalls / thinking）
+
+    // 回合上下文
+    public int RoundIndex { get; }                             // 0-based，副作用节点可据此只在首轮执行
+    public Message? CurrentMessage { get; }                    // 本轮 assistant 的 Message 活对象
+    public IReadOnlyList<IToolV2> Tools { get; }               // 本轮可用工具
+
+    // 直接操作对话
+    public Chat Chat { get; }                                  // = Persistent.Chat
+    public IMessageStoreService? MessageStore { get; }         // null = 虚拟会话，不落库
+
+    // 循环控制
+    public PostLoopDirective LoopDirective { get; set; }       // 默认 Stop
+    public bool ToolCallsHandled { get; set; }
+    public bool ChatMutated { get; set; }
+
+    public IReadOnlyList<ContextSegment> PreFragments { get; }
+    public Dictionary<string, object> SharedState { get; }     // 跨轮复用
+    public PersistentEnv Persistent { get; }
+    public ITreeNodeSerializer Serializer { get; set; }
 }
 ```
+
+**节点直接操作对话**，没有中间提交通道：
+
+```csharp
+var env = context.Env;
+var msg = new Message
+{
+    message = new ChatMessage { Content = "text" },
+    sender = Sender.User,
+    timestamp = DateTime.Now
+};
+env.Chat.AddMessage(msg);
+if (env.MessageStore is { } store)
+    env.Chat.SaveMessage(store, msg);
+env.ChatMutated = true;
+```
+
+`PostChat` 是同一件事的薄封装（负责落库与顺序号），可以绕过：
+
+```csharp
+PostChat.Append(env, new ChatMessage { Content = "text" }, Sender.User);
+PostChat.InsertAfter(env, anchor, new ChatMessage { Content = "x" }, Sender.AI);
+PostChat.Replace(env, target, new ChatMessage { Content = "y" });
+PostChat.Remove(env, target);
+```
+
+### 循环控制
+
+整棵树执行完毕后，宿主按 `LoopDirective` 决定是否再生成一轮：
+
+| 指令 | 行为 |
+|------|------|
+| `Stop`（默认） | 本轮结束，生成完成 |
+| `Continue` | 重建前生成环境（读取最新的 Chat.Messages）后再次请求模型 |
+
+**工具调用不会被自动执行。** 它由 `PostToolCallNode` 完成——后处理树里没有这个节点，
+本轮的工具调用就不会被执行，宿主会记录告警并强制结束循环（继续循环只会重复拿到同样的调用）。
+
+安全网：`ResponseMessage.toolCalls` 非空且 `ToolCallsHandled == false` → `LogWarning` + `DebugOutput` + 强制 Stop。
 
 ### 内置节点
 
 | 节点 | 职责 |
 |------|------|
-| `PostSequenceNode` | 顺序执行子节点 |
+| `PostSequenceNode` | 顺序执行子节点（支持 Repeat） |
 | `PostCallNode` | 引用 `PostGenerationPreset` 并内联执行 |
+| `PostToolCallNode` | **执行本轮工具调用**，结果写入对话并置 `Continue` |
+| `PostLoopDirectiveNode` | 显式设置循环指令 |
+| `PostMessageNode` | 追加消息，或覆盖本轮响应文本 |
+| `PostIfNode` | 按响应文本 / 工具名 / 共享状态 / KV 条件分支 |
+| `PostSubAgentNode` | 用子智能体处理响应文本（内部跑独立的轮次循环） |
 | `PostDebugOutputNode` | 将 LLM 响应写入调试输出 |
+| `AutoChatNameNode` | 根据对话内容自动命名会话 |
+
+默认预设 `__default__` 为：`PostDebugOutputNode` → `AutoChatNameNode` → `PostToolCallNode`。
+
+### 消息顺序契约
+
+消息在会话内的位置由 `Message.Order` 决定，**`timestamp` 只用于展示，不参与排序**。
+
+- `Chat.AddMessage` 追加时分配 `末条 Order + 1`；
+- `Chat.InsertMessage(store, index, msg)` 插入后重编号并全量持久化（顺序权威来自 `Chat.Messages`）；
+- store 排序规则：该会话存在任何 `Order < 0` 的消息时整组回退到 `timestamp`（迁移前行为），否则按 `Order`；
+- 老数据在 `Chat.LoadAllMessages` 时懒迁移（补号 + 全量回写），只迁移被打开的会话。
+
+节点若绕过 `Chat` API 直接改 `ObservableCollection`，回合末的 `Chat.ValidateOrder()` 会告警；`Chat.NormalizeOrder()` 用于修复，不会自动重排。
 
 ### 集成点
 
-`GenerationManagerV2.PostProcessAsync()` 在 LLM 生成完成后调用 `IPostGenerationManagerService.ExecuteAsync()`，执行 Agent 的 `PostGenerationTreeJson` 树。
+`GenerationManagerV2.MainLoopHost.OnAssistantCompleteAsync()` 每轮：
+
+1. 执行后处理树 → `PostPipelineResult`
+2. 用 `ResponseMessage` 回写本轮消息，并提交节点追加的消息
+3. 顺序校验 + 消息数量与存储一致性校验（只告警，不自动修复）
+4. 按 `LoopDirective` 决定重建环境并继续，或结束
 
 ### 预设
 
 存储在 KVData `"PostGenerationManager"` / `"post_generation_presets"`，类型为 `PostGenerationPreset`。
+
+> **破坏性变更（2.2）**：工具调用处理从 `ToolCallLoop` 下沉到 `PostToolCallNode`。
+> 旧的 Agent 若自定义了后处理树且其中没有工具节点，工具调用将不再执行（宿主会告警并停止循环）。
+> 默认预设已包含该节点，未自定义后处理树的 Agent 不受影响。
+
 
 ---
 

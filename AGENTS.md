@@ -70,14 +70,14 @@ ShimmerChat/
 |-----------|------|
 | `Models/` | UI 模型（`Theme`、`PopupOptions` 等） |
 | `Interface/` | 所有服务接口（`IGenerationManagerV2`、`IPluginLoaderService`、`IKVDataService` 等） |
-| `Generation/` | **生成管线核心**：`IPreGenerationNode`、`IPostGenerationNode`、`IRenderModifierNode`、`ITreeNode`、`PreGenerationEnv`、`GenerationTreeExecutor`、`ToolCallLoop`、`IToolV2`、`IToolRegistry`、节点元数据 Attribute 等 |
+| `Generation/` | **生成管线核心**：`IPreGenerationNode`、`IPostGenerationNode`、`IRenderModifierNode`、`ITreeNode`、`PreGenerationEnv`、`PostGenerationEnv`、`PostPipelineResult`、`PostChat`、`GenerationTreeExecutor`、`ToolCallLoop`、`IToolV2`、`IToolRegistry`、节点元数据 Attribute 等 |
 | `ChatView/` | **对话界面系统**：`IChatView`、`ChatViewContext`、`ChatViewAttribute`、`IChatViewRegistry` |
 | `Components/` | 跨项目共享的 Blazor 组件（含 `ChatViewShell` 对话界面外壳） |
 | `Panel/` | 插件面板基础设施 |
 | `Context/` | 共享上下文 |
-| `Chat.cs` | 聊天对象模型 |
+| `Chat.cs` | 聊天对象模型（含 `Order` 分配：`AddMessage` / `InsertMessage` / `NormalizeOrder` / `ValidateOrder`） |
 | `Agent.cs` | 代理对象模型（含 `PreGenerationTreeJson`、`PostGenerationTreeJson`、`RenderModifierTreeJson`、`ChatViewId`） |
-| `Message.cs` | 消息模型（多版本支持） |
+| `Message.cs` | 消息模型（多版本支持 + `Order` 顺序号） |
 | `Sender.cs` | 发送者枚举 |
 
 ### 3.3 ShimmerChat — 主项目
@@ -197,6 +197,35 @@ public class ContextSegment
 
 节点将 `ContextSegment` 追加到 `TransientEnv.Fragments`，生成时这些片段成为 `PromptBuilder.Messages`。
 
+#### PostGenerationEnv — 后处理环境（回合控制器）
+
+后处理树不只是"改一段文本"，它决定这一轮之后发生什么：
+
+```csharp
+public class PostGenerationEnv
+{
+    string ResponseText;                        // 本轮输出（权威来源，提交时覆盖 CurrentMessage）
+    ChatMessage ResponseMessage;                // 用 SetResponse() 整体替换
+    int RoundIndex;                             // 0-based，副作用节点可据此只在首轮执行
+    Message? CurrentMessage;                    // 本轮 assistant 的 Message 活对象
+    IReadOnlyList<IToolV2> Tools;               // 本轮可用工具
+
+    Chat Chat;                                  // 节点直接在此增删改消息
+    IMessageStoreService? MessageStore;         // null = 虚拟会话（SubAgent），不落库
+
+    PostLoopDirective LoopDirective;            // Stop（默认）/ Continue
+    bool ToolCallsHandled;                      // 仅作安全网与诊断
+    bool ChatMutated;
+
+    Dictionary<string, object> SharedState;     // 跨轮复用，前后管线共用同一份
+}
+```
+
+- **工具调用不会被自动执行**，由 `PostToolCallNode` 完成；树里没有该节点时工具调用不执行，宿主告警并强制 Stop。
+- 节点直接 `Chat.AddMessage` + `Chat.SaveMessage(store, msg)` 即可落库；`PostChat` 是同语义的薄封装。
+- 消息位置由 `Message.Order` 决定，`timestamp` 不参与排序；`Chat.InsertMessage(store, index, msg)` 负责重排与全量持久化。
+- 详见 [PostRenderPipelines.md](Docs/PostRenderPipelines.md)。
+
 ### 4.4 节点元数据系统（三个 Attribute）
 
 | Attribute | 作用域 | 用途 |
@@ -224,12 +253,27 @@ public class ContextSegment
 | `WebSearchAutoNode` | 按输入内容（或固定查询词）自动联网搜索，结果追加到 Fragments 末尾；可选先用当前 API 把输入改写成搜索词 |
 | `WebSearchToolSetNode` | 加入 `web_search` 工具，并在服务方支持抓取时加入 `web_fetch` 工具 |
 
+后生成管线节点（决定"这一轮之后发生什么"）：
+
+| 节点 | 职责 |
+|------|------|
+| `PostSequenceNode` | 顺序执行子节点 |
+| `PostCallNode` | 引用后处理预设并内联执行 |
+| `PostToolCallNode` | **执行本轮工具调用**，结果写入对话并置 `Continue`；树里没有它则工具调用不执行 |
+| `PostLoopDirectiveNode` | 显式设置循环指令（Stop / Continue） |
+| `PostMessageNode` | 追加消息，或覆盖本轮响应文本 |
+| `PostIfNode` | 按响应文本 / 工具名 / 共享状态 / KV 条件分支 |
+| `PostSubAgentNode` | 用子智能体处理响应文本 |
+| `PostDebugOutputNode` / `AutoChatNameNode` | 调试输出 / 自动命名会话 |
+
+默认后处理预设：`PostDebugOutputNode` → `AutoChatNameNode` → `PostToolCallNode`。
+
 ### 4.6 Tool 系统
 
 - **`IToolV2`** — 工具执行接口：`GetDefinition()` + `ExecuteAsync(input)`。
 - **`IAutoCreateToolV2 : IToolV2`** — 可通过通用节点自动创建的工具。提供 `static abstract NameKey`、`DescriptionKey`、`CategoryKeys` 元数据和 `static abstract Create(PersistentEnv)` 工厂方法。
 - **`IToolRegistry`** — 扫描所有 `IAutoCreateToolV2` 实现，提供按名称/类型查找和实例创建。
-- **`ToolCallLoop`** — 流式 Tool Call 循环：累积流式响应 → 检测 FunctionCall → 执行工具 → 重建 env → 下一轮，直到 LLM 不再请求工具调用或达到最大轮次（默认 50）。
+- **`ToolCallLoop`** — 生成轮次循环：累积流式响应 → 询问宿主是否继续。**不执行工具**：工具调用由后处理管线里的 `PostToolCallNode` 完成，是否继续也由后处理树决定。
 
 ---
 
@@ -241,8 +285,9 @@ public class ContextSegment
 
 流程：
 1. `BuildEnvironment` — 解析 Agent 的 `PreGenerationTreeJson`（或创建默认回退树），执行完整节点树，构建 `PreGenerationEnv`。
-2. `GenerateStreamAsync` — 取出 Fragments 构建 `PromptBuilder`，通过 `ToolCallLoop` 执行流式 Tool Call 循环。
-3. `MainLoopHost`（内部类）— 实现 `IToolCallLoopHost`，桥接 `ToolCallLoop` 和 ShimmerChat 的 UI 回调。
+2. `GenerateStreamAsync` — 取出 Fragments 构建 `PromptBuilder`，通过 `ToolCallLoop` 驱动轮次循环（流式与非流式走同一路径）。
+3. `MainLoopHost`（内部类）— 实现 `IToolCallLoopHost`，每轮：执行后处理树 → 回写本轮消息并提交节点追加的消息 → 顺序/一致性校验 → 按 `LoopDirective` 决定重建环境继续还是结束。跨轮共享 `SharedState`。
+4. 安全网 — 本轮有 toolCalls 却没有节点接管时，记 `LogWarning` + `DebugOutput` 并强制 Stop，避免死循环。
 
 ### 5.2 IPluginLoaderService / PluginLoaderServiceV1
 
@@ -277,6 +322,10 @@ public class ContextSegment
 
 **消息渲染服务。** 通过 `IRenderModifierManager` 执行 Agent 的 `RenderModifierTreeJson` 节点树（Markdown→HTML、正则替换等）。失败时通过 `BuildErrorHtml` 输出完整变更记录。
 
+### 5.8.1 IPostGenerationManagerService / PostGenerationManagerService
+
+**后处理管线管理器。** 反序列化 Agent 的 `PostGenerationTreeJson` 并执行节点树。节点直接操作 `Chat` 与 `IMessageStoreService`，返回值 `PostPipelineResult` 只汇总本轮响应消息、`LoopDirective`、`ToolCallsHandled`、`ChatMutated`。失败时回退原始响应并强制停止本轮。详见 [PostRenderPipelines.md](Docs/PostRenderPipelines.md)。
+
 ### 5.9 IThemeService / ThemeServiceV2
 
 **主题服务。** 注册为 Scoped。管理主题的 CRUD、切换、导入/导出。内置 Light/Dark 两套主题，支持通过 KVData 持久化自定义主题。主题 token（CSS 变量值）在 `Theme` 对象中定义。
@@ -300,10 +349,12 @@ public class ContextSegment
 ### 5.13 IMessageStoreService
 
 **消息持久化存储。** 两种实现：
-- **FileMessageStoreService** — 文件存储。
+- **FileMessageStoreService** — 文件存储（`_order.json` 保存顺序索引）。
 - **LiteDBMessageStoreService** — LiteDB 存储。
 
 与 KVData 共用同一个 `LiteDatabase` 实例。支持按 Chat GUID 分区的消息 CRUD 操作。
+
+**排序契约**：两种实现都按 `Message.Order` 排序；当会话内存在任何 `Order < 0` 的消息（Order 字段出现前的老数据）时，整组回退到 `timestamp` 排序。老数据在 `Chat.LoadAllMessages` 时懒迁移（补号 + 全量回写），`timestamp` 从此只用于展示。`UpdateMessage` 必须同步维护顺序索引（两种实现行为一致）。
 
 ### 5.14 IKVDataMigrationService / KVDataMigrationMarker
 

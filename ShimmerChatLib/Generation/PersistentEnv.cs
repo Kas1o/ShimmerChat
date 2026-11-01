@@ -24,6 +24,12 @@ namespace ShimmerChatLib.Generation
         public required Chat Chat { get; init; }
 
         /// <summary>
+        /// 消息持久化服务。节点直接操作 <see cref="Chat"/> 时用它在写库；
+        /// null 表示当前会话不落库（如 SubAgent 的虚拟会话），节点只应改内存。
+        /// </summary>
+        public IMessageStoreService? MessageStore { get; init; }
+
+        /// <summary>
         /// 当前 Agent 对象。
         /// </summary>
         public required Agent Agent { get; init; }

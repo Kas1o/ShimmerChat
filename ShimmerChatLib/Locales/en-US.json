@@ -20,5 +20,6 @@
   "category.sub_agent": "SubAgent",
   "category.web_search": "Web Search",
   "category.general": "General",
+  "category.post": "Post-Generation",
   "category.other": "Other"
 }

@@ -1,15 +1,15 @@
-using SharperLLM.Util;
-
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
-    /// 后生成节点接口。在 LLM 生成响应后执行，对原始响应文本进行过滤、转换、富化等处理。
+    /// 后生成节点接口。在 LLM 生成响应后执行，可修改本轮响应、直接增删改对话消息，
+    /// 并决定是否继续下一轮（<see cref="PostGenerationEnv.LoopDirective"/>）。
     /// 继承 <see cref="ITreeNode"/>，可复用节点编辑器基础设施。
     /// </summary>
     public interface IPostGenerationNode : ITreeNode
     {
         /// <summary>
-        /// 执行后处理逻辑，可修改 context.Env.ResponseText 或 SharedState。
+        /// 执行后处理逻辑。可修改 <see cref="PostGenerationEnv.ResponseText"/>、
+        /// 直接操作 <see cref="PostGenerationEnv.Chat"/> 与 <see cref="PostGenerationEnv.MessageStore"/>。
         /// </summary>
         Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context);
     }
@@ -26,38 +26,6 @@ namespace ShimmerChatLib.Generation
         {
             Env = env;
             CancellationToken = ct;
-        }
-    }
-
-    /// <summary>
-    /// 后生成管线环境。包含 LLM 响应文本、前生成上下文片段和共享状态。
-    /// </summary>
-    public class PostGenerationEnv
-    {
-        /// <summary>LLM 原始响应文本（节点可修改）</summary>
-        public string ResponseText { get; set; }
-
-        /// <summary>LLM 完整原始响应消息（含 tool calls、thinking 等）。</summary>
-        public ChatMessage ResponseMessage { get; }
-
-        /// <summary>前生成管线构建的 Fragments（只读参考）</summary>
-        public IReadOnlyList<ContextSegment> PreFragments { get; }
-
-        /// <summary>节点间共享状态</summary>
-        public Dictionary<string, object> SharedState { get; } = new();
-
-        /// <summary>持久化服务访问</summary>
-        public PersistentEnv Persistent { get; }
-
-        /// <summary>当前管线的序列化器（CallNode 加载预设时使用）</summary>
-        public ITreeNodeSerializer Serializer { get; set; } = default!;
-
-        public PostGenerationEnv(ChatMessage responseMessage, IReadOnlyList<ContextSegment> preFragments, PersistentEnv persistent)
-        {
-            ResponseMessage = responseMessage;
-            ResponseText = responseMessage.Content ?? "";
-            PreFragments = preFragments;
-            Persistent = persistent;
         }
     }
 

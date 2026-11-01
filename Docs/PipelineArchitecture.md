@@ -23,14 +23,24 @@ ShimmerChat 2.0 采用**三管线节点树架构**，将 AI 聊天的生成流�
 Pre-Generation Tree ──→ 构建 PreGenerationEnv（含 Transient.Fragments、Transient.Tools、Transient.API）
   │
   ▼
-ToolCallLoop ──→ LLM 流式生成 + 工具调用
-  │
-  ▼
-Post-Generation Tree ──→ 过滤/转换/富化原始响应
+┌─ 轮次循环（ToolCallLoop）──────────────────────────────────┐
+│  LLM 流式生成                                              │
+│      │                                                     │
+│      ▼                                                     │
+│  Post-Generation Tree ──→ 改写响应 / 增删改对话消息         │
+│                      ──→ PostToolCallNode 执行工具调用      │
+│                      ──→ 设置 LoopDirective                 │
+│      │                                                     │
+│      ├ Continue ──→ 重建前生成环境 ──→ 再生成一轮           │
+│      └ Stop     ──→ 结束                                    │
+└────────────────────────────────────────────────────────────┘
   │
   ▼
 Render Modifier Tree ──→ GetContent/UpdateContent 链式处理 ──→ 最终 HTML
 ```
+
+后处理树负责回合控制**：工具调用处理与循环继续/停止都在里面完成，
+因此"按工具名停止""注入提醒再续轮""压缩历史后继续"这类规则可以用节点表达。
 
 ---
 

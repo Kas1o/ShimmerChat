@@ -216,13 +216,10 @@ public class GenerationSessionService
                     session.NotifyStateChanged();
                     return Task.CompletedTask;
                 },
-                onToolCall: _ =>
+                onMessagesCommitted: appended =>
                 {
-                    session.NotifyStateChanged();
-                },
-                onToolResult: tuple =>
-                {
-                    HandleToolResult(session, chat, tuple);
+                    HandleCommittedMessages(session, chat, appended);
+                    return Task.CompletedTask;
                 },
                 onPostGenerationStarted: () =>
                 {
@@ -360,49 +357,52 @@ public class GenerationSessionService
         string? originalContent, Message? continuationMessage)
     {
         var genMsg = chat.Messages.FirstOrDefault(m => m.Id == session.GeneratingMessageId);
-        if (genMsg != null)
+        if (genMsg == null)
         {
-            if (continuationMessage != null)
-            {
-                // 续写模式：保留原始前缀
-                if (genMsg.CurrentVersion != null)
-                    genMsg.CurrentVersion.Content = (originalContent ?? "") + accumulated.Body.Content;
-            }
-            else
-            {
-                if (genMsg.CurrentVersion != null)
-                    genMsg.CurrentVersion.Content = accumulated.Body.Content;
-            }
-
-            genMsg.GenerationState = MessageGenerationState.Completed;
-            if (continuationMessage != null)
-                genMsg.IsContinuation = false;
-            chat.SaveMessage(_messageStore, genMsg);
-
-            session.NotifyAgentMessageCompleted(genMsg);
+            // 后处理节点可能删掉了本轮消息（例如判定该轮无效并替换为自定义消息）。
+            // 消息已经不在 Chat 里，这里不再回写，也不试图重建。
+            if (session.GeneratingMessageId != Guid.Empty)
+                _logger.LogInformation(
+                    "[GenerationSessionService] Round message {MessageId} was removed by the post-generation pipeline; skipping write-back",
+                    session.GeneratingMessageId);
+            session.GeneratingMessageId = Guid.Empty;
+            return;
         }
 
+        if (continuationMessage != null)
+        {
+            // 续写模式：保留原始前缀
+            if (genMsg.CurrentVersion != null)
+                genMsg.CurrentVersion.Content = (originalContent ?? "") + accumulated.Body.Content;
+        }
+        else
+        {
+            if (genMsg.CurrentVersion != null)
+                genMsg.CurrentVersion.Content = accumulated.Body.Content;
+        }
+
+        genMsg.GenerationState = MessageGenerationState.Completed;
+        if (continuationMessage != null)
+            genMsg.IsContinuation = false;
+        chat.SaveMessage(_messageStore, genMsg);
+
+        session.NotifyAgentMessageCompleted(genMsg);
         session.GeneratingMessageId = Guid.Empty;
     }
 
-    private void HandleToolResult(GenerationSession session, Chat chat,
-        (string name, string resp, string id) tuple)
+    /// <summary>
+    /// 后处理节点本轮追加的消息。节点已负责写库，这里只把它们同步给插件面板与界面。
+    /// </summary>
+    private void HandleCommittedMessages(GenerationSession session, Chat chat, IReadOnlyList<Message> appended)
     {
-        var toolMsg = new Message
+        foreach (var msg in appended)
         {
-            message = new ChatMessage
-            {
-                Content = tuple.resp,
-                id = tuple.id,
-                thinking = null
-            },
-            timestamp = DateTime.Now,
-            sender = Sender.ToolResult
-        };
-        chat.AddMessage(toolMsg);
-        chat.SaveMessage(_messageStore, toolMsg);
+            if (msg.sender == Sender.ToolResult)
+                session.NotifyToolResultAdded(msg);
+            else if (msg.sender == Sender.AI)
+                session.NotifyAgentMessageCompleted(msg);
+        }
 
-        session.NotifyToolResultAdded(toolMsg);
         session.NotifyScrollRequested();
         session.NotifyStateChanged();
     }

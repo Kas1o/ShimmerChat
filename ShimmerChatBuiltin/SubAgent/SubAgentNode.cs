@@ -92,15 +92,15 @@ namespace ShimmerChatBuiltin.SubAgent
                 return NodeResult.Failure(NodeErrorCodes.ApiUnavailable,
                     loc["node_err.subagent_no_api"], nodeId: Id, nodeName: Name);
 
-            // 4. Tool Call 循环（隔离 env 内独立运行），每轮 assistant 响应经由 Post-Generation 管线
+            // 4. 轮次循环（隔离 env 内独立运行），每轮 assistant 响应经由 Post-Generation 管线
             var tools = subEnv.Transient.Tools;
             var toolDefs = tools.Select(t => t.GetDefinition()).ToList();
-            var toolExecutor = new ToolV2Executor(tools);
             var promptCtx = new SubAgentPromptContext(
                 subEnv.Transient.Fragments.Select(s => (s.Message, s.From)));
 
-            // 后处理器：始终走后生成管线（对齐主流程，每轮 assistant 响应都触发）
-            Func<ChatMessage, Task<ChatMessage>>? postProcessor = null;
+            // 后处理器：始终走后生成管线（对齐主流程，每轮 assistant 响应都触发）。
+            // 工具调用也由这棵树里的工具节点执行——它们直接写进虚拟 Chat，这里靠前后 Id 快照找出新增消息。
+            Func<ChatMessage, Task<SubAgentPostRound>>? postProcessor = null;
             if (persistent.PostGenerationManager != null)
             {
                 var postAgent = Agent.Create("__sub_post__", "");
@@ -110,23 +110,35 @@ namespace ShimmerChatBuiltin.SubAgent
                 var ct = context.CancellationToken;
                 var cfgName = config.Name;
                 var debug = context.Env.Persistent.DebugOutput;
+                var roundTools = tools;
                 postProcessor = async msg =>
                 {
+                    var beforeIds = new HashSet<Guid>(persistent.Chat.Messages.Select(m => m.Id));
                     try
                     {
-                        return await mgr.ExecuteAsync(postAgent, msg, fragments, persistent, ct);
+                        var result = await mgr.ExecuteAsync(postAgent, msg, fragments, persistent,
+                            new PostPipelineContext { Tools = roundTools }, ct);
+                        var appended = persistent.Chat.Messages
+                            .Where(m => !beforeIds.Contains(m.Id))
+                            .ToList();
+                        return new SubAgentPostRound
+                        {
+                            ResponseMessage = result.ResponseMessage,
+                            LoopDirective = result.LoopDirective,
+                            Appended = appended
+                        };
                     }
                     catch (Exception ex)
                     {
                         debug.Write("SubAgentNode", "PostGeneration",
                             $"[SubAgentNode] Post-Generation failed for '{cfgName}': {ex.Message}");
-                        return msg;
+                        return new SubAgentPostRound { ResponseMessage = msg };
                     }
                 };
             }
 
-            // 环境重建函数：每次工具调用后重执行修饰器树。
-            // 接收对话增量（assistant + tool_result），与种子消息合并后写入虚拟 Chat 的 Messages，
+            // 环境重建函数：每轮结束后重执行修饰器树。
+            // 接收对话增量（assistant + 工具结果等），与种子消息合并后写入虚拟 Chat 的 Messages，
             // 让 AppendChatMessagesNode 等节点从 Chat 统一加载完整上下文。
             Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = async (conversation) =>
             {
@@ -140,13 +152,14 @@ namespace ShimmerChatBuiltin.SubAgent
                 }));
 
                 persistent.Chat.Messages = new ObservableCollection<Message>(fullChatMessages);
+                persistent.Chat.NormalizeOrder();
                 var newEnv = new PreGenerationEnv(persistent);
                 var newCtx = new PreNodeExecutionContext(newEnv, context.CancellationToken);
                 await rootNode.ExecuteAsync(newCtx);
                 return newEnv.Transient.Fragments.ToList();
             };
 
-            var host = new SubAgentLoopHost(promptCtx, toolExecutor, postProcessor, rebuildFragments);
+            var host = new SubAgentLoopHost(promptCtx, postProcessor, rebuildFragments);
             var loop = new ToolCallLoop();
 
             try
@@ -155,7 +168,6 @@ namespace ShimmerChatBuiltin.SubAgent
                     ?? throw new InvalidOperationException("No API configured for SubAgent.");
                 await loop.RunAsync(api, toolDefs, host,
                     maxRounds: MaxIterations,
-                    continueOnToolError: true,
                     ct: context.CancellationToken);
             }
             catch (Exception ex)

@@ -269,13 +269,13 @@ namespace ShimmerChatBuiltin.SubAgent
             var api = subEnv.Transient.API.ChatClient;
             var tools = subEnv.Transient.Tools;
             var toolDefs = tools.Select(t => t.GetDefinition()).ToList();
-            var toolExecutor = new ToolV2Executor(tools);
 
             var promptCtx = new SubAgentPromptContext(
                 subEnv.Transient.Fragments.Select(s => (s.Message, s.From)));
 
-            // 后处理器：始终走后生成管线（对齐主流程）
-            Func<ChatMessage, Task<ChatMessage>>? postProcessor = null;
+            // 后处理器：始终走后生成管线（对齐主流程）。
+            // 工具调用由这棵树里的工具节点执行，这里靠前后 Id 快照找出它们写进虚拟 Chat 的消息。
+            Func<ChatMessage, Task<SubAgentPostRound>>? postProcessor = null;
             if (_postGenerationManager != null)
             {
                 var postAgent = Agent.Create("__sub_post__", "");
@@ -283,22 +283,34 @@ namespace ShimmerChatBuiltin.SubAgent
                 var fragments = subEnv.Transient.Fragments;
                 var mgr = _postGenerationManager;
                 var cfgName = config.Name;
+                var roundTools = tools;
                 postProcessor = async msg =>
                 {
+                    var beforeIds = new HashSet<Guid>(persistent.Chat.Messages.Select(m => m.Id));
                     try
                     {
-                        return await mgr.ExecuteAsync(postAgent, msg, fragments, persistent, CancellationToken.None);
+                        var result = await mgr.ExecuteAsync(postAgent, msg, fragments, persistent,
+                            new PostPipelineContext { Tools = roundTools }, CancellationToken.None);
+                        var appended = persistent.Chat.Messages
+                            .Where(m => !beforeIds.Contains(m.Id))
+                            .ToList();
+                        return new SubAgentPostRound
+                        {
+                            ResponseMessage = result.ResponseMessage,
+                            LoopDirective = result.LoopDirective,
+                            Appended = appended
+                        };
                     }
                     catch (Exception ex)
                     {
                         _debugOutput.Write("SubAgentToolV2", "PostGeneration",
                             $"[SubAgentToolV2] Post-Generation failed for '{cfgName}': {ex}");
-                        return msg;
+                        return new SubAgentPostRound { ResponseMessage = msg };
                     }
                 };
             }
 
-            // 环境重建函数：每次工具调用后重执行修饰器树。
+            // 环境重建函数：每轮结束后重执行修饰器树。
             // 内存路径保持「种子消息 + conversation」，不依赖落盘成功。
             Func<List<(ChatMessage, PromptBuilder.From)>, Task<List<ContextSegment>>>? rebuildFragments = async (conversation) =>
             {
@@ -306,24 +318,24 @@ namespace ShimmerChatBuiltin.SubAgent
                 fullChatMessages.AddRange(conversation.Select(a => SubAgentSessionMessages.FromPrompt(a)));
 
                 persistent.Chat.Messages = new ObservableCollection<Message>(fullChatMessages);
+                persistent.Chat.NormalizeOrder();
                 var newEnv = new PreGenerationEnv(persistent);
                 var newCtx = new PreNodeExecutionContext(newEnv, CancellationToken.None);
                 await rootNode.ExecuteAsync(newCtx);
                 return newEnv.Transient.Fragments.ToList();
             };
 
-            // 增量落盘：每条 assistant / tool_result 立刻写回会话
+            // 增量落盘：每条 assistant / 工具结果立刻写回会话
             Action<(ChatMessage Message, PromptBuilder.From From)> onMessageAppended =
                 appended => scope.Append(SubAgentSessionMessages.FromPrompt(appended));
 
-            var host = new SubAgentLoopHost(promptCtx, toolExecutor, postProcessor, rebuildFragments, onMessageAppended);
+            var host = new SubAgentLoopHost(promptCtx, postProcessor, rebuildFragments, onMessageAppended);
             var loop = new ToolCallLoop();
 
             try
             {
                 await loop.RunAsync(api, toolDefs, host,
                     maxRounds: Int32.MaxValue,
-                    continueOnToolError: true,
                     ct: CancellationToken.None);
             }
             catch (Exception ex)

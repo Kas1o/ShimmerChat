@@ -15,6 +15,11 @@ namespace ShimmerChat.Singletons
             public ObjectId Id { get; set; } = ObjectId.NewObjectId();
             public Guid MessageGuid { get; set; }
             public Guid ChatGuid { get; set; }
+
+            /// <summary>会话内顺序号。&lt; 0 表示 Order 字段出现前写入的老数据。</summary>
+            public long Order { get; set; } = -1;
+
+            /// <summary>仅用于老数据（Order 缺失）的回退排序。</summary>
             public DateTime Timestamp { get; set; }
             public string Sender { get; set; } = string.Empty;
             public string MessageJson { get; set; } = string.Empty;
@@ -25,6 +30,7 @@ namespace ShimmerChat.Singletons
             _database = database;
             _collection = _database.GetCollection<MessageDocument>("messages");
             _collection.EnsureIndex(x => x.ChatGuid);
+            _collection.EnsureIndex(x => x.Order);
             _collection.EnsureIndex(x => x.Timestamp);
             _collection.EnsureIndex(x => x.MessageGuid, true);
         }
@@ -38,6 +44,7 @@ namespace ShimmerChat.Singletons
             {
                 MessageGuid = message.Id,
                 ChatGuid = chatGuid,
+                Order = message.Order,
                 Timestamp = message.timestamp,
                 Sender = message.sender,
                 MessageJson = JsonConvert.SerializeObject(message)
@@ -50,6 +57,7 @@ namespace ShimmerChat.Singletons
             var existing = _collection.FindOne(x => x.MessageGuid == message.Id);
             if (existing != null)
             {
+                existing.Order = message.Order;
                 existing.Timestamp = message.timestamp;
                 existing.Sender = message.sender;
                 existing.MessageJson = JsonConvert.SerializeObject(message);
@@ -74,15 +82,20 @@ namespace ShimmerChat.Singletons
 
         public List<Message> GetMessages(Guid chatGuid, int skip, int take)
         {
-            var docs = _collection
-                .Find(x => x.ChatGuid == chatGuid)
-                .OrderBy(x => x.Timestamp)
-                .Skip(skip)
-                .Take(take)
-                .ToList();
+            var query = _collection.Find(x => x.ChatGuid == chatGuid);
 
+            // 存在未分配顺序号的消息 → 整组回退到 timestamp（等于 Order 出现前的行为）；
+            // 否则按 Order 排序。混合状态统一走回退，避免"一半有序一半乱"。
+            var sorted = HasUnassignedOrder(chatGuid)
+                ? query.OrderBy(x => x.Timestamp)
+                : query.OrderBy(x => x.Order);
+
+            var docs = sorted.Skip(skip).Take(take).ToList();
             return docs.Select(d => DeserializeMessage(d.MessageJson)).ToList();
         }
+
+        private bool HasUnassignedOrder(Guid chatGuid)
+            => _collection.Exists(x => x.ChatGuid == chatGuid && x.Order < 0);
 
         public int GetMessageCount(Guid chatGuid)
         {
@@ -96,10 +109,10 @@ namespace ShimmerChat.Singletons
 
         public string? GetLastMessagePreview(Guid chatGuid)
         {
-            var doc = _collection
-                .Find(x => x.ChatGuid == chatGuid)
-                .OrderByDescending(x => x.Timestamp)
-                .FirstOrDefault();
+            var query = _collection.Find(x => x.ChatGuid == chatGuid);
+            var doc = HasUnassignedOrder(chatGuid)
+                ? query.OrderByDescending(x => x.Timestamp).FirstOrDefault()
+                : query.OrderByDescending(x => x.Order).FirstOrDefault();
 
             if (doc == null)
                 return string.Empty;
