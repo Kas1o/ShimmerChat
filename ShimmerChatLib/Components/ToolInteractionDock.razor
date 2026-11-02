@@ -1,0 +1,599 @@
+@using Newtonsoft.Json.Linq
+@using ShimmerChatLib.ChatView
+@using ShimmerChatLib.ChatView.ToolUi
+@using ShimmerChatLib.Generation.ToolUi
+@using ShimmerChatLib.Interface
+@inject IToolInteractionService Interactions
+@inject IToolUiViewRegistry ToolUiViews
+@inject ILocService Loc
+@implements IDisposable
+
+@*
+	工具交互浮层。由宿主（AgentChatPage）渲染，因此与具体对话界面无关：
+	走 ChatViewShell 的内置界面与自行组织布局的插件界面都能看到同一块交互。
+
+	它只显示"此刻正在等待回答"的请求——这些请求活在 IToolInteractionService 的内存里，
+	不是对话历史的一部分，所以这里不做任何历史配对、也不需要落库。
+*@
+
+@if (visible.Count > 0)
+{
+	<div class="toolui-dock">
+		@foreach (var item in visible)
+		{
+			var view = ResolveView(item);
+			<div class="toolui-card" @key="item.Id">
+				<div class="toolui-head">
+					<span class="toolui-title">@item.Request.Title</span>
+					<span class="toolui-head-meta">
+						@if (Remaining(item) is { } remaining)
+						{
+							<span class="toolui-countdown">@remaining</span>
+						}
+						<span class="toolui-badge">@Loc["toolui.awaiting"]</span>
+					</span>
+				</div>
+
+				@if (!string.IsNullOrEmpty(item.Request.Message))
+				{
+					<div class="toolui-message">@item.Request.Message</div>
+				}
+
+				@if (view != null)
+				{
+					<DynamicComponent Type="view.ComponentType" Parameters="BuildViewParameters(item)" />
+				}
+				else
+				{
+					@if (!string.IsNullOrEmpty(item.Request.ViewId))
+					{
+						<div class="toolui-warn">@Loc.Format("toolui.view_missing", item.Request.ViewId)</div>
+					}
+					@RenderForm(item)
+				}
+
+				@if (errors.TryGetValue(item.Id, out var error))
+				{
+					<div class="toolui-error">@error</div>
+				}
+
+				<div class="toolui-actions">
+					<button class="toolui-btn toolui-btn-primary" @onclick="() => SubmitAsync(item)">
+						@Loc["toolui.submit"]
+					</button>
+					<button class="toolui-btn" @onclick="() => SkipAsync(item)">
+						@Loc["toolui.skip"]
+					</button>
+					@if (ViewContext is { } ctx && ctx.IsGenerating())
+					{
+						<button class="toolui-btn toolui-btn-stop" @onclick="StopRoundAsync">
+							@Loc["toolui.stop"]
+						</button>
+					}
+				</div>
+			</div>
+		}
+	</div>
+
+	<style>
+		.toolui-dock {
+			position: fixed;
+			bottom: 96px;
+			left: 50%;
+			transform: translateX(-50%);
+			z-index: 60;
+			width: min(720px, calc(100% - 32px));
+			display: flex;
+			flex-direction: column;
+			gap: var(--su-space-2);
+		}
+		.toolui-card {
+			background: var(--su-surface-1);
+			border: var(--su-border-size) solid var(--su-accent);
+			border-radius: var(--su-radius-lg);
+			box-shadow: var(--su-shadow-md);
+			padding: var(--su-space-4);
+			display: flex;
+			flex-direction: column;
+			gap: var(--su-space-2);
+		}
+		.toolui-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: var(--su-space-2);
+		}
+		.toolui-title {
+			font-weight: 600;
+			color: var(--su-text-0);
+			font-size: var(--su-font-base);
+			word-break: break-word;
+		}
+		.toolui-badge {
+			flex-shrink: 0;
+			font-size: var(--su-font-xs);
+			color: var(--su-accent);
+			border: var(--su-border-size) solid var(--su-accent);
+			border-radius: var(--su-radius-full);
+			padding: 0 var(--su-space-2);
+		}
+		.toolui-head-meta {
+			display: inline-flex;
+			align-items: center;
+			gap: var(--su-space-2);
+			flex-shrink: 0;
+		}
+		.toolui-countdown {
+			font-family: var(--su-font-mono);
+			font-size: var(--su-font-xs);
+			color: var(--su-text-2);
+		}
+		.toolui-message {
+			font-size: var(--su-font-sm);
+			color: var(--su-text-1);
+			white-space: pre-wrap;
+			word-break: break-word;
+		}
+		.toolui-field {
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+		}
+		.toolui-label {
+			font-size: var(--su-font-xs);
+			color: var(--su-text-2);
+		}
+		.toolui-input {
+			padding: var(--su-space-2) var(--su-space-3);
+			font-family: var(--su-font-sans);
+			font-size: var(--su-font-base);
+			color: var(--su-text-0);
+			background: var(--su-surface-0);
+			border: var(--su-border-size) solid var(--su-border-0);
+			border-radius: var(--su-radius-sm);
+			outline: none;
+		}
+		.toolui-input:focus {
+			border-color: var(--su-accent);
+			box-shadow: 0 0 0 3px var(--su-accent-soft);
+		}
+		.toolui-code {
+			margin: 0;
+			max-height: 220px;
+			overflow: auto;
+			padding: var(--su-space-2) var(--su-space-3);
+			background: var(--su-surface-3);
+			border-radius: var(--su-radius-sm);
+			font-family: var(--su-font-mono);
+			font-size: var(--su-font-xs);
+			white-space: pre-wrap;
+		}
+		.toolui-check {
+			display: flex;
+			align-items: center;
+			gap: var(--su-space-2);
+			font-size: var(--su-font-sm);
+			color: var(--su-text-0);
+		}
+		.toolui-warn,
+		.toolui-error {
+			font-size: var(--su-font-xs);
+			color: var(--su-danger);
+		}
+		.toolui-actions {
+			display: flex;
+			justify-content: flex-end;
+			gap: var(--su-space-2);
+			margin-top: var(--su-space-1);
+		}
+		.toolui-btn {
+			border: var(--su-border-size) solid var(--su-border-0);
+			background: var(--su-surface-0);
+			color: var(--su-text-0);
+			font-family: var(--su-font-sans);
+			font-size: var(--su-font-sm);
+			padding: var(--su-space-1) var(--su-space-3);
+			border-radius: var(--su-radius-sm);
+			cursor: pointer;
+			transition: background var(--su-transition), color var(--su-transition);
+		}
+		.toolui-btn:hover { background: var(--su-surface-3); }
+		.toolui-btn-primary {
+			background: var(--su-accent);
+			border-color: var(--su-accent);
+			color: #fff;
+		}
+		.toolui-btn-primary:hover { background: var(--su-accent-hover); }
+		.toolui-btn-stop { color: var(--su-danger); border-color: var(--su-danger); }
+	</style>
+}
+
+@code {
+	/// <summary>所属对话。只有属于它的待回答交互会被显示。</summary>
+	[Parameter, EditorRequired]
+	public Guid ChatGuid { get; set; }
+
+	/// <summary>宿主上下文；为 null 时不提供"停止本轮"（仍可提交 / 跳过）。</summary>
+	[Parameter]
+	public ChatViewContext? ViewContext { get; set; }
+
+	private List<ToolInteractionPending> visible = new();
+
+	/// <summary>每个待回答交互的表单取值（键 = 字段名）。</summary>
+	private readonly Dictionary<Guid, Dictionary<string, object>> values = new();
+
+	private readonly Dictionary<Guid, string> errors = new();
+
+	/// <summary>倒计时定时器：仅在存在带超时的请求时运行。</summary>
+	private Timer? _countdown;
+
+	protected override void OnInitialized()
+	{
+		Interactions.PendingChanged += OnPendingChanged;
+		RefreshPending();
+	}
+
+	protected override void OnParametersSet()
+	{
+		base.OnParametersSet();
+		RefreshPending();
+	}
+
+	public void Dispose()
+	{
+		Interactions.PendingChanged -= OnPendingChanged;
+		StopCountdown();
+	}
+
+	private void OnPendingChanged(Guid chatGuid)
+	{
+		if (chatGuid != ChatGuid) return;
+
+		// 事件来自后台生成线程，必须切回渲染线程再刷新
+		_ = InvokeAsync(() =>
+		{
+			RefreshPending();
+			StateHasChanged();
+		});
+	}
+
+	private void RefreshPending()
+	{
+		visible = Interactions.GetPending(ChatGuid).ToList();
+
+		// 已结束的交互不再保留界面状态
+		var alive = visible.Select(v => v.Id).ToHashSet();
+		foreach (var id in values.Keys.Where(k => !alive.Contains(k)).ToList())
+			values.Remove(id);
+		foreach (var id in errors.Keys.Where(k => !alive.Contains(k)).ToList())
+			errors.Remove(id);
+
+		// 只有存在倒计时的请求时才需要每秒重绘
+		if (visible.Any(v => v.Timeout is not null))
+			StartCountdown();
+		else
+			StopCountdown();
+	}
+
+	private void StartCountdown()
+	{
+		_countdown ??= new Timer(_ => _ = InvokeAsync(StateHasChanged), null, 1000, 1000);
+	}
+
+	private void StopCountdown()
+	{
+		_countdown?.Dispose();
+		_countdown = null;
+	}
+
+	/// <summary>剩余等待时间；无限等待时返回 null（不渲染倒计时）。</summary>
+	private string? Remaining(ToolInteractionPending item)
+	{
+		if (item.Timeout is not { } limit) return null;
+
+		var left = limit - (DateTime.Now - item.CreatedAt);
+		if (left < TimeSpan.Zero) left = TimeSpan.Zero;
+
+		return Loc.Format("toolui.remaining", (int)Math.Ceiling(left.TotalSeconds));
+	}
+
+	private ToolUiViewInfo? ResolveView(ToolInteractionPending item)
+		=> ViewContext == null ? null : ToolUiViews.GetById(item.Request.ViewId);
+
+	private Dictionary<string, object> BuildViewParameters(ToolInteractionPending item) => new()
+	{
+		["Context"] = new ToolUiContext
+		{
+			Pending = item,
+			Chat = ViewContext?.Chat ?? throw new InvalidOperationException(
+				"ToolInteractionDock requires a ChatViewContext to render custom tool interaction views."),
+			Agent = ViewContext!.Agent,
+			IsAwaiting = () => Interactions.GetPending(item.ChatGuid).Any(p => p.Id == item.Id),
+			SubmitAsync = answer =>
+			{
+				var outcome = Interactions.Submit(item.Id, answer);
+				return Task.FromResult(outcome);
+			},
+			SkipAsync = reason => Task.FromResult(Interactions.Skip(item.Id, reason)),
+			RequestRefreshAsync = () => InvokeAsync(StateHasChanged)
+		}
+	};
+
+	private RenderFragment RenderForm(ToolInteractionPending item) => builder =>
+	{
+		var form = item.Request.Form;
+		if (form == null)
+		{
+			// 既没有声明式表单也没有自定义视图：给一个自由文本兜底，保证永远能解封
+			builder.OpenElement(0, "div");
+			builder.AddAttribute(1, "class", "toolui-field");
+			builder.OpenElement(2, "span");
+			builder.AddAttribute(3, "class", "toolui-label");
+			builder.AddContent(4, Loc["toolui.free_answer"]);
+			builder.CloseElement();
+			builder.OpenElement(5, "textarea");
+			builder.AddAttribute(6, "class", "toolui-input");
+			builder.AddAttribute(7, "rows", "3");
+			builder.AddAttribute(8, "value", GetText(item.Id, "answer"));
+			builder.AddAttribute(9, "oninput", EventCallback.Factory.Create<ChangeEventArgs>(
+				this, e => SetText(item.Id, "answer", e.Value?.ToString())));
+			builder.CloseElement();
+			builder.CloseElement();
+			return;
+		}
+
+		int seq = 0;
+		foreach (var field in form.Fields)
+		{
+			builder.OpenElement(seq++, "div");
+			builder.AddAttribute(seq++, "class", "toolui-field");
+
+			if (field.Kind == ToolUiFieldKind.Code)
+			{
+				if (!string.IsNullOrEmpty(field.Label))
+				{
+					builder.OpenElement(seq++, "span");
+					builder.AddAttribute(seq++, "class", "toolui-label");
+					builder.AddContent(seq++, field.Label);
+					builder.CloseElement();
+				}
+				builder.OpenElement(seq++, "pre");
+				builder.AddAttribute(seq++, "class", "toolui-code");
+				builder.AddContent(seq++, field.Value ?? string.Empty);
+				builder.CloseElement();
+				builder.CloseElement();
+				continue;
+			}
+
+			builder.OpenElement(seq++, "span");
+			builder.AddAttribute(seq++, "class", "toolui-label");
+			builder.AddContent(seq++, Label(field));
+			builder.CloseElement();
+
+			switch (field.Kind)
+			{
+				case ToolUiFieldKind.Choice:
+					var currentChoice = GetText(item.Id, field.Name, field.Value);
+					builder.OpenElement(seq++, "select");
+					builder.AddAttribute(seq++, "class", "toolui-input");
+					builder.AddAttribute(seq++, "value", currentChoice);
+					builder.AddAttribute(seq++, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(
+						this, e => SetText(item.Id, field.Name, e.Value?.ToString())));
+					builder.OpenElement(seq++, "option");
+					builder.AddAttribute(seq++, "value", "");
+					builder.AddContent(seq++, Loc["toolui.choose_placeholder"]);
+					builder.CloseElement();
+					foreach (var option in field.Options ?? Array.Empty<string>())
+					{
+						builder.OpenElement(seq++, "option");
+						builder.AddAttribute(seq++, "value", option);
+						// <select> 的 value 属性不足以让浏览器选中，必须把选中态落到 option 上
+						builder.AddAttribute(seq++, "selected", string.Equals(currentChoice, option, StringComparison.Ordinal));
+						builder.AddContent(seq++, option);
+						builder.CloseElement();
+					}
+					builder.CloseElement();
+					break;
+
+				case ToolUiFieldKind.MultiChoice:
+					foreach (var option in field.Options ?? Array.Empty<string>())
+					{
+						bool isChecked = GetSet(item.Id, field.Name).Contains(option);
+						builder.OpenElement(seq++, "label");
+						builder.AddAttribute(seq++, "class", "toolui-check");
+						builder.OpenElement(seq++, "input");
+						builder.AddAttribute(seq++, "type", "checkbox");
+						builder.AddAttribute(seq++, "checked", isChecked);
+						builder.AddAttribute(seq++, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(
+							this, e => ToggleSet(item.Id, field.Name, option, e.Value is true)));
+						builder.CloseElement();
+						builder.AddContent(seq++, option);
+						builder.CloseElement();
+					}
+					break;
+
+				case ToolUiFieldKind.Bool:
+					builder.OpenElement(seq++, "label");
+					builder.AddAttribute(seq++, "class", "toolui-check");
+					builder.OpenElement(seq++, "input");
+					builder.AddAttribute(seq++, "type", "checkbox");
+					builder.AddAttribute(seq++, "checked", GetBool(item.Id, field.Name, field.Value == "true"));
+					builder.AddAttribute(seq++, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(
+						this, e => SetBool(item.Id, field.Name, e.Value is true)));
+					builder.CloseElement();
+					builder.CloseElement();
+					break;
+
+				case ToolUiFieldKind.LongText:
+					builder.OpenElement(seq++, "textarea");
+					builder.AddAttribute(seq++, "class", "toolui-input");
+					builder.AddAttribute(seq++, "rows", "3");
+					builder.AddAttribute(seq++, "placeholder", field.Placeholder ?? string.Empty);
+					builder.AddAttribute(seq++, "value", GetText(item.Id, field.Name, field.Value));
+					builder.AddAttribute(seq++, "oninput", EventCallback.Factory.Create<ChangeEventArgs>(
+						this, e => SetText(item.Id, field.Name, e.Value?.ToString())));
+					builder.CloseElement();
+					break;
+
+				default:
+					builder.OpenElement(seq++, "input");
+					builder.AddAttribute(seq++, "class", "toolui-input");
+					builder.AddAttribute(seq++, "type", "text");
+					builder.AddAttribute(seq++, "placeholder", field.Placeholder ?? string.Empty);
+					builder.AddAttribute(seq++, "value", GetText(item.Id, field.Name, field.Value));
+					builder.AddAttribute(seq++, "oninput", EventCallback.Factory.Create<ChangeEventArgs>(
+						this, e => SetText(item.Id, field.Name, e.Value?.ToString())));
+					builder.CloseElement();
+					break;
+			}
+
+			builder.CloseElement();
+		}
+	};
+
+	private static string Label(ToolUiField field)
+		=> string.IsNullOrEmpty(field.Label) ? field.Name : field.Label!;
+
+	private async Task SubmitAsync(ToolInteractionPending item)
+	{
+		var payload = BuildPayload(item, out var error);
+		if (payload == null)
+		{
+			errors[item.Id] = error ?? Loc["toolui.submit_failed"];
+			await InvokeAsync(StateHasChanged);
+			return;
+		}
+
+		var outcome = Interactions.Submit(item.Id, payload);
+		if (!outcome.Success)
+		{
+			errors[item.Id] = Describe(outcome);
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task SkipAsync(ToolInteractionPending item)
+	{
+		var outcome = Interactions.Skip(item.Id, "user_skipped");
+		if (!outcome.Success)
+		{
+			errors[item.Id] = Describe(outcome);
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+
+	private async Task StopRoundAsync()
+	{
+		if (ViewContext is { } ctx)
+			await ctx.StopGenerationAsync();
+	}
+
+	private string Describe(ToolInteractionSubmitOutcome outcome) => outcome.Code switch
+	{
+		ToolInteractionSubmitCodes.AlreadyResolved => Loc["toolui.already_resolved"],
+		ToolInteractionSubmitCodes.NotFound => Loc["toolui.not_found"],
+		_ => Loc.Format("toolui.submit_failed", outcome.Message ?? outcome.Code ?? "")
+	};
+
+	private JObject? BuildPayload(ToolInteractionPending item, out string? error)
+	{
+		error = null;
+		var obj = new JObject();
+		var form = item.Request.Form;
+
+		if (form == null)
+		{
+			var free = GetText(item.Id, "answer");
+			if (string.IsNullOrWhiteSpace(free))
+			{
+				error = Loc["toolui.answer_required"];
+				return null;
+			}
+
+			obj["answer"] = free;
+			return obj;
+		}
+
+		foreach (var field in form.Fields)
+		{
+			switch (field.Kind)
+			{
+				case ToolUiFieldKind.Code:
+					continue;
+
+				case ToolUiFieldKind.Bool:
+					obj[field.Name] = GetBool(item.Id, field.Name, field.Value == "true");
+					break;
+
+				case ToolUiFieldKind.MultiChoice:
+					obj[field.Name] = new JArray(GetSet(item.Id, field.Name));
+					break;
+
+				default:
+					var text = GetText(item.Id, field.Name, field.Value);
+					if (string.IsNullOrWhiteSpace(text))
+					{
+						if (field.Required)
+						{
+							error = Loc.Format("toolui.field_required", Label(field));
+							return null;
+						}
+						continue;
+					}
+
+					obj[field.Name] = text;
+					break;
+			}
+		}
+
+		return obj;
+	}
+
+	private Dictionary<string, object> Bucket(Guid id)
+	{
+		if (!values.TryGetValue(id, out var bucket))
+		{
+			bucket = new Dictionary<string, object>(StringComparer.Ordinal);
+			values[id] = bucket;
+		}
+		return bucket;
+	}
+
+	private string GetText(Guid id, string field, string? fallback = null)
+		=> Bucket(id).TryGetValue(field, out var value) && value is string s ? s : fallback ?? string.Empty;
+
+	private void SetText(Guid id, string field, string? value)
+	{
+		Bucket(id)[field] = value ?? string.Empty;
+		InvokeAsync(StateHasChanged);
+	}
+
+	private bool GetBool(Guid id, string field, bool fallback)
+		=> Bucket(id).TryGetValue(field, out var value) && value is bool b ? b : fallback;
+
+	private void SetBool(Guid id, string field, bool value)
+	{
+		Bucket(id)[field] = value;
+		InvokeAsync(StateHasChanged);
+	}
+
+	private HashSet<string> GetSet(Guid id, string field)
+		=> Bucket(id).TryGetValue(field, out var value) && value is HashSet<string> set
+			? set
+			: new HashSet<string>(StringComparer.Ordinal);
+
+	private void ToggleSet(Guid id, string field, string option, bool isChecked)
+	{
+		var bucket = Bucket(id);
+		if (!bucket.TryGetValue(field, out var value) || value is not HashSet<string> set)
+		{
+			set = new HashSet<string>(StringComparer.Ordinal);
+			bucket[field] = set;
+		}
+
+		if (isChecked) set.Add(option);
+		else set.Remove(option);
+
+		InvokeAsync(StateHasChanged);
+	}
+}

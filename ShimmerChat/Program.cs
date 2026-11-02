@@ -62,6 +62,9 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<GenerationProvider
 
 builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
 builder.Services.AddSingleton<IChatViewRegistry, ChatViewRegistry>();
+builder.Services.AddSingleton<IToolInteractionService, ToolInteractionService>();
+builder.Services.AddSingleton<ShimmerChatLib.ChatView.ToolUi.IToolUiViewRegistry,
+    ShimmerChatLib.ChatView.ToolUi.ToolUiViewRegistry>();
 builder.Services.AddSingleton<IPluginLoaderService, PluginLoaderServiceV1>();
 builder.Services.AddSingleton<IImageAttachmentService, ImageAttachmentService>();
 builder.Services.AddSingleton<IPluginPanelService, PluginPanelServiceV1>();

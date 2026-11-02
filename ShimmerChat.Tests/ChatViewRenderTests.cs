@@ -10,6 +10,7 @@ using ShimmerChatBuiltin.ChatView.Aggregated;
 using ShimmerChatBuiltin.ChatView.Standard;
 using ShimmerChatLib;
 using ShimmerChatLib.ChatView;
+using ShimmerChatLib.Generation.ToolUi;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChat.Tests;
@@ -127,12 +128,17 @@ public class ChatViewRenderTests
         var images = new Mock<IImageAttachmentService>();
         images.Setup(i => i.GetDisplayUrl(It.IsAny<MessageImage>())).Returns("/userimages/rendered.png");
 
+        // 外壳在"停止前确认"里会查询待回答交互；这些渲染用例里没有交互
+        var interactions = new Mock<IToolInteractionService>();
+        interactions.Setup(i => i.GetPending(It.IsAny<Guid>())).Returns(Array.Empty<ToolInteractionPending>());
+
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(display.Object);
         services.AddSingleton(loc.Object);
         services.AddSingleton(kv.Object);
         services.AddSingleton(images.Object);
+        services.AddSingleton(interactions.Object);
         services.AddSingleton(Mock.Of<IMessageStoreService>());
         services.AddSingleton(Mock.Of<IPopupService>());
         services.AddSingleton(Mock.Of<IJSRuntime>());

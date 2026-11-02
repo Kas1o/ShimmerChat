@@ -5,6 +5,7 @@
 @inject IKVDataService KVData
 @inject IPopupService PopupService
 @inject IImageAttachmentService ImageAttachments
+@inject IToolInteractionService Interactions
 @inject ILogger<ChatViewShell> Logger
 @implements IAsyncDisposable
 
@@ -624,6 +625,7 @@
 		"pre" => Loc["chat.phase_pre"],
 		"gen" => Loc["chat.phase_gen"],
 		"post" => Loc["chat.phase_post"],
+		"await" => Loc["chat.phase_await"],
 		_ => ""
 	};
 
@@ -933,8 +935,11 @@
 		var postProcessing = ViewContext.Messages.FirstOrDefault(m => m.GenerationState == MessageGenerationState.PostProcessing);
 		if (postProcessing != null)
 		{
+			// 等待用户回答时消息同样处于 PostProcessing，但语义完全不同：
+			// 这时停止意味着放弃这次提问，而不是打断后处理。
+			var awaitingInput = Interactions.GetPending(ViewContext.Chat.Guid).Count > 0;
 			var confirmed = await PopupService.ShowAsync(
-				Loc["chat.stop_post_processing_warn"],
+				Loc[awaitingInput ? "chat.stop_awaiting_input_warn" : "chat.stop_post_processing_warn"],
 				Loc["chat.stop_warn_title"], showCancel: true);
 			if (!confirmed) return;
 		}

@@ -20,6 +20,8 @@
   "tool.memory.desc": "管理对话记忆，支持添加、删除和搜索",
   "tool.set_chat_name": "设置对话名称",
   "tool.set_chat_name.desc": "为当前对话设置名称",
+  "tool.ask_user": "询问用户",
+  "tool.ask_user.desc": "向用户提问并等待回答，可附带候选项",
   "tool.eval_csharp": "执行 C# 代码",
   "tool.eval_csharp.desc": "使用 CSharpScript 执行 C# 代码",
   "tool.variable": "变量管理",
@@ -662,6 +664,10 @@
   "prop.post_tool_call.emit_sender.hint": "工具结果写入对话时使用的发送者角色",
   "prop.post_tool_call.no_tool_call": "无工具调用时",
   "prop.post_tool_call.no_tool_call.hint": "本轮没有工具调用时的循环行为：保持循环指令（默认结束）或强制再生成一轮",
+
+  "prop.append_chat_messages.dangling_tool_calls": "未应答的工具调用",
+  "prop.append_chat_messages.dangling_tool_calls.hint": "assistant 的每个工具调用都必须有配对的工具结果，否则 OpenAI 兼容接口会直接拒绝请求。注入占位：为该调用补一条只进 prompt 的占位结果并记录告警；直接失败：中止本次生成，迫使调用方修复历史。",
+  "node_err.dangling_tool_calls": "对话历史中有 {0} 个未应答的工具调用：{1}。请修复消息，或把该节点切换为「注入占位」。",
 
   "node.post_loop_directive": "循环控制",
   "node.post_loop_directive.desc": "显式设置本轮之后的循环指令。整棵树执行完后才生效，放在末尾即可获得最后决定的语义。",

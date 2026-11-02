@@ -28,6 +28,12 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
     /// <summary>
     /// 执行本轮 LLM 请求的工具调用，把结果写回对话并继续下一轮。
     /// 后处理管线接管工具调用的位置就是这里——它不在，工具调用就不会被执行。
+    /// <para>
+    /// 工具支持两代接口：<see cref="IToolV3"/>（结构化结果 + 取消）优先，
+    /// 旧 <see cref="IToolV2"/> 的字符串结果被包装成 <see cref="ToolResult"/>，行为与之前一致。
+    /// 工具内部等待用户输入（如 ask_user）不需要本节点配合：那段等待发生在
+    /// <c>ExecuteAsync</c> 内部，本节点只是"一次调用耗时较长"。
+    /// </para>
     /// </summary>
     [NodeInfo("node.post_tool_call",
         Icon = "🔧",
@@ -56,6 +62,9 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
             HintKey = "prop.post_tool_call.no_tool_call.hint", Order = 40)]
         public PostNoToolCallBehavior NoToolCallBehavior { get; set; } = PostNoToolCallBehavior.LeaveDirective;
 
+        /// <summary>一次工具调用的执行结论：要么有内容可写，要么是一个真相失败。</summary>
+        private readonly record struct ToolCallOutcome(string? Content, string? FailCode, string? FailMessage);
+
         public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
         {
             var env = context.Env;
@@ -76,7 +85,9 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
 
             if (calls.Count < toolCalls.Count)
             {
-                context.Env.Persistent.DebugOutput.Write("PostToolCallNode", "ToolCall",
+                // 被丢弃的调用不会产生 tool_result，历史完整性由 AppendChatMessagesNode 的
+                // DanglingToolCalls 策略兜底（默认注入占位），这里只留痕。
+                env.Persistent.DebugOutput.Write("PostToolCallNode", "ToolCall",
                     $"Round {env.RoundIndex}: {toolCalls.Count - calls.Count} tool call(s) dropped by MaxCallsPerRound={MaxCallsPerRound}.");
             }
 
@@ -85,13 +96,17 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
                 context.CancellationToken.ThrowIfCancellationRequested();
 
                 var tool = env.Tools.FirstOrDefault(t => t.GetDefinition().name == toolCall.name);
-                var result = await ExecuteOneAsync(env, tool, toolCall, context.CancellationToken);
-                if (result == null)
-                    return Fail(NodeErrorCodes.ToolNotFound,
-                        $"Tool '{toolCall.name}' is not available in the current round.");
+                var outcome = await ExecuteOneAsync(env, tool, toolCall, context.CancellationToken);
+
+                if (outcome.FailCode != null)
+                    return Fail(outcome.FailCode, outcome.FailMessage ?? "Tool call failed.");
+
+                // 工具执行期间可能发生取消（尤其是等待用户输入）：写库前再检查一次，
+                // 避免把"半轮工具结果"落进对话。
+                context.CancellationToken.ThrowIfCancellationRequested();
 
                 PostChat.Append(env,
-                    new ChatMessage { Content = result, id = toolCall.id },
+                    new ChatMessage { Content = outcome.Content ?? string.Empty, id = toolCall.id },
                     ResolveSender());
             }
 
@@ -100,33 +115,86 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
             return PostNodeResult.SuccessResult();
         }
 
-        /// <summary>返回 null 表示工具缺失且不允许继续。</summary>
-        private async Task<string?> ExecuteOneAsync(PostGenerationEnv env, IToolV2? tool,
+        /// <summary>执行一次调用。返回 FailCode 表示硬失败（节点据此中止本轮）。</summary>
+        private async Task<ToolCallOutcome> ExecuteOneAsync(PostGenerationEnv env, IToolV2? tool,
             ToolCall toolCall, CancellationToken ct)
         {
             if (tool == null)
             {
                 if (!ContinueOnError)
-                    return null;
+                    return new ToolCallOutcome(null, NodeErrorCodes.ToolNotFound,
+                        $"Tool '{toolCall.name}' is not available in the current round.");
 
                 env.Persistent.DebugOutput.Write("PostToolCallNode", "ToolCall",
                     $"Round {env.RoundIndex}: tool '{toolCall.name}' not found, reporting to the model.");
-                return $"[Tool error] Tool '{toolCall.name}' not found.";
+                return new ToolCallOutcome($"[Tool error] Tool '{toolCall.name}' not found.", null, null);
             }
 
             try
             {
-                return await tool.ExecuteAsync(toolCall.arguments ?? "{}");
+                var result = await InvokeAsync(env, tool, toolCall, ct);
+                return Interpret(env, toolCall, result);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // 用户 / 宿主取消：绝不吞成"工具错误"，否则用户按了停止还会继续下一轮。
+                throw;
+            }
+            catch (OperationCanceledException ex)
+            {
+                // ct 未取消却抛取消 = 工具内部超时（如 HttpClient.Timeout），这是真的失败。
+                env.Persistent.DebugOutput.Write("PostToolCallNode", "ToolCall",
+                    $"Round {env.RoundIndex}: tool '{toolCall.name}' was cancelled internally: {ex.Message}");
+                if (!ContinueOnError)
+                    throw;
+                return new ToolCallOutcome("[Tool error] The tool timed out.", null, null);
             }
             catch (Exception ex) when (ContinueOnError)
             {
                 // 吞异常必须留痕：模型看到的是错误文本，排查依赖 DebugOutput
                 env.Persistent.DebugOutput.Write("PostToolCallNode", "ToolCall",
                     $"Round {env.RoundIndex}: tool '{toolCall.name}' threw {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
-                return $"[Tool error] {ex.Message}";
+                return new ToolCallOutcome($"[Tool error] {ex.Message}", null, null);
             }
         }
 
+        /// <summary>按接口代次分派：优先结构化接口，旧接口的字符串结果包装成 <see cref="ToolResult"/>。</summary>
+        private static async Task<ToolResult> InvokeAsync(PostGenerationEnv env, IToolV2 tool,
+            ToolCall toolCall, CancellationToken ct)
+        {
+            if (tool is IToolV3 v3)
+            {
+                return await v3.ExecuteAsync(new ToolInvocationContext
+                {
+                    ToolCallId = toolCall.id ?? string.Empty,
+                    ToolName = toolCall.name,
+                    ArgumentsJson = toolCall.arguments ?? "{}",
+                    RoundIndex = env.RoundIndex
+                }, ct);
+            }
+
+            var text = await tool.ExecuteAsync(toolCall.arguments ?? "{}");
+            return ToolResult.Ok(text);
+        }
+
+        /// <summary>把工具结果翻译成"写给模型的内容"或硬失败。</summary>
+        private ToolCallOutcome Interpret(PostGenerationEnv env, ToolCall toolCall, ToolResult result)
+        {
+            if (result.Status == ToolResultStatus.Completed)
+                return new ToolCallOutcome(result.Content ?? string.Empty, null, null);
+
+            env.Persistent.DebugOutput.Write("PostToolCallNode", "ToolCall",
+                $"Round {env.RoundIndex}: tool '{toolCall.name}' failed ({result.ErrorCode}): " +
+                $"{result.ErrorMessage}{(result.Details == null ? "" : $"\n{result.Details}")}");
+
+            if (!ContinueOnError)
+                return new ToolCallOutcome(null,
+                    result.ErrorCode ?? NodeErrorCodes.CommonError,
+                    result.ErrorMessage ?? $"Tool '{toolCall.name}' failed.");
+
+            return new ToolCallOutcome(
+                $"[Tool error] {result.ErrorCode ?? NodeErrorCodes.CommonError}: {result.ErrorMessage}", null, null);
+        }
         private string ResolveSender() => EmitSender switch
         {
             PostToolResultSender.User => Sender.User,

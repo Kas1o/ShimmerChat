@@ -70,7 +70,7 @@ ShimmerChat/
 |-----------|------|
 | `Models/` | UI 模型（`Theme`、`PopupOptions` 等） |
 | `Interface/` | 所有服务接口（`IGenerationManagerV2`、`IPluginLoaderService`、`IKVDataService` 等） |
-| `Generation/` | **生成管线核心**：`IPreGenerationNode`、`IPostGenerationNode`、`IRenderModifierNode`、`ITreeNode`、`PreGenerationEnv`、`PostGenerationEnv`、`PostPipelineResult`、`PostChat`、`GenerationTreeExecutor`、`ToolCallLoop`、`IToolV2`、`IToolRegistry`、节点元数据 Attribute 等 |
+| `Generation/` | **生成管线核心**：`IPreGenerationNode`、`IPostGenerationNode`、`IRenderModifierNode`、`ITreeNode`、`PreGenerationEnv`、`PostGenerationEnv`、`PostPipelineResult`、`PostChat`、`GenerationTreeExecutor`、`ToolCallLoop`、`IToolV2`、`IToolV3`、`ToolResult`、`ToolCallPairing`、`IToolRegistry`、`ToolUi/`（工具交互表单与结果模型）、节点元数据 Attribute 等 |
 | `ChatView/` | **对话界面系统**：`IChatView`、`ChatViewContext`、`ChatViewAttribute`、`IChatViewRegistry` |
 | `Components/` | 跨项目共享的 Blazor 组件（含 `ChatViewShell` 对话界面外壳） |
 | `Panel/` | 插件面板基础设施 |
@@ -109,6 +109,7 @@ Blazor Server 宿主 + 所有服务实现 + UI 页面。
 | `SubAgent/` | 子代理节点与工具；`Sessions/` 为 `subagent_call` 的私有会话存储（KVData 空间 `SubAgent`，含索引与会话级锁），`SubAgentSessionPanel` 是 Settings 里的会话 Viewer |
 | `RegexModifier/` | 消息显示修改器 |
 | `WebSearch/` | 联网搜索：五个服务方（DeepSeek / Tavily / Brave / Exa / SerpApi）、自动搜索节点、搜索 + 抓取工具、设置面板 |
+| `AskUser/` | `ask_user` 工具：向用户提问并就地等待回答（声明式表单，见 §4.7） |
 
 ### 3.5 src-tauri — 桌面发布
 
@@ -243,7 +244,7 @@ public class PostGenerationEnv
 | `SequenceNode` | 顺序执行子节点，支持 Repeat |
 | `FragmentNode` | 向 Fragments 追加自定义片段（role + content） |
 | `CallNode` | 通过 PresetId 加载并执行预设 |
-| `AppendChatMessagesNode` | 从 Chat 加载历史消息并追加到 Fragments |
+| `AppendChatMessagesNode` | 从 Chat 加载历史消息并追加到 Fragments；同时是工具调用完整性的唯一检查点（`DanglingToolCalls`：注入占位 / 直接失败） |
 | `APISelectNode` | 选择 API 配置 |
 | `ToolPresetNode` | 根据预设名加载工具列表 |
 | `ToolInstantiateNode` | 实例化单个工具 |
@@ -270,10 +271,30 @@ public class PostGenerationEnv
 
 ### 4.6 Tool 系统
 
-- **`IToolV2`** — 工具执行接口：`GetDefinition()` + `ExecuteAsync(input)`。
-- **`IAutoCreateToolV2 : IToolV2`** — 可通过通用节点自动创建的工具。提供 `static abstract NameKey`、`DescriptionKey`、`CategoryKeys` 元数据和 `static abstract Create(PersistentEnv)` 工厂方法。
+- **`IToolV2`** — 旧工具执行接口：`GetDefinition()` + `ExecuteAsync(input)`。仍被所有内置工具使用，行为不变。
+- **`IToolV3 : IToolV2`** — 结构化工具接口：`Task<ToolResult> ExecuteAsync(ToolInvocationContext, CancellationToken)`。新工具实现它（旧的 `ExecuteAsync(string)` 有默认实现，不必写）。`ToolInvocationContext` 提供 `ToolCallId` / `ToolName` / `ArgumentsJson` / `RoundIndex`，`ToolResult` 只有 `Completed` / `Failed` 两态 + `ToolErrorCodes`。`PostToolCallNode` 优先走 V3，旧工具的结果被包装成 `ToolResult.Ok(text)`，因此两代接口可以共存、逐个迁移。
+- **`IAutoCreateToolV2 : IToolV2`** — 可通过通用节点自动创建的工具。提供 `static abstract NameKey`、`DescriptionKey`、`CategoryKeys` 元数据和 `static abstract Create(PersistentEnv)` 工厂方法。要写结构化工具时同时实现 `IToolV3`（`AskUserToolV2` 即此形态），注册表无需改动。
 - **`IToolRegistry`** — 扫描所有 `IAutoCreateToolV2` 实现，提供按名称/类型查找和实例创建。
 - **`ToolCallLoop`** — 生成轮次循环：累积流式响应 → 询问宿主是否继续。**不执行工具**：工具调用由后处理管线里的 `PostToolCallNode` 完成，是否继续也由后处理树决定。
+- **取消契约** — 工具必须响应 `CancellationToken`。`PostToolCallNode` 只在「令牌确实被取消」时向上抛 `OperationCanceledException`；工具内部超时（`ct` 未取消）才转成工具错误。
+
+### 4.7 工具 ↔ 用户交互（需要用户输入的工具）
+
+`ask_user` 这类工具在 `ExecuteAsync` 内部**就地产等待**用户回答，而不是把对话挂起：
+
+```
+工具 → IToolInteractionService.RequestAsync(chatGuid, request, timeout: null, ct)
+     ← 用户提交 / 跳过 / 生成被取消（抛 OCE）
+工具 → ToolResult.Ok(结果 JSON)  →  PostToolCallNode 写 tool_result  →  LoopDirective=Continue
+```
+
+- **等待期间本轮没有结束**，因此不会产生"assistant 有 toolCalls 却没有 tool_result"的中间状态；对话记录任何时刻都是合法的。
+- **待回答请求只存在内存**（`ToolInteractionService` 单例，按 chatGuid 索引）：页面刷新、切换对话后仍可继续回答；进程重启会丢失，但那同时意味着本次生成已经结束。
+- **超时由模型决定**：`ask_user` 的 `timeout_seconds` 参数（0 / 缺省 = 无限等待，上限 3600）。到点后工具返回 `{"status":"timed_out"}` 作为**正常结果**，本轮 loop 继续；负数与超上限一律 `TOOL_INVALID_ARGUMENTS`，不静默截断。等待的终点始终是"用户提交 / 用户跳过 / 超时 / 生成被取消"四者之一。
+- **可见性**由 `ToolInteractionDock`（宿主级浮层，与具体对话界面无关）承担；带超时的请求会显示倒计时。
+- **UI 描述由工具产出数据，不产出组件**：`ToolInteractionRequest.Form`（`ToolUiForm` 声明式表单，默认形态，零 Razor）；确实需要特殊界面时用 `ViewId` 引用一个 `[ToolUiView]` 组件（注册表与 `IChatViewRegistry` 同构），未注册即降级为通用表单。
+- **给模型看的措辞只由宿主生成**（`ToolInteractionResult.ToModelJson()`），工具与界面都不得自行拼接 prompt 文本。
+- **没有交互通道时快速失败**：`PersistentEnv.Interactions == null`（子代理虚拟会话）时工具返回 `TOOL_INTERACTION_UNAVAILABLE`，绝不空等。
 
 ---
 
@@ -309,6 +330,15 @@ public class PostGenerationEnv
 ### 5.5 IToolRegistry / ToolRegistry
 
 **工具注册表。** 扫描所有 `IAutoCreateToolV2` 实现，提供按名称/类型名查找和通过 `Create(PersistentEnv)` 工厂实例化。
+
+### 5.5.1 IToolInteractionService / ToolInteractionService
+
+**工具 ↔ 用户交互通道。** 注册为 Singleton，**不落库**：待回答请求（`ToolInteractionPending`）保存在内存字典里，用 `TaskCompletionSource` 与工具握手。
+
+- `RequestAsync(chatGuid, request, timeout, ct)` — 工具在此等待；`timeout = null`（默认）表示无限等待。
+- `Submit` / `Skip` / `CancelAll` — 界面与宿主的三条定案路径；四路竞态（提交/跳过/超时/取消）由 `TrySetResult` 的返回值裁决，输的一方拿到 `TOOL_INTERACTION_ALREADY_RESOLVED` 之类的结构化错误，绝不静默。
+- 取消优先于超时：`ct` 触发时抛 `OperationCanceledException`，不会被伪装成"用户未响应"。
+- 宿主侧配套：`GenerationSessionService.StopGeneration` / `CancelPreviousGenerationAsync` 在取消生成前先 `CancelAll`（等待中的工具不听取消令牌就会一直等）；停止等待有 2 秒上限，超时只 `LogError`，绝不阻塞渲染线程。
 
 ### 5.6 IPluginPanelService / PluginPanelServiceV1
 

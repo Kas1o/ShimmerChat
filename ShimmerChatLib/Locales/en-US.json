@@ -21,5 +21,19 @@
   "category.web_search": "Web Search",
   "category.general": "General",
   "category.post": "Post-Generation",
-  "category.other": "Other"
+  "category.other": "Other",
+
+  "toolui.awaiting": "Waiting for you",
+  "toolui.remaining": "{0}s left",
+  "toolui.submit": "Submit",
+  "toolui.skip": "Skip",
+  "toolui.stop": "Stop generation",
+  "toolui.free_answer": "Your answer",
+  "toolui.choose_placeholder": "— choose —",
+  "toolui.answer_required": "Please enter an answer.",
+  "toolui.field_required": "Please fill in or choose the required field ({0}).",
+  "toolui.view_missing": "Tool view '{0}' is not registered; showing the generic form instead.",
+  "toolui.submit_failed": "Submit failed: {0}",
+  "toolui.already_resolved": "This question already ended (answered elsewhere, skipped, or timed out).",
+  "toolui.not_found": "This question no longer exists."
 }

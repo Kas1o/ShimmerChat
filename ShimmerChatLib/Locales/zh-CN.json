@@ -21,5 +21,19 @@
   "category.web_search": "联网搜索",
   "category.general": "通用",
   "category.post": "后处理",
-  "category.other": "其他"
+  "category.other": "其他",
+
+  "toolui.awaiting": "等待你的回答",
+  "toolui.remaining": "剩余 {0} 秒",
+  "toolui.submit": "提交",
+  "toolui.skip": "跳过",
+  "toolui.stop": "停止生成",
+  "toolui.free_answer": "你的回答",
+  "toolui.choose_placeholder": "— 请选择 —",
+  "toolui.answer_required": "请输入回答。",
+  "toolui.field_required": "请先填写或选择必填项（{0}）。",
+  "toolui.view_missing": "工具视图 '{0}' 未注册，已改用通用表单。",
+  "toolui.submit_failed": "提交失败：{0}",
+  "toolui.already_resolved": "该提问已结束（已在其它窗口回答、跳过或超时）。",
+  "toolui.not_found": "该提问已不存在。"
 }

@@ -19,19 +19,25 @@ public class GenerationSessionService
     private readonly IMessageStoreService _messageStore;
     private readonly IKVDataService _kvData;
     private readonly ILocService _loc;
+    private readonly IToolInteractionService _toolInteractions;
     private readonly ILogger<GenerationSessionService> _logger;
+
+    /// <summary>停止生成时等待后台任务收尾的上限。工具违约（不响应取消）不得拖住渲染线程。</summary>
+    private static readonly TimeSpan StopWaitLimit = TimeSpan.FromSeconds(2);
 
     public GenerationSessionService(
         IGenerationManagerV2 generationManager,
         IMessageStoreService messageStore,
         IKVDataService kvData,
         ILocService loc,
+        IToolInteractionService toolInteractions,
         ILogger<GenerationSessionService> logger)
     {
         _generationManager = generationManager;
         _messageStore = messageStore;
         _kvData = kvData;
         _loc = loc;
+        _toolInteractions = toolInteractions;
         _logger = logger;
     }
 
@@ -54,29 +60,54 @@ public class GenerationSessionService
 
     /// <summary>
     /// 取消之前的生成并重置会话（用于发送新消息、重新生成等场景）。
+    /// <para>
+    /// 必须 async：工具可能正处于"等待用户输入"的无限等待中，同步阻塞会把渲染线程一起冻住，
+    /// 而解冻它的按钮（提交交互）恰好排在同一个渲染线程上。等待有上限，超时只记录不抛出。
+    /// </para>
     /// </summary>
-    public void CancelPreviousGeneration(string chatGuid)
+    public async Task CancelPreviousGenerationAsync(string chatGuid)
     {
-        if (_sessions.TryGetValue(chatGuid, out var session) && session.IsActive)
-        {
-            session.Cancel();
-            if (session.RunningTask != null)
-            {
-                try { session.RunningTask.GetAwaiter().GetResult(); } catch { }
-            }
+        if (!_sessions.TryGetValue(chatGuid, out var session) || !session.IsActive)
+            return;
 
-            session.IsActive = false;
-            session.Phase = null;
+        // 先让等待中的工具感知取消，否则它们会一直等着一个不会来的答案
+        CancelPendingInteractions(session, "generation_cancelled");
+
+        session.Cancel();
+        var stopped = true;
+        if (session.RunningTask != null)
+        {
+            try
+            {
+                await session.RunningTask.WaitAsync(StopWaitLimit);
+            }
+            catch (TimeoutException)
+            {
+                stopped = false;
+                // 工具违约（不响应取消）：记录并继续清理，绝不在此无限等待
+                _logger.LogError(
+                    "[GenerationSessionService] Session {ChatGuid} did not stop within {Seconds}s; " +
+                    "a tool is ignoring cancellation. Continuing with cleanup, the task is left running.",
+                    chatGuid, StopWaitLimit.TotalSeconds);
+            }
+            catch (Exception)
+            {
+                // 取消导致的异常是预期结果
+            }
+        }
+
+        session.IsActive = false;
+        session.Phase = null;
+        if (stopped)
             session.DisposeCts();
 
-            // 标记生成中的消息为已完成
-            if (session.Chat != null)
+        // 标记生成中的消息为已完成
+        if (session.Chat != null)
+        {
+            foreach (var msg in session.Chat.Messages.Where(m => m.IsGenerating))
             {
-                foreach (var msg in session.Chat.Messages.Where(m => m.IsGenerating))
-                {
-                    msg.GenerationState = MessageGenerationState.Completed;
-                    session.Chat.SaveMessage(_messageStore, msg);
-                }
+                msg.GenerationState = MessageGenerationState.Completed;
+                session.Chat.SaveMessage(_messageStore, msg);
             }
         }
     }
@@ -89,15 +120,33 @@ public class GenerationSessionService
         if (!_sessions.TryGetValue(chatGuid, out var session) || !session.IsActive)
             return;
 
+        CancelPendingInteractions(session, "generation_stopped");
         session.Cancel();
+        var stopped = true;
         if (session.RunningTask != null)
         {
-            try { await session.RunningTask; } catch { }
+            try
+            {
+                await session.RunningTask.WaitAsync(StopWaitLimit);
+            }
+            catch (TimeoutException)
+            {
+                stopped = false;
+                _logger.LogError(
+                    "[GenerationSessionService] Session {ChatGuid} did not stop within {Seconds}s; " +
+                    "a tool is ignoring cancellation. Continuing with cleanup, the task is left running.",
+                    chatGuid, StopWaitLimit.TotalSeconds);
+            }
+            catch (Exception)
+            {
+                // 取消导致的异常是预期结果
+            }
         }
 
         session.IsActive = false;
         session.Phase = null;
-        session.DisposeCts();
+        if (stopped)
+            session.DisposeCts();
 
         if (session.Chat != null)
         {
@@ -122,8 +171,30 @@ public class GenerationSessionService
         }
     }
 
-    // ---- 启动生成 ----
+    /// <summary>
+    /// 取消该会话正在等待回答的工具交互。工具在 <c>ExecuteAsync</c> 内部等待，
+    /// 不打断它们的话，取消令牌之外没有任何东西能唤醒它们。
+    /// </summary>
+    private void CancelPendingInteractions(GenerationSession session, string reason)
+    {
+        if (session.Chat is { } chat)
+        {
+            _toolInteractions.CancelAll(chat.Guid, reason);
+            return;
+        }
 
+        if (Guid.TryParse(session.ChatGuid, out var chatId))
+        {
+            _toolInteractions.CancelAll(chatId, reason);
+            return;
+        }
+
+        _logger.LogWarning(
+            "[GenerationSessionService] ChatGuid '{ChatGuid}' is not a valid Guid; pending tool interactions were not cancelled.",
+            session.ChatGuid);
+    }
+
+    // ---- 启动生成 ----
     /// <summary>
     /// 启动普通生成。会话持有 Chat/Agent 引用，消息操作直接作用在 Chat.Messages 上。
     /// overrides 非空时用其树 JSON 替代 Agent 的管线树（生成提供器场景）。
@@ -257,6 +328,9 @@ public class GenerationSessionService
         }
         finally
         {
+            // 安全网：生成结束时不应残留待回答交互（异常、取消、正常结束都走这里）。
+            _toolInteractions.CancelAll(chat.Guid, "generation_finished");
+
             session.IsActive = false;
             session.DisposeCts();
             GetDirty(chat, agent);

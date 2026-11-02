@@ -20,6 +20,8 @@
   "tool.memory.desc": "Manage memory in conversations. Supports add, delete, and search",
   "tool.set_chat_name": "Set Chat Name",
   "tool.set_chat_name.desc": "Set name for current chat",
+  "tool.ask_user": "Ask User",
+  "tool.ask_user.desc": "Ask the user a question and wait for their answer, optionally with choices",
   "tool.eval_csharp": "Eval C#",
   "tool.eval_csharp.desc": "Execute C# code using CSharpScript",
   "tool.variable": "Variable Manager",
@@ -662,6 +664,10 @@
   "prop.post_tool_call.emit_sender.hint": "Sender role used when writing tool results into the conversation",
   "prop.post_tool_call.no_tool_call": "When no tool call",
   "prop.post_tool_call.no_tool_call.hint": "Loop behaviour when this round has no tool calls: keep the current directive (default stop) or force another round",
+
+  "prop.append_chat_messages.dangling_tool_calls": "Unanswered tool calls",
+  "prop.append_chat_messages.dangling_tool_calls.hint": "Assistants tool calls must each have a matching tool result, otherwise OpenAI-compatible providers reject the request. InjectPlaceholder adds a prompt-only placeholder result and logs a warning; FailFast aborts generation instead.",
+  "node_err.dangling_tool_calls": "Chat history contains {0} unanswered tool call(s): {1}. Repair the messages or switch this node to InjectPlaceholder.",
 
   "node.post_loop_directive": "Loop Control",
   "node.post_loop_directive.desc": "Explicitly sets the loop directive for this round. It is applied after the whole tree runs, so placing it last gives it the final say.",

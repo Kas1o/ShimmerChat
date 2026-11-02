@@ -12,6 +12,7 @@
 @inject ILocService Loc
 @inject IPanelDraftStore PanelDrafts
 @inject IChatViewRegistry ChatViews
+@inject IToolInteractionService ToolInteractions
 @inject NavigationManager navigation
 @inject ILogger<AgentChatPage> logger
 @implements IAsyncDisposable
@@ -43,6 +44,9 @@
 	{
 		<div class="chat-view-missing">@Loc["chat.chat_view_none"]</div>
 	}
+
+	@* 工具交互浮层：由宿主渲染，因此与具体对话界面无关（插件界面同样可用） *@
+	<ShimmerChatLib.Components.ToolInteractionDock ChatGuid="chat.Guid" ViewContext="ViewContext!" />
 
 	<ShimmerChat.Components.SubComponents.ChatPluginPanelContainer AgentGuid="agent.Guid" ChatGuid="chat.Guid" PanelContext="PanelContext" @ref="ChatPluginPanelContainer"/>
 }
@@ -128,7 +132,10 @@
 		Chat = currentChat,
 		Agent = currentAgent,
 		IsGenerating = () => session is { IsActive: true },
-		GenerationPhase = () => session?.Phase,
+		// 有工具在等用户回答时，阶段显示"等待回答"而不是误导性的"后处理"
+		GenerationPhase = () => ToolInteractions.GetPending(currentChat.Guid).Count > 0
+			? "await"
+			: session?.Phase,
 		SendAsync = text => SendUserMessageAsync(text, null),
 		SendWithImagesAsync = SendUserMessageAsync,
 		StopGenerationAsync = StopGenerationAsync,
@@ -230,7 +237,7 @@
 		ReloadAgent();
 
 		// 取消之前的生成
-		sessionService.CancelPreviousGeneration(ChatGuid);
+		await sessionService.CancelPreviousGenerationAsync(ChatGuid);
 
 		// 添加用户消息
 		if (!string.IsNullOrWhiteSpace(text) || images is { Count: > 0 })
@@ -529,6 +536,9 @@
 							chat = Chat.LoadAndMigrate(chatGuid, KVData, messageStore);
 							chat.LoadAllMessages(messageStore);
 
+							// 上次进程异常结束会留下停在 Generating / PostProcessing 的脏消息
+							HealInterruptedMessageStates();
+
 							// 清理旧的非活跃会话
 							sessionService.CleanupSession(ChatGuid);
 							session = null;
@@ -546,6 +556,32 @@
 		WarnIfChatViewMissing();
 
 		await base.OnParametersSetAsync();
+	}
+
+	/// <summary>
+	/// 上次进程异常结束（崩溃、强杀）会留下停在 <see cref="MessageGenerationState.Generating"/> /
+	/// <see cref="MessageGenerationState.PostProcessing"/> 的消息——该状态随消息持久化，
+	/// 重开对话时会让气泡一直显示"生成中"。这里显式修回 Completed 并记录告警，不做静默修补。
+	/// </summary>
+	private void HealInterruptedMessageStates()
+	{
+		if (chat == null) return;
+
+		var stale = chat.Messages
+			.Where(m => m.GenerationState != MessageGenerationState.Completed)
+			.ToList();
+		if (stale.Count == 0) return;
+
+		foreach (var msg in stale)
+		{
+			msg.GenerationState = MessageGenerationState.Completed;
+			chat.SaveMessage(messageStore, msg);
+		}
+
+		logger.LogWarning(
+			"[AgentChatPage] Chat {ChatGuid}: {Count} message(s) were left in a non-completed generation state " +
+			"by an interrupted run; reset to Completed.",
+			chat.Guid, stale.Count);
 	}
 
 	/// <summary>

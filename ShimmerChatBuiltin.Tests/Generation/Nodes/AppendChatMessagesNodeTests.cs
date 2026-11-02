@@ -191,4 +191,77 @@ public class AppendChatMessagesNodeTests : NodeTestBase
         ctx.Env.Transient.Fragments.Should().HaveCount(1);
         ctx.Env.Transient.Fragments[0].Message.Content.Should().Be("late");
     }
+
+    private static Message AssistantWithCalls(params string[] ids)
+    {
+        var message = CreateMsg(Sender.AI, "");
+        message.message.toolCalls = ids
+            .Select(id => new SharperLLM.API.ToolCall { id = id, name = "ask_user", arguments = "{}" })
+            .ToList();
+        return message;
+    }
+
+    [Fact]
+    public async Task UnansweredToolCall_GetsAPlaceholderResultAfterTheToolRun()
+    {
+        var node = new AppendChatMessagesNode();
+        var env = new PreGenerationEnv(CreatePersistentEnv());
+        env.Persistent.Chat.Messages.Add(CreateMsg(Sender.User, "go"));
+        env.Persistent.Chat.Messages.Add(AssistantWithCalls("c1", "c2"));
+        env.Persistent.Chat.Messages.Add(new Message
+        {
+            sender = Sender.ToolResult,
+            timestamp = DateTime.UtcNow,
+            message = new ChatMessage { Content = "done", id = "c1" }
+        });
+        var ctx = CreateContext(env);
+
+        var result = await node.ExecuteAsync(ctx);
+
+        result.Success.Should().BeTrue();
+
+        // user, assistant, tool(c1), placeholder(c2) —— 占位落在整段工具结果之后
+        ctx.Env.Transient.Fragments.Should().HaveCount(4);
+        var placeholder = ctx.Env.Transient.Fragments[3];
+        placeholder.From.Should().Be(PromptBuilder.From.tool_result);
+        placeholder.Message.id.Should().Be("c2");
+        placeholder.Message.Content.Should().Contain("no_result");
+
+        // 只改 prompt，不动对话
+        env.Persistent.Chat.Messages.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task FullyAnsweredRound_AddsNoPlaceholder()
+    {
+        var node = new AppendChatMessagesNode();
+        var env = new PreGenerationEnv(CreatePersistentEnv());
+        env.Persistent.Chat.Messages.Add(AssistantWithCalls("c1"));
+        env.Persistent.Chat.Messages.Add(new Message
+        {
+            sender = Sender.ToolResult,
+            timestamp = DateTime.UtcNow,
+            message = new ChatMessage { Content = "done", id = "c1" }
+        });
+        var ctx = CreateContext(env);
+
+        await node.ExecuteAsync(ctx);
+
+        ctx.Env.Transient.Fragments.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task FailFastPolicy_ReportsTheDanglingCalls()
+    {
+        var node = new AppendChatMessagesNode { DanglingToolCalls = DanglingToolCallPolicy.FailFast };
+        var env = new PreGenerationEnv(CreatePersistentEnv());
+        env.Persistent.Chat.Messages.Add(AssistantWithCalls("c1"));
+        var ctx = CreateContext(env);
+
+        var result = await node.ExecuteAsync(ctx);
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(NodeErrorCodes.ParseError);
+        result.Message.Should().Contain("ask_user");
+    }
 }

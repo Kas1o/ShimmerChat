@@ -40,6 +40,12 @@ namespace ShimmerChatLib.Generation
         /// </summary>
         public IImageAttachmentService? ImageAttachments { get; init; }
 
+        /// <summary>
+        /// 工具 ↔ 用户 的交互通道。为 null 表示当前上下文没有可展示交互的界面
+        /// （如子代理的虚拟会话），需要用户输入的工具必须据此明确失败而不是一直等下去。
+        /// </summary>
+        public IToolInteractionService? Interactions { get; init; }
+
         /// <summary>从 Chat 实例派生</summary>
         public Guid ChatGuid => Chat.Guid;
 
