@@ -206,9 +206,36 @@ public class RenderNodeException : Exception
 | 节点 | 职责 |
 |------|------|
 | `RenderSequenceNode` | 顺序执行子节点，各子节点通过 `GetContent`/`UpdateContent` 读写内容 |
-| `MarkdownRenderNode` | Markdown → HTML 渲染（基于 Markdig，可配置 PipeTables） |
+| `MarkdownRenderNode` | Markdown → HTML 渲染（基于 Markdig，可配置 PipeTables 与数学公式） |
 | `RegexReplaceNode` | 正则表达式替换（IgnoreCase/Multiline/Singleline） |
 | `RenderCallNode` | 引用 `RenderModifierPreset`，通过 `context.Env.Serializer` + `KVData` 加载 |
+
+### 数学公式（KStyleMath）
+
+`MarkdownRenderNode` 的公式渲染由 [KStyleMath](https://github.com/Kas1o/KStyleMath)（KaTeX 0.19.1 的纯 C# 移植，
+仓库内以 git 子模块引入）承担，无 JS 运行时、无浏览器依赖：
+
+| 属性 | 行为 |
+|------|------|
+| `EnableMath`（默认开） | 识别 `$...$`、`$$...$$`、`\(...\)`、`\[...\]` 并渲染为公式 |
+| `MathOutput` | `MathML`（默认）：只输出 MathML，浏览器原生渲染，不需要额外样式；`KatexHtml`：输出与 `katex.renderToString` 一致的 HTML + MathML，需要 `katex.min.css` |
+
+实现要点：
+
+- 公式在 **Markdig 内联解析阶段**替换为 `HtmlInline`，因此 Markdown 不会破坏 LaTeX 里的 `_`、`*`、`\\` 等字符；
+  公式节点无需与 Markdown 节点排序配合，单节点即可完成。
+- 代码块与代码段由 Markdig 自己的解析器先行接管，其中的 `$` 不参与公式解析；`\$` 由转义解析器处理。
+- 行内公式沿用 KaTeX auto-render 的约定：定界符内侧不能是空白，避免把 “$5 and $10” 这类金额当成公式；
+  定界符未闭合时整段原样保留（流式输出中途不会出现半截公式）。
+- 解析失败按 KaTeX 的约定产出 `katex-error` 标记（红字 + `title` 里的错误详情），不做静默降级。
+- 渲染结果按（形态, 行内/块级, LaTeX）缓存，避免消息重渲染时重复解析。
+
+`KatexHtml` 形态的样式：`katex.min.css` 与字体已在 `ShimmerChat/wwwroot/katex/` 下，
+在主题的 `CustomCss` 里写一行即可启用（`ThemeCss` 会把自定义 CSS 放进独立的 `<style>`，`@import` 因此生效）：
+
+```css
+@import url("/katex/katex.min.css");
+```
 
 ### 执行示例
 

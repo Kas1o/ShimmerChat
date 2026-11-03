@@ -62,11 +62,12 @@
             --su-transition: @t.Transition;
         }
         [data-theme="dark"] { }
-        @if (!string.IsNullOrEmpty(t.CustomCss))
-        {
-            @((MarkupString)t.CustomCss)
-        }
     </style>
+    @if (!string.IsNullOrEmpty(t.CustomCss))
+    {
+        @* 独立 style 标签：让自定义 CSS 里的 @import 位于样式表开头，从而真正生效 *@
+        <style>@((MarkupString)t.CustomCss)</style>
+    }
 }
 
 @code {

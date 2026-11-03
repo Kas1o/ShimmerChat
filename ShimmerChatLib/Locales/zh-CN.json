@@ -21,6 +21,7 @@
   "category.web_search": "联网搜索",
   "category.general": "通用",
   "category.post": "后处理",
+  "category.render": "渲染",
   "category.other": "其他",
 
   "toolui.awaiting": "等待你的回答",

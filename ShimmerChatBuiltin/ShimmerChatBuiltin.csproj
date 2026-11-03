@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShimmerChatLib\ShimmerChatLib.csproj" />
+    <ProjectReference Include="..\KStyleMath\src\KStyleMath\KStyleMath.csproj" />
   </ItemGroup>
 
   <ItemGroup>

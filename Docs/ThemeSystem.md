@@ -378,6 +378,13 @@
 }
 ```
 
+`CustomCss` 会被渲染进**独立的** `<style>` 标签（与主题 token 的 `:root` 块分开），因此可以在其中使用 `@import`，
+例如为 `MarkdownRenderNode` 的 `KatexHtml` 公式输出启用 KaTeX 样式：
+
+```css
+@import url("/katex/katex.min.css");
+```
+
 ---
 
 ## 节点编辑器样式 (`node-editor.css`)

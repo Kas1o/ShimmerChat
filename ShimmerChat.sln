@@ -17,6 +17,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChat.Tests", "Shimme
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShimmerChatBuiltin.Tests", "ShimmerChatBuiltin.Tests\ShimmerChatBuiltin.Tests.csproj", "{A2954545-F193-4E8B-B474-947A3C88F42A}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "KStyleMath", "KStyleMath", "{7993CFA9-17DF-B430-FEAF-584679FDB5CE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{94605544-CE23-0A05-A6EE-11FC4202368C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KStyleMath", "KStyleMath\src\KStyleMath\KStyleMath.csproj", "{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -111,9 +117,25 @@ Global
 		{A2954545-F193-4E8B-B474-947A3C88F42A}.Release|x64.Build.0 = Release|Any CPU
 		{A2954545-F193-4E8B-B474-947A3C88F42A}.Release|x86.ActiveCfg = Release|Any CPU
 		{A2954545-F193-4E8B-B474-947A3C88F42A}.Release|x86.Build.0 = Release|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Debug|x64.Build.0 = Debug|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Debug|x86.Build.0 = Debug|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Release|x64.ActiveCfg = Release|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Release|x64.Build.0 = Release|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Release|x86.ActiveCfg = Release|Any CPU
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{94605544-CE23-0A05-A6EE-11FC4202368C} = {7993CFA9-17DF-B430-FEAF-584679FDB5CE}
+		{8C5B663C-E355-4BCE-8AB3-65923EEB1D3D} = {94605544-CE23-0A05-A6EE-11FC4202368C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9278135C-5245-4B9E-BDC4-6320CED2768F}

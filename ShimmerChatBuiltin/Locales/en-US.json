@@ -104,6 +104,15 @@
   "node.web_search_auto.desc": "Searches the web from the input content (or a fixed query) and appends the results to the end of the context",
   "node.web_search_tool_set": "Web Search Tools",
   "node.web_search_tool_set.desc": "Adds the search tool, and the fetch tool when the provider supports it, to this generation",
+  "node.markdown_render": "Markdown Render",
+  "node.markdown_render.desc": "Renders message text to HTML with Markdig, with pipe tables and math formulas (KStyleMath) as toggles",
+
+  "prop.markdown.pipe_tables": "Pipe tables",
+  "prop.markdown.pipe_tables.hint": "Enable GFM pipe tables (| a | b |)",
+  "prop.markdown.enable_math": "Math formulas",
+  "prop.markdown.enable_math.hint": "Render $...$, $$...$$, \\(...\\) and \\[...\\] as formulas (KStyleMath, a pure C# port of KaTeX). Code blocks and \\$ are unaffected.",
+  "prop.markdown.math_output": "Math output",
+  "prop.markdown.math_output.hint": "MathML: MathML only, rendered natively by the browser, no extra stylesheet needed. KatexHtml: KaTeX-compatible HTML + MathML (accessibility copy + visual copy); katex.min.css must be loaded first, otherwise each formula is shown twice and the layout breaks. Enable it by adding @import url(\"/katex/katex.min.css\"); to the theme's custom CSS.",
 
   "prop.comment.text": "Comment",
   "prop.comment.text.hint": "Arbitrary text for documentation only, does not affect generation",

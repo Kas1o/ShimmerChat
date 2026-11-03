@@ -104,6 +104,15 @@
   "node.web_search_auto.desc": "按输入内容（或固定查询词）自动调用联网搜索，并把结果片段追加到上下文末尾",
   "node.web_search_tool_set": "联网搜索工具集",
   "node.web_search_tool_set.desc": "把搜索工具、以及服务支持时的抓取工具加入本次生成的工具列表",
+  "node.markdown_render": "Markdown 渲染",
+  "node.markdown_render.desc": "把消息文本按 Markdig 渲染为 HTML，可开关管道表格与数学公式（KStyleMath）",
+
+  "prop.markdown.pipe_tables": "管道表格",
+  "prop.markdown.pipe_tables.hint": "支持 GFM 管道表格（| a | b |）",
+  "prop.markdown.enable_math": "数学公式",
+  "prop.markdown.enable_math.hint": "把 $...$、$$...$$、\\(...\\)、\\[...\\] 渲染为公式（KStyleMath，KaTeX 的纯 C# 移植）。代码块与 \\$ 不受影响。",
+  "prop.markdown.math_output": "公式输出形态",
+  "prop.markdown.math_output.hint": "MathML：只输出 MathML，浏览器原生渲染，不需要额外样式；KatexHtml：输出与 KaTeX 一致的 HTML + MathML（无障碍副本 + 视觉副本），必须先生效 katex.min.css，否则公式会重复显示、排版错位。启用方式：在主题的自定义 CSS 里加一行 @import url(\"/katex/katex.min.css\");",
 
   "prop.comment.text": "注释内容",
   "prop.comment.text.hint": "任意文本，仅作说明，不会影响生成结果",
