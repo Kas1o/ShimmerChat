@@ -27,7 +27,7 @@ Pre-Generation Tree ──→ LLM Generation ──→ Post-Generation Tree ─�
 |----------|---------------|
 | **Pre-Generation** | Build context: inject system prompts, chat history, tool declarations, select API |
 | **Post-Generation** | Process raw LLM response: post-processing, formatting, result transformation |
-| **Render Modifier** | Markdown → HTML render pipeline: regex replacements, display modifications |
+| **Render Modifier** | Markdown → HTML render pipeline: math formulas, regex replacements, display modifications |
 
 ## 🌟 Features
 
@@ -37,6 +37,7 @@ Pre-Generation Tree ──→ LLM Generation ──→ Post-Generation Tree ─�
 | 🤖 **Smart Agent System** | Each Agent has independent three-pipeline node tree configuration for differentiated behavior |
 | 🔧 **Tool Call System** | Full Function Calling support, streaming Tool Call loop, automatic tool discovery and instantiation |
 | 🧠 **SubAgent** | Nest other Agents within a node tree, building complex collaboration workflows |
+| 📐 **Math Formulas** | Renders LaTeX in messages (`$...$`, `$$...$$`, `\(...\)`, `\[...\]`), MathML by default, KaTeX markup optional |
 | 🎨 **Theme System** | Full theme CRUD + import/export, CSS variable driven |
 | 💾 **Persistent Storage** | LiteDB embedded database / JSON file dual-mode, automatic migration |
 | 🔌 **Plugin System** | Dynamic assembly loading, nodes/tools/panels all plugin-based, equal status with built-in features |
@@ -70,6 +71,7 @@ Pre-Generation Tree ──→ LLM Generation ──→ Post-Generation Tree ─�
 | **SharperLLM** | In-house LLM connection library (Tool Call, streaming, multi-API adaptation) |
 | **LiteDB** | Embedded NoSQL database |
 | **Markdig** | Markdown → HTML rendering |
+| **KStyleMath** | LaTeX math rendering (pure C# port of KaTeX 0.19.1, no JS runtime) |
 | **Newtonsoft.Json** | JSON serialization |
 | **Tauri v2** | Desktop app packaging |
 | **Bootstrap Icons** | UI icons |
@@ -166,6 +168,7 @@ Place plugins in the `Plugins/` directory — they are automatically discovered 
 ```
 ShimmerChat/
 ├── SharperLLM/           # LLM connection library (submodule)
+├── KStyleMath/           # LaTeX math rendering library (submodule, C# port of KaTeX)
 ├── ShimmerChatLib/       # Shared library: models, interfaces, pipeline core abstractions
 ├── ShimmerChat/          # Main project: Blazor Server host, service implementations, UI
 ├── ShimmerChatBuiltin/   # Built-in plugins: default nodes, tools, panels
@@ -177,6 +180,8 @@ ShimmerChat/
 
 ## 📄 Third-Party Licenses
 
+- [KaTeX](https://github.com/KaTeX/KaTeX) — MIT (CSS and fonts under `ShimmerChat/wwwroot/katex`)
+- [KStyleMath](https://github.com/Kas1o/KStyleMath) — MIT
 - [LiteDB](https://github.com/mbdavid/LiteDB) — MIT
 - [Markdig](https://github.com/xoofx/markdig) — BSD-2-Clause
 - [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) — MIT

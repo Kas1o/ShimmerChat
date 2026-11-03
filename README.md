@@ -27,7 +27,7 @@ Pre-Generation Tree ──→ LLM 生成 ──→ Post-Generation Tree ──�
 |------|------|
 | **Pre-Generation** | 构建上下文：注入 system prompt、聊天历史、工具声明、选择 API |
 | **Post-Generation** | 处理 LLM 原始响应：后处理、格式化、结果转换 |
-| **Render Modifier** | Markdown → HTML 渲染管线：正则替换、显示修改 |
+| **Render Modifier** | Markdown → HTML 渲染管线：数学公式、正则替换、显示修改 |
 
 ## 🌟 功能特性
 
@@ -37,6 +37,7 @@ Pre-Generation Tree ──→ LLM 生成 ──→ Post-Generation Tree ──�
 | 🤖 **智能代理系统** | 每个 Agent 拥有独立的三管线节点树配置，实现差异化行为 |
 | 🔧 **Tool Call 系统** | 完整的 Function Calling 支持，流式 Tool Call 循环，自动工具发现与实例化 |
 | 🧠 **子代理（SubAgent）** | 节点树中嵌套调用其他 Agent，构建复杂协作流程 |
+| 📐 **数学公式** | 渲染消息里的 LaTeX（`$...$`、`$$...$$`、`\(...\)`、`\[...\]`），默认输出 MathML，可选 KaTeX 排版 |
 | 🎨 **主题系统** | 完整的主题 CRUD + 导入/导出，CSS 变量驱动 |
 | 💾 **持久化存储** | LiteDB 嵌入式数据库 / JSON 文件双模式，自动迁移 |
 | 🔌 **插件系统** | 动态程序集加载，节点/工具/面板全插件化，与内置功能同权 |
@@ -70,6 +71,7 @@ Pre-Generation Tree ──→ LLM 生成 ──→ Post-Generation Tree ──�
 | **SharperLLM** | 自研 LLM 连接库（Tool Call、流式响应、多 API 适配） |
 | **LiteDB** | 嵌入式 NoSQL 数据库 |
 | **Markdig** | Markdown → HTML 渲染 |
+| **KStyleMath** | LaTeX 公式渲染（KaTeX 0.19.1 的纯 C# 移植，无 JS 运行时） |
 | **Newtonsoft.Json** | JSON 序列化 |
 | **Tauri v2** | 桌面应用打包 |
 | **Bootstrap Icons** | UI 图标 |
@@ -166,6 +168,7 @@ dotnet run
 ```
 ShimmerChat/
 ├── SharperLLM/           # LLM 连接库（子模块）
+├── KStyleMath/           # LaTeX 公式渲染库（子模块，KaTeX 的 C# 移植）
 ├── ShimmerChatLib/       # 共享库：模型、接口、管线核心抽象
 ├── ShimmerChat/          # 主项目：Blazor Server 宿主、服务实现、UI
 ├── ShimmerChatBuiltin/   # 内置插件：默认节点、工具、面板
@@ -177,6 +180,8 @@ ShimmerChat/
 
 ## 📄 第三方许可
 
+- [KaTeX](https://github.com/KaTeX/KaTeX) — MIT（`ShimmerChat/wwwroot/katex` 下的 CSS 与字体）
+- [KStyleMath](https://github.com/Kas1o/KStyleMath) — MIT
 - [LiteDB](https://github.com/mbdavid/LiteDB) — MIT
 - [Markdig](https://github.com/xoofx/markdig) — BSD-2-Clause
 - [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) — MIT
