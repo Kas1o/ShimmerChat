@@ -1,0 +1,72 @@
+/*
+ * 代码高亮配色。
+ *
+ * CodeHighlightNode 输出 highlight.js 风格的 hljs-* class，这里把它们映射到主题的
+ * --su-* 变量，因此换主题/换配色时高亮会跟着变，不需要维护两套配色表。
+ * 需要覆盖时，在主题的自定义 CSS 里写同优先级或更高的规则即可。
+ */
+
+/* 围栏代码块本身不再需要行内 code 的底色与内边距（见 ChatViewShell 里的 :not(pre) > code） */
+.chat-msg-body pre code {
+	background: none;
+	padding: 0;
+	color: var(--su-text-0);
+}
+
+/* 注释 / 引用 */
+.chat-msg-body pre code .hljs-comment,
+.chat-msg-body pre code .hljs-quote {
+	color: var(--su-text-2);
+	font-style: italic;
+}
+
+/* 关键字 / 类型 / 字面量 */
+.chat-msg-body pre code .hljs-keyword,
+.chat-msg-body pre code .hljs-selector-tag,
+.chat-msg-body pre code .hljs-literal,
+.chat-msg-body pre code .hljs-type,
+.chat-msg-body pre code .hljs-built_in,
+.chat-msg-body pre code .hljs-class {
+	color: var(--su-accent);
+}
+
+/* 字符串 / 正则 / diff 新增 */
+.chat-msg-body pre code .hljs-string,
+.chat-msg-body pre code .hljs-regexp,
+.chat-msg-body pre code .hljs-addition {
+	color: var(--su-success);
+}
+
+/* 数字 / 符号 */
+.chat-msg-body pre code .hljs-number,
+.chat-msg-body pre code .hljs-symbol,
+.chat-msg-body pre code .hljs-bullet {
+	color: var(--su-warning);
+}
+
+/* 标识符 / 属性 / 函数名 */
+.chat-msg-body pre code .hljs-title,
+.chat-msg-body pre code .hljs-section,
+.chat-msg-body pre code .hljs-function,
+.chat-msg-body pre code .hljs-name,
+.chat-msg-body pre code .hljs-attr,
+.chat-msg-body pre code .hljs-attribute,
+.chat-msg-body pre code .hljs-variable,
+.chat-msg-body pre code .hljs-template-variable {
+	color: var(--su-info);
+}
+
+/* 预处理 / 元信息 */
+.chat-msg-body pre code .hljs-meta,
+.chat-msg-body pre code .hljs-doctag,
+.chat-msg-body pre code .hljs-link {
+	color: var(--su-text-1);
+}
+
+/* diff 删除 */
+.chat-msg-body pre code .hljs-deletion {
+	color: var(--su-danger);
+}
+
+.chat-msg-body pre code .hljs-emphasis { font-style: italic; }
+.chat-msg-body pre code .hljs-strong { font-weight: 600; }

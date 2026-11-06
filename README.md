@@ -184,6 +184,7 @@ ShimmerChat/
 - [KStyleMath](https://github.com/Kas1o/KStyleMath) — MIT
 - [LiteDB](https://github.com/mbdavid/LiteDB) — MIT
 - [Markdig](https://github.com/xoofx/markdig) — BSD-2-Clause
+- [Meziantou.Framework.SyntaxHighlighting](https://github.com/meziantou/Meziantou.Framework) — MIT
 - [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) — MIT
 - [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) — MIT
 - [qdrant-dotnet](https://github.com/qdrant/qdrant-dotnet) — Apache-2.0

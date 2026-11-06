@@ -52,17 +52,24 @@ namespace ShimmerChatLib.Generation
 
         public ITreeNodeSerializer Serializer { get; }
         public IKVDataService KVData { get; }
+
+        /// <summary>
+        /// 本地化服务。宿主未提供时为 null，节点必须提供自己的回退文案。
+        /// </summary>
+        public ILocService? Loc { get; }
+
         public Chat? Chat { get; }
         public Agent? Agent { get; }
 
         public RenderEnv(string initialContent, ITreeNodeSerializer serializer, IKVDataService kvData,
-            Chat? chat = null, Agent? agent = null)
+            Chat? chat = null, Agent? agent = null, ILocService? loc = null)
         {
             _content = initialContent;
             Serializer = serializer;
             KVData = kvData;
             Chat = chat;
             Agent = agent;
+            Loc = loc;
         }
 
         public string GetContent() => _content;

@@ -181,6 +181,7 @@ public class RenderEnv
     public List<RenderChangeRecord> ChangeLog { get; }   // 完整变更记录
     public ITreeNodeSerializer Serializer { get; }       // 序列化器
     public IKVDataService KVData { get; }                // KV 存储
+    public ILocService? Loc { get; }                     // 本地化（宿主未提供时为 null，节点需自带回退文案）
     public Chat? Chat { get; }
     public Agent? Agent { get; }
 }
@@ -207,6 +208,8 @@ public class RenderNodeException : Exception
 |------|------|
 | `RenderSequenceNode` | 顺序执行子节点，各子节点通过 `GetContent`/`UpdateContent` 读写内容 |
 | `MarkdownRenderNode` | Markdown → HTML 渲染（基于 Markdig，可配置 PipeTables 与数学公式） |
+| `CodeHighlightNode` | 给围栏代码块加语法高亮，**必须排在 Markdown 渲染之后**；可配置跳过着色的语言（默认 `svg,mermaid`）与最大块长度 |
+| `CodeBlockActionsNode` | 给代码块加语言标签与复制 / 下载按钮（行为在 `wwwroot/js/code-block-actions.js`，事件委托）；与高亮节点先后顺序无关 |
 | `RegexReplaceNode` | 正则表达式替换（IgnoreCase/Multiline/Singleline） |
 | `RenderCallNode` | 引用 `RenderModifierPreset`，通过 `context.Env.Serializer` + `KVData` 加载 |
 

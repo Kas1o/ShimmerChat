@@ -12,16 +12,18 @@ namespace ShimmerChat.Singletons
     {
         private readonly ITreeNodeSerializer _serializer;
         private readonly IKVDataService _kvData;
+        private readonly ILocService _loc;
         private readonly ILogger<RenderModifierManager> _logger;
 
         private IRenderModifierNode? _globalRoot;
         private readonly object _globalLock = new();
 
         public RenderModifierManager(RenderModifierNodeSerializer serializer, IKVDataService kvData,
-            ILogger<RenderModifierManager> logger)
+            ILocService loc, ILogger<RenderModifierManager> logger)
         {
             _serializer = serializer;
             _kvData = kvData;
+            _loc = loc;
             _logger = logger;
 
             EnsureDefaultRenderPreset();
@@ -42,7 +44,7 @@ namespace ShimmerChat.Singletons
             IRenderModifierNode? root = ResolveRoot(agent, chat)
                 ?? CreateFallbackRoot();
 
-            var env = new RenderEnv(content, _serializer, _kvData, chat, agent);
+            var env = new RenderEnv(content, _serializer, _kvData, chat, agent, _loc);
             var context = new RenderNodeExecutionContext(env);
 
             try

@@ -361,7 +361,8 @@
 		padding: var(--su-space-3); overflow-x: auto;
 		font-family: var(--su-font-mono); font-size: var(--su-font-sm);
 	}
-	.chat-msg-body code {
+	/* 行内代码：只作用于非 pre 内的 code，避免围栏代码块被套上第二层底色与内边距 */
+	.chat-msg-body :not(pre) > code {
 		font-family: var(--su-font-mono); font-size: var(--su-font-sm);
 		background: var(--su-surface-3); padding: 1px 5px; border-radius: 3px;
 	}

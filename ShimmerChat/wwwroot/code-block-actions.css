@@ -1,0 +1,74 @@
+/*
+ * 代码块工具条（CodeBlockActionsNode 产出的结构）。
+ * 结构：.code-block > .code-block-head > (.code-block-lang, .code-block-tools) + <pre>
+ */
+
+.code-block {
+	margin: var(--su-space-3) 0;
+	border: var(--su-border-size) solid var(--su-border-0);
+	border-radius: var(--su-radius-md);
+	overflow: hidden;
+	background: var(--su-surface-3);
+}
+
+.code-block-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--su-space-2);
+	min-height: 26px;
+	padding: 0 var(--su-space-2) 0 var(--su-space-3);
+	background: var(--su-surface-2);
+	border-bottom: var(--su-border-size) solid var(--su-border-0);
+	font-size: var(--su-font-xs);
+	color: var(--su-text-2);
+	user-select: none;
+}
+
+.code-block-lang {
+	font-family: var(--su-font-mono);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.code-block-tools {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.code-block-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	border: none;
+	background: none;
+	cursor: pointer;
+	color: var(--su-text-2);
+	font-size: var(--su-font-xs);
+	padding: 2px 6px;
+	border-radius: var(--su-radius-sm);
+	transition: color var(--su-transition), background var(--su-transition);
+}
+
+.code-block-btn:hover {
+	color: var(--su-accent);
+	background: var(--su-surface-3);
+}
+
+.code-block-btn.is-copied {
+	color: var(--su-success);
+}
+
+.code-block-btn i {
+	font-size: 0.9em;
+}
+
+/* 工具条自带边框与底色，<pre> 不要再叠一层 */
+.chat-msg-body .code-block pre {
+	margin: 0;
+	border-radius: 0;
+	background: transparent;
+}
