@@ -11,6 +11,7 @@ public class ChildListEditorTests
     private static IRenderedComponent<GenericNodeEditor<TestListNode>> RenderEditor(BunitContext ctx, TestListNode listNode, TreeDragContext? drag = null)
     {
         ctx.Services.AddSingleton(EditorTestHelpers.CreateLocService());
+        ctx.Services.AddSingleton(EditorTestHelpers.CreatePluginLoader());
         return ctx.Render<GenericNodeEditor<TestListNode>>(ps => ps
             .Add(p => p.Node, listNode)
             .Add(p => p.Depth, 0)

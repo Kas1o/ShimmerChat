@@ -12,6 +12,7 @@ public class SlotEditorRefreshTests
     private static IRenderedComponent<GenericNodeEditor<TestSlotNode>> RenderEditor(BunitContext ctx, TestSlotNode slotNode, TreeDragContext? drag = null)
     {
         ctx.Services.AddSingleton(EditorTestHelpers.CreateLocService());
+        ctx.Services.AddSingleton(EditorTestHelpers.CreatePluginLoader());
         return ctx.Render<GenericNodeEditor<TestSlotNode>>(ps => ps
             .Add(p => p.Node, slotNode)
             .Add(p => p.Depth, 0)

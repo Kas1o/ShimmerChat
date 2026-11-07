@@ -58,14 +58,32 @@ public class NodePropertyAttribute : Attribute
     public string? HintKey { get; init; } // Tooltip
     public int Order { get; init; }       // 排序，越小越靠前
     public bool MultiLine { get; init; }  // string 用 textarea
+    public string? OptionsKey { get; init; } // 动态下拉选项来源
 }
 ```
+
+`OptionsKey` 只对 `string` 属性生效：设置后该属性渲染为 `<select>`，选项由实现了
+`INodePropertyOptionsProvider` 的插件提供（`Key` 与 `OptionsKey` 相同）。下拉框总会额外
+保留一个空值选项，表示“跟随当前默认配置”。内置示例：
+
+```csharp
+[NodeProperty("prop.memory_retrieve.profile", OptionsKey = "embedding_profiles")]
+public string EmbeddingProfileId { get; set; } = string.Empty;
+
+public sealed class EmbeddingProfileOptionsProvider : INodePropertyOptionsProvider
+{
+    public string Key => "embedding_profiles";
+    public IReadOnlyList<NodePropertyOption> GetOptions(IServiceProvider services) => ...;
+}
+```
+
+提供者通过 `IPluginLoaderService` 自动发现；选项在每次渲染时重新读取，配置变化后无需重建编辑器。
 
 支持的类型和对应控件：
 
 | 属性类型 | 表单控件 |
 |----------|---------|
-| `string` | `<input>` 或 `<textarea>` (MultiLine) |
+| `string` | `<input>` / `<textarea>` (MultiLine) / `<select>` (OptionsKey) |
 | `int` | `<input type="number">` |
 | `float` | `<input type="number" step="0.1">` |
 | `bool` | `<input type="checkbox">` |

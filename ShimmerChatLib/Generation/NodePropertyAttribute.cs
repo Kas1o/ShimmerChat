@@ -19,9 +19,31 @@ namespace ShimmerChatLib.Generation
         /// <summary>标记字符串属性使用多行文本框编辑</summary>
         public bool MultiLine { get; init; }
 
+        /// <summary>
+        /// 动态选项来源的 Key。设置后属性渲染为下拉框，选项由
+        /// <see cref="INodePropertyOptionsProvider"/> 提供。
+        /// </summary>
+        public string? OptionsKey { get; init; }
+
         public NodePropertyAttribute(string labelKey)
         {
             LabelKey = labelKey;
         }
+    }
+
+    /// <summary>节点属性下拉框的一个选项。</summary>
+    public sealed record NodePropertyOption(string Value, string Label);
+
+    /// <summary>
+    /// 节点属性的动态选项来源。实现会被插件加载器自动发现，
+    /// 通过 <see cref="NodePropertyAttribute.OptionsKey"/> 关联到具体属性。
+    /// </summary>
+    public interface INodePropertyOptionsProvider
+    {
+        /// <summary>与 OptionsKey 对应的唯一标识。</summary>
+        string Key { get; }
+
+        /// <summary>返回当前可选项。</summary>
+        IReadOnlyList<NodePropertyOption> GetOptions(IServiceProvider services);
     }
 }

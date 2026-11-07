@@ -1,8 +1,13 @@
 @using System.Collections
 @using System.Reflection
+@using Microsoft.Extensions.Logging
 @using ShimmerChatLib.Generation
+@using ShimmerChatLib.Interface
 @typeparam TNode where TNode : ITreeNode
 @inject ILocService Loc
+@inject IPluginLoaderService PluginLoader
+@inject IServiceProvider Services
+@inject ILogger<GenericNodeEditor<TNode>> Logger
 
 <div class="generic-editor">
     @foreach (var prop in _properties.OrderBy(p => p.Order))
@@ -45,6 +50,29 @@
     private List<PropInfo> _singleNodeProps = new();
     private PropInfo? _childNodesProp;
     private IList _childNodes = new List<ITreeNode>();
+    private List<INodePropertyOptionsProvider>? _optionProviders;
+
+    private IReadOnlyList<NodePropertyOption> GetOptions(string key)
+    {
+        try
+        {
+            // 提供者集合只扫描一次；选项本身每次渲染重新读取，配置面板修改后无需重建编辑器。
+            _optionProviders ??= PluginLoader.LoadImplementations<INodePropertyOptionsProvider>();
+
+            foreach (var provider in _optionProviders)
+            {
+                if (!string.Equals(provider.Key, key, StringComparison.Ordinal)) continue;
+                return provider.GetOptions(Services) ?? [];
+            }
+        }
+        catch (Exception ex)
+        {
+            // 选项来自插件：坏了不能拖垮整个编辑器，但必须留下可追踪的日志。
+            Logger.LogError(ex, "加载节点属性选项失败：{OptionsKey}", key);
+        }
+
+        return [];
+    }
 
     protected override void OnParametersSet()
     {
@@ -94,7 +122,33 @@
     {
         var value = prop.GetValue(Node);
 
-        if (prop.PropertyType == typeof(string))
+        if (prop.OptionsKey is { Length: > 0 } optionsKey && prop.PropertyType == typeof(string))
+        {
+            var current = value as string ?? "";
+            var options = GetOptions(optionsKey);
+
+            builder.OpenElement(0, "select");
+            builder.AddAttribute(1, "class", "ge-select");
+            builder.AddAttribute(2, "value", current);
+            builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
+                v => prop.SetValue(Node, v ?? ""), current));
+
+            builder.OpenElement(4, "option");
+            builder.AddAttribute(5, "value", "");
+            builder.AddContent(6, Loc["node_editor.option_default"]);
+            builder.CloseElement();
+
+            foreach (var option in options)
+            {
+                builder.OpenElement(7, "option");
+                builder.AddAttribute(8, "value", option.Value);
+                builder.AddContent(9, option.Label);
+                builder.CloseElement();
+            }
+
+            builder.CloseElement();
+        }
+        else if (prop.PropertyType == typeof(string))
         {
             if (prop.MultiLine)
             {
@@ -175,6 +229,7 @@
         public string? HintKey { get; }
         public int Order { get; }
         public bool MultiLine { get; }
+        public string? OptionsKey { get; }
         public PropertyInfo Prop { get; }
         public Type PropertyType { get; }
 
@@ -187,6 +242,7 @@
             HintKey = attr?.HintKey;
             Order = attr?.Order ?? 0;
             MultiLine = attr?.MultiLine ?? false;
+            OptionsKey = attr?.OptionsKey;
         }
 
         public object? GetValue(object obj) => Prop.GetValue(obj);

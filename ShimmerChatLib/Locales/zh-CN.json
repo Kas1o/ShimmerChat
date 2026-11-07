@@ -36,5 +36,6 @@
   "toolui.view_missing": "工具视图 '{0}' 未注册，已改用通用表单。",
   "toolui.submit_failed": "提交失败：{0}",
   "toolui.already_resolved": "该提问已结束（已在其它窗口回答、跳过或超时）。",
-  "toolui.not_found": "该提问已不存在。"
+  "toolui.not_found": "该提问已不存在。",
+  "node_editor.option_default": "（使用当前默认配置）"
 }

@@ -68,4 +68,13 @@ public static class EditorTestHelpers
         loc.Setup(s => s[It.IsAny<string>()]).Returns((string key) => key);
         return loc.Object;
     }
+
+    /// <summary>不提供任何属性选项提供者的插件加载器，避免编辑器测试依赖真实插件扫描。</summary>
+    public static IPluginLoaderService CreatePluginLoader()
+    {
+        var loader = new Mock<IPluginLoaderService>();
+        loader.Setup(l => l.LoadImplementations<INodePropertyOptionsProvider>())
+            .Returns(new List<INodePropertyOptionsProvider>());
+        return loader.Object;
+    }
 }

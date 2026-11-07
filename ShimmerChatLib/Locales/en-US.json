@@ -36,5 +36,6 @@
   "toolui.view_missing": "Tool view '{0}' is not registered; showing the generic form instead.",
   "toolui.submit_failed": "Submit failed: {0}",
   "toolui.already_resolved": "This question already ended (answered elsewhere, skipped, or timed out).",
-  "toolui.not_found": "This question no longer exists."
+  "toolui.not_found": "This question no longer exists.",
+  "node_editor.option_default": "(Use current default profile)"
 }
