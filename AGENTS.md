@@ -47,7 +47,8 @@ ShimmerChat/
     ├── PluginDevelopment.md      # 插件开发
     ├── ThemeSystem.md            # 主题系统
     ├── CustomAPI.md              # 自定义 API
-    └── KVDataStorage.md          # KV 存储
+    ├── KVDataStorage.md          # KV 存储
+    └── MemorySystem.md           # 记忆文本库 / 向量索引 / 嵌入配置
 ```
 
 ### 3.1 SharperLLM — LLM 连接库
