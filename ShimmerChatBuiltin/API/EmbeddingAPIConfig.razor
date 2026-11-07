@@ -1,79 +1,188 @@
+@using ShimmerChatBuiltin.API
+@using ShimmerChatBuiltin.Memory
+@using ShimmerChatLib.Interface
+@attribute [PluginPanel("panel.embedding_api_config", "panel.embedding_api_config.desc")]
+
 @inject IKVDataService KVData
 @inject ILocService Loc
-@attribute [PluginPanel("panel.embedding_api_config", "panel.embedding_api_config.desc")]
-<div class="su-group su-flex su-flex-col su-gap-3">
-	<div class="su-form-group">
-		<label class="su-label">@Loc["api_config.embedding_uri"]</label>
-		<input class="su-input" type="text" @bind="Uri" placeholder="@Loc["api_config.embedding_uri_placeholder"]" />
-	</div>
-	<div class="su-form-group">
-		<label class="su-label">@Loc["api_config.embedding_apikey"]</label>
-		<input class="su-input" type="text" @bind="ApiKey" placeholder="@Loc["api_config.embedding_apikey_placeholder"]" />
-	</div>
-	<div class="su-form-group">
-		<label class="su-label">@Loc["api_config.embedding_model"]</label>
-		<input class="su-input" type="text" @bind="ModelName" placeholder="@Loc["api_config.embedding_model_placeholder"]" />
-	</div>
+
+<div class="shimmer-content su-p-4">
+    <h2 class="su-text-lg su-font-bold su-mb-2">@Loc["panel.embedding_api_config"]</h2>
+    <p class="su-text-sm su-text-2 su-mb-3">@Loc["api_config.profiles_hint"]</p>
+
+    @if (_loadError is not null)
+    {
+        <p class="su-text-sm" style="color: var(--su-danger);">@_loadError</p>
+    }
+
+    @if (_profiles.Count == 0)
+    {
+        <p class="su-text-sm su-text-2">@Loc["api_config.empty"]</p>
+    }
+
+    @foreach (var profile in _profiles)
+    {
+        <div class="su-card su-mb-3">
+            <div class="su-card-body">
+                <div class="su-flex su-gap-2 su-mb-2" style="align-items:center;">
+                    <input class="su-input" @bind="profile.Name" @bind:after="SaveProfiles" placeholder="@Loc["api_config.name"]" />
+                    @if (profile.Id == _activeId)
+                    {
+                        <span class="su-badge su-badge-success">@Loc["api_config.active"]</span>
+                    }
+                    else
+                    {
+                        <button class="su-btn su-btn-sm" @onclick="() => SetActive(profile.Id)">@Loc["api_config.set_active"]</button>
+                    }
+                </div>
+
+                <div class="su-row su-gap-3">
+                    <div class="su-col-12">
+                        <label class="su-label">@Loc["api_config.embedding_uri"]</label>
+                        <input class="su-input su-w-full" @bind="profile.BaseUrl" @bind:after="SaveProfiles" placeholder="@Loc["api_config.embedding_uri_placeholder"]" />
+                    </div>
+                    <div class="su-col-6">
+                        <label class="su-label">@Loc["api_config.embedding_model"]</label>
+                        <input class="su-input su-w-full" @bind="profile.ModelName" @bind:after="SaveProfiles" placeholder="@Loc["api_config.embedding_model_placeholder"]" />
+                    </div>
+                    <div class="su-col-6">
+                        <label class="su-label">@Loc["api_config.embedding_apikey"]</label>
+                        <input class="su-input su-w-full" type="password" @bind="profile.ApiKey" @bind:after="SaveProfiles" placeholder="@Loc["api_config.embedding_apikey_placeholder"]" />
+                    </div>
+                </div>
+
+                <div class="su-flex su-gap-2 su-mt-2" style="align-items:center;">
+                    <button class="su-btn su-btn-sm" @onclick="() => TestAsync(profile)" disabled="@(_testingId == profile.Id)">
+                        @Loc["api_config.test"]
+                    </button>
+                    <span class="su-text-sm su-text-2">@TestText(profile.Id)</span>
+
+                    @if (_confirmDelete == profile.Id)
+                    {
+                        <button class="su-btn su-btn-danger su-btn-sm" @onclick="() => Delete(profile.Id)">@Loc["api_config.confirm_delete"]</button>
+                        <button class="su-btn su-btn-sm" @onclick="() => _confirmDelete = null">@Loc["api_config.cancel"]</button>
+                    }
+                    else
+                    {
+                        <button class="su-btn su-btn-sm" @onclick="() => _confirmDelete = profile.Id">@Loc["api_config.delete"]</button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="su-flex su-gap-2">
+        <button class="su-btn su-btn-primary" @onclick="Add" disabled="@(_loadError is not null)">@Loc["api_config.add"]</button>
+    </div>
+
+    <p class="su-text-sm su-text-2 su-mt-3">@Loc["api_config.switch_hint"]</p>
 </div>
 
-
 @code {
-	string? Uri
-	{
-		get;
-		set
-		{
-			if (field == value)
-				return;
-			if (value == null)
-				return;
-			field = value;
-			Save();
-		}
-	}
-	string? ApiKey
-	{
-		get;
-		set
-		{
-			if (field == value)
-				return;
-			if (value == null)
-				return;
-			field = value;
-			Save();
-		}
-	}
-	string? ModelName
-	{
-		get;
-		set
-		{
-			if (field == value)
-				return;
-			if (value == null)
-				return;
-			field = value;
-			Save();
-		}
-	}	
+    private List<EmbeddingProfile> _profiles = [];
+    private string? _activeId;
+    private string? _confirmDelete;
+    private string? _testingId;
+    private string? _loadError;
+    private readonly Dictionary<string, string> _testResults = [];
 
-	void Save()
-	{
-		if (!Initialized)
-			return;
-		KVData.Write("EmbeddingAPI", "uri", Uri);
-		KVData.Write("EmbeddingAPI", "apikey", ApiKey);
-		KVData.Write("EmbeddingAPI", "modelname", ModelName);
-	}
+    protected override void OnInitialized()
+    {
+        Reload();
+    }
 
-	bool Initialized = false;
+    private void Reload()
+    {
+        _profiles = EmbeddingProfileStore.EnsureMigrated(KVData, out var loadError);
+        if (loadError is not null)
+        {
+            _loadError = Loc.Format("api_config.load_error", loadError);
+            _activeId = null;
+            return;
+        }
 
-	protected override void OnInitialized()
-	{
-		Uri = KVData.Read("EmbeddingAPI", "uri") ?? string.Empty;
-		ApiKey = KVData.Read("EmbeddingAPI", "apikey") ?? string.Empty;
-		ModelName = KVData.Read("EmbeddingAPI", "modelname") ?? string.Empty;
-		Initialized = true;
-	}
+        _loadError = null;
+        _activeId = EmbeddingProfileStore.GetActiveId(KVData);
+
+        if (_profiles.Count == 0)
+        {
+            _activeId = null;
+            EmbeddingProfileStore.SetActive(KVData, string.Empty);
+            return;
+        }
+
+        if (_activeId is null || _profiles.All(x => x.Id != _activeId))
+        {
+            _activeId = _profiles[0].Id;
+            EmbeddingProfileStore.SetActive(KVData, _activeId);
+        }
+    }
+
+    private void SaveProfiles()
+    {
+        if (_loadError is not null) return;
+        EmbeddingProfileStore.Save(KVData, _profiles);
+    }
+
+    private void Add()
+    {
+        if (_loadError is not null) return;
+
+        var profile = new EmbeddingProfile
+        {
+            Id = EmbeddingProfileStore.NewId(),
+            Name = $"配置 {_profiles.Count + 1}"
+        };
+
+        _profiles.Add(profile);
+        SaveProfiles();
+
+        if (_activeId is null) SetActive(profile.Id);
+    }
+
+    private void SetActive(string id)
+    {
+        _activeId = id;
+        EmbeddingProfileStore.SetActive(KVData, id);
+    }
+
+    private void Delete(string id)
+    {
+        _profiles.RemoveAll(x => x.Id == id);
+        _testResults.Remove(id);
+        SaveProfiles();
+
+        if (_activeId == id)
+        {
+            _activeId = _profiles.FirstOrDefault()?.Id;
+            EmbeddingProfileStore.SetActive(KVData, _activeId ?? string.Empty);
+        }
+
+        _confirmDelete = null;
+    }
+
+    private async Task TestAsync(EmbeddingProfile profile)
+    {
+        _testingId = profile.Id;
+        _testResults[profile.Id] = Loc["api_config.testing"];
+        StateHasChanged();
+
+        try
+        {
+            var config = new MemoryModelConfig(profile.BaseUrl, profile.ApiKey, profile.ModelName, profile.Id, profile.Name);
+            var started = DateTimeOffset.UtcNow;
+            var dimensions = await new MemoryEmbeddingClient(config).ProbeDimensionsAsync();
+            _testResults[profile.Id] = $"{Loc["api_config.test_ok"]}: dim={dimensions}, {(DateTimeOffset.UtcNow - started).TotalMilliseconds:F0} ms";
+        }
+        catch (Exception ex)
+        {
+            _testResults[profile.Id] = $"{Loc["api_config.test_failed"]}: {ex.Message}";
+        }
+        finally
+        {
+            _testingId = null;
+        }
+    }
+
+    private string TestText(string id) => _testResults.TryGetValue(id, out var value) ? value : string.Empty;
 }

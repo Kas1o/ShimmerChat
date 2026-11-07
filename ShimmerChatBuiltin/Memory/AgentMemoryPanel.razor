@@ -1,0 +1,354 @@
+@using Microsoft.Extensions.Logging
+@using ShimmerChatBuiltin.Memory
+@using ShimmerChatLib.Interface
+@using ShimmerChatLib.Panel
+@attribute [PluginPanelAttribute("panel.memory.agent", "panel.memory.agent.desc", PanelDisplayPlace.Agent)]
+@implements IDisposable
+
+@inject IKVDataService KVData
+@inject IVectorStoreService VectorStore
+@inject ILocService Loc
+@inject ILogger<AgentMemoryPanel> Logger
+
+<div class="shimmer-content su-p-4">
+    <h2 class="su-text-lg su-font-bold su-mb-2">@Loc["panel.memory.agent.title"]</h2>
+
+    @if (_error is not null)
+    {
+        <div class="su-card su-mb-2" style="border-color: var(--su-danger);">
+            <div class="su-card-body su-text-sm">@_error</div>
+        </div>
+    }
+
+    <div class="su-flex su-gap-2 su-mb-3" style="align-items:center;">
+        <span class="su-text-sm su-text-2">@Loc["panel.memory.agent.count"]: @_total</span>
+        <span class="su-badge @BadgeClass(_status)">@Loc[$"panel.memory.status.{_status.ToString().ToLowerInvariant()}"]</span>
+        <button class="su-btn su-btn-primary su-btn-sm" @onclick="SyncAgentAsync" disabled="@MemorySyncCoordinator.IsRunning">
+            @Loc["panel.memory.agent.sync"]
+        </button>
+    </div>
+
+    <div class="su-card su-mb-3">
+        <div class="su-card-body">
+            <div class="su-flex su-gap-2">
+                <input class="su-input su-w-full" @bind="_newContent" placeholder="@Loc["panel.memory.agent.add_placeholder"]" />
+                <button class="su-btn su-btn-primary" @onclick="AddAsync" disabled="@string.IsNullOrWhiteSpace(_newContent)">@Loc["panel.memory.agent.add"]</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="su-flex su-gap-2 su-mb-3">
+        <input class="su-input su-w-full" @bind="_keyword" placeholder="@Loc["panel.memory.agent.search_placeholder"]" />
+        <button class="su-btn" @onclick="SearchKeywordAsync">@Loc["panel.memory.agent.search_keyword"]</button>
+        <button class="su-btn" @onclick="SearchSemanticAsync">@Loc["panel.memory.agent.search_semantic"]</button>
+    </div>
+
+    @if (_hits.Count > 0)
+    {
+        <div class="su-card su-mb-3">
+            <div class="su-card-body">
+                <strong class="su-text-sm">@Loc["panel.memory.agent.semantic_results"]</strong>
+                @foreach (var hit in _hits)
+                {
+                    <p class="su-text-sm su-mt-1">[@hit.Score.ToString("F3")] @hit.Content</p>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_records.Count == 0)
+    {
+        <p class="su-text-sm su-text-2">@Loc["panel.memory.agent.empty"]</p>
+    }
+    else
+    {
+        @foreach (var record in _records)
+        {
+            <div class="su-card su-mb-2">
+                <div class="su-card-body">
+                    @if (_editingId == record.Id)
+                    {
+                        <textarea class="su-input su-w-full" rows="4" @bind="_editContent"></textarea>
+                        <input class="su-input su-w-full su-mt-2" @bind="_editTags" placeholder="tags" />
+                        <div class="su-flex su-gap-2 su-mt-2">
+                            <button class="su-btn su-btn-primary su-btn-sm" @onclick="() => SaveAsync(record.Id)">@Loc["panel.memory.agent.save"]</button>
+                            <button class="su-btn su-btn-sm" @onclick="() => _editingId = null">@Loc["panel.memory.agent.cancel"]</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="su-text-sm" style="white-space: pre-wrap;">@record.Content</p>
+                        <div class="su-flex su-gap-2 su-mt-1" style="align-items:center;">
+                            <span class="su-text-sm su-text-2">@record.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+                            @if (!string.IsNullOrWhiteSpace(record.Tags))
+                            {
+                                <span class="su-badge su-badge-secondary">@record.Tags</span>
+                            }
+                            <span class="su-text-sm su-text-2">v@(record.Version)</span>
+                            <button class="su-btn su-btn-sm" @onclick="() => BeginEdit(record)">@Loc["panel.memory.agent.edit"]</button>
+                            @if (_confirmDelete == record.Id)
+                            {
+                                <button class="su-btn su-btn-danger su-btn-sm" @onclick="() => DeleteAsync(record.Id)">@Loc["panel.memory.confirm"]</button>
+                                <button class="su-btn su-btn-sm" @onclick="() => _confirmDelete = null">@Loc["panel.memory.agent.cancel"]</button>
+                            }
+                            else
+                            {
+                                <button class="su-btn su-btn-sm" @onclick="() => _confirmDelete = record.Id">@Loc["panel.memory.agent.delete"]</button>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="su-flex su-gap-2 su-mt-2">
+            <button class="su-btn su-btn-sm" @onclick="PrevPageAsync" disabled="@(_offset == 0)">@Loc["panel.memory.agent.prev"]</button>
+            <button class="su-btn su-btn-sm" @onclick="NextPageAsync" disabled="@(_offset + PageSize >= _total)">@Loc["panel.memory.agent.next"]</button>
+        </div>
+    }
+</div>
+
+@code {
+    private const int PageSize = 20;
+
+    [Parameter] public Guid AgentGuid { get; set; }
+    [Parameter] public Action<IChatPanelEventHandler>? EventHandlerReg { get; set; }
+    [Parameter] public AgentPanelContext? PanelContext { get; set; }
+
+    private readonly List<MemoryRecord> _records = [];
+    private readonly List<MemoryHit> _hits = [];
+    private int _total;
+    private int _offset;
+    private string _keyword = string.Empty;
+    private string _newContent = string.Empty;
+    private string? _editingId;
+    private string _editContent = string.Empty;
+    private string _editTags = string.Empty;
+    private string? _confirmDelete;
+    private string? _error;
+    private MemoryIndexStatus _status = MemoryIndexStatus.Missing;
+    private bool _wasRunning;
+    private Guid? _loadedAgentGuid;
+
+    private string AgentId => MemoryPartition.ForAgent(AgentGuid);
+
+    private MemoryIndexService? CreateService(out string? error)
+    {
+        error = null;
+        var (config, configError) = MemoryModelConfig.Load(KVData);
+        if (config is null)
+        {
+            error = configError;
+            return null;
+        }
+
+        return new MemoryIndexService(MemoryStoreProvider.Current, VectorStore, config, Logger);
+    }
+
+    protected override Task OnInitializedAsync()
+    {
+        MemorySyncCoordinator.Changed += OnSyncChanged;
+        _wasRunning = MemorySyncCoordinator.IsRunning;
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // 同一路由下切换 Agent 时组件实例会被复用，必须按 AgentGuid 重新加载。
+        if (_loadedAgentGuid == AgentGuid) return;
+        _loadedAgentGuid = AgentGuid;
+        _offset = 0;
+        _editingId = null;
+        _confirmDelete = null;
+        _hits.Clear();
+        await ReloadAsync();
+    }
+
+    public void Dispose()
+    {
+        MemorySyncCoordinator.Changed -= OnSyncChanged;
+    }
+
+    private void OnSyncChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            var running = MemorySyncCoordinator.IsRunning;
+            if (_wasRunning && !running) await ReloadAsync();
+            _wasRunning = running;
+            StateHasChanged();
+        });
+    }
+
+    private async Task ReloadAsync()
+    {
+        try
+        {
+            _error = null;
+            _total = MemoryStoreProvider.Current.Count(AgentId, NullIfBlank(_keyword));
+
+            var service = CreateService(out var configError);
+            if (service is null)
+            {
+                _error = configError;
+                _status = MemoryIndexStatus.Missing;
+            }
+            else
+            {
+                _status = await service.GetStatusAsync(AgentId);
+            }
+
+            _records.Clear();
+            _records.AddRange(MemoryStoreProvider.Current.List(AgentId, _offset, PageSize, NullIfBlank(_keyword)));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task AddAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newContent)) return;
+
+        var service = CreateService(out var configError);
+        if (service is null)
+        {
+            _error = configError;
+            return;
+        }
+
+        try
+        {
+            await service.AddAsync(AgentId, _newContent.Trim());
+            _newContent = string.Empty;
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void BeginEdit(MemoryRecord record)
+    {
+        _editingId = record.Id;
+        _editContent = record.Content;
+        _editTags = record.Tags;
+    }
+
+    private async Task SaveAsync(string id)
+    {
+        var service = CreateService(out var configError);
+        if (service is null)
+        {
+            _error = configError;
+            return;
+        }
+
+        try
+        {
+            await service.UpdateAsync(id, _editContent, _editTags);
+            _editingId = null;
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task DeleteAsync(string id)
+    {
+        var service = CreateService(out var configError);
+        if (service is null)
+        {
+            _error = configError;
+            return;
+        }
+
+        try
+        {
+            await service.DeleteAsync(id);
+            _confirmDelete = null;
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task SearchKeywordAsync()
+    {
+        _hits.Clear();
+        _offset = 0;
+        await ReloadAsync();
+    }
+
+    private async Task SearchSemanticAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_keyword)) return;
+
+        var service = CreateService(out var configError);
+        if (service is null)
+        {
+            _error = configError;
+            return;
+        }
+
+        try
+        {
+            var hits = await service.SearchAsync(AgentId, [_keyword], 5, 0f);
+            _hits.Clear();
+            _hits.AddRange(hits);
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task SyncAgentAsync()
+    {
+        var service = CreateService(out var configError);
+        if (service is null)
+        {
+            _error = configError;
+            return;
+        }
+
+        MemorySyncCoordinator.Start(async (ct, progress) =>
+        {
+            var plan = await service.PlanAsync(AgentId, ct);
+            var report = await service.SyncAsync(plan, progress, ct);
+            if (report.Error is not null)
+                throw new InvalidOperationException(report.Error);
+        }, Logger);
+    }
+
+    private async Task PrevPageAsync()
+    {
+        _offset = Math.Max(0, _offset - PageSize);
+        await ReloadAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        _offset += PageSize;
+        await ReloadAsync();
+    }
+
+    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string BadgeClass(MemoryIndexStatus status) => status switch
+    {
+        MemoryIndexStatus.Ready => "su-badge-success",
+        MemoryIndexStatus.Partial => "su-badge-warning",
+        MemoryIndexStatus.Error => "su-badge-danger",
+        _ => "su-badge-secondary"
+    };
+}

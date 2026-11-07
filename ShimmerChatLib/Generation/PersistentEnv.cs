@@ -46,6 +46,11 @@ namespace ShimmerChatLib.Generation
         /// </summary>
         public IToolInteractionService? Interactions { get; init; }
 
+        /// <summary>
+        /// 嵌入式向量存储。为 null 表示当前宿主未提供，需要向量的节点/工具必须明确失败。
+        /// </summary>
+        public IVectorStoreService? VectorStore { get; init; }
+
         /// <summary>从 Chat 实例派生</summary>
         public Guid ChatGuid => Chat.Guid;
 

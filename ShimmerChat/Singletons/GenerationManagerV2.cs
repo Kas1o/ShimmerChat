@@ -30,6 +30,7 @@ namespace ShimmerChat.Singletons
         private readonly IImageAttachmentService _imageAttachments;
         private readonly IMessageStoreService _messageStore;
         private readonly IToolInteractionService _toolInteractions;
+        private readonly IVectorStoreService _vectorStore;
         private readonly ToolCallLoop _loop = new();
         private readonly ILogger<GenerationManagerV2> _logger;
 
@@ -37,7 +38,7 @@ namespace ShimmerChat.Singletons
             IPreGenerationNodeSerializer serializer, IPostGenerationManagerService postManager,
             ILocService locService, IDebugOutputService debugOutput,
             IImageAttachmentService imageAttachments, IMessageStoreService messageStore,
-            IToolInteractionService toolInteractions,
+            IToolInteractionService toolInteractions, IVectorStoreService vectorStore,
             ILogger<GenerationManagerV2> logger)
         {
             _kvData = kvData;
@@ -49,6 +50,7 @@ namespace ShimmerChat.Singletons
             _imageAttachments = imageAttachments;
             _messageStore = messageStore;
             _toolInteractions = toolInteractions;
+            _vectorStore = vectorStore;
             _logger = logger;
             EnsureDefaultPreset();
         }
@@ -164,6 +166,7 @@ namespace ShimmerChat.Singletons
                 PostGenerationManager = _postManager,
                 ImageAttachments = _imageAttachments,
                 Interactions = _toolInteractions,
+                VectorStore = _vectorStore,
                 Chat = chat,
                 Agent = agent,
                 MessageStore = _messageStore

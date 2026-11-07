@@ -1,5 +1,3 @@
-using Qdrant.Client;
-using Qdrant.Client.Grpc;
 using SharperLLM.API;
 using SharperLLM.Util;
 using ShimmerChatLib;
@@ -8,7 +6,8 @@ using ShimmerChatLib.Generation;
 namespace ShimmerChatBuiltin.Memory
 {
     /// <summary>
-    /// Qdrant 记忆检索注入节点：基于最近的 N 条消息检索相关记忆并注入到上下文
+    /// 记忆检索注入节点：用最近的对话消息作为查询，从当前模型的记忆索引里召回相关条目。
+    /// 索引未就绪时明确失败，不静默返回空结果。
     /// </summary>
     [NodeInfo("node.memory_retrieve", Icon = "🔍", Color = "var(--node-memory)", CategoryKeys = ["category.content", "category.memory_node"])]
     public class MemoryRetrieveNode : IPreGenerationNode
@@ -16,25 +15,25 @@ namespace ShimmerChatBuiltin.Memory
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Memory Retrieve";
 
-        /// <summary>
-        /// 用于检索的最近消息数量
-        /// </summary>
+        /// <summary>指定使用的嵌入配置；留空表示使用当前激活配置。</summary>
+        [NodeProperty("prop.memory_retrieve.profile", HintKey = "prop.memory_retrieve.profile.hint", Order = -1, OptionsKey = "embedding_profiles")]
+        public string EmbeddingProfileId { get; set; } = string.Empty;
+
+        /// <summary>用于检索的最近消息数量</summary>
         [NodeProperty("prop.memory_retrieve.recent_messages", HintKey = "prop.memory_retrieve.recent_messages.hint")]
         public int RecentMessageCount { get; set; } = 3;
 
-        /// <summary>
-        /// 相似度阈值 (0.0 ~ 1.0)
-        /// </summary>
+        /// <summary>相似度阈值 (0.0 ~ 1.0)</summary>
         [NodeProperty("prop.memory_retrieve.similarity_threshold", HintKey = "prop.memory_retrieve.similarity_threshold.hint")]
         public float SimilarityThreshold { get; set; } = 0.5f;
 
-        /// <summary>
-        /// 注入位置（-1 为开头，-2 为末尾）
-        /// </summary>
+        /// <summary>注入位置（-1 为开头，-2 为末尾）</summary>
         [NodeProperty("prop.memory_retrieve.insert_position", HintKey = "prop.memory_retrieve.insert_position.hint")]
         public int InsertPosition { get; set; } = 0;
 
-        private static Dictionary<string, List<float>>? _vectorCache;
+        /// <summary>每条查询召回条数</summary>
+        [NodeProperty("prop.memory_retrieve.top_k", HintKey = "prop.memory_retrieve.top_k.hint")]
+        public int TopK { get; set; } = 3;
 
         public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
@@ -42,99 +41,70 @@ namespace ShimmerChatBuiltin.Memory
             var kvData = context.Env.Persistent.KVData;
             var agentGuid = context.Env.Persistent.AgentGuid;
             var chat = context.Env.Persistent.Chat;
+            var vectorStore = context.Env.Persistent.VectorStore;
+
+            if (vectorStore is null)
+            {
+                return NodeResult.Failure(
+                    NodeErrorCodes.ServiceError,
+                    loc["node_err.memory_no_vector_store"],
+                    nodeId: Id, nodeName: Name);
+            }
+
+            var (config, configError) = MemoryModelConfig.Load(kvData, EmbeddingProfileId);
+            if (config is null)
+            {
+                return NodeResult.Failure(
+                    NodeErrorCodes.DataMissing,
+                    configError ?? loc["node_err.memory_no_model"],
+                    nodeId: Id, nodeName: Name);
+            }
 
             var recentMessages = context.Env.Transient.Fragments
                 .Where(f => f.From != PromptBuilder.From.tool_result && !string.IsNullOrEmpty(f.Message.Content))
                 .Reverse()
-                .Take(RecentMessageCount)
+                .Take(Math.Max(1, RecentMessageCount))
                 .Reverse()
                 .ToList();
 
             if (recentMessages.Count == 0)
                 return NodeResult.SuccessResult();
 
-            var qHost = kvData.Read("QdrantAPI", "host");
-            if (string.IsNullOrEmpty(qHost))
-                return NodeResult.Failure(
-                    NodeErrorCodes.DataMissing,
-                    loc["node_err.memory_no_host"],
-                    nodeId: Id, nodeName: Name);
-            var qPort = kvData.Read("QdrantAPI", "port");
-            if (string.IsNullOrEmpty(qPort))
-                return NodeResult.Failure(
-                    NodeErrorCodes.DataMissing,
-                    loc["node_err.memory_no_port"],
-                    nodeId: Id, nodeName: Name);
-            var qApiKey = kvData.Read("QdrantAPI", "apikey");
+            var service = new MemoryIndexService(MemoryStoreProvider.Current, vectorStore, config);
 
             try
             {
-                var qclient = new QdrantClient(qHost, int.Parse(qPort));
-                if (!string.IsNullOrEmpty(qApiKey))
-                {
-                    var chnl = QdrantChannel.ForAddress(
-                        new Uri($"http://{qHost}:{qPort}"),
-                        new ClientConfiguration { ApiKey = qApiKey });
-                    qclient = new QdrantClient(new QdrantGrpcClient(chnl));
-                }
+                var hits = await service.SearchAsync(
+                    MemoryPartition.ForAgent(agentGuid),
+                    recentMessages.Select(x => x.Message.Content!).ToList(),
+                    Math.Max(1, TopK),
+                    SimilarityThreshold,
+                    context.CancellationToken);
 
-                var exists = await qclient.CollectionExistsAsync($"{agentGuid}");
-                if (!exists)
+                MemoryRecallLog.Save(kvData, chat.Guid, new MemoryRecallSnapshot
+                {
+                    At = DateTimeOffset.UtcNow,
+                    Status = "ok",
+                    Model = config.ModelName,
+                    Hits = hits.Take(10)
+                        .Select(x => new MemoryRecallEntry(x.Id, x.Score, x.Content))
+                        .ToList()
+                });
+
+                if (hits.Count == 0)
                     return NodeResult.SuccessResult();
 
-                var eUri = kvData.Read("EmbeddingAPI", "uri") ?? string.Empty;
-                var eApiKey = kvData.Read("EmbeddingAPI", "apikey") ?? string.Empty;
-                var eModelName = kvData.Read("EmbeddingAPI", "modelname") ?? string.Empty;
-                var api = new OpenAIChatCompletionClient(eUri, eApiKey, eModelName);
-
-                _vectorCache ??= new Dictionary<string, List<float>>();
-
-                var vectors = new List<(List<float> vector, int weight)>();
-                int idx = 0;
-                foreach (var msg in recentMessages)
-                {
-                    idx++;
-                    if (!_vectorCache.ContainsKey(msg.Message.Content))
-                    {
-                        var vec = await api.GetEmbedding(msg.Message.Content);
-                        _vectorCache[msg.Message.Content] = vec;
-                    }
-                    vectors.Add((_vectorCache[msg.Message.Content], idx));
-                }
-
-                var maxWeight = vectors.Count > 0 ? vectors.Max(v => v.weight) : 1;
-                var searchResults = new List<string>();
-
-                foreach (var (vector, weight) in vectors)
-                {
-                    var actualThreshold = (1f - (0.9f * (weight - 1) / (maxWeight - 1 == 0 ? 1 : maxWeight - 1))) * SimilarityThreshold;
-                    var results = await qclient.SearchAsync(
-                        collectionName: $"{agentGuid}",
-                        vector: vector.ToArray().AsMemory(),
-                        limit: 3,
-                        scoreThreshold: actualThreshold);
-
-                    foreach (var res in results)
-                    {
-                        for (int w = 0; w < weight; w++)
-                        {
-                            if (res.Payload.ContainsKey("content"))
-                                searchResults.Add(res.Payload["content"].ToString()!);
-                        }
-                    }
-                }
-
-                var distinct = searchResults.Distinct().ToList();
-                if (distinct.Count == 0)
-                    return NodeResult.SuccessResult();
-
-                var memoryText = string.Join("\n---\n", distinct);
+                var memoryText = string.Join("\n---\n", hits.Select(x => x.Content).Distinct());
                 var segment = new ContextSegment
                 {
                     SourceType = typeof(MemoryRetrieveNode),
                     Message = new ChatMessage { Content = $"System Auto Recall Memories:\n{{\n{memoryText}\n}}" },
                     From = PromptBuilder.From.system,
-                    Metadata = new Dictionary<string, object> { ["memoryCount"] = distinct.Count }
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["memoryCount"] = hits.Count,
+                        ["memoryProfile"] = config.DisplayName
+                    }
                 };
 
                 if (InsertPosition < 0 || InsertPosition >= context.Env.Transient.Fragments.Count)
@@ -143,6 +113,21 @@ namespace ShimmerChatBuiltin.Memory
                     context.Env.Transient.Fragments.Insert(InsertPosition, segment);
 
                 return NodeResult.SuccessResult();
+            }
+            catch (MemoryNotReadyException ex)
+            {
+                MemoryRecallLog.Save(kvData, chat.Guid, new MemoryRecallSnapshot
+                {
+                    At = DateTimeOffset.UtcNow,
+                    Status = ex.Status.ToString(),
+                    Model = config.ModelName
+                });
+
+                return NodeResult.Failure(
+                    NodeErrorCodes.DataMissing,
+                    loc.Format("node_err.memory_not_ready", ex.Status),
+                    details: ex.Message,
+                    nodeId: Id, nodeName: Name);
             }
             catch (Exception ex)
             {

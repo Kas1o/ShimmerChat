@@ -1,0 +1,155 @@
+@using Microsoft.Extensions.Logging
+@using ShimmerChatBuiltin.Memory
+@using ShimmerChatLib.Interface
+@using ShimmerChatLib.Panel
+@attribute [PluginPanelAttribute("panel.memory.chat", "panel.memory.chat.desc", PanelDisplayPlace.Chat)]
+
+@inject IKVDataService KVData
+@inject IVectorStoreService VectorStore
+@inject ILocService Loc
+@inject ILogger<ChatMemoryPanel> Logger
+
+<div class="shimmer-content su-p-3">
+    <h2 class="su-text-lg su-font-bold su-mb-2">@Loc["panel.memory.chat.title"]</h2>
+
+    <div class="su-flex su-gap-2 su-mb-2" style="align-items:center;">
+        <span class="su-badge @BadgeClass(_status)">@Loc[$"panel.memory.status.{_status.ToString().ToLowerInvariant()}"]</span>
+        @if (!string.IsNullOrEmpty(_modelName))
+        {
+            <span class="su-text-sm su-text-2">@_modelName</span>
+        }
+        <button class="su-btn su-btn-sm" @onclick="RefreshAsync">@Loc["panel.memory.refresh"]</button>
+    </div>
+
+    @if (_status != MemoryIndexStatus.Ready)
+    {
+        <p class="su-text-sm" style="color: var(--su-warning, #b8860b);">@Loc["panel.memory.chat.not_ready"]</p>
+    }
+
+    @if (_error is not null)
+    {
+        <p class="su-text-sm" style="color: var(--su-danger);">@_error</p>
+    }
+
+    <h3 class="su-text-sm su-font-bold su-mt-3">@Loc["panel.memory.chat.last_recall"]</h3>
+    @if (_recall is null)
+    {
+        <p class="su-text-sm su-text-2">@Loc["panel.memory.chat.no_recall"]</p>
+    }
+    else
+    {
+        <p class="su-text-sm su-text-2">
+            @_recall.At.ToLocalTime().ToString("yyyy-MM-dd HH:mm") · @_recall.Status
+        </p>
+
+        @if (_recall.Hits.Count == 0)
+        {
+            <p class="su-text-sm su-text-2">@Loc["panel.memory.chat.no_hits"]</p>
+        }
+        else
+        {
+            @foreach (var hit in _recall.Hits)
+            {
+                <div class="su-card su-mb-1">
+                    <div class="su-card-body">
+                        <div class="su-text-sm">@hit.Content</div>
+                        <div class="su-text-sm su-text-2">@hit.Score.ToString("F3")</div>
+                    </div>
+                </div>
+            }
+        }
+    }
+
+    <h3 class="su-text-sm su-font-bold su-mt-3">@Loc["panel.memory.chat.quick_search"]</h3>
+    <div class="su-flex su-gap-2">
+        <input class="su-input su-w-full" @bind="_keyword" placeholder="@Loc["panel.memory.chat.search_placeholder"]" />
+        <button class="su-btn su-btn-sm" @onclick="SearchAsync" disabled="@(_status != MemoryIndexStatus.Ready)">@Loc["panel.memory.chat.search"]</button>
+    </div>
+
+    @foreach (var hit in _hits)
+    {
+        <div class="su-card su-mb-1 su-mt-1">
+            <div class="su-card-body">
+                <div class="su-text-sm">@hit.Content</div>
+                <div class="su-text-sm su-text-2">@hit.Score.ToString("F3")</div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid ChatGuid { get; set; }
+    [Parameter] public Guid AgentGuid { get; set; }
+    [Parameter] public Action<IChatPanelEventHandler>? EventHandlerReg { get; set; }
+    [Parameter] public ChatPanelContext? PanelContext { get; set; }
+
+    private MemoryRecallSnapshot? _recall;
+    private MemoryIndexStatus _status = MemoryIndexStatus.Missing;
+    private string _modelName = string.Empty;
+    private string _keyword = string.Empty;
+    private string? _error;
+    private readonly List<MemoryHit> _hits = [];
+    private Guid? _loadedChatGuid;
+    private Guid? _loadedAgentGuid;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // 同一路由下切换对话时组件实例会被复用，必须按 ChatGuid / AgentGuid 重新加载。
+        if (_loadedChatGuid == ChatGuid && _loadedAgentGuid == AgentGuid) return;
+        _loadedChatGuid = ChatGuid;
+        _loadedAgentGuid = AgentGuid;
+        _hits.Clear();
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _error = null;
+        _recall = MemoryRecallLog.Load(KVData, ChatGuid, out var recallError);
+        if (recallError is not null) _error = recallError;
+
+        var (config, configError) = MemoryModelConfig.Load(KVData);
+        if (config is null)
+        {
+            _error = configError;
+            _status = MemoryIndexStatus.Missing;
+            return;
+        }
+
+        _modelName = config.ModelName;
+        _status = await new MemoryIndexService(MemoryStoreProvider.Current, VectorStore, config, Logger)
+            .GetStatusAsync(MemoryPartition.ForAgent(AgentGuid));
+    }
+
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_keyword)) return;
+
+        var (config, configError) = MemoryModelConfig.Load(KVData);
+        if (config is null)
+        {
+            _error = configError;
+            return;
+        }
+
+        try
+        {
+            var service = new MemoryIndexService(MemoryStoreProvider.Current, VectorStore, config, Logger);
+            var hits = await service.SearchAsync(MemoryPartition.ForAgent(AgentGuid), [_keyword], 5, 0f);
+            _hits.Clear();
+            _hits.AddRange(hits);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private static string BadgeClass(MemoryIndexStatus status) => status switch
+    {
+        MemoryIndexStatus.Ready => "su-badge-success",
+        MemoryIndexStatus.Partial => "su-badge-warning",
+        MemoryIndexStatus.Error => "su-badge-danger",
+        _ => "su-badge-secondary"
+    };
+}

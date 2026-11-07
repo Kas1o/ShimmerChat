@@ -1,5 +1,6 @@
 using ShimmerChat.Components;
 using ShimmerChat.Singletons;
+using ShimmerChat.Singletons.VectorStore;
 using ShimmerChatLib.ChatView;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib;
@@ -36,6 +37,9 @@ builder.Services.AddSignalR(options =>
 
 // 配置 KV 数据存储
 ConfigureKVDataStorage(builder);
+
+// 配置向量存储（默认 LiteDB，实现由 appsettings:VectorStore 决定）
+builder.Services.AddShimmerVectorStore(builder.Configuration);
 
 // ShimmerChat 2.0 服务
 builder.Services.AddSingleton<IToolRegistry, ToolRegistry>();

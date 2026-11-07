@@ -1,0 +1,437 @@
+@using Microsoft.Extensions.Logging
+@using ShimmerChatBuiltin.Memory
+@using ShimmerChatLib.Interface
+@using ShimmerChatLib.Models
+@attribute [PluginPanelAttribute("panel.memory", "panel.memory.desc", PanelDisplayPlace.Settings, Order = 5)]
+@implements IDisposable
+
+@inject IKVDataService KVData
+@inject IVectorStoreService VectorStore
+@inject VectorStoreConfig VectorConfig
+@inject ILocService Loc
+@inject ILogger<MemorySettingsPanel> Logger
+
+<div class="shimmer-content su-p-4">
+    <h2 class="su-text-lg su-font-bold su-mb-2">@Loc["panel.memory.title"]</h2>
+    <p class="su-text-2 su-mb-4">@Loc["panel.memory.desc_text"]</p>
+
+    <div class="su-flex su-gap-2 su-mb-4">
+        <button class="su-btn @(_tab == 0 ? "su-btn-primary" : "")" @onclick="() => _tab = 0">@Loc["panel.memory.tab.overview"]</button>
+        <button class="su-btn @(_tab == 1 ? "su-btn-primary" : "")" @onclick="() => _tab = 1">@Loc["panel.memory.tab.indexes"]</button>
+        <button class="su-btn @(_tab == 2 ? "su-btn-primary" : "")" @onclick="() => _tab = 2">@Loc["panel.memory.tab.backend"]</button>
+        <button class="su-btn" @onclick="RefreshAsync" disabled="@_loading">@Loc["panel.memory.refresh"]</button>
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="su-card su-mt-2" style="border-color: var(--su-danger);">
+            <div class="su-card-body su-text-sm">@_error</div>
+        </div>
+    }
+
+    @if (MemorySyncCoordinator.IsRunning || MemorySyncCoordinator.Progress is not null || MemorySyncCoordinator.Error is not null)
+    {
+        <div class="su-card su-mt-2">
+            <div class="su-card-body">
+                <div class="su-flex su-gap-2" style="align-items:center;">
+                    <strong>@Loc["panel.memory.task"]</strong>
+                    <span class="su-text-sm su-text-2">
+                        @(MemorySyncCoordinator.Progress is { } p
+                            ? $"{PhaseText(p.Phase)} {p.Done}/{p.Total} (failed {p.Failed})"
+                            : "")
+                    </span>
+                    @if (MemorySyncCoordinator.IsRunning)
+                    {
+                        <button class="su-btn su-btn-danger su-btn-sm" @onclick="CancelSync">@Loc["panel.memory.cancel"]</button>
+                    }
+                    else
+                    {
+                        <button class="su-btn su-btn-sm" @onclick="DismissTask">@Loc["panel.memory.dismiss"]</button>
+                    }
+                </div>
+                @if (MemorySyncCoordinator.Cancelled)
+                {
+                    <p class="su-text-sm su-text-2">@Loc["panel.memory.cancelled"]</p>
+                }
+                else if (MemorySyncCoordinator.Error is { } err)
+                {
+                    <p class="su-text-sm" style="color: var(--su-danger);">@err</p>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_tab == 0)
+    {
+        <div class="su-group">
+            <h3 class="su-text-lg su-font-bold">@Loc["panel.memory.overview"]</h3>
+            <div class="su-row su-gap-4 su-mt-2">
+                <div class="su-col-3">
+                    <div class="su-card"><div class="su-card-body">
+                        <div class="su-text-sm su-text-2">@Loc["panel.memory.records"]</div>
+                        <div class="su-text-lg su-font-bold">@_records</div>
+                    </div></div>
+                </div>
+                <div class="su-col-3">
+                    <div class="su-card"><div class="su-card-body">
+                        <div class="su-text-sm su-text-2">@Loc["panel.memory.indexes"]</div>
+                        <div class="su-text-lg su-font-bold">@_states.Count</div>
+                    </div></div>
+                </div>
+                <div class="su-col-3">
+                    <div class="su-card"><div class="su-card-body">
+                        <div class="su-text-sm su-text-2">@Loc["panel.memory.status"]</div>
+                        <div class="su-text-lg su-font-bold">@StatusText(_status)</div>
+                    </div></div>
+                </div>
+                <div class="su-col-3">
+                    <div class="su-card"><div class="su-card-body">
+                        <div class="su-text-sm su-text-2">@Loc["panel.memory.backend_health"]</div>
+                        <div class="su-text-lg su-font-bold">@(_health?.Healthy == true ? Loc["panel.memory.healthy"] : Loc["panel.memory.unhealthy"])</div>
+                    </div></div>
+                </div>
+            </div>
+
+            <div class="su-card su-mt-3">
+                <div class="su-card-body">
+                    <h4 class="su-font-bold">@Loc["panel.memory.current_model"]</h4>
+                    @if (_config is null)
+                    {
+                        <p class="su-text-sm" style="color: var(--su-danger);">@_configError</p>
+                    }
+                    else
+                    {
+                        <p class="su-text-sm su-mt-1">@Loc["panel.memory.model"]: <strong>@_config.ModelName</strong></p>
+                        <p class="su-text-sm">@Loc["panel.memory.profile"]: @_config.DisplayName</p>
+                        <p class="su-text-sm">@Loc["panel.memory.endpoint"]: @_config.BaseUrl</p>
+                        <p class="su-text-sm">@Loc["panel.memory.dimensions"]: @(_state?.Dimensions > 0 ? _state.Dimensions.ToString() : "?")</p>
+                        <p class="su-text-sm">@Loc["panel.memory.model_key"]: <code>@_config.ModelKey[..16]</code></p>
+                        <div class="su-flex su-gap-2 su-mt-2">
+                            <button class="su-btn su-btn-primary" @onclick="BuildAsync" disabled="@(_config is null || MemorySyncCoordinator.IsRunning)">
+                                @Loc["panel.memory.build"]
+                            </button>
+                            <button class="su-btn" @onclick="VerifyAsync" disabled="@(_config is null)">@Loc["panel.memory.verify"]</button>
+                            <button class="su-btn" @onclick="TestEmbeddingAsync" disabled="@(_config is null)">@Loc["panel.memory.test_embedding"]</button>
+                        </div>
+                    }
+                    @if (_message is not null)
+                    {
+                        <p class="su-text-sm su-mt-2">@_message</p>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_tab == 1)
+    {
+        <div class="su-group">
+            <h3 class="su-text-lg su-font-bold">@Loc["panel.memory.indexes"]</h3>
+            <p class="su-text-sm su-text-2">@Loc["panel.memory.indexes_hint"]</p>
+
+            @if (_states.Count == 0)
+            {
+                <p class="su-text-sm su-text-2 su-mt-2">@Loc["panel.memory.no_indexes"]</p>
+            }
+            else
+            {
+                <table class="su-table su-mt-2">
+                    <thead>
+                        <tr>
+                            <th>@Loc["panel.memory.model"]</th>
+                            <th>@Loc["panel.memory.dimensions"]</th>
+                            <th>@Loc["panel.memory.count"]</th>
+                            <th>@Loc["panel.memory.status"]</th>
+                            <th>@Loc["panel.memory.built_at"]</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var state in _states)
+                        {
+                            <tr>
+                                <td>
+                                    <div>@state.ModelName</div>
+                                    <div class="su-text-sm su-text-2"><code>@ShortKey(state.Id)</code></div>
+                                </td>
+                                <td>@state.Dimensions</td>
+                                <td>@state.Count</td>
+                                <td>
+                                    <span class="su-badge @BadgeClass(state.Status)">@StatusText(ToStatus(state))</span>
+                                </td>
+                                <td class="su-text-sm">@(state.BuiltAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
+                                <td>
+                                    @if (_confirmDrop == state.Id)
+                                    {
+                                        <button class="su-btn su-btn-danger su-btn-sm" @onclick="() => DropIndexAsync(state.Id)">@Loc["panel.memory.confirm"]</button>
+                                        <button class="su-btn su-btn-sm" @onclick="() => _confirmDrop = null">@Loc["panel.memory.cancel"]</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="su-btn su-btn-sm" @onclick="() => _confirmDrop = state.Id">@Loc["panel.memory.drop_index"]</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+
+    @if (_tab == 2)
+    {
+        <div class="su-group">
+            <MemoryBackendSection />
+
+            <p class="su-text-sm su-mt-3">
+                @Loc["panel.memory.memory_records_path"]: <code>@Store.FilePath</code>
+            </p>
+            <p class="su-text-sm su-text-2">@Loc["panel.memory.memory_records_path_hint"]</p>
+
+            <div class="su-flex su-gap-2 su-mt-3">
+                <button class="su-btn" @onclick="TestStoreAsync">@Loc["panel.memory.test_store"]</button>
+                <button class="su-btn" @onclick="CleanupOrphansAsync" disabled="@MemorySyncCoordinator.IsRunning">@Loc["panel.memory.cleanup_orphans"]</button>
+            </div>
+
+            <h4 class="su-font-bold su-mt-4">@Loc["panel.memory.collections"]</h4>
+            @if (_collections.Count == 0)
+            {
+                <p class="su-text-sm su-text-2">@Loc["panel.memory.no_collections"]</p>
+            }
+            else
+            {
+                <table class="su-table su-mt-2">
+                    <thead>
+                        <tr>
+                            <th>@Loc["panel.memory.collection"]</th>
+                            <th>@Loc["panel.memory.dimensions"]</th>
+                            <th>@Loc["panel.memory.count"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var collection in _collections)
+                        {
+                            <tr>
+                                <td><code>@collection.Name</code></td>
+                                <td>@collection.Options.Dimensions</td>
+                                <td>@collection.Count</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private int _tab;
+    private bool _loading;
+    private string? _error;
+    private string? _message;
+    private string? _confirmDrop;
+    private int _records;
+    private MemoryModelState? _state;
+    private MemoryIndexStatus _status = MemoryIndexStatus.Missing;
+    private MemoryModelConfig? _config;
+    private string? _configError;
+    private List<MemoryModelState> _states = [];
+    private List<CollectionInfo> _collections = [];
+    private VectorStoreHealth? _health;
+    private bool _wasRunning;
+
+    private MemoryRecordStore Store => MemoryStoreProvider.Current;
+
+    protected override async Task OnInitializedAsync()
+    {
+        MemorySyncCoordinator.Changed += OnSyncChanged;
+        _wasRunning = MemorySyncCoordinator.IsRunning;
+        await RefreshAsync();
+    }
+
+    public void Dispose()
+    {
+        MemorySyncCoordinator.Changed -= OnSyncChanged;
+    }
+
+    private void OnSyncChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            var running = MemorySyncCoordinator.IsRunning;
+            if (_wasRunning && !running) await RefreshAsync();
+            _wasRunning = running;
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            (_config, _configError) = MemoryModelConfig.Load(KVData);
+            _records = Store.TotalCount();
+            _state = _config is null ? null : Store.GetState(_config.ModelKey);
+            _status = _config is null
+                ? MemoryIndexStatus.Missing
+                : await new MemoryIndexService(Store, VectorStore, _config, Logger).GetStatusAsync(null);
+
+            _states = Store.ListStates().OrderByDescending(x => x.BuiltAt).ToList();
+            _collections = (await VectorStore.ListCollectionsAsync()).ToList();
+            _health = await VectorStore.CheckHealthAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task BuildAsync()
+    {
+        if (_config is not { } config) return;
+
+        var service = new MemoryIndexService(Store, VectorStore, config, Logger);
+        var started = MemorySyncCoordinator.Start(async (ct, progress) =>
+        {
+            var plan = await service.PlanAsync(null, ct);
+            var report = await service.SyncAsync(plan, progress, ct);
+            if (report.Error is not null)
+                throw new InvalidOperationException(report.Error);
+        }, Logger);
+
+        _message = started ? null : Loc["panel.memory.task_busy"];
+        await Task.CompletedTask;
+    }
+
+    private async Task VerifyAsync()
+    {
+        if (_config is not { } config) return;
+        try
+        {
+            var report = await new MemoryIndexService(Store, VectorStore, config, Logger).VerifyAsync(null);
+            _message = $"{Loc["panel.memory.report"]}: missing={report.Missing}, stale={report.Stale}, orphan={report.Orphans}, records={report.Records}";
+            await RefreshAsync();
+            if (report.Error is not null)
+                _error = report.Error;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task TestEmbeddingAsync()
+    {
+        if (_config is not { } config) return;
+        try
+        {
+            var started = DateTimeOffset.UtcNow;
+            var dimensions = await new MemoryEmbeddingClient(config).ProbeDimensionsAsync();
+            _message = $"{Loc["panel.memory.test_ok"]}: dim={dimensions}, {(DateTimeOffset.UtcNow - started).TotalMilliseconds:F0} ms";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task TestStoreAsync()
+    {
+        try
+        {
+            _health = await VectorStore.CheckHealthAsync();
+            _message = _health.Healthy ? Loc["panel.memory.healthy"] : _health.Message;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task CleanupOrphansAsync()
+    {
+        if (_config is not { } config) return;
+        try
+        {
+            var service = new MemoryIndexService(Store, VectorStore, config, Logger);
+            var plan = await service.PlanAsync(null);
+            if (plan.OrphanIds.Count == 0)
+            {
+                _message = Loc["panel.memory.no_orphans"];
+                return;
+            }
+
+            await VectorStore.DeleteAsync(
+                config.CollectionName,
+                new VectorFilter(Ids: plan.OrphanIds.ToList()));
+            _message = $"{Loc["panel.memory.orphans_removed"]}: {plan.OrphanIds.Count}";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task DropIndexAsync(string modelKey)
+    {
+        try
+        {
+            var collection = "memory_" + modelKey[..16];
+            try
+            {
+                await VectorStore.DropCollectionAsync(collection);
+            }
+            catch (VectorStoreException ex) when (ex.Code == VectorStoreErrorCodes.CollectionNotFound)
+            {
+                // 集合已经不存在，继续清理状态。
+            }
+
+            Store.RemoveState(modelKey);
+            _confirmDrop = null;
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void CancelSync() => MemorySyncCoordinator.Cancel();
+    private void DismissTask() => MemorySyncCoordinator.Reset();
+
+    private string StatusText(MemoryIndexStatus status) => Loc[$"panel.memory.status.{status.ToString().ToLowerInvariant()}"];
+
+    private string PhaseText(string phase) => phase switch
+    {
+        "starting" => Loc["panel.memory.phase.starting"],
+        "embedding" => Loc["panel.memory.phase.embedding"],
+        "done" => Loc["panel.memory.phase.done"],
+        _ => phase
+    };
+
+    private static MemoryIndexStatus ToStatus(MemoryModelState state) => state.Status switch
+    {
+        MemoryStateStatus.Missing => MemoryIndexStatus.Missing,
+        MemoryStateStatus.Ready => MemoryIndexStatus.Ready,
+        MemoryStateStatus.Partial => MemoryIndexStatus.Partial,
+        MemoryStateStatus.Error => MemoryIndexStatus.Error,
+        _ => MemoryIndexStatus.Suspect
+    };
+
+    private static string BadgeClass(string status) => status switch
+    {
+        MemoryStateStatus.Ready => "su-badge-success",
+        MemoryStateStatus.Partial => "su-badge-warning",
+        MemoryStateStatus.Error => "su-badge-danger",
+        _ => "su-badge-secondary"
+    };
+
+    private static string ShortKey(string key) => key.Length > 16 ? key[..16] : key;
+}

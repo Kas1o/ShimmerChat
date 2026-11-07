@@ -1,0 +1,101 @@
+@using Microsoft.Extensions.Hosting
+@using ShimmerChatBuiltin.Memory
+@using ShimmerChatLib.Models
+@inject ILocService Loc
+@inject VectorStoreConfig VectorConfig
+@inject IHostEnvironment Env
+@inject IJSRuntime JS
+
+<div>
+    <h3 class="su-text-lg su-font-bold">@Loc["panel.memory.backend"]</h3>
+    <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel.memory.backend_readonly"]</p>
+
+    <label class="su-label su-mt-3">@Loc["panel.memory.backend_file"]</label>
+    <div class="su-flex su-gap-2" style="align-items:center; flex-wrap:wrap;">
+        <code class="su-text-sm" style="word-break:break-all;">@_configPath</code>
+        <button class="su-btn su-btn-sm" @onclick="@(() => CopyAsync(_configPath, "path"))">@CopyLabel("path")</button>
+    </div>
+    @if (!_configFileExists)
+    {
+        <p class="su-text-sm" style="color: var(--su-warning, #b8860b);">@Loc["panel.memory.backend_file_missing"]</p>
+    }
+
+    <label class="su-label su-mt-3">@Loc["panel.memory.backend_section"]</label>
+    <pre class="su-pre su-mt-1">@_snippet</pre>
+    <div class="su-flex su-gap-2 su-mt-2">
+        <button class="su-btn su-btn-sm" @onclick="@(() => CopyAsync(_snippet, "snippet"))">@CopyLabel("snippet")</button>
+    </div>
+
+    <p class="su-font-bold su-text-sm su-mt-3">@Loc["panel.memory.backend_howto"]</p>
+    <ol class="su-text-sm su-text-2" style="margin:0; padding-left:20px;">
+        <li>@Loc["panel.memory.backend_step_edit"]</li>
+        <li>@Loc["panel.memory.backend_values_provider"]</li>
+        <li>@Loc["panel.memory.backend_values_scope"]</li>
+        <li>@Loc["panel.memory.backend_step_restart"]</li>
+    </ol>
+
+    @if (_backendError is not null)
+    {
+        <p class="su-text-sm su-mt-2" style="color: var(--su-danger);">@_backendError</p>
+    }
+    else if (_dataRoot is null)
+    {
+        <p class="su-text-sm su-text-2 su-mt-2">@Loc["panel.memory.backend_no_disk"]</p>
+    }
+    else
+    {
+        <p class="su-text-sm su-text-2 su-mt-2">@Loc["panel.memory.backend_data_root"]: <code>@_dataRoot</code></p>
+    }
+</div>
+
+@code {
+    private string _configPath = string.Empty;
+    private string _snippet = string.Empty;
+    private string? _dataRoot;
+    private bool _configFileExists;
+    private string? _copied;
+    private string? _backendError;
+
+    protected override void OnInitialized()
+    {
+        _configPath = MemoryBackendInfo.ResolveConfigPath(Env.ContentRootPath, AppContext.BaseDirectory);
+        _configFileExists = File.Exists(_configPath);
+        _snippet = MemoryBackendInfo.BuildSnippet(VectorConfig);
+
+        try
+        {
+            _dataRoot = MemoryBackendInfo.ResolveDataRoot(VectorConfig);
+            _backendError = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _dataRoot = null;
+            _backendError = ex.Message;
+        }
+    }
+
+    private async Task CopyAsync(string text, string slot)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+        }
+        catch (JSException ex)
+        {
+            _backendError = $"{Loc["panel.memory.copy_failed"]}: {ex.Message}";
+            return;
+        }
+
+        _copied = slot;
+        StateHasChanged();
+        await Task.Delay(1500);
+        if (_copied == slot)
+        {
+            _copied = null;
+            StateHasChanged();
+        }
+    }
+
+    private string CopyLabel(string slot)
+        => Loc[_copied == slot ? "panel.memory.copied" : "panel.memory.copy"];
+}

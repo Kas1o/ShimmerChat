@@ -166,6 +166,8 @@
     background: var(--su-surface-3); color: var(--su-text-1);
 }
 .su-badge-accent  { background: var(--su-accent-soft);  color: var(--su-accent); }
+.su-badge-warning { background: var(--su-warning-soft); color: var(--su-warning); }
+.su-badge-secondary { background: var(--su-surface-3); color: var(--su-text-1); }
 .su-badge-success { background: var(--su-success-soft); color: var(--su-success); }
 .su-badge-danger  { background: var(--su-danger-soft);  color: var(--su-danger); }
 
@@ -378,3 +380,6 @@
 .debug-detail-time { color: var(--su-text-1); margin-left: 8px; }
 .debug-detail-id { padding: 4px 16px 0; font-size: 0.8em; color: var(--su-text-2); }
 .debug-detail-content { margin: 0; padding: 16px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: var(--su-font-mono); font-size: var(--su-font-sm); color: var(--su-text-0); }
+
+/* 只读的配置 / 代码片段展示（appsettings 片段、路径等） */
+.su-pre { margin: 0; padding: var(--su-space-3) var(--su-space-4); background: var(--su-surface-2); border: var(--su-border-size) solid var(--su-border-1); border-radius: var(--su-radius-md); font-family: var(--su-font-mono); font-size: var(--su-font-sm); line-height: 1.5; color: var(--su-text-0); overflow-x: auto; white-space: pre; tab-size: 2; }

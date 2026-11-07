@@ -1,36 +1,31 @@
 using Newtonsoft.Json;
-using Qdrant.Client;
-using Qdrant.Client.Grpc;
-using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using ShimmerChatLib.Generation;
-using ShimmerChatLib.Interface;
-using static Qdrant.Client.Grpc.Conditions;
 
 namespace ShimmerChatBuiltin.Memory
 {
     /// <summary>
-    /// IAutoCreateToolV2 版本的 MemoryTool。
+    /// 记忆工具：新增 / 删除 / 搜索。文本写入真值库，向量写穿到当前模型索引。
     /// </summary>
     public class MemoryToolV2 : IAutoCreateToolV2
     {
-        private readonly IKVDataService _kvData;
-        private readonly Guid _agentGuid;
+        private readonly PersistentEnv _env;
 
         public static string NameKey => "tool.memory";
         public static string DescriptionKey => "tool.memory.desc";
         public static string[] CategoryKeys => ["category.memory"];
 
-        public MemoryToolV2() { }
-
-        private MemoryToolV2(IKVDataService kvData, Guid agentGuid)
+        public MemoryToolV2()
         {
-            _kvData = kvData;
-            _agentGuid = agentGuid;
+            _env = null!;
         }
 
-        public static IAutoCreateToolV2 Create(PersistentEnv env) =>
-            new MemoryToolV2(env.KVData, env.AgentGuid);
+        private MemoryToolV2(PersistentEnv env)
+        {
+            _env = env;
+        }
+
+        public static IAutoCreateToolV2 Create(PersistentEnv env) => new MemoryToolV2(env);
 
         public Tool GetDefinition() => new()
         {
@@ -47,92 +42,83 @@ namespace ShimmerChatBuiltin.Memory
 
         public async Task<string> ExecuteAsync(string input)
         {
+            if (_env is null)
+                throw new InvalidOperationException("MemoryToolV2 必须通过 Create(PersistentEnv) 创建。");
+
             var action = JsonConvert.DeserializeObject<InputAction>(input);
+            var vectorStore = _env.VectorStore
+                ?? throw new InvalidOperationException("当前宿主没有提供向量存储。");
 
-            var qHost = _kvData.Read("QdrantAPI", "host") ?? throw new InvalidDataException("Qdrant API host not set.");
-            var qPort = _kvData.Read("QdrantAPI", "port") ?? throw new InvalidDataException("Qdrant API port not set.");
-            var qApiKey = _kvData.Read("QdrantAPI", "apikey");
-            var vectorSize = ulong.Parse(_kvData.Read("QdrantAPI", "dim") ?? "1024");
+            var (config, configError) = MemoryModelConfig.Load(_env.KVData);
+            if (config is null)
+                throw new InvalidDataException(configError ?? "嵌入模型未配置。");
 
-            var qclient = new QdrantClient(qHost, int.Parse(qPort));
-            if (!string.IsNullOrEmpty(qApiKey))
-            {
-                var chnl = QdrantChannel.ForAddress(new Uri($"http://{qHost}:{qPort}"), new ClientConfiguration { ApiKey = qApiKey });
-                qclient = new QdrantClient(new QdrantGrpcClient(chnl));
-            }
-
-            var eUri = _kvData.Read("EmbeddingAPI", "uri") ?? string.Empty;
-            var eApiKey = _kvData.Read("EmbeddingAPI", "apikey") ?? string.Empty;
-            var eModelName = _kvData.Read("EmbeddingAPI", "modelname") ?? string.Empty;
-            var api = new OpenAIChatCompletionClient(eUri, eApiKey, eModelName);
-
-            var exists = await qclient.CollectionExistsAsync($"{_agentGuid}");
-            if (!exists)
-            {
-                await qclient.CreateCollectionAsync($"{_agentGuid}",
-                    vectorsConfig: new VectorParams { Size = vectorSize, Distance = Distance.Cosine });
-            }
-
-            var collectionName = $"{_agentGuid}";
+            var agentId = MemoryPartition.ForAgent(_env.AgentGuid);
+            var service = new MemoryIndexService(MemoryStoreProvider.Current, vectorStore, config);
 
             return action.action switch
             {
-                "add" => await HandleAdd(qclient, api, action, collectionName),
-                "delete" => await HandleDelete(qclient, action, collectionName),
-                "search" => await HandleSearch(qclient, api, action, collectionName),
+                "add" => await HandleAdd(service, agentId, action),
+                "delete" => await HandleDelete(service, agentId, action),
+                "search" => await HandleSearch(service, agentId, action),
                 _ => "Unknown action."
             };
         }
 
-        private static async Task<string> HandleAdd(QdrantClient qclient, OpenAIChatCompletionClient api, InputAction action, string collectionName)
+        private async Task<string> HandleAdd(MemoryIndexService service, string agentId, InputAction action)
         {
-            if (action.content == null) return "Content cannot be null when adding memory.";
-            var embd = await api.GetEmbedding(action.content);
-            var point = new PointStruct
+            if (string.IsNullOrWhiteSpace(action.content))
+                return "[Tool error] Content cannot be empty when adding memory.";
+
+            try
             {
-                Id = Guid.NewGuid(),
-                Vectors = embd.ToArray(),
-                Payload = { ["content"] = action.content, ["timestamp"] = DateTime.UtcNow.ToString("o") }
-            };
-            await qclient.UpsertAsync(collectionName, points: [point]);
-            return $"Memory added: {action.content}";
+                var record = await service.AddAsync(agentId, action.content, source: _env.ChatGuid.ToString());
+                return $"Memory added: {record.Id}";
+            }
+            catch (MemoryVectorSyncException ex)
+            {
+                return $"[Tool error] {ex.Message}";
+            }
         }
 
-        private static async Task<string> HandleDelete(QdrantClient qclient, InputAction action, string collectionName)
+        private async Task<string> HandleDelete(MemoryIndexService service, string agentId, InputAction action)
         {
-            if (action.id == null) return "ID cannot be null when deleting memory.";
-            var result = await qclient.DeleteAsync(collectionName, id: Guid.Parse(action.id));
+            if (string.IsNullOrWhiteSpace(action.id))
+                return "[Tool error] ID cannot be empty when deleting memory.";
+
+            var record = MemoryStoreProvider.Current.Get(action.id);
+            if (record is null || !string.Equals(record.AgentId, agentId, StringComparison.Ordinal))
+                return $"Memory with ID {action.id} not found.";
+
+            await service.DeleteAsync(action.id);
             return $"Memory with ID {action.id} deleted.";
         }
 
-        private static async Task<string> HandleSearch(QdrantClient qclient, OpenAIChatCompletionClient api, InputAction action, string collectionName)
+        private async Task<string> HandleSearch(MemoryIndexService service, string agentId, InputAction action)
         {
-            if (action.content == null) return "Content cannot be null when searching memory.";
-            var sb = new System.Text.StringBuilder();
+            if (string.IsNullOrWhiteSpace(action.content))
+                return "[Tool error] Content cannot be empty when searching memory.";
 
-            if (action.search_mode == "keyword")
+            if (string.Equals(action.search_mode, "keyword", StringComparison.OrdinalIgnoreCase))
             {
-                var filter = MatchText("content", action.content);
-                var result = await qclient.ScrollAsync(collectionName, filter: filter, limit: 5);
-                sb.AppendLine("Search Results:");
-                foreach (var res in result.Result)
-                {
-                    if (res.Payload.ContainsKey("content"))
-                        sb.AppendLine($"ID: {res.Id}, Content: {res.Payload["content"]}");
-                }
+                var keywordHits = service.SearchKeyword(agentId, action.content, 5);
+                if (keywordHits.Count == 0) return "Search Results: (empty)";
+
+                return "Search Results:\n" + string.Join("\n", keywordHits.Select(x => $"ID: {x.Id}, Content: {x.Content}"));
             }
-            else
+
+            try
             {
-                var embd = await api.GetEmbedding(action.content);
-                var result = await qclient.SearchAsync(collectionName, vector: embd.ToArray(), limit: 5);
-                sb.AppendLine("Search Results:");
-                foreach (var res in result)
-                {
-                    if (res.Payload.ContainsKey("content"))
-                        sb.AppendLine($"ID: {res.Id}, Score: {res.Score}, Content: {res.Payload["content"]}");
-                }
+                var hits = await service.SearchAsync(agentId, [action.content], 5, 0f);
+                if (hits.Count == 0) return "Search Results: (empty)";
+
+                return "Search Results:\n" + string.Join("\n",
+                    hits.Select(x => $"ID: {x.Id}, Score: {x.Score:F4}, Content: {x.Content}"));
             }
-            return sb.ToString();
+            catch (MemoryNotReadyException ex)
+            {
+                return $"[Tool error] Memory index is not ready ({ex.Status}). Build or verify it in Settings first.";
+            }
         }
 
         private struct InputAction
