@@ -14,7 +14,6 @@
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.41.0" />
     <PackageReference Include="LiteDB" Version="5.0.21" />
-    <PackageReference Include="Qdrant.Client" Version="1.16.1" />
     <PackageReference Include="Meziantou.Framework.SyntaxHighlighting" Version="1.0.6" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0-2.final" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.0.0-2.final" />
