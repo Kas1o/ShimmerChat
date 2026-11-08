@@ -1,465 +1,123 @@
-# AGENTS.md — ShimmerChat 开发指南
+# AGENTS.md — 开发与维护规则
 
-## 1. 项目简介
+## 1. 项目哲学
 
-ShimmerChat 是一个功能丰富的 AI 聊天应用，基于 **.NET 10 + Blazor Server**，支持多种 LLM API（OpenAI、DeepSeek、OpenCode Go、Ollama、Kobold）接入。核心架构围绕 **三管线可编辑节点树（Pre / Post / Render）** 重构。
+### 1.1 严格报错，禁止隐藏错误
 
-**目标用户：** 需要高度自定义 AI 生成管线的用户，可以通过可视化节点编辑器自由编排 system prompt、聊天历史注入、工具调用、子代理、后处理、渲染修改等全链路流程。
+- **不得**在 `catch` 块中吞掉异常而不做处理。
+- **不得**用隐式修补（补默认值、静默降级、悄悄换实现）掩盖上游数据或配置错误。
+- 所有可能失败的操作必须返回明确的成功/失败结果；失败必须带错误码、用户可读信息与可追踪详情。
+- 边界层（序列化、插件扫描、外部 HTTP 等）允许 catch 后返回 `null`/空集合，但必须输出完整的 `LogError`，并由调用方把空结果转成显式失败。
 
----
+### 1.2 降级必须可见
 
-## 2. 代码风格
+未注册的界面 Id、非法配置、缺失预设、悬空工具调用等，不允许假装成功：必须显式回退，同时告警并记录日志。
 
-### 核心原则：严格报错，禁止隐藏错误
+### 1.3 单一事实来源
 
-- **不得** 在 `catch` 块中吞掉异常而不做任何处理。
-- **不得** 通过隐式修补（如自动填充缺省值、静默降级）掩盖上游数据或配置错误。
-- 在开发节点时，所有可能失败的操作必须返回明确的成功/失败结果。使用 `NodeResult.SuccessResult()` / `NodeResult.Failure(code, message)` 模式。
-- 在开发节点时，失败时必须提供可追踪的错误码（`NodeErrorCodes` 中定义）和用户可读的错误信息。
-- 在边界层（如序列化、插件加载）可以 catch 后记录日志并返回 null/空列表，但必须输出完整的 `LogError`。
+同一份元数据只允许一处定义（服务方目录、配置校验、错误码表等），UI、节点、工具都读它；不得维护平行的复制表。
 
-### 具体规范
+### 1.4 自动发现优于手工注册
 
-- **节点执行**：`ExecuteAsync` 返回 `NodeResult`，调用方检查 `Success`；失败时逐级向上汇报，不吞掉。
-- **序列化**：反序列化失败时 `LogError` 并返回 `null`，调用方负责检查并返回 `NodeResult.Failure`。
-- **插件加载**：类型扫描失败时 `LogError`（包含 `LoaderExceptions`），继续加载其余类型；不因一个坏插件拖垮整个系统。
-- **Tool 调用**：`continueOnToolError=false` 时工具异常向上抛出；`=true` 时返回 `[Tool error]` 文本但要记录日志。
+节点、工具、对话界面、面板、插件初始化器通过接口 + Attribute 自动发现。新增扩展点不得要求修改中央注册表。
 
----
+### 1.5 内置即插件
 
-## 3. 项目结构
+内置能力与外部插件地位相同，走同一加载与发现路径；不得为主项目开后门。
 
-```
-ShimmerChat/
-├── SharperLLM/              # LLM 连接库（独立子模块，非必要不修改）
-├── ShimmerChatLib/           # 共享库：模型、接口、生成管线核心抽象、共享组件
-├── ShimmerChat/              # 主项目：Blazor Server 宿主、服务实现、UI 页面
-├── ShimmerChatBuiltin/       # 内置插件：默认节点、内置工具、内置面板
-├── src-tauri/                # Tauri 桌面发布项目
-├── ShimmerChatLib.Tests/     # 共享库单元测试
-├── ShimmerChat.Tests/        # 主项目单元测试
-├── ShimmerChatBuiltin.Tests/ # 内置插件测试
-└── Docs/                     # 开发文档
-    ├── PipelineArchitecture.md   # 三管线架构总览
-    ├── PreGenerationPipeline.md  # 前生成管线
-    ├── PostRenderPipelines.md    # 后生成 + 渲染修改管线
-    ├── NodeEditorSystem.md       # 节点编辑器系统
-    ├── PluginDevelopment.md      # 插件开发
-    ├── ThemeSystem.md            # 主题系统
-    ├── CustomAPI.md              # 自定义 API
-    ├── KVDataStorage.md          # KV 存储
-    └── MemorySystem.md           # 记忆文本库 / 向量索引 / 嵌入配置
-```
+### 1.6 兼容优先，渐进迁移
 
-### 3.1 SharperLLM — LLM 连接库
+旧接口、旧数据保持可读可写；新接口提供默认实现，允许逐个迁移；任何破坏性变更都必须附带迁移路径。
 
-独立的 .NET 类库（git 子模块）。**非必要不修改。**
+### 1.7 文档与代码同步
 
-| 模块 | 职责 |
-|------|------|
-| `API/` | `IChatCompletionClient` 接口及其实现（OpenAI、Ollama、Kobold）；`ITextCompletionClient` 接口及 `TextToChatAdapter` |
-| `FunctionCalling/` | `Tool` / `ToolCall` / `ToolParameter` 类型定义；`ToolPromptParser` 工具声明格式化 |
-| `Agents/` | `ToolCallLoopRunner` 通用 Tool Call 循环（流式/非流式）；`IToolExecutor` / `IPromptContext` 抽象 |
-| `Util/` | `ChatMessage`、`PromptBuilder`、`ResponseEx` 等基础类型 |
-| `Managers/` | `ConversationManager`、`RolePlayManager` 高层封装 |
-
-### 3.2 ShimmerChatLib — 共享库
-
-提供模型、接口和生成管线核心抽象。**不引用 ShimmerChat 主项目。**
-
-| 目录/文件 | 职责 |
-|-----------|------|
-| `Models/` | UI 模型（`Theme`、`PopupOptions` 等） |
-| `Interface/` | 所有服务接口（`IGenerationManagerV2`、`IPluginLoaderService`、`IKVDataService` 等） |
-| `Generation/` | **生成管线核心**：`IPreGenerationNode`、`IPostGenerationNode`、`IRenderModifierNode`、`ITreeNode`、`PreGenerationEnv`、`PostGenerationEnv`、`PostPipelineResult`、`PostChat`、`GenerationTreeExecutor`、`ToolCallLoop`、`IToolV2`、`IToolV3`、`ToolResult`、`ToolCallPairing`、`IToolRegistry`、`ToolUi/`（工具交互表单与结果模型）、节点元数据 Attribute 等 |
-| `ChatView/` | **对话界面系统**：`IChatView`、`ChatViewContext`、`ChatViewAttribute`、`IChatViewRegistry` |
-| `Components/` | 跨项目共享的 Blazor 组件（含 `ChatViewShell` 对话界面外壳） |
-| `Panel/` | 插件面板基础设施 |
-| `Context/` | 共享上下文 |
-| `Chat.cs` | 聊天对象模型（含 `Order` 分配：`AddMessage` / `InsertMessage` / `NormalizeOrder` / `ValidateOrder`） |
-| `Agent.cs` | 代理对象模型（含 `PreGenerationTreeJson`、`PostGenerationTreeJson`、`RenderModifierTreeJson`、`ChatViewId`） |
-| `Message.cs` | 消息模型（多版本支持 + `Order` 顺序号） |
-| `Sender.cs` | 发送者枚举 |
-
-### 3.3 ShimmerChat — 主项目
-
-Blazor Server 宿主 + 所有服务实现 + UI 页面。
-
-| 目录 | 职责 |
-|------|------|
-| `Singletons/` | 所有服务的具体实现 |
-| `Components/Pages/` | Blazor 页面（`AgentChatPage` 只是会话宿主，对话区由 `IChatView` 渲染） |
-| `Components/Layout/` | 布局组件 |
-| `Components/SubComponents/` | 可复用子组件 |
-| `wwwroot/` | 静态资源（CSS、JS、图标） |
-| `Locales/` | 本地化 JSON（zh-CN、en-US） |
-
-### 3.4 ShimmerChatBuiltin — 内置插件
-
-所有内置节点、内置工具、内置面板。通过 `IPluginLoaderService` 自动发现，与外部插件具有同等地位。
-
-| 目录 | 职责 |
-|------|------|
-| `Generation/Nodes/` | 22 个内置节点（SequenceNode、FragmentNode、CallNode、APISelectNode、ToolPresetNode 等） |
-| `ChatView/` | 内置对话界面（`Standard/` 标准、`Aggregated/` 聚合）及其消息渲染组件 |
-| `API/` | API 配置面板 |
-| `DynPrompt/` | 动态提示系统 |
-| `FileSystem/` | 文件系统工具集 |
-| `Memory/` | 记忆系统 |
-| `Variable/` | 变量管理 |
-| `SubAgent/` | 子代理节点与工具；`Sessions/` 为 `subagent_call` 的私有会话存储（KVData 空间 `SubAgent`，含索引与会话级锁），`SubAgentSessionPanel` 是 Settings 里的会话 Viewer |
-| `RegexModifier/` | 消息显示修改器 |
-| `WebSearch/` | 联网搜索：五个服务方（DeepSeek / Tavily / Brave / Exa / SerpApi）、自动搜索节点、搜索 + 抓取工具、设置面板 |
-| `AskUser/` | `ask_user` 工具：向用户提问并就地等待回答（声明式表单，见 §4.7） |
-
-### 3.5 src-tauri — 桌面发布
-
-Tauri v2 桌面壳，将 Blazor Server 包装为桌面应用。通过 `SHIMMER_READY:{url}` stdout 信号完成启动握手。
+管线、插件、主题、API、存储、记忆等领域的**行为变更**必须同步更新 `Docs/` 对应文档。文档是设计契约，不是事后说明。
 
 ---
 
-## 4. 核心概念：三管线节点树
+## 2. 架构与依赖纪律
 
-ShimmerChat 2.0 采用三管线架构。参见 [管线架构总览](Docs/PipelineArchitecture.md)。
-
-### 4.1 概述
-
-每次 AI 生成分为三个阶段执行，每个阶段由用户可配置的节点树驱动：
-
-```
-Pre-Generation Tree ──→ LLM 生成 ──→ Post-Generation Tree ──→ Render Modifier Tree ──→ 显示
-```
-
-- **Pre**: 构建上下文（Fragments, Tools, API）→ [文档](Docs/PreGenerationPipeline.md)
-- **Post**: 处理 LLM 原始响应 → [文档](Docs/PostRenderPipelines.md)
-- **Render**: Markdown→HTML 渲染管线 → [文档](Docs/PostRenderPipelines.md)
-
-三个管线共享节点编辑器系统 → [文档](Docs/NodeEditorSystem.md)
-
-### 4.2 核心类型
-
-#### ITreeNode — 最小节点接口
-
-```csharp
-public interface ITreeNode
-{
-    string Id { get; }            // 唯一标识（GUID）
-    string Name { get; set; }     // 用户可编辑名称
-}
-```
-
-#### IPreGenerationNode — 前生成节点
-
-```csharp
-public interface IPreGenerationNode : ITreeNode
-{
-    Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context);
-}
-```
-
-每个节点通过 `ExecuteAsync` 修改 `context.Env`（`PreGenerationEnv`），返回 `NodeResult`。
-
-#### PreGenerationEnv — 生成环境
-
-- **`TransientEnv`**（临时）：每次生成重新构建。
-  - `Fragments` — `List<ContextSegment>`，最终转换为 LLM 消息列表。
-  - `Tools` — `List<IToolV2>`，本次生成可用的工具。
-  - `API` — 当前使用的 `APISetting`（IChatCompletionClient + 能力标记）。
-  - `SharedState` — `Dictionary<string, object>`，节点间共享状态。
-- **`PersistentEnv`**（持久）：对话/Agent 级别不变。
-  - `KVData`、`ChatGuid`、`AgentGuid`、`ToolRegistry`、`Serializer`、`LocService`、`DebugOutput`。
-
-#### NodeResult — 执行结果
-
-```csharp
-public class NodeResult
-{
-    bool Success;          // 是否成功
-    string? Code;          // 错误码（PRESET_NOT_FOUND、TOOL_NOT_FOUND 等）
-    string? Message;       // 用户可读错误信息
-    string? Details;       // 技术详情
-    string? NodeId;        // 失败节点 ID
-    string? NodeName;      // 失败节点名称
-}
-```
-
-预定义错误码见 `NodeErrorCodes`：`PresetNotFound`、`ToolNotFound`、`ApiUnavailable`、`DataMissing`、`ParseError`、`ServiceError`、`ConfigNotFound`、`Cancelled`。
-
-#### ContextSegment — 上下文片段
-
-```csharp
-public class ContextSegment
-{
-    ChatMessage Message;            // 消息内容
-    PromptBuilder.From From;        // system / user / assistant
-    Type? SourceType;               // 来源节点类型
-    Dictionary<string, object> Metadata;
-}
-```
-
-节点将 `ContextSegment` 追加到 `TransientEnv.Fragments`，生成时这些片段成为 `PromptBuilder.Messages`。
-
-#### PostGenerationEnv — 后处理环境（回合控制器）
-
-后处理树不只是"改一段文本"，它决定这一轮之后发生什么：
-
-```csharp
-public class PostGenerationEnv
-{
-    string ResponseText;                        // 本轮输出（权威来源，提交时覆盖 CurrentMessage）
-    ChatMessage ResponseMessage;                // 用 SetResponse() 整体替换
-    int RoundIndex;                             // 0-based，副作用节点可据此只在首轮执行
-    Message? CurrentMessage;                    // 本轮 assistant 的 Message 活对象
-    IReadOnlyList<IToolV2> Tools;               // 本轮可用工具
-
-    Chat Chat;                                  // 节点直接在此增删改消息
-    IMessageStoreService? MessageStore;         // null = 虚拟会话（SubAgent），不落库
-
-    PostLoopDirective LoopDirective;            // Stop（默认）/ Continue
-    bool ToolCallsHandled;                      // 仅作安全网与诊断
-    bool ChatMutated;
-
-    Dictionary<string, object> SharedState;     // 跨轮复用，前后管线共用同一份
-}
-```
-
-- **工具调用不会被自动执行**，由 `PostToolCallNode` 完成；树里没有该节点时工具调用不执行，宿主告警并强制 Stop。
-- 节点直接 `Chat.AddMessage` + `Chat.SaveMessage(store, msg)` 即可落库；`PostChat` 是同语义的薄封装。
-- 消息位置由 `Message.Order` 决定，`timestamp` 不参与排序；`Chat.InsertMessage(store, index, msg)` 负责重排与全量持久化。
-- 详见 [PostRenderPipelines.md](Docs/PostRenderPipelines.md)。
-
-### 4.4 节点元数据系统（三个 Attribute）
-
-| Attribute | 作用域 | 用途 |
-|-----------|--------|------|
-| `[NodeInfo]` | 类 | 节点显示名、图标、颜色、分类、描述 |
-| `[NodeProperty]` | 属性 | 属性标签、提示、排序、多行编辑 |
-| `[NodeEditor]` | 类 | 指定自定义编辑器组件（可选，默认使用 `GenericNodeEditor`） |
-
-只要实现了 `IPreGenerationNode`（或其他管线接口）并标记了 `[NodeInfo]`，节点即自动出现在对应管线编辑器的添加菜单中。
-
-### 4.5 关键内置节点
-
-| 节点 | 职责 |
-|------|------|
-| `SequenceNode` | 顺序执行子节点，支持 Repeat |
-| `FragmentNode` | 向 Fragments 追加自定义片段（role + content） |
-| `CallNode` | 通过 PresetId 加载并执行预设 |
-| `AppendChatMessagesNode` | 从 Chat 加载历史消息并追加到 Fragments；同时是工具调用完整性的唯一检查点（`DanglingToolCalls`：注入占位 / 直接失败） |
-| `APISelectNode` | 选择 API 配置 |
-| `ToolPresetNode` | 根据预设名加载工具列表 |
-| `ToolInstantiateNode` | 实例化单个工具 |
-| `IfNode` / `AdvancedIfNode` | 条件分支 |
-| `SubAgentNode` | 嵌套子代理调用 |
-| `DynPromptNode` | 动态模板提示 |
-| `WebSearchAutoNode` | 按输入内容（或固定查询词）自动联网搜索，结果追加到 Fragments 末尾；可选先用当前 API 把输入改写成搜索词 |
-| `WebSearchToolSetNode` | 加入 `web_search` 工具，并在服务方支持抓取时加入 `web_fetch` 工具 |
-
-后生成管线节点（决定"这一轮之后发生什么"）：
-
-| 节点 | 职责 |
-|------|------|
-| `PostSequenceNode` | 顺序执行子节点 |
-| `PostCallNode` | 引用后处理预设并内联执行 |
-| `PostToolCallNode` | **执行本轮工具调用**，结果写入对话并置 `Continue`；树里没有它则工具调用不执行 |
-| `PostLoopDirectiveNode` | 显式设置循环指令（Stop / Continue） |
-| `PostMessageNode` | 追加消息，或覆盖本轮响应文本 |
-| `PostIfNode` | 按响应文本 / 工具名 / 共享状态 / KV 条件分支 |
-| `PostSubAgentNode` | 用子智能体处理响应文本 |
-| `PostDebugOutputNode` / `AutoChatNameNode` | 调试输出 / 自动命名会话 |
-
-默认后处理预设：`PostDebugOutputNode` → `AutoChatNameNode` → `PostToolCallNode`。
-
-### 4.6 Tool 系统
-
-- **`IToolV2`** — 旧工具执行接口：`GetDefinition()` + `ExecuteAsync(input)`。仍被所有内置工具使用，行为不变。
-- **`IToolV3 : IToolV2`** — 结构化工具接口：`Task<ToolResult> ExecuteAsync(ToolInvocationContext, CancellationToken)`。新工具实现它（旧的 `ExecuteAsync(string)` 有默认实现，不必写）。`ToolInvocationContext` 提供 `ToolCallId` / `ToolName` / `ArgumentsJson` / `RoundIndex`，`ToolResult` 只有 `Completed` / `Failed` 两态 + `ToolErrorCodes`。`PostToolCallNode` 优先走 V3，旧工具的结果被包装成 `ToolResult.Ok(text)`，因此两代接口可以共存、逐个迁移。
-- **`IAutoCreateToolV2 : IToolV2`** — 可通过通用节点自动创建的工具。提供 `static abstract NameKey`、`DescriptionKey`、`CategoryKeys` 元数据和 `static abstract Create(PersistentEnv)` 工厂方法。要写结构化工具时同时实现 `IToolV3`（`AskUserToolV2` 即此形态），注册表无需改动。
-- **`IToolRegistry`** — 扫描所有 `IAutoCreateToolV2` 实现，提供按名称/类型查找和实例创建。
-- **`ToolCallLoop`** — 生成轮次循环：累积流式响应 → 询问宿主是否继续。**不执行工具**：工具调用由后处理管线里的 `PostToolCallNode` 完成，是否继续也由后处理树决定。
-- **取消契约** — 工具必须响应 `CancellationToken`。`PostToolCallNode` 只在「令牌确实被取消」时向上抛 `OperationCanceledException`；工具内部超时（`ct` 未取消）才转成工具错误。
-
-### 4.7 工具 ↔ 用户交互（需要用户输入的工具）
-
-`ask_user` 这类工具在 `ExecuteAsync` 内部**就地产等待**用户回答，而不是把对话挂起：
-
-```
-工具 → IToolInteractionService.RequestAsync(chatGuid, request, timeout: null, ct)
-     ← 用户提交 / 跳过 / 生成被取消（抛 OCE）
-工具 → ToolResult.Ok(结果 JSON)  →  PostToolCallNode 写 tool_result  →  LoopDirective=Continue
-```
-
-- **等待期间本轮没有结束**，因此不会产生"assistant 有 toolCalls 却没有 tool_result"的中间状态；对话记录任何时刻都是合法的。
-- **待回答请求只存在内存**（`ToolInteractionService` 单例，按 chatGuid 索引）：页面刷新、切换对话后仍可继续回答；进程重启会丢失，但那同时意味着本次生成已经结束。
-- **超时由模型决定**：`ask_user` 的 `timeout_seconds` 参数（0 / 缺省 = 无限等待，上限 3600）。到点后工具返回 `{"status":"timed_out"}` 作为**正常结果**，本轮 loop 继续；负数与超上限一律 `TOOL_INVALID_ARGUMENTS`，不静默截断。等待的终点始终是"用户提交 / 用户跳过 / 超时 / 生成被取消"四者之一。
-- **可见性**由 `ToolInteractionDock`（宿主级浮层，与具体对话界面无关）承担；带超时的请求会显示倒计时。
-- **UI 描述由工具产出数据，不产出组件**：`ToolInteractionRequest.Form`（`ToolUiForm` 声明式表单，默认形态，零 Razor）；确实需要特殊界面时用 `ViewId` 引用一个 `[ToolUiView]` 组件（注册表与 `IChatViewRegistry` 同构），未注册即降级为通用表单。
-- **给模型看的措辞只由宿主生成**（`ToolInteractionResult.ToModelJson()`），工具与界面都不得自行拼接 prompt 文本。
-- **没有交互通道时快速失败**：`PersistentEnv.Interactions == null`（子代理虚拟会话）时工具返回 `TOOL_INTERACTION_UNAVAILABLE`，绝不空等。
+- **依赖方向**：`SharperLLM ← ShimmerChatLib ← ShimmerChat / ShimmerChatBuiltin`。共享库不得引用主项目或内置插件。
+- **技术栈**保持 Blazor Server + 桌面壳形态；引入新框架、运行时或部署形态前先论证兼容性。
+- `SharperLLM` 是独立子模块，**非必要不修改**；必须修改时保持向后兼容并同步下游调用方。
+- **三管线职责不得混淆**：
+  - **Pre**：只构建本轮上下文（Fragments / Tools / API），不产生消息副作用。
+  - **Post**：决定本轮之后发生什么（写消息、执行工具、设置循环指令）。
+  - **Render**：只影响显示，不改变对话数据。
+- **工具调用不自动执行**。是否执行、是否继续循环由后处理树决定；宿主安全网只负责告警并停止，不替用户做决定。
+- **消息顺序**以 `Message.Order` 为唯一权威，`timestamp` 只用于展示。任何存储实现都必须维持这一契约和顺序索引的一致性。
+- **节点树反序列化**必须使用类型白名单，禁止放宽为任意类型解析。
+- **取消契约**：工具必须响应 `CancellationToken`。只有令牌真正取消才抛 `OperationCanceledException`；工具内部超时属于工具错误。
+- **持久化边界**：只存在于内存的状态（如待回答的交互请求）必须在文档和代码注释中显式写明，不得让人误以为会落库。
 
 ---
 
-## 5. 服务详解
+## 3. 编码规范
 
-### 5.1 IGenerationManagerV2 / GenerationManagerV2
-
-**生成管线总控。** 注册为 Singleton。
-
-流程：
-1. `BuildEnvironment` — 解析 Agent 的 `PreGenerationTreeJson`（或创建默认回退树），执行完整节点树，构建 `PreGenerationEnv`。
-2. `GenerateStreamAsync` — 取出 Fragments 构建 `PromptBuilder`，通过 `ToolCallLoop` 驱动轮次循环（流式与非流式走同一路径）。
-3. `MainLoopHost`（内部类）— 实现 `IToolCallLoopHost`，每轮：执行后处理树 → 回写本轮消息并提交节点追加的消息 → 顺序/一致性校验 → 按 `LoopDirective` 决定重建环境继续还是结束。跨轮共享 `SharedState`。
-4. 安全网 — 本轮有 toolCalls 却没有节点接管时，记 `LogWarning` + `DebugOutput` 并强制 Stop，避免死循环。
-
-### 5.2 IPluginLoaderService / PluginLoaderServiceV1
-
-**插件加载与类型发现。** 扫描 `Plugins/` 目录下所有插件程序集，连同 BuiltinAssembly、HostAssembly、LibAssembly 一起提供统一的类型扫描接口。
-
-- `LoadImplementations<T>()` — 从所有程序集创建实现实例。
-- `GetTypesWithAttribute<T>()` — 按 Attribute 过滤类型。
-- `GetImplementingTypes(Type)` — 获取接口的所有具体实现。
-- `InitializePluginsAsync()` — 执行所有 `IPluginInitializer`。
-
-### 5.3 IPreGenerationNodeSerializer / ITreeNodeSerializer
-
-**节点树序列化/反序列化。** 使用 Newtonsoft.Json + `TypeNameHandling.Objects`，通过 `SerializationBinder` 白名单类型解析（防止反序列化攻击）。每个管线有独立的序列化器实现 `ITreeNodeSerializer` 接口。
-
-### 5.4 INodeTypeCatalog / NodeTypeCatalog
-
-**节点类型目录。** 扫描所有 `ITreeNode` 实现，提取 `[NodeInfo]` 元数据，供添加节点菜单使用。通过 `GetNodeTypes(Type)` 按管线接口过滤。
-
-### 5.5 IToolRegistry / ToolRegistry
-
-**工具注册表。** 扫描所有 `IAutoCreateToolV2` 实现，提供按名称/类型名查找和通过 `Create(PersistentEnv)` 工厂实例化。
-
-### 5.5.1 IToolInteractionService / ToolInteractionService
-
-**工具 ↔ 用户交互通道。** 注册为 Singleton，**不落库**：待回答请求（`ToolInteractionPending`）保存在内存字典里，用 `TaskCompletionSource` 与工具握手。
-
-- `RequestAsync(chatGuid, request, timeout, ct)` — 工具在此等待；`timeout = null`（默认）表示无限等待。
-- `Submit` / `Skip` / `CancelAll` — 界面与宿主的三条定案路径；四路竞态（提交/跳过/超时/取消）由 `TrySetResult` 的返回值裁决，输的一方拿到 `TOOL_INTERACTION_ALREADY_RESOLVED` 之类的结构化错误，绝不静默。
-- 取消优先于超时：`ct` 触发时抛 `OperationCanceledException`，不会被伪装成"用户未响应"。
-- 宿主侧配套：`GenerationSessionService.StopGeneration` / `CancelPreviousGenerationAsync` 在取消生成前先 `CancelAll`（等待中的工具不听取消令牌就会一直等）；停止等待有 2 秒上限，超时只 `LogError`，绝不阻塞渲染线程。
-
-### 5.6 IPluginPanelService / PluginPanelServiceV1
-
-**插件面板服务。** 扫描 `[PluginPanelAttribute]` 标记的类型，构建面板列表供 UI 导航。
-
-### 5.7 IPopupService / PopupService
-
-**弹窗服务。** 基于 `TaskCompletionSource<bool>` 的异步弹窗，返回用户确认/取消结果。
-
-### 5.8 IMessageDisplayService / MessageDisplayServiceV1
-
-**消息渲染服务。** 通过 `IRenderModifierManager` 执行 Agent 的 `RenderModifierTreeJson` 节点树（Markdown→HTML、正则替换等）。失败时通过 `BuildErrorHtml` 输出完整变更记录。
-
-### 5.8.1 IPostGenerationManagerService / PostGenerationManagerService
-
-**后处理管线管理器。** 反序列化 Agent 的 `PostGenerationTreeJson` 并执行节点树。节点直接操作 `Chat` 与 `IMessageStoreService`，返回值 `PostPipelineResult` 只汇总本轮响应消息、`LoopDirective`、`ToolCallsHandled`、`ChatMutated`。失败时回退原始响应并强制停止本轮。详见 [PostRenderPipelines.md](Docs/PostRenderPipelines.md)。
-
-### 5.9 IThemeService / ThemeServiceV2
-
-**主题服务。** 注册为 Scoped。管理主题的 CRUD、切换、导入/导出。内置 Light/Dark 两套主题，支持通过 KVData 持久化自定义主题。主题 token（CSS 变量值）在 `Theme` 对象中定义。
-
-### 5.10 ILocService / LocService
-
-**本地化服务。** 轻量级 Key → 显示字符串查找。从所有程序集的嵌入资源 `Locales.{culture}.json` 加载翻译。支持 `zh-CN`、`en-US`。先加载 `en-US` 作为 fallback 再覆盖目标语言。语言设置通过 KVData 持久化，切换即时生效。
-
-### 5.11 IDebugOutputService / DebugOutputService
-
-**调试输出服务。** 结构化日志写入 LiteDB 集合 `debug_output`，按时间戳、来源、类别索引。支持分页查询、过滤、删除。
-
-### 5.12 IKVDataService
-
-**KV 数据存储。** 两种实现：
-- **LocalFileStorageKVData** — JSON 文件存储。
-- **LiteDBKVData** — LiteDB 嵌入式数据库存储。
-
-通过 `appsettings.json` 中 `KVDataStorage` 配置节选择。支持启动时自动迁移（`AutoMigrateOnStartup`）。
-
-### 5.13 IMessageStoreService
-
-**消息持久化存储。** 两种实现：
-- **FileMessageStoreService** — 文件存储（`_order.json` 保存顺序索引）。
-- **LiteDBMessageStoreService** — LiteDB 存储。
-
-与 KVData 共用同一个 `LiteDatabase` 实例。支持按 Chat GUID 分区的消息 CRUD 操作。
-
-**排序契约**：两种实现都按 `Message.Order` 排序；当会话内存在任何 `Order < 0` 的消息（Order 字段出现前的老数据）时，整组回退到 `timestamp` 排序。老数据在 `Chat.LoadAllMessages` 时懒迁移（补号 + 全量回写），`timestamp` 从此只用于展示。`UpdateMessage` 必须同步维护顺序索引（两种实现行为一致）。
-
-### 5.14 IKVDataMigrationService / KVDataMigrationMarker
-
-**数据迁移服务。** `KVDataMigrationService` 执行 LocalFile ↔ LiteDB 的批量迁移。`KVDataMigrationMarker` 记录迁移完成状态，防止重复迁移。
-
-### 5.15 IMessageStoreMigrationService
-
-**消息存储迁移服务。** 执行 File ↔ LiteDB 的消息批量迁移。
-
-### 5.16 IAgentMigrationService
-
-**Agent 格式迁移。** 将 1.0 版本的 Agent 数据迁移到 2.0 格式（`PreGenerationTreeJson` 节点树）。启动时自动执行。
-
-### 5.17 IChatView / IChatViewRegistry / ChatViewRegistry
-
-**对话界面系统。** 每个 Agent 可通过 `Agent.ChatViewId` 选用不同的对话界面（气泡样式、消息合并方式等），与主题系统、消息渲染管线互不影响。
-
-- `IChatView`（ShimmerChatLib）：对话界面契约。实现它的 Blazor 组件 + `[ChatView("id", "name.key")]` 即被自动发现，必须声明 `[Parameter] ChatViewContext Context`。
-- `ChatViewContext`：宿主契约。暴露活对象（`Chat` / `Agent`、`Messages`）、生成状态与宿主能力（发送 / 停止 / 删除 / 重新生成 / 续写 / 重命名对话 / 持久化 / 返回），界面不持有页面引用。宿主在 `Chat` / `Agent` 实例被替换时重建上下文。
-- `IChatViewRegistry`：扫描所有实现，提供 `GetAll()` / `GetById(id)` / `GetDefault()`。Agent 未指定界面时用默认界面（声明 `IsDefault = true` 的那个）；指定了未注册的 Id 时宿主回退到默认界面**并显示警告条 + 记录错误日志**，不静默修补。
-- `ChatViewShell`（ShimmerChatLib/Components）：可复用的对话界面外壳（顶栏含对话标题与就地重命名、消息滚动区、输入区、滚动跟随、内联样式、图像附件输入），界面只需提供消息区渲染；插件界面亦可复用它。输入区支持点选 / 拖入 / 粘贴图像：三条入口都把文件交给隐藏的 `InputFile`，共用同一套校验与落盘逻辑（`window.chatImageDrop`，实现在宿主的 `wwwroot/js/util.js`）。
-
-内置界面（ShimmerChatBuiltin/ChatView）：`standard`（逐条消息一个气泡）与 `aggregated`（把一次 ToolCallLoop 的连续 AI / 工具消息合并进同一气泡）。聚合界面把 AI 消息的正文与工具调用**分离**：正文留在气泡里，工具调用（无论一次还是多次、周围有没有别的调用）统一并入折叠的「工具调用活动」块，生成中时该块默认展开、生成结束后自动折叠。
-
-### 5.18 联网搜索（WebSearch）
-
-**多服务方联网搜索。** 全部实现位于 `ShimmerChatBuiltin/WebSearch/`，配置持久化于 KVData `WebSearch/Config`，面板为 `WebSearchPanel`（Settings > 联网搜索，含 API Key、默认条数、超时、正文长度、语言 / 地区与真实连接测试）。
-
-- `WebSearchProviderCatalog`：五个服务方的**唯一事实来源**（名称、文档地址、默认 BaseUrl，以及 `SupportsContent` / `SupportsFetch` 能力标记），界面与节点都读它。
-- `IWebSearchProvider` / `WebSearchProviderBase`：服务方契约与公共 HTTP 层（超时、鉴权头、JSON 解析、错误信息提取）。实现为 `DeepSeekSearchProvider`（`/v1/tools/search` + `/v1/tools/fetch`）、`TavilySearchProvider`（`/search` + `/extract`）、`BraveSearchProvider`（`/res/v1/web/search`，无抓取）、`ExaSearchProvider`（`/search` + `/contents`）、`SerpApiSearchProvider`（`/search.json`，无抓取）。
-- `WebSearchProviderFactory.Resolve(config, kind)`：`kind` 为 `FromSettings` 时使用配置中的默认服务；失败以 `WebSearchResolutionError`（`UnknownProvider` / `ApiKeyMissing`）返回，**不抛异常也不静默回落到别的服务**，由节点本地化后汇报、工具转成英文错误文本。
-- `WebSearchConfigManager.Load` 校验取值（提供方、超时、条数、正文长度、BaseUrl 必须是绝对 http(s) 地址），非法即返回错误说明；面板保存走同一 `Validate`。
-- 节点：`WebSearchAutoNode`（按输入内容或固定查询词搜索，结果作为片段追加到 Fragments 末尾；可选 LLM 改写查询词；`OnFailure` 决定失败是终止生成还是记录 DebugOutput 后跳过）、`WebSearchToolSetNode`（加入 `web_search`，并在服务方支持抓取时加入 `web_fetch`）。
-- 工具：`WebSearchToolV2` / `WebFetchToolV2`（`IAutoCreateToolV2`，可被 ToolManager 直接勾选）。搜索参数统一来自设置面板；抓取请求由服务方服务器发起，本进程不直连目标站点。
+- 节点执行使用 `NodeResult.SuccessResult()` / `NodeResult.Failure(code, message)`；错误码来自集中定义，不写魔法字符串。
+- Tool 调用：`continueOnToolError=false` 时异常向上抛出；`=true` 时返回 `[Tool error]` 文本，**且必须记录日志**。
+- 等待用户输入或外部资源时不得阻塞渲染线程；等待必须有明确终点（提交 / 跳过 / 超时 / 取消）。
+- 用户可见文本一律走本地化 Key；新增 Key 必须补齐所有受支持语言。
+- 日志分级：可恢复的边界失败用 `LogError`；违反契约但已兜底用 `LogWarning` + DebugOutput。不得用日志代替返回值。
+- 注释解释「为什么」，不复述代码「做什么」。
 
 ---
 
-## 6. 快速参考
+## 4. 扩展点操作规程
 
-### 添加新节点的步骤
+### 4.1 新增管线节点
 
-1. 创建类，实现 `IPreGenerationNode`、`IPostGenerationNode` 或 `IRenderModifierNode`。
-2. 标记 `[NodeInfo("node.xxx", Icon = "✦", Color = "...", CategoryKeys = [...])]`。
-3. 为可编辑属性标记 `[NodeProperty("prop.xxx")]`。
-4. 实现 `ExecuteAsync` / `Modify` → 返回 `NodeResult` / `PostNodeResult` / `string`。
-5. （可选）在 `Locales/` 中添加对应的本地化条目。
-6. 节点自动出现在对应管线编辑器的添加菜单中，无需手动注册。
+1. 实现对应管线接口。
+2. 标记 `[NodeInfo]`；可编辑属性标记 `[NodeProperty]`；仅当默认编辑器不够用时才加 `[NodeEditor]`。
+3. 失败路径返回带错误码的 `NodeResult`，不吞异常。
+4. 补齐本地化 Key。
+5. 不手动注册。
 
-### 添加新对话界面的步骤
+### 4.2 新增对话界面
 
-1. 创建 `.razor` 组件，`@implements IChatView`，声明 `[Parameter] ChatViewContext Context`。
-2. 标记 `@attribute [ChatView("my.view", "chatview.my", DescriptionKey = "chatview.my.desc")]`（`Id` 是持久化标识，不要随重命名改动；如需作为默认界面则加 `IsDefault = true`）。
-3. 用 `<ChatViewShell ViewContext="Context">…消息区…</ChatViewShell>` 复用外壳与样式，或在组件内自行组织布局。
-4. 在 `Locales/` 中补齐 `NameKey` / `DescriptionKey`。
-5. 界面自动出现在 Agent 设置页的「对话界面」选择列表中，无需手动注册。
+1. Razor 组件实现 `IChatView`，声明 `[Parameter] ChatViewContext Context`。
+2. 标记 `[ChatView]`；`Id` 是持久化标识，发布后不得随重命名改动。
+3. 优先复用共享外壳；界面只负责消息区渲染，不持有页面引用。
+4. 未注册 Id 的回退与告警由宿主统一处理，界面自身不做静默兜底。
+5. 补齐 `NameKey` / `DescriptionKey`。
 
-### 关键接口总览
+### 4.3 新增工具
 
-| 接口 | 所在库 | 注册方式 |
-|------|--------|----------|
-| `IPreGenerationNode` | ShimmerChatLib | 自动发现 |
-| `IPostGenerationNode` | ShimmerChatLib | 自动发现 |
-| `IRenderModifierNode` | ShimmerChatLib | 自动发现 |
-| `IAutoCreateToolV2` | ShimmerChatLib | 自动发现 |
-| `IPluginInitializer` | ShimmerChatLib | 自动发现 |
-| `IMessageRenderModifier` | ShimmerChatLib | 自动发现 |
-| `IChatView` | ShimmerChatLib | 自动发现（`IChatViewRegistry`） |
-| `IPluginLoaderService` | ShimmerChatLib | Singleton |
-| `IChatViewRegistry` | ShimmerChatLib | Singleton |
-| `IGenerationManagerV2` | ShimmerChatLib | Singleton |
-| `IPostGenerationManager` | ShimmerChatLib | Singleton |
-| `IRenderModifierManager` | ShimmerChatLib | Singleton |
-| `IKVDataService` | ShimmerChatLib | Singleton（按配置选实现） |
-| `IMessageStoreService` | ShimmerChatLib | Singleton（按配置选实现） |
-| `IThemeService` | ShimmerChatLib | Scoped |
-| `ILocService` | ShimmerChatLib | Singleton |
-| `IDebugOutputService` | ShimmerChatLib | Singleton |
+1. 优先实现结构化工具接口与自动创建接口；旧接口保留默认实现以维持兼容。
+2. 参数非法返回结构化错误，不截断、不自动修正。
+3. 必须传递并响应取消令牌。
+4. 需要用户输入时就地等待交互服务，不挂起对话；无交互通道时快速失败。
+5. 工具只产出数据与结果，不自行拼接给模型看的提示词文本。
+
+### 4.4 新增服务
+
+1. 接口放共享库，实现放主项目或内置插件。
+2. 生命周期显式选择并保持一致。
+3. 不持久化的状态必须在文档与注释中说明。
+
+### 4.5 存储与迁移
+
+1. 新增存储实现必须与现有实现行为一致，尤其是排序与更新语义。
+2. 迁移必须幂等、有完成标记、可重复执行。
+3. 读取旧数据时懒迁移，不要求用户手动操作。
+
+---
+
+## 5. 测试与验证
+
+- 共享库逻辑 → `ShimmerChatLib.Tests`；内置插件 → `ShimmerChatBuiltin.Tests`；宿主服务与 UI 逻辑 → `ShimmerChat.Tests`。
+- 新功能至少覆盖成功路径与一条失败路径；错误码与降级行为必须有测试。
+- 改动生成链路、序列化、存储排序或插件发现后，跑对应测试并手动验证一次完整生成流程。
+- 涉及桌面包启动握手时，同步验证 `src-tauri` 侧。
+
+---
+
+## 6. 变更自检
+
+- [ ] 失败是否显式返回，而不是被 catch 吞掉或静默修补？
+- [ ] 是否引入了第二份事实来源或手工注册表？
+- [ ] 用户可见文本是否本地化？
+- [ ] 是否破坏 Order / 序列化白名单 / 取消 / 循环指令契约？
+- [ ] 旧数据与旧插件是否仍可用？
+- [ ] `Docs/` 是否同步？
+- [ ] 是否补充了失败路径测试？
