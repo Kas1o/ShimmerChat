@@ -58,38 +58,85 @@ public class NodePropertyAttribute : Attribute
     public string? HintKey { get; init; } // Tooltip
     public int Order { get; init; }       // 排序，越小越靠前
     public bool MultiLine { get; init; }  // string 用 textarea
-    public string? OptionsKey { get; init; } // 动态下拉选项来源
+
+    // —— 动态下拉选项（OptionsKey 系列） ——
+    public string? OptionsKey { get; init; }              // 选项来源 Key
+    public bool OptionsSearchable { get; init; }          // 允许搜索（选项够多时才出现搜索框）
+    public bool ShowOptionDescription { get; init; }      // 在选项里显示副标题
+    public string OptionsDefaultLabelKey { get; init; }   // 空值项文案，默认 node_editor.option_default
 }
 ```
-
-`OptionsKey` 只对 `string` 属性生效：设置后该属性渲染为 `<select>`，选项由实现了
-`INodePropertyOptionsProvider` 的插件提供（`Key` 与 `OptionsKey` 相同）。下拉框总会额外
-保留一个空值选项，表示“跟随当前默认配置”。内置示例：
-
-```csharp
-[NodeProperty("prop.memory_retrieve.profile", OptionsKey = "embedding_profiles")]
-public string EmbeddingProfileId { get; set; } = string.Empty;
-
-public sealed class EmbeddingProfileOptionsProvider : INodePropertyOptionsProvider
-{
-    public string Key => "embedding_profiles";
-    public IReadOnlyList<NodePropertyOption> GetOptions(IServiceProvider services) => ...;
-}
-```
-
-提供者通过 `IPluginLoaderService` 自动发现；选项在每次渲染时重新读取，配置变化后无需重建编辑器。
 
 支持的类型和对应控件：
 
 | 属性类型 | 表单控件 |
 |----------|---------|
-| `string` | `<input>` / `<textarea>` (MultiLine) / `<select>` (OptionsKey) |
+| `string` | `<input>` / `<textarea>` (MultiLine) / `PropertyOptionsSelect` (OptionsKey) |
 | `int` | `<input type="number">` |
 | `float` | `<input type="number" step="0.1">` |
 | `bool` | `<input type="checkbox">` |
-| `enum` | `<select>` |
+| `enum` | `<select>`（枚举名即显示文本，标签本地化尚未覆盖） |
 | `List<T>` (T : ITreeNode) | ChildListEditor |
 | `T` (T : ITreeNode) | SlotEditor |
+
+> 需要「选项」语义的属性必须是 `string`；把枚举改成 string 只为了用 OptionsKey 是不必要的 ——
+> 枚举已经渲染成下拉框，缺的只是标签本地化。
+
+### 动态下拉选项（OptionsKey）
+
+`OptionsKey` 只对 `string` 属性生效。设置后该属性由
+[`PropertyOptionsSelect`](../ShimmerChatLib/Components/PropertyOptionsSelect.razor) 渲染，
+选项来自实现了 `INodePropertyOptionsProvider` 的插件（`Key` 与 `OptionsKey` 相同）。
+
+**为什么不用原生 `<select>`**：原生控件无法展示分组与副标题，也没有搜索；而绝对定位的自绘浮层会被
+`.tree-node-card { overflow: hidden }` 裁剪。因此选择器展开成**内联面板**（列表在触发器下方撑开，
+`max-height` 内滚动），与卡片布局天然共存。
+
+```csharp
+public sealed record NodePropertyOption(
+    string Value,                          // 写回属性的值
+    string Label,                          // 显示文本（提供者负责本地化）
+    string? Group = null,                  // 分级展示，支持 "父 / 子" 文本
+    string? Description = null,            // 副标题，仅在 ShowOptionDescription 打开时显示
+    IReadOnlyList<string>? SearchTerms = null); // 额外搜索词：只参与匹配，不显示
+```
+
+语义约定：
+
+| 行为 | 规则 |
+|------|------|
+| 空值项 | 永远保留一项，值为 `""`；文案由 `OptionsDefaultLabelKey` 指定（未选择 / 使用默认 / 全部 / 继承，语义各不相同） |
+| 分级 | 按 `Group` 分组渲染标题行，无组选项排在最前 |
+| 搜索 | `OptionsSearchable = true` **且**选项数 ≥ `NodePropertyOptions.SearchThreshold`（8）才显示搜索框，小列表保持紧凑 |
+| 匹配字段 | `Label` / `Value` / `Group` / `Description` / `SearchTerms`，大小写不敏感包含匹配（`NodePropertyOptions.Matches`） |
+| 副标题 | 仅 `ShowOptionDescription = true` 时显示；关闭时信息保留在 `title` 提示里 |
+| 空选项 | 显示 `node_editor.options_empty` 提示，不静默当作「已配置」 |
+| 值已失效 | 属性值不在选项里时，触发器红色显示原始值并提示 `node_editor.option_missing`，不做静默替换 |
+
+提供者实现约定：
+
+- 通过 `IPluginLoaderService` 自动发现，**不需要注册**；选项在每次渲染时重新获取，配置面板改动后无需重建编辑器。
+- 失败路径必须「返回空集合 + `LogError`」：服务缺失、JSON 损坏、注册表未就绪都属于这种情况；空集合会由 UI 转成可见提示。
+- 数据「还没创建过」不是错误（返回空集合、不写日志），UI 同样显示「暂无可选项」。
+- 共享实现放在 `ShimmerChatBuiltin/Options/KVListOptionsProvider.cs`：从 KVData 的 JSON 数组读出条目 →`NodePropertyOption`，子类只声明存储位置与标签/分组/描述/搜索词。
+
+内置提供者（Key → 数据来源）：
+
+| OptionsKey | 使用节点 | 数据来源 |
+|-----------|---------|---------|
+| `embedding_profiles` | MemoryRetrieveNode | `EmbeddingProfileStore`（激活项带 ★） |
+| `api_configs` | APISelectNode | `ApiSettings/apiSetting`（按类型分组，副标题为模型 + 流式，全局选中带 ★） |
+| `pre_generation_presets` | CallNode | `GenerationManager/generation_presets` |
+| `post_generation_presets` | PostCallNode | `PostGenerationManager/post_generation_presets` |
+| `render_modifier_presets` | RenderCallNode | `RenderModifierManager/render_modifier_presets` |
+| `tool_presets` | ToolPresetNode | `ToolPresets/__presets__`（默认预设带徽标，副标题为工具数，工具类型名可搜索） |
+| `tool_types` | ToolInstantiateNode | `IToolRegistry.AllTools`（按 `CategoryKeys` 分级，副标题为工具描述） |
+| `subagent_configs` | SubAgentNode / SubAgentToolNode / PostSubAgentNode | `SubAgent/configs`（副标题为输出模式 + 预设） |
+| `subagent_output_modes` | SubAgentNode / PostSubAgentNode | 常量（`LastMessage` / `FullJson` / `None`） |
+| `dyn_prompt_sets` | DynPromptNode | `DynPrompt/DynPromptSets`（值为集合名，规则名可搜索） |
+| `highlight_languages` | CodeHighlightNode | `SyntaxHighlighter.GetSupportedLanguages()` |
+
+---
 
 ### NodeEditorAttribute — 自定义编辑器
 
@@ -120,6 +167,10 @@ TreeEditor
         ├── 有 [NodeEditor] → DynamicComponent 加载自定义编辑器
         └── 无 [NodeEditor] → NodeBodyRenderer → GenericNodeEditor<T>
               ├── [NodeProperty] 标量 → 表单控件
+              ├── [NodeProperty] string + OptionsKey → PropertyOptionsSelect
+              │     ├── .po-trigger (触发器，显示当前选项)
+              │     ├── .po-search (选项 ≥ 8 且声明可搜索时)
+              │     └── .po-list (分组标题 + 选项 + 副标题)
               ├── [NodeProperty] List<T> → ChildListEditor
               │     ├── NodePickerMenu (添加菜单)
               │     ├── DropStrip × (插入点)
@@ -135,22 +186,27 @@ TreeEditor
 
 ### 何时需要
 
-- 属性需要特殊 UI（搜索、列表选择等）
+- 属性需要特殊 UI（键值表格、树形结构、多步向导等）
 - 需要访问注入服务（IKVDataService 等）
+
+> 仅仅是「从已有列表里选一个」不再需要自定义编辑器：用 `OptionsKey` 即可（见上节）。
+> 内置节点里已有 7 个自定义编辑器因此被删除（CallNode / PostCallNode / RenderCallNode 预设选择、
+> ToolPresetNode、ToolInstantiateNode、APISelectNode、三个 SubAgent 节点的配置选择）。
 
 ### 实现步骤
 
 **步骤 1**: 标记节点
 
 ```csharp
-[NodeInfo("node.my_call", Icon = "⚙", Color = "var(--node-link)")]
-[NodeEditor(typeof(CallNodeEditor))]
-public class CallNode : IPreGenerationNode { ... }
+[NodeInfo("node.config", Icon = "⚙", Color = "var(--node-fragment)")]
+[NodeEditor(typeof(ConfigNodeEditor))]
+public class ConfigNode : IPreGenerationNode { ... }
 ```
 
 **步骤 2**: 创建编辑器（与节点同程序集）
 
-以下为示意代码，展示自定义编辑器的基本结构。实际 `CallNodeEditor` 使用预设搜索/选择 UI（注入 `IKVDataService`、`IJSRuntime` 等），比此示例更复杂。
+以下为示意代码，展示自定义编辑器的基本结构。实际 `ConfigNodeEditor` 支持编辑/配置两种模式的
+配置项表格（注入 `ILocService`），比此示例复杂。
 
 ```razor
 @using ShimmerChatLib.Components
@@ -342,6 +398,7 @@ public interface ITreeNodeSerializer
 | `.ge-input` | 文本输入框 |
 | `.ge-textarea` | 多行文本框 |
 | `.ge-select` | 下拉框 |
+| `.po-select` / `.po-trigger` / `.po-panel` / `.po-item` / `.po-item-desc` / `.po-hint` | 动态选项选择器（分组、搜索、副标题、空值/失效值提示） |
 | `.ge-check` | 复选框 |
 | `.ge-children` / `.ge-children-header` | 子列表容器/标题 |
 | `.tn-child-row` / `.tn-child-actions` / `.tn-child-tree` | 子节点行/按钮/TreeEditor |

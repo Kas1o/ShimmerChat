@@ -7,13 +7,14 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
     /// 根据 PresetId 从 KVData 加载预设并内联执行其根节点
     /// </summary>
     [NodeInfo("node.call_preset", Icon = "↗", Color = "var(--node-link)", CategoryKeys = ["category.flow", "category.link"], DescriptionKey = "node.call_preset.desc")]
-    [NodeEditor(typeof(CallNodeEditor))]
     public class CallNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Call Preset";
 
-        [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint")]
+        [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint",
+            OptionsKey = "pre_generation_presets", OptionsSearchable = true,
+            OptionsDefaultLabelKey = "node_editor.option_none")]
         public string PresetId { get; set; } = "";
 
         public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)

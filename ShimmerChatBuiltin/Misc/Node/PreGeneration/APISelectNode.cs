@@ -11,15 +11,17 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
     /// 同时处理续写（IsContinuation）标记。
     /// </summary>
     [NodeInfo("node.api_select", Icon = "⚡", Color = "var(--node-config)", CategoryKeys = ["category.config"], DescriptionKey = "node.api_select.desc")]
-    [NodeEditor(typeof(APISelectNodeEditor))]
     public class APISelectNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Select API";
 
         /// <summary>
-        /// API 配置 Guid。null 表示全局选中。
+        /// API 配置 Guid。null（或空串）表示全局选中。
         /// </summary>
+        [NodeProperty("node.api_select.label", HintKey = "node.api_select.order_hint", Order = 0,
+            OptionsKey = "api_configs", ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "node.api_select.global_default")]
         public string? APIGuid { get; set; }
 
         public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)

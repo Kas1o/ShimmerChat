@@ -9,12 +9,14 @@ namespace ShimmerChatBuiltin.SubAgent
     /// 多个 SubAgentToolNode 共享同一个工具，每个添加一个 SubAgent。
     /// </summary>
     [NodeInfo("node.sub_agent_tool", Icon = "🔧", Color = "var(--node-subagent)", CategoryKeys = ["category.tool", "category.sub_agent"])]
-    [NodeEditor(typeof(SubAgentToolNodeEditor))]
     public class SubAgentToolNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "SubAgent Tool";
 
+        [NodeProperty("editor_subagent.label", HintKey = "editor_subagent.select_hint", Order = -1,
+            OptionsKey = "subagent_configs", ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "editor_subagent.disabled_option")]
         public string ConfigGuid { get; set; } = "";
 
         /// <summary>

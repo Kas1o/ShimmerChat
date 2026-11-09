@@ -12,7 +12,9 @@ namespace ShimmerChatBuiltin.NodeBasic.Render
 
         public string Name { get; set; } = "Call Preset";
 
-        [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint")]
+        [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint",
+            OptionsKey = "render_modifier_presets",
+            OptionsDefaultLabelKey = "node_editor.option_none")]
         public string PresetId { get; set; } = "";
 
         public void Execute(RenderNodeExecutionContext context)

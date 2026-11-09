@@ -1,0 +1,172 @@
+@using ShimmerChatLib.Generation
+@inject ILocService Loc
+
+@*
+    节点属性的动态选项选择器。
+    不用原生 <select>：原生控件无法展示分组、副标题，也没有搜索；
+    这里展开成一个内联面板（不是绝对定位浮层），避免被 .tree-node-card 的 overflow:hidden 裁剪。
+*@
+<div class="po-select" @onkeydown="OnKeyDown">
+    <button type="button"
+            class="po-trigger @(_open ? "po-trigger-open" : "")"
+            role="combobox"
+            aria-expanded="@(_open ? "true" : "false")"
+            title="@TriggerTitle"
+            @onclick="Toggle">
+        <span class="po-trigger-label @(IsDangling ? "po-trigger-dangling" : "")">@TriggerLabel</span>
+        <span class="po-caret">@(_open ? "▴" : "▾")</span>
+    </button>
+
+    @if (_open)
+    {
+        <div class="po-panel">
+            @if (ShowSearchBox)
+            {
+                <input class="po-search"
+                       type="text"
+                       value="@_query"
+                       placeholder="@Loc["node_editor.search_placeholder"]"
+                       @oninput="OnSearchInput" />
+            }
+
+            <div class="po-list" role="listbox">
+                <div class="po-item po-item-default @(_value.Length == 0 ? "po-item-active" : "")"
+                     role="option"
+                     aria-selected="@(_value.Length == 0 ? "true" : "false")"
+                     @onclick="() => SelectAsync(string.Empty)">
+                    <span class="po-item-label">@DefaultLabel</span>
+                </div>
+
+                @foreach (var group in Groups)
+                {
+                    @if (group.Name is { } groupName)
+                    {
+                        <div class="po-group">@groupName</div>
+                    }
+
+                    @foreach (var option in group.Items)
+                    {
+                        var isActive = string.Equals(option.Value, _value, StringComparison.Ordinal);
+                        <div class="po-item @(isActive ? "po-item-active" : "")"
+                             role="option"
+                             aria-selected="@(isActive ? "true" : "false")"
+                             title="@(ShowDescription ? null : option.Description)"
+                             @onclick="() => SelectAsync(option.Value)">
+                            <span class="po-item-label">@option.Label</span>
+                            @if (ShowDescription && !string.IsNullOrWhiteSpace(option.Description))
+                            {
+                                <span class="po-item-desc">@option.Description</span>
+                            }
+                        </div>
+                    }
+                }
+
+                @if (Groups.Count == 0)
+                {
+                    <div class="po-empty">@Loc["node_editor.no_match"]</div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (IsDangling)
+    {
+        @* 已保存的值指向不存在的条目：显式提示，不做静默替换。 *@
+        <div class="po-hint">@Loc.Format("node_editor.option_missing", _value)</div>
+    }
+    else if (Options.Count == 0 && !string.IsNullOrEmpty(EmptyHint))
+    {
+        <div class="po-hint">@EmptyHint</div>
+    }
+</div>
+
+@code {
+    /// <summary>可选项。每次渲染由 GenericNodeEditor 重新获取，配置变化后无需重建编辑器。</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<NodePropertyOption> Options { get; set; } = [];
+
+    /// <summary>当前值；空串表示使用空值选项（未选择 / 使用默认 / 全部）。</summary>
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>是否允许搜索；选项数不足 <see cref="NodePropertyOptions.SearchThreshold"/> 时不显示搜索框。</summary>
+    [Parameter]
+    public bool Searchable { get; set; }
+
+    /// <summary>是否在选项里显示副标题。</summary>
+    [Parameter]
+    public bool ShowDescription { get; set; }
+
+    /// <summary>空值选项的显示文本。</summary>
+    [Parameter]
+    public string DefaultLabel { get; set; } = string.Empty;
+
+    /// <summary>没有可选项时显示的提示（本地化文本），为空则不显示。</summary>
+    [Parameter]
+    public string EmptyHint { get; set; } = string.Empty;
+
+    private bool _open;
+    private string _query = string.Empty;
+    private string _value = string.Empty;
+
+    private sealed record OptionGroup(string? Name, List<NodePropertyOption> Items);
+
+    protected override void OnParametersSet()
+    {
+        // 外部（序列化/复制节点）改值后立即反映，不保留上一次的内部状态。
+        _value = Value ?? string.Empty;
+    }
+
+    private bool ShowSearchBox => Searchable && Options.Count >= NodePropertyOptions.SearchThreshold;
+
+    private NodePropertyOption? Current =>
+        Options.FirstOrDefault(o => string.Equals(o.Value, _value, StringComparison.Ordinal));
+
+    private bool IsDangling => _value.Length > 0 && Current is null;
+
+    private string TriggerLabel => _value.Length == 0
+        ? DefaultLabel
+        : Current?.Label ?? _value;
+
+    private string? TriggerTitle =>
+        _value.Length == 0 ? null : Current?.Description ?? _value;
+
+    private List<OptionGroup> Groups => NodePropertyOptions.Filter(Options, _query)
+        .GroupBy(o => string.IsNullOrWhiteSpace(o.Group) ? null : o.Group)
+        .OrderBy(g => g.Key is null ? 0 : 1)
+        .ThenBy(g => g.Key ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+        .Select(g => new OptionGroup(g.Key, g.ToList()))
+        .ToList();
+
+    private void Toggle()
+    {
+        _open = !_open;
+        _query = string.Empty;
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        _query = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        // 键盘事件从触发器与搜索框冒泡到外层，Escape 统一在这里收起面板。
+        if (!_open || !string.Equals(e.Key, "Escape", StringComparison.Ordinal))
+            return;
+
+        _open = false;
+        _query = string.Empty;
+    }
+
+    private async Task SelectAsync(string value)
+    {
+        _value = value ?? string.Empty;
+        _open = false;
+        _query = string.Empty;
+        await ValueChanged.InvokeAsync(_value);
+    }
+}

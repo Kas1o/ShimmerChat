@@ -37,5 +37,10 @@
   "toolui.submit_failed": "Submit failed: {0}",
   "toolui.already_resolved": "This question already ended (answered elsewhere, skipped, or timed out).",
   "toolui.not_found": "This question no longer exists.",
-  "node_editor.option_default": "(Use current default profile)"
+  "node_editor.option_default": "(Use current default profile)",
+  "node_editor.option_none": "(Not selected)",
+  "node_editor.options_empty": "No options yet — create one in the matching settings panel first.",
+  "node_editor.search_placeholder": "Search…",
+  "node_editor.no_match": "No match",
+  "node_editor.option_missing": "Current value is not in the option list: {0}"
 }

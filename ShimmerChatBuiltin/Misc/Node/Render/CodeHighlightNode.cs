@@ -49,7 +49,9 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
 
         /// <summary>没有语言标识的代码块按此语言着色；空 = 不着色。</summary>
         [NodeProperty("prop.code_highlight.default_language",
-            HintKey = "prop.code_highlight.default_language.hint", Order = 40)]
+            HintKey = "prop.code_highlight.default_language.hint", Order = 40,
+            OptionsKey = "highlight_languages", OptionsSearchable = true,
+            OptionsDefaultLabelKey = "prop.code_highlight.default_language.none")]
         public string DefaultLanguage { get; set; } = "";
 
         public void Execute(RenderNodeExecutionContext context)

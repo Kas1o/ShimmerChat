@@ -46,6 +46,40 @@ public class TestTree : ITreeNode
     public List<TestTree> Children { get; set; } = new();
 }
 
+/// <summary>带动态选项属性的测试节点（对应 OptionsKey 迁移后的节点形态）。</summary>
+[NodeInfo("test.options_node", Icon = "O", Color = "#000000", CategoryKeys = ["category.test"])]
+public class TestOptionsNode : ITreeNode
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Name { get; set; } = "Options";
+
+    [NodeProperty("test.options_node.choice", Order = 1, OptionsKey = TestOptionsProvider.KeyName,
+        ShowOptionDescription = true, OptionsDefaultLabelKey = "test.options_node.none")]
+    public string Choice { get; set; } = "";
+}
+
+/// <summary>固定选项提供者，用于验证 OptionsKey → PropertyOptionsSelect 的接线。</summary>
+public sealed class TestOptionsProvider : INodePropertyOptionsProvider
+{
+    public const string KeyName = "test_options";
+
+    public string Key => KeyName;
+
+    public IReadOnlyList<NodePropertyOption> GetOptions(IServiceProvider services) =>
+    [
+        new("x", "Option X", Group: "G1", Description: "desc x"),
+        new("y", "Option Y", Group: "G1", Description: "desc y")
+    ];
+}
+
+/// <summary>空选项提供者：覆盖「有 OptionsKey 但无数据」的降级路径。</summary>
+public sealed class EmptyOptionsProvider : INodePropertyOptionsProvider
+{
+    public string Key => TestOptionsProvider.KeyName;
+
+    public IReadOnlyList<NodePropertyOption> GetOptions(IServiceProvider services) => [];
+}
+
 /// <summary>节点编辑器测试共享辅助。</summary>
 public static class EditorTestHelpers
 {
@@ -70,11 +104,11 @@ public static class EditorTestHelpers
     }
 
     /// <summary>不提供任何属性选项提供者的插件加载器，避免编辑器测试依赖真实插件扫描。</summary>
-    public static IPluginLoaderService CreatePluginLoader()
+    public static IPluginLoaderService CreatePluginLoader(params INodePropertyOptionsProvider[] providers)
     {
         var loader = new Mock<IPluginLoaderService>();
         loader.Setup(l => l.LoadImplementations<INodePropertyOptionsProvider>())
-            .Returns(new List<INodePropertyOptionsProvider>());
+            .Returns(providers.ToList());
         return loader.Object;
     }
 }

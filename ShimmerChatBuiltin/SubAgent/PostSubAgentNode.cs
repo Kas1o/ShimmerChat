@@ -8,15 +8,19 @@ using ShimmerChatLib.Interface;
 namespace ShimmerChatBuiltin.SubAgent
 {
     [NodeInfo("node.post_sub_agent", Icon = "🤖", Color = "var(--node-subagent)", CategoryKeys = ["category.flow", "category.sub_agent", "category.post"])]
-    [NodeEditor(typeof(PostSubAgentNodeEditor))]
     public class PostSubAgentNode : IPostGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Post SubAgent";
 
+        [NodeProperty("editor_subagent.label", HintKey = "editor_subagent.select_hint", Order = -1,
+            OptionsKey = "subagent_configs", ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "editor_subagent.disabled_option")]
         public string ConfigGuid { get; set; } = "";
 
-        [NodeProperty("prop.post_sub_agent.output_mode", HintKey = "prop.post_sub_agent.output_mode.hint")]
+        [NodeProperty("prop.post_sub_agent.output_mode", HintKey = "prop.post_sub_agent.output_mode.hint",
+            OptionsKey = "subagent_output_modes", ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "editor_subagent.inherit_option")]
         public string OutputMode { get; set; } = "";
 
         [NodeProperty("prop.post_sub_agent.max_iterations", HintKey = "prop.post_sub_agent.max_iterations.hint")]

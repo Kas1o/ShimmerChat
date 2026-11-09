@@ -7,13 +7,14 @@ namespace ShimmerChatBuiltin.ToolManage
     /// 从 KVData 中加载工具预设。PresetId 为空时使用 IsDefault 预设，否则按 ID 匹配。
     /// </summary>
     [NodeInfo("node.tool_preset", Icon = "📦", Color = "var(--node-link)", CategoryKeys = ["category.tool", "category.preset"], DescriptionKey = "node.tool_preset.desc")]
-    [NodeEditor(typeof(ToolPresetNodeEditor))]
     public class ToolPresetNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Tool Preset";
 
-        [NodeProperty("prop.tool_preset.preset_id", HintKey = "prop.tool_preset.preset_id.hint")]
+        [NodeProperty("prop.tool_preset.preset_id", HintKey = "prop.tool_preset.preset_id.hint",
+            OptionsKey = "tool_presets", OptionsSearchable = true, ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "editor.tool_preset.default_option")]
         public string PresetId { get; set; } = "";
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)

@@ -12,7 +12,9 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
 
         public string Name { get; set; } = "Call Preset";
 
-        [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint")]
+        [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint",
+            OptionsKey = "post_generation_presets",
+            OptionsDefaultLabelKey = "node_editor.option_none")]
         public string PresetId { get; set; } = "";
 
         public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)

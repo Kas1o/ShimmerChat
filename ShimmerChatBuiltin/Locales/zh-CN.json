@@ -940,5 +940,15 @@
   "panel.memory.phase.embedding": "嵌入中",
   "panel.memory.phase.done": "完成",
   "panel.memory.memory_records_path": "记忆文本库",
-  "panel.memory.memory_records_path_hint": "记忆文本始终落盘在此路径；向量后端只保存派生出的向量。"
+  "panel.memory.memory_records_path_hint": "记忆文本始终落盘在此路径；向量后端只保存派生出的向量。",
+
+  "editor.tool_preset.default_option": "（使用默认预设）",
+  "editor_subagent.disabled_option": "（不启用）",
+  "prop.dyn_prompt.set_name.all": "（全部集合）",
+  "prop.code_highlight.default_language.none": "（不着色）",
+  "options.tool_preset.desc": "{0} 个工具",
+  "options.dyn_prompt_set.desc": "{0} 条规则",
+  "options.subagent_output.last_message": "只注入子代理最后一条消息",
+  "options.subagent_output.full_json": "注入子代理的完整消息 JSON",
+  "options.subagent_output.none": "不注入任何输出"
 }

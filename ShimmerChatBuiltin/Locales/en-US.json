@@ -940,5 +940,15 @@
   "panel.memory.phase.embedding": "embedding",
   "panel.memory.phase.done": "done",
   "panel.memory.memory_records_path": "Memory text database",
-  "panel.memory.memory_records_path_hint": "Memory text is always stored on disk here; the vector backend only stores derived embeddings."
+  "panel.memory.memory_records_path_hint": "Memory text is always stored on disk here; the vector backend only stores derived embeddings.",
+
+  "editor.tool_preset.default_option": "(Use default preset)",
+  "editor_subagent.disabled_option": "(Disabled)",
+  "prop.dyn_prompt.set_name.all": "(All sets)",
+  "prop.code_highlight.default_language.none": "(No highlighting)",
+  "options.tool_preset.desc": "{0} tools",
+  "options.dyn_prompt_set.desc": "{0} rules",
+  "options.subagent_output.last_message": "Inject the sub-agent's last message only",
+  "options.subagent_output.full_json": "Inject the sub-agent's full message JSON",
+  "options.subagent_output.none": "Inject nothing"
 }

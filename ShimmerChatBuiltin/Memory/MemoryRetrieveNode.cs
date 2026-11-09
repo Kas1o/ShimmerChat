@@ -16,7 +16,8 @@ namespace ShimmerChatBuiltin.Memory
         public string Name { get; set; } = "Memory Retrieve";
 
         /// <summary>指定使用的嵌入配置；留空表示使用当前激活配置。</summary>
-        [NodeProperty("prop.memory_retrieve.profile", HintKey = "prop.memory_retrieve.profile.hint", Order = -1, OptionsKey = "embedding_profiles")]
+        [NodeProperty("prop.memory_retrieve.profile", HintKey = "prop.memory_retrieve.profile.hint", Order = -1,
+            OptionsKey = "embedding_profiles", OptionsSearchable = true)]
         public string EmbeddingProfileId { get; set; } = string.Empty;
 
         /// <summary>用于检索的最近消息数量</summary>

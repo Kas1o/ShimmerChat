@@ -7,7 +7,6 @@ namespace ShimmerChatBuiltin.ToolManage
     /// 只处理实现了 IAutoCreateToolV2 的类型。
     /// </summary>
     [NodeInfo("node.instantiate_tool", Icon = "⚙", Color = "var(--node-tool)", CategoryKeys = ["category.tool"])]
-    [NodeEditor(typeof(ToolInstantiateNodeEditor))]
     public class ToolInstantiateNode : IPreGenerationNode
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
@@ -16,6 +15,9 @@ namespace ShimmerChatBuiltin.ToolManage
         /// <summary>
         /// IAutoCreateToolV2 实现的完整类型名
         /// </summary>
+        [NodeProperty("editor_tool_instantiate.select_tool",
+            OptionsKey = "tool_types", OptionsSearchable = true, ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "node_editor.option_none")]
         public string ToolTypeName { get; set; } = "";
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)

@@ -37,5 +37,10 @@
   "toolui.submit_failed": "提交失败：{0}",
   "toolui.already_resolved": "该提问已结束（已在其它窗口回答、跳过或超时）。",
   "toolui.not_found": "该提问已不存在。",
-  "node_editor.option_default": "（使用当前默认配置）"
+  "node_editor.option_default": "（使用当前默认配置）",
+  "node_editor.option_none": "（未选择）",
+  "node_editor.options_empty": "暂无可选项：请先在对应的配置面板中创建。",
+  "node_editor.search_placeholder": "搜索…",
+  "node_editor.no_match": "没有匹配项",
+  "node_editor.option_missing": "当前值不在可选项中：{0}"
 }

@@ -95,6 +95,21 @@ namespace ShimmerChatBuiltin
 		};
 
 		/// <summary>
+		/// 当前类型实际使用的模型名。只给 UI 展示用（例如节点属性下拉的副标题），
+		/// 集中在这里避免各处按类型猜字段。
+		/// </summary>
+		[Newtonsoft.Json.JsonIgnore]
+		public string ModelName => Type switch
+		{
+			ApiConfigType.OpenAI => OpenAIModel ?? "",
+			ApiConfigType.DeepSeek => DeepSeekModel ?? "",
+			ApiConfigType.Ollama => OllamaModel ?? "",
+			ApiConfigType.OpenAIText => OpenAITextModel ?? "",
+			ApiConfigType.OpenCodeGo => OpenCodeGoModel ?? "",
+			_ => ""
+		};
+
+		/// <summary>
 		/// 转换为管线使用的 API 设置。
 		/// </summary>
 		/// <param name="sessionId">

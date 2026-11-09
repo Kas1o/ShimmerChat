@@ -118,35 +118,30 @@
         await InvokeAsync(StateHasChanged);
     }
 
+    private void OnOptionValueChanged(PropInfo prop, string value)
+    {
+        prop.SetValue(Node, value ?? "");
+        // 触发器上显示的是节点属性值，父组件必须重渲染才能同步。
+        StateHasChanged();
+    }
+
     private RenderFragment RenderProperty(PropInfo prop) => builder =>
     {
         var value = prop.GetValue(Node);
 
         if (prop.OptionsKey is { Length: > 0 } optionsKey && prop.PropertyType == typeof(string))
         {
-            var current = value as string ?? "";
-            var options = GetOptions(optionsKey);
-
-            builder.OpenElement(0, "select");
-            builder.AddAttribute(1, "class", "ge-select");
-            builder.AddAttribute(2, "value", current);
-            builder.AddAttribute(3, "onchange", EventCallback.Factory.CreateBinder<string>(this,
-                v => prop.SetValue(Node, v ?? ""), current));
-
-            builder.OpenElement(4, "option");
-            builder.AddAttribute(5, "value", "");
-            builder.AddContent(6, Loc["node_editor.option_default"]);
-            builder.CloseElement();
-
-            foreach (var option in options)
-            {
-                builder.OpenElement(7, "option");
-                builder.AddAttribute(8, "value", option.Value);
-                builder.AddContent(9, option.Label);
-                builder.CloseElement();
-            }
-
-            builder.CloseElement();
+            // 原生 <select> 撑不住分组 / 副标题 / 搜索，统一交给 PropertyOptionsSelect。
+            builder.OpenComponent<PropertyOptionsSelect>(0);
+            builder.AddAttribute(1, nameof(PropertyOptionsSelect.Options), GetOptions(optionsKey));
+            builder.AddAttribute(2, nameof(PropertyOptionsSelect.Value), value as string ?? "");
+            builder.AddAttribute(3, nameof(PropertyOptionsSelect.ValueChanged),
+                EventCallback.Factory.Create<string>(this, v => OnOptionValueChanged(prop, v)));
+            builder.AddAttribute(4, nameof(PropertyOptionsSelect.Searchable), prop.OptionsSearchable);
+            builder.AddAttribute(5, nameof(PropertyOptionsSelect.ShowDescription), prop.ShowOptionDescription);
+            builder.AddAttribute(6, nameof(PropertyOptionsSelect.DefaultLabel), Loc[prop.OptionsDefaultLabelKey]);
+            builder.AddAttribute(7, nameof(PropertyOptionsSelect.EmptyHint), Loc["node_editor.options_empty"]);
+            builder.CloseComponent();
         }
         else if (prop.PropertyType == typeof(string))
         {
@@ -230,6 +225,9 @@
         public int Order { get; }
         public bool MultiLine { get; }
         public string? OptionsKey { get; }
+        public bool OptionsSearchable { get; }
+        public bool ShowOptionDescription { get; }
+        public string OptionsDefaultLabelKey { get; }
         public PropertyInfo Prop { get; }
         public Type PropertyType { get; }
 
@@ -243,6 +241,9 @@
             Order = attr?.Order ?? 0;
             MultiLine = attr?.MultiLine ?? false;
             OptionsKey = attr?.OptionsKey;
+            OptionsSearchable = attr?.OptionsSearchable ?? false;
+            ShowOptionDescription = attr?.ShowOptionDescription ?? false;
+            OptionsDefaultLabelKey = attr?.OptionsDefaultLabelKey ?? NodePropertyAttribute.DefaultOptionLabelKey;
         }
 
         public object? GetValue(object obj) => Prop.GetValue(obj);

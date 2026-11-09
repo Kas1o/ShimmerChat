@@ -18,7 +18,9 @@ namespace ShimmerChatBuiltin.DynPrompt
         /// <summary>
         /// 指定要使用的 DynPromptSet 名称。留空则使用所有集合。
         /// </summary>
-        [NodeProperty("prop.dyn_prompt.set_name", HintKey = "prop.dyn_prompt.set_name.hint", Order = 1)]
+        [NodeProperty("prop.dyn_prompt.set_name", HintKey = "prop.dyn_prompt.set_name.hint", Order = 1,
+            OptionsKey = "dyn_prompt_sets", OptionsSearchable = true, ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "prop.dyn_prompt.set_name.all")]
         public string SetName { get; set; } = "";
 
         /// <summary>

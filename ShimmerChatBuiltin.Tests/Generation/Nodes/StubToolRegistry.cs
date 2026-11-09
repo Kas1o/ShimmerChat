@@ -11,9 +11,9 @@ public class StubToolRegistry : IToolRegistry
 
     public IReadOnlyList<ToolMetadata> AllTools => _byName.Values.ToList().AsReadOnly();
 
-    public StubToolRegistry Register(string nameKey, Type type)
+    public StubToolRegistry Register(string nameKey, Type type, params string[] categoryKeys)
     {
-        var meta = new ToolMetadata(nameKey, $"{nameKey}.desc", [], type);
+        var meta = new ToolMetadata(nameKey, $"{nameKey}.desc", categoryKeys, type);
         _byName[nameKey] = meta;
         return this;
     }
