@@ -33,13 +33,14 @@ namespace ShimmerChat.Singletons
         private readonly IVectorStoreService _vectorStore;
         private readonly ToolCallLoop _loop = new();
         private readonly ILogger<GenerationManagerV2> _logger;
+        private readonly IServiceProvider _services;
 
         public GenerationManagerV2(IKVDataService kvData, IToolRegistry toolRegistry,
             IPreGenerationNodeSerializer serializer, IPostGenerationManagerService postManager,
             ILocService locService, IDebugOutputService debugOutput,
             IImageAttachmentService imageAttachments, IMessageStoreService messageStore,
             IToolInteractionService toolInteractions, IVectorStoreService vectorStore,
-            ILogger<GenerationManagerV2> logger)
+            ILogger<GenerationManagerV2> logger, IServiceProvider services)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
@@ -52,6 +53,7 @@ namespace ShimmerChat.Singletons
             _toolInteractions = toolInteractions;
             _vectorStore = vectorStore;
             _logger = logger;
+            _services = services;
             EnsureDefaultPreset();
         }
 
@@ -105,29 +107,57 @@ namespace ShimmerChat.Singletons
         {
             var env = await BuildEnvironment(agent, chat, cancellationToken, overrides);
 
-            var host = new MainLoopHost(this, agent, chat, env,
-                onStreamDelta, onAssistantComplete, onMessagesCommitted,
-                onPostGenerationStarted, overrides, cancellationToken);
+            try
+            {
+                var host = new MainLoopHost(this, agent, chat, env,
+                    onStreamDelta, onAssistantComplete, onMessagesCommitted,
+                    onPostGenerationStarted, overrides, cancellationToken);
 
-            var apiSetting = env.Transient.API
-                ?? throw new InvalidOperationException("No API configured.");
+                var apiSetting = env.Transient.API
+                    ?? throw new InvalidOperationException("No API configured.");
 
-            // 前生成管线未产出任何消息时明确报错（常见于事件覆盖树缺少
-            // 历史/片段注入节点），避免 LLM 报晦涩的 'messages' array cannot be empty
-            if (env.Transient.Fragments.Count == 0)
-                throw new InvalidOperationException(
-                    "Pre-generation pipeline produced no messages (Fragments is empty). " +
-                    "Add a chat-history or fragment node to the pre-generation tree.");
+                // 前生成管线未产出任何消息时明确报错（常见于事件覆盖树缺少
+                // 历史/片段注入节点），避免 LLM 报晦涩的 'messages' array cannot be empty
+                if (env.Transient.Fragments.Count == 0)
+                    throw new InvalidOperationException(
+                        "Pre-generation pipeline produced no messages (Fragments is empty). " +
+                        "Add a chat-history or fragment node to the pre-generation tree.");
 
-            if (!apiSetting.SupportsToolCalling && env.Transient.Tools.Count > 0)
-                _logger.LogWarning("[GenerationManagerV2] Warning: API does not support tool calling, but {Count} tool(s) are registered.", env.Transient.Tools.Count);
+                if (!apiSetting.SupportsToolCalling && env.Transient.Tools.Count > 0)
+                    _logger.LogWarning("[GenerationManagerV2] Warning: API does not support tool calling, but {Count} tool(s) are registered.", env.Transient.Tools.Count);
 
-            await _loop.RunAsync(
-                apiSetting.ChatClient,
-                env.Transient.Tools.Select(t => t.GetDefinition()).ToList(),
-                host,
-                streaming: apiSetting.SupportsStreaming,
-                ct: cancellationToken);
+                await _loop.RunAsync(
+                    apiSetting.ChatClient,
+                    env.Transient.Tools.Select(t => t.GetDefinition()).ToList(),
+                    host,
+                    streaming: apiSetting.SupportsStreaming,
+                    ct: cancellationToken);
+            }
+            finally
+            {
+                // 释放本次生成注册的会话级资源（MCP 子进程/HTTP 会话等）。
+                await DisposeGenerationResourcesAsync(env.Persistent);
+            }
+        }
+
+        /// <summary>
+        /// 释放前生成节点在 <see cref="PersistentEnv"/> 上注册的会话级资源。
+        /// 释放失败不能中断已经完成的生成，但必须记录（不静默吞掉）。
+        /// </summary>
+        private async Task DisposeGenerationResourcesAsync(PersistentEnv persistent)
+        {
+            if (persistent.Resources.Count == 0) return;
+
+            try
+            {
+                await persistent.Resources.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[GenerationManagerV2] Failed to dispose generation-scoped resources.");
+                _debugOutput.Write("GenerationManagerV2", "ResourceCleanup",
+                    $"[GenerationManagerV2] Generation-scoped resource cleanup failed: {ex}");
+            }
         }
 
         /// <summary>
@@ -169,7 +199,8 @@ namespace ShimmerChat.Singletons
                 VectorStore = _vectorStore,
                 Chat = chat,
                 Agent = agent,
-                MessageStore = _messageStore
+                MessageStore = _messageStore,
+                Services = _services
             };
 
             IPreGenerationNode rootNode;
