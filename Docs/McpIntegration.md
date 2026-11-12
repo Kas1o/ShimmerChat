@@ -89,9 +89,12 @@ Authorization: Bearer <token>
     `PerResourceCharLimit`（16000 字符）上限并标注截断。
 - **按需资源工具**：`ExposeResourceReadTool` 会额外注入一个 `read_mcp_resource` 工具，
   模型传入 `uri` 读取资源，传空则返回该端点的资源清单。
+- **日志级别**：`LogLevel` 四档（`关闭` / `仅错误` / `信息` / `详细`，级别从低到高 Off &lt; Error &lt; Info &lt; Debug），
+  控制该端点在调试面板的日志量与 STDIO 服务端 stderr 转发；默认 `信息`。
 
 存储位置：`KVData` 空间 `Mcp`，键 `servers`，内容为 `McpEndpointConfig[]` 的 JSON。
-读取失败（JSON 损坏 / `null`）不会静默降级，而是抛出 `McpConfigException` 并由调用方呈现。
+读取失败（JSON 损坏 / `null` / 目录含 `null` 条目）不会静默降级，而是抛出 `McpConfigException` 并由调用方呈现；
+旧版/手改数据中显式为 `null` 的集合字段（`Arguments`/`Environment`/`Headers`/`Tools`/`Resources`）会在读取时归一化为空集合，避免触发 `NullReferenceException`。
 
 ---
 
@@ -107,14 +110,15 @@ Authorization: Bearer <token>
 | `ResourceInjection` | 资源注入模式：`沿用端点配置` / `不注入` / `按勾选` / `全部` |
 | `ExposeResourceReadTool` | 额外注入按需读取资源的工具 |
 | `InjectServerInstructions` | 把服务端自报的 `instructions` 写成 system 片段 |
+| `FailurePolicy` | 连接/枚举失败时的处理：`Fail`（默认，中止本轮）或 `Skip`（跳过该端点继续，并写告警日志） |
 
 执行流程：
 
 1. 读取端点目录 → 未配置 / 未找到 / 已禁用 → 返回带错误码的 `NodeResult.Failure`（不静默跳过）；
-2. 建立（或复用）会话；连接失败（进程起不来、握手失败、超时）→ `SERVICE_ERROR` + 原始异常详情；
-3. `tools/list` → 按暴露策略注册 `IToolV2` 桥接；失败 → `SERVICE_ERROR`；
-4. `resources/read` → 按注入策略写入 system 片段并带上预算与截断标注；失败 → `SERVICE_ERROR`；
-5. 写入调试输出（工具数 / 片段数 / 注入模式）。
+2. 建立（或复用）会话；连接失败（进程起不来、握手失败、超时）→ 按 `FailurePolicy` 决定 `SERVICE_ERROR` 或跳过该端点；
+3. `tools/list` → 按暴露策略注册 `IToolV3` 桥接（传递 `CancellationToken`，遵守取消契约）；失败 → 同上；
+4. `resources/read` → 按注入策略写入 system 片段并带上预算与截断标注；失败 → 同上；
+5. 按端点 `LogLevel` 写入调试输出（工具数 / 片段数 / 注入模式）。
 
 ### 会话生命周期
 
@@ -180,6 +184,8 @@ mcp_{端点标识}_{净化后的工具名}
 ```
 
 净化会把非法字符替换为 `_`，超长时保留前缀并追加 6 位短哈希以保证唯一（`McpToolBridge.BuildExposedName`）。
+短名也存在 sanitize 碰撞的可能（如 `a/b` 与 `a_b` 都净化为 `a_b`）：添加工具时若检测到暴露名已被占用，
+会用原始工具名的短哈希追加后缀（`McpToolBridge.BuildUniqueExposedName`）并写调试日志，绝不静默丢弃。
 
 `inputSchema`（JSON Schema）→ SharperLLM 的扁平 `parameters`：
 
@@ -191,8 +197,10 @@ mcp_{端点标识}_{净化后的工具名}
 工具返回内容：`text` 原样拼接；`resource_link` 转为链接标注；`image` / `audio` / 二进制内嵌资源
 按「类型 + 字节数」标注省略（不入上下文）；`structuredContent` 以 JSON 追加；
 `isError=true` 时在开头标注 `[MCP tool '...' reported an error]`。
-JSON-RPC 层错误（协议错误、未知工具）由 `McpToolBridge` 捕获为 `[MCP error] ...` 文本并保留原始信息，
-是否上抛仍由 `ToolCallLoop.continueOnToolError` 决定。
+工具执行走 `IToolV3` 结构化接口：参数 JSON 非法返回 `ToolResult.Fail(TOOL_INVALID_ARGUMENTS)`，
+协议/连接/服务端拒绝等预期内失败返回 `ToolResult.Fail(TOOL_SERVICE_ERROR)`（附技术详情，由执行节点写进 DebugOutput）；
+`CancellationToken` 贯穿到 SDK 调用，用户/宿主取消时抛 `OperationCanceledException` 而不是伪造失败。
+是否继续由 `ToolCallLoop.continueOnToolError` 决定。
 
 ---
 

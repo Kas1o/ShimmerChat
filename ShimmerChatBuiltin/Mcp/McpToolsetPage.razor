@@ -161,6 +161,18 @@
                             <label class="su-text-sm">@Loc["panel_mcp.init_timeout"]</label>
                             <input type="number" class="shimmer-input" style="max-width:140px" @bind="e.InitializationTimeoutSeconds" />
                         </div>
+
+                        <div class="su-mt-2">
+                            <label class="su-text-sm">@Loc["panel_mcp.log_level"]</label>
+                            <select class="su-select" value="@e.LogLevel"
+                                    @onchange="ev => ChangeLogLevel(e, ev)">
+                                <option value="Off">@Loc["panel_mcp.log_level_off"]</option>
+                                <option value="Error">@Loc["panel_mcp.log_level_error"]</option>
+                                <option value="Info">@Loc["panel_mcp.log_level_info"]</option>
+                                <option value="Debug">@Loc["panel_mcp.log_level_debug"]</option>
+                            </select>
+                            <p class="su-text-sm su-text-2">@Loc["panel_mcp.log_level_hint"]</p>
+                        </div>
                     </div>
 
                     <div class="su-col-6">
@@ -445,17 +457,9 @@
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(5, config.InitializationTimeoutSeconds + 15)));
             session = await McpEndpointSession.ConnectAsync(config, LoggerFactory, cts.Token);
 
-            var tools = (await session.GetToolsAsync(cts.Token)).Select(McpToolDescriptor.From).ToList();
-            var resources = (await session.GetResourcesAsync(cts.Token))
-                .Select(r => new McpResourceDescriptor(r.Uri, r.Name, r.Title, r.Description, r.MimeType, null))
-                .ToList();
-            var prompts = (await session.GetPromptsAsync(cts.Token))
-                .Select(p => new McpPromptDescriptor(
-                    p.Name, p.Title, p.Description,
-                    p.ProtocolPrompt.Arguments?.Select(a => new McpPromptArgumentDescriptor(
-                        a.Name, a.Title, a.Description, a.Required == true)).ToList()
-                        ?? (IReadOnlyList<McpPromptArgumentDescriptor>)[]))
-                .ToList();
+            var tools = McpDescriptorFactory.Tools(await session.GetToolsAsync(cts.Token));
+            var resources = McpDescriptorFactory.Resources(await session.GetResourcesAsync(cts.Token));
+            var prompts = McpDescriptorFactory.Prompts(await session.GetPromptsAsync(cts.Token));
 
             inventories[endpoint.Id] = new Inventory(tools, resources, prompts);
             probeResults[endpoint.Id] = new ProbeResult(
@@ -570,6 +574,14 @@
         MarkDirty();
     }
 
+    private void ChangeLogLevel(EditorModel endpoint, ChangeEventArgs e)
+    {
+        endpoint.LogLevel = Enum.TryParse<McpLogLevel>(e.Value?.ToString(), out var level)
+            ? level
+            : McpLogLevel.Info;
+        MarkDirty();
+    }
+
     private void ShowStatus(string message, bool isError)
     {
         statusMessage = message;
@@ -615,6 +627,7 @@
         public McpResourceInjection ResourceInjection { get => Config.ResourceInjection; set => Config.ResourceInjection = value; }
         public bool ExposeResourceReadTool { get => Config.ExposeResourceReadTool; set => Config.ExposeResourceReadTool = value; }
         public int ResourceCharBudget { get => Config.ResourceCharBudget; set => Config.ResourceCharBudget = value; }
+        public McpLogLevel LogLevel { get => Config.LogLevel; set => Config.LogLevel = value; }
         public List<McpNamedToggle> Tools => Config.Tools;
         public List<McpNamedToggle> Resources => Config.Resources;
 

@@ -182,6 +182,23 @@ public class McpExposedToolNameTests
     {
         Assert.Equal("mcp_srv_t1password", McpToolBridge.BuildExposedName("srv", "1password"));
     }
+
+    [Fact]
+    public void BuildUniqueExposedName_DisambiguatesSanitizedCollision()
+    {
+        // a/b 与 a_b 经 Sanitize 后都会变成 a_b，短名无法区分。
+        var taken = new HashSet<string>(StringComparer.Ordinal)
+        {
+            McpToolBridge.BuildExposedName("srv", "a/b")
+        };
+
+        var name = McpToolBridge.BuildUniqueExposedName("srv", "a_b", taken);
+
+        Assert.NotEqual("mcp_srv_a_b", name);
+        Assert.Matches("^[A-Za-z0-9_-]+$", name);
+        Assert.True(name.Length <= 64);
+        Assert.DoesNotContain(name, taken);
+    }
 }
 
 public class McpResourceCompositionTests

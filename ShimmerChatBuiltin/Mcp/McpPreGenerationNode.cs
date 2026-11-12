@@ -22,6 +22,16 @@ namespace ShimmerChatBuiltin.Mcp
         All = 3
     }
 
+    /// <summary>MCP 端点连接/枚举失败时的处理策略。</summary>
+    public enum McpFailurePolicy
+    {
+        /// <summary>失败时中止本轮生成并报告错误（默认，行为与之前一致）。</summary>
+        Fail = 0,
+
+        /// <summary>失败时跳过该端点继续生成，同时写告警日志。</summary>
+        Skip = 1
+    }
+
     /// <summary>
     /// MCP 工具集前生成节点：应用「MCP 工具集设置页」中配置好的某个端点。
     /// <list type="bullet">
@@ -30,8 +40,8 @@ namespace ShimmerChatBuiltin.Mcp
     /// <item>可选注入一个 <c>read_mcp_resource</c> 工具，让模型按需列举并读取资源；</item>
     /// <item>可选把服务端自报的 instructions 注入为 system 片段。</item>
     /// </list>
-    /// 连接建立失败（进程起不来、HTTP 握手失败、超时等）时返回明确的失败结果，
-    /// 由管线向上报告，不静默降级。
+    /// 连接建立/枚举失败时的行为由 <see cref="FailurePolicy"/> 决定：默认返回明确的失败结果
+    /// 由管线向上报告；也可配置为跳过该端点继续生成（同时写告警日志）。
     /// </summary>
     [NodeInfo("node.mcp_toolset", Icon = "🔌", Color = "var(--node-tool)",
         CategoryKeys = ["category.tool", "category.mcp"],
@@ -65,6 +75,10 @@ namespace ShimmerChatBuiltin.Mcp
         /// <summary>是否把端点的服务端标识与使用说明写入上下文。</summary>
         [NodeProperty("prop.mcp_toolset.inject_instructions", HintKey = "prop.mcp_toolset.inject_instructions.hint")]
         public bool InjectServerInstructions { get; set; } = true;
+
+        /// <summary>连接/枚举失败时是中止本轮生成还是跳过该端点继续。</summary>
+        [NodeProperty("prop.mcp_toolset.failure_policy", HintKey = "prop.mcp_toolset.failure_policy.hint")]
+        public McpFailurePolicy FailurePolicy { get; set; } = McpFailurePolicy.Fail;
 
         public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
@@ -117,15 +131,20 @@ namespace ShimmerChatBuiltin.Mcp
             }
             catch (Exception ex)
             {
-                WriteDebug(env, $"endpoint '{endpoint.Id}' connect failed: {ex}");
-                return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                    loc.Format("node_err.mcp_connect_failed", endpoint.Name, ex.Message), ex.ToString(), Id, Name);
+                return HandleRuntimeFailure(env, endpoint, NodeErrorCodes.ServiceError,
+                    loc.Format("node_err.mcp_connect_failed", endpoint.Name, ex.Message), ex.ToString(),
+                    $"endpoint '{endpoint.Id}' connect failed: {ex}");
             }
 
             var addedTools = 0;
             var addedFragments = 0;
 
             var injection = ResolveResourceInjection(endpoint);
+
+            // 预计算当前已暴露的工具名，避免在添加时反复调用 GetDefinition()（会重新解析 schema）。
+            var existingToolNames = env.Transient.Tools
+                .Select(t => t.GetDefinition().name)
+                .ToHashSet(StringComparer.Ordinal);
 
             if (ExposeTools)
             {
@@ -141,12 +160,12 @@ namespace ShimmerChatBuiltin.Mcp
                 }
                 catch (Exception ex)
                 {
-                    WriteDebug(env, $"endpoint '{endpoint.Id}' tools/list failed: {ex}");
-                    return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                        loc.Format("node_err.mcp_tools_failed", endpoint.Name, ex.Message), ex.ToString(), Id, Name);
+                    return HandleRuntimeFailure(env, endpoint, NodeErrorCodes.ServiceError,
+                        loc.Format("node_err.mcp_tools_failed", endpoint.Name, ex.Message), ex.ToString(),
+                        $"endpoint '{endpoint.Id}' tools/list failed: {ex}");
                 }
 
-                addedTools += AddTools(env, session, endpoint, descriptors, ToolsSelectedOnly);
+                addedTools += AddTools(env, session, endpoint, descriptors, ToolsSelectedOnly, existingToolNames);
             }
 
             if (injection != McpResourceInjection.Off)
@@ -161,19 +180,19 @@ namespace ShimmerChatBuiltin.Mcp
                 }
                 catch (Exception ex)
                 {
-                    WriteDebug(env, $"endpoint '{endpoint.Id}' resources/read failed: {ex}");
-                    return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                        loc.Format("node_err.mcp_resources_failed", endpoint.Name, ex.Message), ex.ToString(), Id, Name);
+                    return HandleRuntimeFailure(env, endpoint, NodeErrorCodes.ServiceError,
+                        loc.Format("node_err.mcp_resources_failed", endpoint.Name, ex.Message), ex.ToString(),
+                        $"endpoint '{endpoint.Id}' resources/read failed: {ex}");
                 }
             }
 
             if (ExposeResourceReadTool || endpoint.ExposeResourceReadTool)
-                addedTools += AddResourceReadTool(env, session);
+                addedTools += AddResourceReadTool(env, session, existingToolNames);
 
             if (InjectServerInstructions)
                 addedFragments += AddServerInstructionsFragment(env, session, endpoint);
 
-            WriteDebug(env,
+            WriteLog(env, endpoint, McpLogLevel.Info,
                 $"endpoint '{endpoint.Id}' applied: {addedTools} tool(s), {addedFragments} fragment(s), " +
                 $"resource injection = {injection}.");
 
@@ -189,8 +208,28 @@ namespace ShimmerChatBuiltin.Mcp
             _ => endpoint.ResourceInjection
         };
 
+        /// <summary>
+        /// 处理端点连接/枚举/读取的运行时失败：按 <see cref="FailurePolicy"/> 决定中止本轮还是跳过该端点。
+        /// 取消与本地配置错误不走这里（它们始终显式返回）。
+        /// </summary>
+        private NodeResult HandleRuntimeFailure(PreGenerationEnv env, McpEndpointConfig endpoint,
+            string errorCode, string userMessage, string details, string debugMessage)
+        {
+            WriteLog(env, endpoint, McpLogLevel.Error, debugMessage);
+
+            if (FailurePolicy == McpFailurePolicy.Skip)
+            {
+                // 跳过后端点不再显式失败：降级必须可见，这里写一条不受 LogLevel 限制的告警。
+                WriteDebug(env, $"endpoint '{endpoint.Id}' unavailable and skipped: {userMessage}");
+                return NodeResult.SuccessResult();
+            }
+
+            return NodeResult.Failure(errorCode, userMessage, details, Id, Name);
+        }
+
         private static int AddTools(PreGenerationEnv env, McpEndpointSession session,
-            McpEndpointConfig endpoint, List<McpToolDescriptor> descriptors, bool selectedOnly)
+            McpEndpointConfig endpoint, List<McpToolDescriptor> descriptors, bool selectedOnly,
+            HashSet<string> existingNames)
         {
             var candidateNames = descriptors.Select(d => d.Name).ToList();
 
@@ -215,21 +254,26 @@ namespace ShimmerChatBuiltin.Mcp
             {
                 if (!enabledSet.Contains(descriptor.Name)) continue;
 
-                var bridge = new McpToolBridge(session, descriptor);
-                if (env.Transient.Tools.Any(t => t.GetDefinition().name == bridge.ExposedName))
-                    continue;
+                var exposedName = McpToolBridge.BuildExposedName(session.Config.Key, descriptor.Name);
+                if (existingNames.Contains(exposedName))
+                {
+                    // sanitize 可能把不同工具名映射到同一暴露名；改名为唯一形式而不是静默丢弃。
+                    exposedName = McpToolBridge.BuildUniqueExposedName(session.Config.Key, descriptor.Name, existingNames);
+                    WriteLog(env, endpoint, McpLogLevel.Info, $"tool '{descriptor.Name}' exposed name collides; using '{exposedName}'.");
+                }
 
-                env.Transient.Tools.Add(bridge);
+                existingNames.Add(exposedName);
+                env.Transient.Tools.Add(new McpToolBridge(session, descriptor, exposedName));
                 added++;
             }
 
             return added;
         }
 
-        private static int AddResourceReadTool(PreGenerationEnv env, McpEndpointSession session)
+        private static int AddResourceReadTool(PreGenerationEnv env, McpEndpointSession session, HashSet<string> existingNames)
         {
             var bridge = new McpResourceReadToolBridge(session);
-            if (env.Transient.Tools.Any(t => t.GetDefinition().name == bridge.ExposedName))
+            if (!existingNames.Add(bridge.ExposedName))
                 return 0;
 
             env.Transient.Tools.Add(bridge);
@@ -326,6 +370,13 @@ namespace ShimmerChatBuiltin.Mcp
 
         private static void WriteDebug(PreGenerationEnv env, string message)
         {
+            env.Persistent.DebugOutput.Write(nameof(McpPreGenerationNode), "Mcp", $"[MCP] {message}");
+        }
+
+        /// <summary>按端点日志级别输出端点作用域内的日志。</summary>
+        private static void WriteLog(PreGenerationEnv env, McpEndpointConfig endpoint, McpLogLevel level, string message)
+        {
+            if (!endpoint.LogsAt(level)) return;
             env.Persistent.DebugOutput.Write(nameof(McpPreGenerationNode), "Mcp", $"[MCP] {message}");
         }
     }

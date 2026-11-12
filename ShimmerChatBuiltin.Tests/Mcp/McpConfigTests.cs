@@ -64,7 +64,8 @@ public class McpEndpointCatalogTests
             ResourceInjection = McpResourceInjection.Selected,
             Resources = [new McpNamedToggle { Name = "file:///a.md", Enabled = true }],
             ExposeResourceReadTool = true,
-            ResourceCharBudget = 12345
+            ResourceCharBudget = 12345,
+            LogLevel = McpLogLevel.Debug
         };
 
         McpEndpointCatalog.Save(kv, [original]);
@@ -80,6 +81,7 @@ public class McpEndpointCatalogTests
         Assert.True(actual.ExposeResourceReadTool);
         Assert.Equal(12345, actual.ResourceCharBudget);
         Assert.Equal(McpResourceInjection.Selected, actual.ResourceInjection);
+        Assert.Equal(McpLogLevel.Debug, actual.LogLevel);
         Assert.Single(actual.Tools);
         Assert.Single(actual.Resources);
     }
@@ -108,6 +110,22 @@ public class McpEndpointCatalogTests
         Assert.Single(actual.Headers);
     }
 
+    [Theory]
+    [InlineData(McpLogLevel.Off, McpLogLevel.Off, true)]
+    [InlineData(McpLogLevel.Off, McpLogLevel.Error, false)]
+    [InlineData(McpLogLevel.Off, McpLogLevel.Debug, false)]
+    [InlineData(McpLogLevel.Error, McpLogLevel.Error, true)]
+    [InlineData(McpLogLevel.Error, McpLogLevel.Info, false)]
+    [InlineData(McpLogLevel.Info, McpLogLevel.Info, true)]
+    [InlineData(McpLogLevel.Info, McpLogLevel.Error, true)]
+    [InlineData(McpLogLevel.Debug, McpLogLevel.Info, true)]
+    public void LogsAt_RespectsThreshold(McpLogLevel configured, McpLogLevel requested, bool expected)
+    {
+        var config = new McpEndpointConfig { LogLevel = configured };
+
+        Assert.Equal(expected, config.LogsAt(requested));
+    }
+
     [Fact]
     public void Load_ThrowsReportableError_WhenJsonBroken()
     {
@@ -125,6 +143,32 @@ public class McpEndpointCatalogTests
         kv.Write(McpEndpointCatalog.SpaceId, McpEndpointCatalog.Key, "null");
 
         Assert.Throws<McpConfigException>(() => McpEndpointCatalog.Load(kv));
+    }
+
+    [Fact]
+    public void Load_NormalizesExplicitNullCollections()
+    {
+        var kv = new InMemoryKvData();
+        kv.Write(McpEndpointCatalog.SpaceId, McpEndpointCatalog.Key,
+            """[{"Id":"a","Name":"A","Command":"npx","Arguments":null,"Environment":null,"Headers":null,"Tools":null,"Resources":null}]""");
+
+        var actual = Assert.Single(McpEndpointCatalog.Load(kv));
+
+        Assert.NotNull(actual.Arguments);
+        Assert.NotNull(actual.Environment);
+        Assert.NotNull(actual.Headers);
+        Assert.NotNull(actual.Tools);
+        Assert.NotNull(actual.Resources);
+    }
+
+    [Fact]
+    public void Load_ThrowsReportableError_WhenCatalogContainsNullEntry()
+    {
+        var kv = new InMemoryKvData();
+        kv.Write(McpEndpointCatalog.SpaceId, McpEndpointCatalog.Key, "[null]");
+
+        var ex = Assert.Throws<McpConfigException>(() => McpEndpointCatalog.Load(kv));
+        Assert.Contains("null entry", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]

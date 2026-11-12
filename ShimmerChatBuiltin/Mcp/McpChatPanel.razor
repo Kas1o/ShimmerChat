@@ -368,22 +368,20 @@
             {
                 var session = await scope.EnsureConnectedAsync(endpoint.Id, ct);
                 state.Session = session;
-                state.Tools = (await session.GetToolsAsync(ct)).Select(McpToolDescriptor.From).ToList();
-                state.Resources = (await session.GetResourcesAsync(ct))
-                    .Select(r => new McpResourceDescriptor(r.Uri, r.Name, r.Title, r.Description, r.MimeType, null))
-                    .ToList();
-                state.Prompts = (await session.GetPromptsAsync(ct))
-                    .Select(p => new McpPromptDescriptor(
-                        p.Name, p.Title, p.Description,
-                        p.ProtocolPrompt.Arguments?.Select(a => new McpPromptArgumentDescriptor(
-                            a.Name, a.Title, a.Description, a.Required == true)).ToList()
-                            ?? (IReadOnlyList<McpPromptArgumentDescriptor>)[]))
-                    .ToList();
+                state.Tools = McpDescriptorFactory.Tools(await session.GetToolsAsync(ct));
+                state.Resources = McpDescriptorFactory.Resources(await session.GetResourcesAsync(ct));
+                state.Prompts = McpDescriptorFactory.Prompts(await session.GetPromptsAsync(ct));
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
                 state.Error = Loc["panel_mcp_chat.cancelled"];
                 failures.Add((endpoint, state.Error));
+            }
+            catch (OperationCanceledException ex)
+            {
+                // 令牌未取消却抛取消 = 内部超时（如 HTTP 请求超时），不是用户主动停止。
+                state.Error = ex.Message;
+                failures.Add((endpoint, ex.Message));
             }
             catch (Exception ex)
             {

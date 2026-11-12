@@ -74,10 +74,14 @@ namespace ShimmerChatBuiltin.Mcp
                             EnvironmentVariables = McpEndpointCatalog.ParseEnvironment(config.Environment)
                         };
 
-                        // 服务端 stderr 是日志通道：写入调试输出，绝不当成协议消息。
+                        // 服务端 stderr 是日志通道：绝不当成协议消息。
+                        // 仅在端点日志级别为 Debug 时转发，否则丢弃，避免刷屏。
                         var logger = loggerFactory?.CreateLogger("ShimmerChat.Mcp.Stdio");
                         stdioOptions.StandardErrorLines = line =>
-                            logger?.LogDebug("[MCP:{Endpoint}] {Line}", config.Id, line);
+                        {
+                            if (config.LogsAt(McpLogLevel.Debug))
+                                logger?.LogDebug("[MCP:{Endpoint}] {Line}", config.Id, line);
+                        };
 
                         candidate = new StdioClientTransport(stdioOptions, loggerFactory);
                         break;
@@ -119,10 +123,6 @@ namespace ShimmerChatBuiltin.Mcp
                 await SafeDisposeAsync(candidate, loggerFactory).ConfigureAwait(false);
                 throw;
             }
-            catch (McpConnectException)
-            {
-                throw;
-            }
             catch (Exception ex)
             {
                 await SafeDisposeAsync(candidate, loggerFactory).ConfigureAwait(false);
@@ -159,7 +159,8 @@ namespace ShimmerChatBuiltin.Mcp
             }
             catch (McpProtocolException ex) when (IsUnsupportedMethod(ex))
             {
-                Logger?.LogDebug("[MCP:{Endpoint}] resources/list unsupported: {Message}", Config.Id, ex.Message);
+                if (Config.LogsAt(McpLogLevel.Debug))
+                    Logger?.LogDebug("[MCP:{Endpoint}] resources/list unsupported: {Message}", Config.Id, ex.Message);
                 return _resources = [];
             }
         }
@@ -178,7 +179,8 @@ namespace ShimmerChatBuiltin.Mcp
             }
             catch (McpProtocolException ex) when (IsUnsupportedMethod(ex))
             {
-                Logger?.LogDebug("[MCP:{Endpoint}] prompts/list unsupported: {Message}", Config.Id, ex.Message);
+                if (Config.LogsAt(McpLogLevel.Debug))
+                    Logger?.LogDebug("[MCP:{Endpoint}] prompts/list unsupported: {Message}", Config.Id, ex.Message);
                 return _prompts = [];
             }
         }
@@ -361,9 +363,9 @@ namespace ShimmerChatBuiltin.Mcp
     /// <summary>JSON 参数解析：把工具调用的 arguments 字符串解析为 SDK 需要的字典。</summary>
     internal static class McpJsonArguments
     {
-        public static IReadOnlyDictionary<string, object> Parse(string? argumentsJson)
+        public static IReadOnlyDictionary<string, object?> Parse(string? argumentsJson)
         {
-            if (string.IsNullOrWhiteSpace(argumentsJson)) return new Dictionary<string, object>();
+            if (string.IsNullOrWhiteSpace(argumentsJson)) return new Dictionary<string, object?>();
 
             try
             {
@@ -372,7 +374,7 @@ namespace ShimmerChatBuiltin.Mcp
                     throw new McpConfigException(
                         $"MCP tool arguments must be a JSON object, got: {argumentsJson}");
 
-                var result = new Dictionary<string, object>(StringComparer.Ordinal);
+                var result = new Dictionary<string, object?>(StringComparer.Ordinal);
                 foreach (var (key, value) in obj)
                 {
                     if (value is null) continue;

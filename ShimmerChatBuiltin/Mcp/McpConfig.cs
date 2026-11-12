@@ -44,6 +44,25 @@ namespace ShimmerChatBuiltin.Mcp
     }
 
     /// <summary>
+    /// 单个 MCP 端点的日志详细程度，控制该端点的调试输出与服务端 stderr 转发。
+    /// 级别从低到高：Off &lt; Error &lt; Info &lt; Debug。
+    /// </summary>
+    public enum McpLogLevel
+    {
+        /// <summary>关闭该端点的所有 MCP 日志。</summary>
+        Off = 0,
+
+        /// <summary>仅记录失败与跳过的告警。</summary>
+        Error = 1,
+
+        /// <summary>默认：再包含应用摘要（工具数 / 片段数）。</summary>
+        Info = 2,
+
+        /// <summary>详细：再包含服务端 stderr 与能力枚举细节。</summary>
+        Debug = 3
+    }
+
+    /// <summary>
     /// 单个 MCP 端点的持久化配置。仅保存用户意图，不保存任何运行时连接状态。
     /// </summary>
     public class McpEndpointConfig
@@ -114,10 +133,16 @@ namespace ShimmerChatBuiltin.Mcp
         /// <summary>资源上下文注入的总字符预算，超出部分截断并标注。</summary>
         public int ResourceCharBudget { get; set; } = 24000;
 
+        /// <summary>该端点的日志详细程度（控制调试输出与服务端 stderr 转发）。</summary>
+        public McpLogLevel LogLevel { get; set; } = McpLogLevel.Info;
+
         /// <summary>
         /// 生成工具名/资源名使用的短标识。Id 已被约束为小写字母数字与 '_'。
         /// </summary>
         public string Key => string.IsNullOrWhiteSpace(Id) ? "mcp" : Id;
+
+        /// <summary>该端点是否应输出指定级别的日志（Off &lt; Error &lt; Info &lt; Debug）。</summary>
+        public bool LogsAt(McpLogLevel level) => LogLevel >= level;
 
         /// <summary>
         /// 计算该端点应暴露给 LLM 的工具名列表：
@@ -222,13 +247,35 @@ namespace ShimmerChatBuiltin.Mcp
 
             try
             {
-                return Newtonsoft.Json.JsonConvert.DeserializeObject<List<McpEndpointConfig>>(json)
+                var endpoints = Newtonsoft.Json.JsonConvert.DeserializeObject<List<McpEndpointConfig>>(json)
                     ?? throw new McpConfigException($"MCP endpoint catalog deserialized to null (space '{SpaceId}', key '{Key}').");
+
+                for (var i = 0; i < endpoints.Count; i++)
+                {
+                    var endpoint = endpoints[i]
+                        ?? throw new McpConfigException($"MCP endpoint catalog contains a null entry at index {i} (space '{SpaceId}', key '{Key}').");
+                    Normalize(endpoint);
+                }
+
+                return endpoints;
             }
             catch (Newtonsoft.Json.JsonException ex)
             {
                 throw new McpConfigException($"MCP endpoint catalog is not valid JSON: {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// 归一化从存储读取的端点：旧版/手改数据可能把集合字段写成显式 null，
+        /// 统一收敛为空集合，避免在连接、校验或渲染时触发 NullReferenceException。
+        /// </summary>
+        private static void Normalize(McpEndpointConfig endpoint)
+        {
+            endpoint.Arguments ??= [];
+            endpoint.Environment ??= [];
+            endpoint.Headers ??= [];
+            endpoint.Tools ??= [];
+            endpoint.Resources ??= [];
         }
 
         public static void Save(IKVDataService kvData, List<McpEndpointConfig> endpoints)
@@ -332,9 +379,9 @@ namespace ShimmerChatBuiltin.Mcp
         }
 
         /// <summary>把 "KEY=VALUE" 行解析为环境变量字典。</summary>
-        public static Dictionary<string, string> ParseEnvironment(IEnumerable<string> lines)
+        public static Dictionary<string, string?> ParseEnvironment(IEnumerable<string> lines)
         {
-            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            var result = new Dictionary<string, string?>(StringComparer.Ordinal);
             foreach (var line in lines)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;

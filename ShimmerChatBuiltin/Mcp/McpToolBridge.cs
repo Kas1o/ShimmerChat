@@ -169,20 +169,41 @@ namespace ShimmerChatBuiltin.Mcp
     public record McpPromptDescriptor(string Name, string? Title, string? Description, IReadOnlyList<McpPromptArgumentDescriptor> Arguments);
 
     /// <summary>
-    /// 把单个 MCP 工具暴露为 ShimmerChat <see cref="IToolV2"/>。
+    /// 把 SDK 会话枚举到的工具/资源/提示词统一转换为与 SDK 解耦的轻量描述。
+    /// 设置页探针与聊天面板共用，避免同一套转换逻辑在多处漂移。
+    /// </summary>
+    public static class McpDescriptorFactory
+    {
+        public static List<McpToolDescriptor> Tools(IReadOnlyList<ModelContextProtocol.Client.McpClientTool> tools) =>
+            tools.Select(McpToolDescriptor.From).ToList();
+
+        public static List<McpResourceDescriptor> Resources(IReadOnlyList<ModelContextProtocol.Client.McpClientResource> resources) =>
+            resources.Select(r => new McpResourceDescriptor(r.Uri, r.Name, r.Title, r.Description, r.MimeType, null)).ToList();
+
+        public static List<McpPromptDescriptor> Prompts(IReadOnlyList<ModelContextProtocol.Client.McpClientPrompt> prompts) =>
+            prompts.Select(p => new McpPromptDescriptor(
+                p.Name, p.Title, p.Description,
+                p.ProtocolPrompt.Arguments?.Select(a => new McpPromptArgumentDescriptor(
+                    a.Name, a.Title, a.Description, a.Required == true)).ToList()
+                    ?? (IReadOnlyList<McpPromptArgumentDescriptor>)[]))
+                .ToList();
+    }
+
+    /// <summary>
+    /// 把单个 MCP 工具暴露为 ShimmerChat <see cref="IToolV3"/>。
     /// 工具名会被规整为 LLM 可安全调用的形式：mcp_{endpoint}_{tool}。
     /// </summary>
-    public class McpToolBridge : IToolV2
+    public class McpToolBridge : IToolV3
     {
         private readonly McpEndpointSession _session;
         private readonly McpToolDescriptor _descriptor;
         private readonly string _exposedName;
 
-        public McpToolBridge(McpEndpointSession session, McpToolDescriptor descriptor)
+        public McpToolBridge(McpEndpointSession session, McpToolDescriptor descriptor, string? exposedName = null)
         {
             _session = session;
             _descriptor = descriptor;
-            _exposedName = BuildExposedName(session.Config.Key, descriptor.Name);
+            _exposedName = exposedName ?? BuildExposedName(session.Config.Key, descriptor.Name);
         }
 
         /// <summary>暴露给 LLM 的工具名。</summary>
@@ -193,16 +214,29 @@ namespace ShimmerChatBuiltin.Mcp
 
         public Tool GetDefinition() => McpToolSchemaMapper.ToTool(_descriptor, _exposedName);
 
-        public async Task<string> ExecuteAsync(string input)
+        public async Task<ToolResult> ExecuteAsync(ToolInvocationContext context, CancellationToken ct)
         {
             try
             {
-                return await _session.CallToolAsync(_descriptor.Name, input, CancellationToken.None).ConfigureAwait(false);
+                var text = await _session.CallToolAsync(_descriptor.Name, context.ArgumentsJson, ct).ConfigureAwait(false);
+                return ToolResult.Ok(text);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // 用户/宿主取消：上抛给执行节点，绝不伪造成“工具失败”继续下一轮。
+                throw;
+            }
+            catch (McpConfigException ex)
+            {
+                // 参数 JSON 非法属于预期内失败，给模型一个可直接读的错误文本。
+                return ToolResult.Fail(ToolErrorCodes.InvalidArguments, ex.Message, ex.ToString());
             }
             catch (Exception ex)
             {
-                // ToolCallLoop 按 continueOnToolError 决定是否上抛；这里返回可读文本并保留原始信息。
-                return $"[MCP error] tool '{_descriptor.Name}' on endpoint '{_session.Config.Name}': {ex.Message}";
+                // 协议/连接/服务端拒绝等：结构化失败；是否继续由 ToolCallLoop 的 continueOnToolError 决定。
+                return ToolResult.Fail(ToolErrorCodes.ServiceError,
+                    $"MCP tool '{_descriptor.Name}' on endpoint '{_session.Config.Name}' failed: {ex.Message}",
+                    ex.ToString());
             }
         }
 
@@ -231,6 +265,31 @@ namespace ShimmerChatBuiltin.Mcp
             return prefix + name[..keep] + "_" + hash;
         }
 
+        /// <summary>
+        /// 计算暴露名并确保在 <paramref name="taken"/> 中唯一。
+        /// sanitize 会把不同工具名（如 a/b 与 a_b）映射到同一暴露名，导致工具被静默丢弃；
+        /// 此时用原始工具名的短哈希追加后缀，并在极端碰撞下继续加序号。
+        /// </summary>
+        public static string BuildUniqueExposedName(string endpointKey, string toolName, ISet<string> taken)
+        {
+            var baseName = BuildExposedName(endpointKey, toolName);
+            if (!taken.Contains(baseName)) return baseName;
+
+            var candidate = AppendSuffix(baseName, ShortHash(toolName));
+            for (var i = 2; taken.Contains(candidate); i++)
+                candidate = AppendSuffix(baseName, ShortHash(toolName) + "_" + i);
+
+            return candidate;
+        }
+
+        private static string AppendSuffix(string name, string suffix)
+        {
+            var suffixWithSep = "_" + suffix;
+            if (name.Length + suffixWithSep.Length <= 64)
+                return name + suffixWithSep;
+            return name[..(64 - suffixWithSep.Length)] + suffixWithSep;
+        }
+
         private static string Sanitize(string raw)
         {
             var sb = new StringBuilder(raw.Length);
@@ -254,7 +313,7 @@ namespace ShimmerChatBuiltin.Mcp
     /// 为端点注入一个可调用的资源工具：
     /// 传入 uri 读取资源内容；传入空参数时返回该端点可用资源的清单。
     /// </summary>
-    public class McpResourceReadToolBridge : IToolV2
+    public class McpResourceReadToolBridge : IToolV3
     {
         private readonly McpEndpointSession _session;
         private readonly string _exposedName;
@@ -284,25 +343,32 @@ namespace ShimmerChatBuiltin.Mcp
             ]
         };
 
-        public async Task<string> ExecuteAsync(string input)
+        public async Task<ToolResult> ExecuteAsync(ToolInvocationContext context, CancellationToken ct)
         {
             try
             {
-                var uri = ExtractUri(input);
-                if (string.IsNullOrWhiteSpace(uri))
-                    return await ListResourcesAsync().ConfigureAwait(false);
-
-                return await _session.ReadResourceAsync(uri, CancellationToken.None).ConfigureAwait(false);
+                var uri = ExtractUri(context.ArgumentsJson);
+                var text = string.IsNullOrWhiteSpace(uri)
+                    ? await ListResourcesAsync(ct).ConfigureAwait(false)
+                    : await _session.ReadResourceAsync(uri, ct).ConfigureAwait(false);
+                return ToolResult.Ok(text);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // 用户/宿主取消：上抛给执行节点，绝不伪造成“工具失败”。
+                throw;
             }
             catch (Exception ex)
             {
-                return $"[MCP error] reading resource from endpoint '{_session.Config.Name}': {ex.Message}";
+                return ToolResult.Fail(ToolErrorCodes.ServiceError,
+                    $"Failed to read resource from endpoint '{_session.Config.Name}': {ex.Message}",
+                    ex.ToString());
             }
         }
 
-        private async Task<string> ListResourcesAsync()
+        private async Task<string> ListResourcesAsync(CancellationToken ct)
         {
-            var resources = await _session.GetResourcesAsync(CancellationToken.None).ConfigureAwait(false);
+            var resources = await _session.GetResourcesAsync(ct).ConfigureAwait(false);
             if (resources.Count == 0)
                 return $"Endpoint '{_session.Config.Name}' exposes no resources.";
 
