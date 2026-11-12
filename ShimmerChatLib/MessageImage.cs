@@ -1,5 +1,8 @@
 namespace ShimmerChatLib
 {
+	// TODO: 升级 C# 15 后改用 closed record / union
+
+
 	/// <summary>
 	/// 消息持久化的图像附件。
 	/// <para>

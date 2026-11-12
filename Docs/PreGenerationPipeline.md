@@ -129,6 +129,8 @@ public class PreGenerationPreset
 |------|------|
 | `SequenceNode` | 顺序执行子节点，支持 Repeat |
 | `FragmentNode` | 注入自定义片段 (role + content) |
+| `AdvancedFragmentNode` | 注入带图像、tool_calls、tool_call_id、thinking 与自定义参数的复杂角色片段 |
+| `SpecialRoleImageCarrierNode` | 把特殊角色的图像搬到相邻伪 user 消息，并与原消息成组 |
 | `CallNode` | 通过 PresetId 引用预设 |
 | `AppendChatMessagesNode` | 加载聊天历史并注入 Fragments |
 | `APISelectNode` | 选择 API 配置 |
@@ -137,6 +139,37 @@ public class PreGenerationPreset
 | `IfNode` / `AdvancedIfNode` | 条件分支 |
 | `SubAgentNode` | 嵌套子代理调用 |
 | `DynPromptNode` | 动态模板提示 |
+
+### 复杂角色片段 `AdvancedFragmentNode`
+
+`AdvancedFragmentNode` 是 `FragmentNode` 的高级版本，用于手工构造复杂角色负载，也用于在真实管线里复现特殊角色携带图像的场景：
+
+| 属性 | 说明 |
+|------|------|
+| `From` | 片段角色，包含 `tool_result` |
+| `Content` | 文本内容，可为空（构造纯图像消息） |
+| `ImagesJson` | 图像数组：base64 字符串、data URL，或 `{ "mimeType": "image/png", "base64": "..." }` 对象 |
+| `ToolCallId` | `tool_result` 必填，写入 `ChatMessage.id` |
+| `ToolCallsJson` | assistant 的 `tool_calls` 数组；`arguments` 为对象时自动序列化成字符串 |
+| `Thinking` | assistant 的 `reasoning_content`，留空表示不携带 |
+| `CustomPropertiesJson` | 消息级自定义参数，合并到请求体的 message 对象 |
+
+节点只做解析与构造，不判断角色“是否应该”携带某个字段——不同兼容端点与客户端 `as_is` 模式的接受范围不同；唯一的结构性校验是 `tool_result` 必须带 `ToolCallId`。图像或 JSON 非法时返回 `PARSE_ERROR` / `DATA_MISSING`，不会添加半成品片段。
+
+注意：OpenAI 客户端不会序列化 `tool_result` 消息的 `Images`（tool 分支只发 `content` 与 `tool_call_id`）。用本节点构造带图工具结果时，必须同时加入 `SpecialRoleImageCarrierNode`，否则图像会在请求构建阶段被丢弃。
+
+### 特殊角色图像搬运 `SpecialRoleImageCarrierNode`
+
+OpenAI Chat Completions 规范中只有 `user` 消息允许 `image_url`；`system` / `assistant` / `tool` 携带图像属于部分兼容端点的扩展。该节点把这些角色消息中的图像拆到一条相邻的伪 `user` 消息里，原消息保留文本、`tool_calls`、`tool_call_id`、`thinking` 与自定义参数，两者通过片段 `Metadata["image_carrier_group"]` 标记为同一组（伪消息另有 `Metadata["image_carrier"] = "synthetic"`）。
+
+拆分位置按协议约束决定：
+
+- **system**：原消息在前、伪 user 在后，保持 system 仍可位于对话开头。
+- **tool_result**：整段连续工具结果全部输出后，再追加一条伪 user，图像合并到这一条消息；绝不把 user 消息插进 `assistant(tool_calls)` 与 `tool` 之间。
+- **assistant**：伪 user 在前、原 assistant 在后，assistant 带 `tool_calls` 时同样不破坏配对。
+
+节点是显式兼容开关：目标端点本身支持特殊角色图像时不要加入。只有被勾选的角色会被处理，`user` 图像永远不动；图像 Base64 缺失时返回 `DATA_MISSING`，且不会对上下文做部分改写。
+
 
 ### 子智能体工具 `subagent_call` 的会话
 
