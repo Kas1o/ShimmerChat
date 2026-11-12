@@ -116,6 +116,23 @@ public class McpRegistryFingerprintTests
 
         Assert.NotEqual(McpRegistry.ComputeFingerprint(a), McpRegistry.ComputeFingerprint(b));
     }
+
+    [Fact]
+    public void Fingerprint_ChangesWhenProtocolModeChanges()
+    {
+        var legacy = Stdio("npx");
+        var auto = Stdio("npx");
+        auto.ProtocolMode = McpProtocolMode.Auto;
+
+        Assert.NotEqual(McpRegistry.ComputeFingerprint(legacy), McpRegistry.ComputeFingerprint(auto));
+    }
+
+    [Fact]
+    public void DefaultProtocolMode_IsLegacyHandshake()
+    {
+        // 默认锁定握手版本：SDK 不会发 server/discover 探测，也就没有探测超时与报错。
+        Assert.Equal(McpProtocolMode.Legacy, new McpEndpointConfig().ProtocolMode);
+    }
 }
 
 /// <summary>

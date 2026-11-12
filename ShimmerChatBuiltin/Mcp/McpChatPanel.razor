@@ -116,7 +116,10 @@
     @foreach (var state in _stateSnapshot)
     {
         var s = state;
-        <details class="plugin-item su-mb-2" open="@s.Open" @ontoggle="ev => OnDetailsToggle(s, ev)">
+        @* open 是静态属性：折叠状态完全交给浏览器管理。
+           若绑定到 @s.Open 并在 ontoggle 里取反，重渲染会把属性写回相反值，
+           再次触发 ontoggle，形成振荡——这就是面板闪烁的原因。 *@
+        <details class="plugin-item su-mb-2" open @key="s.Endpoint.Id">
             <summary class="plugin-summary">
                 <span class="plugin-name">
                     @if (s.Session == null)
@@ -671,13 +674,6 @@
 
     private void OnDraftInput(ChangeEventArgs e) => SetDraft(e.Value?.ToString() ?? "");
 
-    private void OnDetailsToggle(EndpointState state, EventArgs e)
-    {
-        // details 的展开状态由浏览器 DOM 维护；这里只避免重渲染时覆盖用户的折叠操作。
-        // Blazor 对 details 的 open 属性不做双向绑定，因此无需读取具体值。
-        state.Open = !state.Open;
-    }
-
     private void ClearInsertedPreview() => insertedText = "";
 
     private void SetDraft(string value)
@@ -834,6 +830,7 @@
         public List<McpResourceDescriptor> Resources { get; set; } = [];
         public List<McpPromptDescriptor> Prompts { get; set; } = [];
 
+        /// <summary>折叠状态仅供初次渲染参考；之后由浏览器 DOM 主导，不再回写。</summary>
         public bool Open { get; set; } = true;
         public McpPromptDescriptor? ActivePrompt { get; set; }
         public Dictionary<string, string?> PromptArguments { get; } = new(StringComparer.Ordinal);

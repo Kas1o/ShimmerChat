@@ -449,6 +449,7 @@ namespace ShimmerChatBuiltin.Mcp
         {
             var sb = new StringBuilder();
             sb.Append(config.Transport).Append('\n');
+            sb.Append(config.ProtocolMode).Append('\n');
 
             switch (config.Transport)
             {

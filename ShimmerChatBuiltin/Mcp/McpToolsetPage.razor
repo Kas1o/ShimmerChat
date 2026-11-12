@@ -173,6 +173,17 @@
                             </select>
                             <p class="su-text-sm su-text-2">@Loc["panel_mcp.log_level_hint"]</p>
                         </div>
+
+                        <div class="su-mt-2">
+                            <label class="su-text-sm">@Loc["panel_mcp.protocol_mode"]</label>
+                            <select class="su-select" value="@e.ProtocolMode"
+                                    @onchange="ev => ChangeProtocolMode(e, ev)">
+                                <option value="Legacy">@Loc["panel_mcp.protocol_legacy"]</option>
+                                <option value="Auto">@Loc["panel_mcp.protocol_auto"]</option>
+                                <option value="Modern">@Loc["panel_mcp.protocol_modern"]</option>
+                            </select>
+                            <p class="su-text-sm su-text-2">@Loc["panel_mcp.protocol_mode_hint"]</p>
+                        </div>
                     </div>
 
                     <div class="su-col-6">
@@ -587,6 +598,14 @@
         MarkDirty();
     }
 
+    private void ChangeProtocolMode(EditorModel endpoint, ChangeEventArgs e)
+    {
+        endpoint.ProtocolMode = Enum.TryParse<McpProtocolMode>(e.Value?.ToString(), out var mode)
+            ? mode
+            : McpProtocolMode.Legacy;
+        MarkDirty();
+    }
+
     private void ShowStatus(string message, bool isError)
     {
         statusMessage = message;
@@ -633,6 +652,7 @@
         public bool ExposeResourceReadTool { get => Config.ExposeResourceReadTool; set => Config.ExposeResourceReadTool = value; }
         public int ResourceCharBudget { get => Config.ResourceCharBudget; set => Config.ResourceCharBudget = value; }
         public McpLogLevel LogLevel { get => Config.LogLevel; set => Config.LogLevel = value; }
+        public McpProtocolMode ProtocolMode { get => Config.ProtocolMode; set => Config.ProtocolMode = value; }
         public List<McpNamedToggle> Tools => Config.Tools;
         public List<McpNamedToggle> Resources => Config.Resources;
 

@@ -48,6 +48,23 @@ stderr 仅作为日志通道（转发到 `ILogger`，绝不会被当作协议消
 D:\data
 ```
 
+### 2.3 协议版本：`ProtocolMode`
+
+SDK 在 `ProtocolVersion` 为 null（默认）时会先向服务端发 `server/discover` 探测 `2026-07-28`（无握手时代），
+不支持时才回退到 `initialize` 握手。很多现有服务端不识别该方法且**不回响应**，于是客户端会一直等到探测超时，
+日志里出现一条 `Client (ShimmerChat …) client initialization error … TaskCanceledException`，然后才回退——
+功能正常，但会白等一次超时并刷错误日志。
+
+因此端点新增 `ProtocolMode`：
+
+| `ProtocolMode` | SDK `ProtocolVersion` | 行为 |
+|----------------|----------------------|------|
+| `Legacy`（**默认**） | `2025-11-25` | 直接 `initialize` 握手，**不探测**、无探测超时日志 |
+| `Auto` | `null` | SDK 探测 + 自动回退；探测超时被限制为 `min(握手超时, 5s)` |
+| `Modern` | `2026-07-28` | 仅无握手新版协议，服务端不支持则直接失败（不降级） |
+
+`ProtocolMode` 属于连接指纹的一部分：切换它会丢弃旧连接重建。
+
 ### 2.2 Streamable HTTP（首选）→ SSE（回退）
 
 使用 SDK `HttpClientTransport`，`HttpMode` 映射到 `HttpTransportMode`：
@@ -157,6 +174,9 @@ MCP 连接由 **`McpRegistry`（进程级静态单例，完全位于内置插件
 - **失败只在面板内提示**：连接失败、枚举失败、资源读取失败、发送失败都渲染为面板内的错误块，
   **全程不弹窗**；加载中显示进度，全部失败时给出汇总提示。
 - **渲染快照**：后台任务只改写状态集合的**结构外**内容，渲染遍历只读快照，避免「集合已被修改」异常。
+- **折叠不振荡**：`<details>` 的 `open` 是静态属性，折叠状态完全交给浏览器，不在 `ontoggle` 里回写状态。
+  若把 `open` 绑定到组件字段并在 `ontoggle` 中取反，重渲染会把属性写回相反值，再次触发 `ontoggle`，
+  形成振荡——这是早期“面板闪烁”的根因。
 - **交互超时**：提示词渲染与资源读取各自带独立超时，不借用重载用的取消令牌，避免按钮永久卡在「处理中」。
 - **PROMPTS 模板应用**：
   1. 展开某个提示词模板，按 `prompts/list` 返回的 `arguments` 生成参数表单（必填项标注 `*`）；

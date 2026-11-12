@@ -18,6 +18,12 @@ namespace ShimmerChatBuiltin.Mcp
         private readonly McpClient _client;
         private readonly ILoggerFactory? _loggerFactory;
 
+        /// <summary>
+        /// 自动探测模式下的 <c>server/discover</c> 超时上限。
+        /// 服务端不认识该方法时往往不回响应，不限制就会白等到握手超时。
+        /// </summary>
+        private static readonly TimeSpan DiscoverProbeBudget = TimeSpan.FromSeconds(5);
+
         private IReadOnlyList<McpClientTool>? _tools;
         private IReadOnlyList<McpClientResource>? _resources;
         private IReadOnlyList<McpClientPrompt>? _prompts;
@@ -54,11 +60,34 @@ namespace ShimmerChatBuiltin.Mcp
                 throw new McpConfigException($"MCP endpoint id '{config.Id}' contains characters other than [A-Za-z0-9_].");
 
             IClientTransport candidate;
+            var initTimeout = TimeSpan.FromSeconds(Math.Max(1, config.InitializationTimeoutSeconds));
+
             var options = new McpClientOptions
             {
                 ClientInfo = new Implementation { Name = "ShimmerChat", Version = McpClientInfo.Version },
-                InitializationTimeout = TimeSpan.FromSeconds(Math.Max(1, config.InitializationTimeoutSeconds))
+                InitializationTimeout = initTimeout
             };
+
+            // 协议版本策略：
+            // - Legacy（默认）锁定握手版本 → SDK 不探测，直接 initialize。
+            // - Modern 锁定无握手版本 → 服务端不支持时直接失败（不降级）。
+            // - Auto 交给 SDK 探测；探测超时单独限制，避免默认等到握手超时才回退。
+            switch (config.ProtocolMode)
+            {
+                case McpProtocolMode.Legacy:
+                    options.ProtocolVersion = McpProtocolVersions.LegacyHandshake;
+                    break;
+
+                case McpProtocolMode.Modern:
+                    options.ProtocolVersion = McpProtocolVersions.ModernStateless;
+                    break;
+
+                default:
+                    options.DiscoverProbeTimeout = initTimeout < DiscoverProbeBudget
+                        ? initTimeout
+                        : DiscoverProbeBudget;
+                    break;
+            }
 
             switch (config.Transport)
             {

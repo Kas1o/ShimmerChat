@@ -30,6 +30,38 @@ namespace ShimmerChatBuiltin.Mcp
         Sse = 2
     }
 
+    /// <summary>
+    /// 协议版本协商策略。
+    /// <para>
+    /// SDK 默认（自动）会先向服务端发 <c>server/discover</c> 探测 2026-07-28（无握手时代）。
+    /// 若服务端不认识该方法且不回响应，客户端会一直等到探测超时，日志里就会出现一条
+    /// <c>client initialization error / TaskCanceledException</c>，然后才回退到 <c>initialize</c> 握手
+    /// ——功能正常，但会白等一次超时并刷错误日志。
+    /// </para>
+    /// <para>绝大多数现有服务端仍属握手时代，因此默认锁定握手版本，完全跳过探测。</para>
+    /// </summary>
+    public enum McpProtocolMode
+    {
+        /// <summary>自动探测：先用 2026-07-28，不支持时回退握手。（会产生一条预期内的探测超时日志）</summary>
+        Auto = 0,
+
+        /// <summary>默认：锁定 2025-11-25（最后一个握手版本），跳过探测。</summary>
+        Legacy = 1,
+
+        /// <summary>锁定 2026-07-28（无握手、无 Streamable HTTP 会话），不接受降级。</summary>
+        Modern = 2
+    }
+
+    /// <summary>MCP 协议版本号（日期式版本）。</summary>
+    public static class McpProtocolVersions
+    {
+        /// <summary>最后一个支持 initialize 握手的版本。</summary>
+        public const string LegacyHandshake = "2025-11-25";
+
+        /// <summary>移除 initialize 握手与 Streamable HTTP 会话的版本。</summary>
+        public const string ModernStateless = "2026-07-28";
+    }
+
     /// <summary>资源注入模式。节点级与端点级共用。</summary>
     public enum McpResourceInjection
     {
@@ -109,6 +141,14 @@ namespace ShimmerChatBuiltin.Mcp
 
         /// <summary>附加 HTTP 请求头（每行 KEY: VALUE）。常用于 Authorization。</summary>
         public List<string> Headers { get; set; } = [];
+
+        // ---- 协议 ----
+
+        /// <summary>
+        /// 协议版本协商策略。默认锁定握手版本，不对服务端做 2026-07-28 探测，
+        /// 避免“探测超时 → 报错 → 回退”的白等与日志噪音。
+        /// </summary>
+        public McpProtocolMode ProtocolMode { get; set; } = McpProtocolMode.Legacy;
 
         // ---- 暴露策略 ----
 
