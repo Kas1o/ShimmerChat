@@ -44,6 +44,7 @@ namespace ShimmerChatBuiltin.SubAgent
         private readonly ILocService _locService;
         private readonly IDebugOutputService _debugOutput;
         private readonly IPostGenerationManagerService? _postGenerationManager;
+        private readonly IServiceProvider? _services;
 
         private readonly List<SubAgentEntry> _entries = new();
 
@@ -57,7 +58,8 @@ namespace ShimmerChatBuiltin.SubAgent
             IToolRegistry toolRegistry, Guid chatGuid, Guid agentGuid,
             IPreGenerationNodeSerializer serializer, ILocService locService,
             IDebugOutputService debugOutput,
-            IPostGenerationManagerService? postGenerationManager = null)
+            IPostGenerationManagerService? postGenerationManager = null,
+            IServiceProvider? services = null)
         {
             _kvData = kvData;
             _toolRegistry = toolRegistry;
@@ -67,6 +69,7 @@ namespace ShimmerChatBuiltin.SubAgent
             _locService = locService;
             _debugOutput = debugOutput;
             _postGenerationManager = postGenerationManager;
+            _services = services;
         }
 
         /// <summary>注册一个 SubAgent 配置（使用继承父级身份的默认选项）。</summary>
@@ -241,7 +244,8 @@ namespace ShimmerChatBuiltin.SubAgent
                 DebugOutput = _debugOutput,
                 PostGenerationManager = _postGenerationManager,
                 Chat = new Chat { Name = session.Title, Guid = chatGuid },
-                Agent = CreateVirtualAgent(agentGuid)
+                Agent = CreateVirtualAgent(agentGuid),
+                Services = _services
             };
             persistent.Chat.Messages = new ObservableCollection<Message>(seedMessages);
 
@@ -341,6 +345,22 @@ namespace ShimmerChatBuiltin.SubAgent
             catch (Exception ex)
             {
                 return Fail(scope, config, ErrorCodes.LoopFailed, $"[SubAgent Error: {ex.Message}]", ex.Message);
+            }
+            finally
+            {
+                // 释放子代理生成期间注册的会话级资源（如 MCP 连接）。
+                if (persistent.Resources.Count > 0)
+                {
+                    try
+                    {
+                        await persistent.Resources.DisposeAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _debugOutput.Write("SubAgentToolV2", "ResourceCleanup",
+                            $"[SubAgentToolV2] Generation-scoped resource cleanup failed: {ex}");
+                    }
+                }
             }
 
             var outputText = SubAgentFormatter.Format(config.OutputMode, host.CurrentContext);
