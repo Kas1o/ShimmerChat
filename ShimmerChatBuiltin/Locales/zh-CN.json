@@ -203,6 +203,7 @@
   "panel_mcp_chat.resources": "资源（{0}）",
   "panel_mcp_chat.read_first": "读取第一个资源",
   "panel_mcp_chat.cancelled": "加载已取消。",
+  "panel_mcp_chat.operation_timeout": "操作超时，请稍后重试。",
   "panel_mcp_chat.empty_arguments": "无需参数。",
 
   "panel.variable.desc": "管理对话中的变量，支持 Agent 和 Chat 两种作用域",

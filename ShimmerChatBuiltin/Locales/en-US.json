@@ -203,6 +203,7 @@
   "panel_mcp_chat.resources": "Resources ({0})",
   "panel_mcp_chat.read_first": "Read first resource",
   "panel_mcp_chat.cancelled": "Loading was cancelled.",
+  "panel_mcp_chat.operation_timeout": "The operation timed out. Please try again.",
   "panel_mcp_chat.empty_arguments": "No arguments required.",
 
   "panel.variable.desc": "Manage variables in conversations, supports Agent and Chat scopes",

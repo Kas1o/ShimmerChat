@@ -35,7 +35,7 @@
 
 <div class="mcp-chat-panel">
     <div class="su-flex su-items-center su-gap-2 su-mb-2 su-flex-wrap">
-        <button class="su-btn su-btn-sm" @onclick="ReloadAsync" disabled="@loading">
+        <button class="su-btn su-btn-sm" @onclick="StartReload" disabled="@loading">
             <span class="bi bi-arrow-clockwise"></span> @Loc["panel_mcp_chat.reload"]
         </button>
         @if (loading)
@@ -48,13 +48,13 @@
         }
         <label class="su-flex su-items-center su-gap-1 su-text-sm">
             <input type="checkbox" class="su-check" checked="@autoReload"
-                   @onchange="ev => autoReload = (bool)(ev.Value ?? true)" />
+                   @onchange="OnAutoReloadChanged" />
             @Loc["panel_mcp_chat.auto_reload"]
         </label>
     </div>
 
     @* 连接失败与其它问题只在面板内提示，不弹窗。 *@
-    @foreach (var failure in failures)
+    @foreach (var failure in _failureSnapshot)
     {
         <div class="su-mb-2 su-px-3 su-py-2 su-rounded su-text-sm mcp-panel-error">
             <div>
@@ -113,7 +113,7 @@
         </div>
     }
 
-    @foreach (var state in states)
+    @foreach (var state in _stateSnapshot)
     {
         var s = state;
         <details class="plugin-item su-mb-2" open="@s.Open" @ontoggle="ev => OnDetailsToggle(s, ev)">
@@ -296,7 +296,18 @@
     private bool _disposed;
     private Guid? _loadedForChat;
 
-    private int ConnectedCount => states.Count(s => s.Session != null);
+    /// <summary>failures 会被多个并行连接任务写入，必须串行化。</summary>
+    private readonly object _uiGate = new();
+
+    /// <summary>
+    /// 渲染用的只读快照。后台连接任务会改写 states/failures 的<b>结构</b>，
+    /// 而 Blazor 在另一个线程渲染；直接遍历可变 List 会抛“集合已被修改”。
+    /// 快照只固定结构，元素对象仍共享引用，因此能反映最新的连接状态。
+    /// </summary>
+    private IReadOnlyList<EndpointState> _stateSnapshot = [];
+    private IReadOnlyList<(McpEndpointConfig Endpoint, string Message)> _failureSnapshot = [];
+
+    private int ConnectedCount => _stateSnapshot.Count(s => s.Session != null);
 
     private bool IsGenerating => PanelContext?.IsGenerating() ?? false;
 
@@ -305,41 +316,125 @@
 
     private string EffectiveDraft => PanelContext?.Draft ?? _localDraft;
 
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync()
     {
         // 本面板不需要接收对话事件（EventHandlerReg），只按需读取当前端点的能力清单。
-        // ChatGuid 变化（切换对话）时必须重载，否则会显示上一个对话的连接状态。
-        if (_loadedForChat != ChatGuid)
+        //
+        // 关键：绝不在这里 await 连接。OnParametersSetAsync 返回前 Blazor 不会提交渲染，
+        // 而 MCP 握手可能耗时数十秒（失败的端点要等满握手超时），会把整个对话界面卡住。
+        var chatChanged = _loadedForChat != ChatGuid;
+        _loadedForChat = ChatGuid;
+
+        if (!chatChanged && (states.Count > 0 || loading))
+            return Task.CompletedTask;
+
+        insertedText = "";
+        panelMessage = "";
+
+        // 先显示面板骨架，再决定要不要建连。
+        if (autoReload)
+            StartReload();
+        else
+            _ = ResetWithoutConnectingAsync();
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 关掉「自动重载」时的路径：清掉上一对话的残留状态并释放连接，但不主动建立任何连接。
+    /// 同样不能在生命周期方法里 await（释放子进程也可能耗时）。
+    /// </summary>
+    private async Task ResetWithoutConnectingAsync()
+    {
+        try
         {
-            _loadedForChat = ChatGuid;
-            insertedText = "";
-            panelMessage = "";
-            await ReloadAsync();
+            loading = true;
+            await SafeRefreshAsync();
+
+            await DisposeScopeAsync();
+
+            states.Clear();
+            lock (_uiGate)
+            {
+                failures.Clear();
+                _stateSnapshot = [];
+                _failureSnapshot = [];
+            }
         }
-        else if (endpoints.Count == 0 && !loading)
+        catch (Exception ex)
         {
-            await ReloadAsync();
+            LoggerFactory?.CreateLogger("ShimmerChat.Mcp.Panel")
+                .LogError(ex, "[MCP] panel reset failed: {Message}", ex.Message);
+            PanelFail(new McpEndpointConfig { Id = "panel", Name = "MCP" }, ex.Message);
+        }
+        finally
+        {
+            loading = false;
+            await SafeRefreshAsync();
         }
     }
 
-    private async Task ReloadAsync()
+    /// <summary>
+    /// 启动一次后台重载。面板立即渲染「连接中」，连接在后台并行进行。
+    /// 每个后台任务拥有自己的 CTS，互不影响。
+    /// </summary>
+    private void StartReload()
+    {
+        if (_disposed || loading) return;
+
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+        var previous = Interlocked.Exchange(ref _loadCts, cts);
+        try
+        {
+            previous?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 旧任务已自行收尾，无需处理。
+        }
+
+        _ = RunReloadAsync(cts);
+    }
+
+    /// <summary>后台重载的异常收口：没有调用方，异常必须自己消化并留痕，否则会被静默丢弃。</summary>
+    private async Task RunReloadAsync(CancellationTokenSource cts)
+    {
+        try
+        {
+            await ReloadAsync(cts.Token);
+        }
+        catch (Exception ex)
+        {
+            LoggerFactory?.CreateLogger("ShimmerChat.Mcp.Panel")
+                .LogError(ex, "[MCP] panel reload failed: {Message}", ex.Message);
+            PanelFail(new McpEndpointConfig { Id = "panel", Name = "MCP" }, ex.Message);
+            await SafeRefreshAsync();
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _loadCts, null, cts);
+            cts.Dispose();
+        }
+    }
+
+    private async Task ReloadAsync(CancellationToken ct)
     {
         if (loading || _disposed) return;
 
         loading = true;
         panelMessage = "";
-        await InvokeAsync(StateHasChanged);
-
-        _loadCts?.Cancel();
-        _loadCts?.Dispose();
-        _loadCts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-        var ct = _loadCts.Token;
+        await SafeRefreshAsync();
 
         // 上一轮的连接先释放，避免重复拉起子进程。
         await DisposeScopeAsync();
 
         states.Clear();
-        failures.Clear();
+        lock (_uiGate)
+        {
+            failures.Clear();
+            _stateSnapshot = [];
+            _failureSnapshot = [];
+        }
         insertedText = "";
 
         try
@@ -348,56 +443,106 @@
         }
         catch (McpConfigException ex)
         {
-            failures.Add((new McpEndpointConfig { Id = "config", Name = "MCP" }, ex.Message));
+            PanelFail(new McpEndpointConfig { Id = "config", Name = "MCP" }, ex.Message);
             loading = false;
+            await SafeRefreshAsync();
             return;
         }
 
-        scope = new McpSessionScope(endpoints, LoggerFactory);
+        var newScope = new McpSessionScope(endpoints, LoggerFactory);
+        scope = newScope;
 
-        // 异步加载：逐个端点连接，失败只记录到面板内，不弹窗。
-        foreach (var endpoint in endpoints)
-        {
-            if (ct.IsCancellationRequested) break;
+        // 先把全部端点以「连接中」列出，再并行建立连接。
+        // 串行连接会让总耗时随端点数线性叠加（N × 握手超时）。
+        var pending = endpoints.Select(e => new EndpointState(e)).ToList();
+        states.AddRange(pending);
+        PublishStates();
+        await SafeRefreshAsync();
 
-            var state = new EndpointState(endpoint);
-            states.Add(state);
-            await InvokeAsync(StateHasChanged);
-
-            try
-            {
-                var session = await scope.EnsureConnectedAsync(endpoint.Id, ct);
-                state.Session = session;
-                state.Tools = McpDescriptorFactory.Tools(await session.GetToolsAsync(ct));
-                state.Resources = McpDescriptorFactory.Resources(await session.GetResourcesAsync(ct));
-                state.Prompts = McpDescriptorFactory.Prompts(await session.GetPromptsAsync(ct));
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                state.Error = Loc["panel_mcp_chat.cancelled"];
-                failures.Add((endpoint, state.Error));
-            }
-            catch (OperationCanceledException ex)
-            {
-                // 令牌未取消却抛取消 = 内部超时（如 HTTP 请求超时），不是用户主动停止。
-                state.Error = ex.Message;
-                failures.Add((endpoint, ex.Message));
-            }
-            catch (Exception ex)
-            {
-                state.Error = ex.Message;
-                failures.Add((endpoint, ex.Message));
-            }
-
-            await InvokeAsync(StateHasChanged);
-        }
+        await Task.WhenAll(pending.Select(state => LoadEndpointAsync(state, newScope, ct)));
 
         loading = false;
         if (states.Count > 0 && ConnectedCount == 0)
             panelMessage = Loc["panel_mcp_chat.all_failed"];
 
+        await SafeRefreshAsync();
+    }
+
+    /// <summary>连接并枚举单个端点的能力清单。失败只写进该端点的状态与面板错误列表。</summary>
+    private async Task LoadEndpointAsync(EndpointState state, McpSessionScope scope, CancellationToken ct)
+    {
+        try
+        {
+            var session = await scope.EnsureConnectedAsync(state.Endpoint.Id, ct);
+            state.Session = session;
+            state.Tools = McpDescriptorFactory.Tools(await session.GetToolsAsync(ct));
+            state.Resources = McpDescriptorFactory.Resources(await session.GetResourcesAsync(ct));
+            state.Prompts = McpDescriptorFactory.Prompts(await session.GetPromptsAsync(ct));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            state.Error = Loc["panel_mcp_chat.cancelled"];
+            PanelFail(state.Endpoint, state.Error);
+        }
+        catch (OperationCanceledException ex)
+        {
+            // 令牌未取消却抛取消 = 内部超时（如 HTTP 请求超时），不是用户主动停止。
+            state.Error = ex.Message;
+            PanelFail(state.Endpoint, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            state.Error = ex.Message;
+            PanelFail(state.Endpoint, ex.Message);
+        }
+
+        await SafeRefreshAsync();
+    }
+
+    private void PanelFail(McpEndpointConfig endpoint, string message)
+    {
+        lock (_uiGate)
+        {
+            failures.Add((endpoint, message));
+            _failureSnapshot = failures.ToArray();
+        }
+    }
+
+    /// <summary>把 states 的结构同步到渲染快照（结构只在重载时变动，调用频率很低）。</summary>
+    private void PublishStates()
+    {
+        lock (_uiGate) _stateSnapshot = states.ToArray();
+    }
+
+    /// <summary>自动加载开关：勾选时立即补一次加载，取消勾选则保留当前状态不再重连。</summary>
+    private void OnAutoReloadChanged(ChangeEventArgs e)
+    {
+        autoReload = e.Value is bool flag && flag;
+        if (autoReload && _stateSnapshot.Count == 0 && !loading)
+            StartReload();
+    }
+
+    /// <summary>交互式操作（提示词渲染 / 资源读取）的超时，避免面板按钮永远卡在「处理中」。</summary>
+    private static CancellationTokenSource CreateOperationTimeout() =>
+        new(TimeSpan.FromSeconds(McpTimeouts.HttpRequestSeconds));
+
+    /// <summary>组件已释放时不再触发重绘，避免后台任务在 circuit 关闭后抛异常。</summary>
+    private async ValueTask SafeRefreshAsync()
+    {
         if (_disposed) return;
-        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // circuit/组件已销毁：停止刷新即可，无需向用户报告。
+        }
+        catch (InvalidOperationException)
+        {
+            // 渲染器已关闭（例如页面已导航离开）：同上。
+        }
     }
 
     private async Task TogglePrompt(EndpointState state, McpPromptDescriptor prompt)
@@ -417,7 +562,7 @@
         foreach (var arg in prompt.Arguments)
             state.PromptArguments[arg.Name] = "";
 
-        await InvokeAsync(StateHasChanged);
+        await SafeRefreshAsync();
     }
 
     private async Task RenderPromptAsync(EndpointState state, McpPromptDescriptor prompt)
@@ -426,7 +571,7 @@
 
         state.PromptRendering = true;
         state.PromptError = "";
-        await InvokeAsync(StateHasChanged);
+        await SafeRefreshAsync();
 
         try
         {
@@ -446,10 +591,17 @@
                 a => (object?)(state.PromptArguments.GetValueOrDefault(a.Name) ?? ""),
                 StringComparer.Ordinal);
 
-            var result = await state.Session.GetPromptAsync(prompt.Name, arguments, _loadCts?.Token ?? CancellationToken.None);
+            // 每次操作自带超时：不借用重载用的 CTS（它可能已结束或被下一轮取消）。
+            using var opCts = CreateOperationTimeout();
+            var result = await state.Session.GetPromptAsync(prompt.Name, arguments, opCts.Token);
             state.RenderedPrompt = FlattenPrompt(result);
             if (string.IsNullOrWhiteSpace(state.RenderedPrompt))
                 state.PromptError = Loc["panel_mcp_chat.empty_prompt"];
+        }
+        catch (OperationCanceledException)
+        {
+            // 内部超时：对用户就是「这次操作没能完成」。
+            state.PromptError = Loc["panel_mcp_chat.operation_timeout"];
         }
         catch (Exception ex)
         {
@@ -458,7 +610,7 @@
         finally
         {
             state.PromptRendering = false;
-            await InvokeAsync(StateHasChanged);
+            await SafeRefreshAsync();
         }
     }
 
@@ -548,7 +700,7 @@
         if (PanelContext.IsGenerating())
         {
             panelMessage = Loc["panel_mcp_chat.generating"];
-            await InvokeAsync(StateHasChanged);
+            await SafeRefreshAsync();
             return;
         }
 
@@ -564,7 +716,7 @@
             panelMessage = Loc["panel_mcp_chat.send_failed"];
         }
 
-        await InvokeAsync(StateHasChanged);
+        await SafeRefreshAsync();
     }
 
     private async Task ReadResourceAsync(EndpointState state, string? uri)
@@ -574,17 +726,22 @@
         state.ResourceError = "";
         try
         {
-            var content = await state.Session.ReadResourceAsync(uri, _loadCts?.Token ?? CancellationToken.None);
+            using var opCts = CreateOperationTimeout();
+            var content = await state.Session.ReadResourceAsync(uri, opCts.Token);
             insertedText = McpResources.Truncate(content, McpResources.PerResourceCharLimit, uri);
             insertedTextSource = $"{state.Endpoint.Name}/{uri}";
             panelMessage = Loc["panel_mcp_chat.preview_ready"];
+        }
+        catch (OperationCanceledException)
+        {
+            state.ResourceError = Loc["panel_mcp_chat.operation_timeout"];
         }
         catch (Exception ex)
         {
             state.ResourceError = ex.Message;
         }
 
-        await InvokeAsync(StateHasChanged);
+        await SafeRefreshAsync();
     }
 
     private static bool IsToolExposed(EndpointState state, string toolName)
@@ -616,7 +773,7 @@
         }
         catch (Exception ex)
         {
-            failures.Add((new McpEndpointConfig { Id = "dispose", Name = "MCP" }, ex.Message));
+            PanelFail(new McpEndpointConfig { Id = "dispose", Name = "MCP" }, ex.Message);
         }
     }
 
@@ -625,8 +782,15 @@
         if (_disposed) return;
         _disposed = true;
 
-        _loadCts?.Cancel();
-        _loadCts?.Dispose();
+        // 只取消，不 Dispose：正在等待的后台任务仍会读它的 Token（各自在 finally 里释放）。
+        try
+        {
+            _loadCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 后台任务已自行收尾。
+        }
         _loadCts = null;
 
         await DisposeScopeAsync();
