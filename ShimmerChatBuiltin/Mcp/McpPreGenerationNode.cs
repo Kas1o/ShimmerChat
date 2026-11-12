@@ -115,11 +115,12 @@ namespace ShimmerChatBuiltin.Mcp
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
                     loc.Format("node_err.mcp_endpoint_disabled", endpoint.Name, endpoint.Id), nodeId: Id, nodeName: Name);
 
-            var scope = GetScope(env.Persistent, endpoints);
-            McpEndpointSession session;
+            var loggerFactory = env.Persistent.Services?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
+
+            McpEndpointLease lease;
             try
             {
-                session = await scope.EnsureConnectedAsync(endpoint.Id, ct).ConfigureAwait(false);
+                lease = await McpRegistry.Instance.AcquireAsync(endpoint, loggerFactory, ct).ConfigureAwait(false);
             }
             catch (McpConfigException ex)
             {
@@ -135,6 +136,24 @@ namespace ShimmerChatBuiltin.Mcp
                     loc.Format("node_err.mcp_connect_failed", endpoint.Name, ex.Message), ex.ToString(),
                     $"endpoint '{endpoint.Id}' connect failed: {ex}");
             }
+
+            try
+            {
+                return await ApplyEndpointAsync(env, endpoint, lease.Session, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                // 释放租约只减少引用计数；连接由注册表按空闲超时回收，
+                // 因此同一对话的连续多轮生成不会重复握手。
+                await lease.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>把一个已连接的端点应用到本次生成：注册工具 + 注入资源上下文。</summary>
+        private async Task<NodeResult> ApplyEndpointAsync(
+            PreGenerationEnv env, McpEndpointConfig endpoint, McpEndpointSession session, CancellationToken ct)
+        {
+            var loc = env.Persistent.LocService;
 
             var addedTools = 0;
             var addedFragments = 0;
@@ -353,19 +372,6 @@ namespace ShimmerChatBuiltin.Mcp
             });
 
             return 1;
-        }
-
-        /// <summary>
-        /// 取本次生成共享的 MCP 会话作用域。
-        /// Tool Call 循环重建 TransientEnv 时 PersistentEnv（及其资源袋）保持不变，
-        /// 因此同一次生成内的多个 MCP 节点复用同一条连接，并在生成结束时统一释放。
-        /// </summary>
-        private static McpSessionScope GetScope(PersistentEnv persistent, List<McpEndpointConfig> endpoints)
-        {
-            var loggerFactory = persistent.Services?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
-            return persistent.Resources.GetOrAdd(
-                "shimmerchat.mcp.scope",
-                () => new McpSessionScope(endpoints, loggerFactory));
         }
 
         private static void WriteDebug(PreGenerationEnv env, string message)

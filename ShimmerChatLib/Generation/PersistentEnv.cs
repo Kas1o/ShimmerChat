@@ -53,9 +53,8 @@ namespace ShimmerChatLib.Generation
 
         /// <summary>
         /// 生成作用域的资源袋。节点用它登记需要在本次生成结束时释放的资源
-        /// （如 MCP 子进程连接、HTTP 会话）。
+        /// （如本地进程句柄、HTTP 会话）。
         /// 由 <c>GenerationManagerV2</c> 在生成结束时统一释放。
-        /// 同一实例会在一次生成内被多次复用（Tool Call 循环重建 TransientEnv 时不会重建 PersistentEnv）。
         /// </summary>
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]

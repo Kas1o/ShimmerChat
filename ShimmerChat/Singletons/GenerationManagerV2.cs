@@ -135,7 +135,7 @@ namespace ShimmerChat.Singletons
             }
             finally
             {
-                // 释放本次生成注册的会话级资源（MCP 子进程/HTTP 会话等）。
+                // 释放本次生成注册的会话级资源（本地进程句柄 / HTTP 会话等）。
                 await DisposeGenerationResourcesAsync(env.Persistent);
             }
         }

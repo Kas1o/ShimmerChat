@@ -139,6 +139,14 @@ namespace ShimmerChatBuiltin.Mcp
             _ => config.Transport.ToString()
         };
 
+        /// <summary>清空连接内缓存的能力清单，下次取用时重新向服务端枚举。</summary>
+        public void InvalidateCapabilities()
+        {
+            _tools = null;
+            _resources = null;
+            _prompts = null;
+        }
+
         /// <summary>列出工具（带进程内缓存）。</summary>
         public async Task<IReadOnlyList<McpClientTool>> GetToolsAsync(CancellationToken ct)
         {

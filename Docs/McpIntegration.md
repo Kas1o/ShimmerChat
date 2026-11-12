@@ -120,15 +120,26 @@ Authorization: Bearer <token>
 4. `resources/read` → 按注入策略写入 system 片段并带上预算与截断标注；失败 → 同上；
 5. 按端点 `LogLevel` 写入调试输出（工具数 / 片段数 / 注入模式）。
 
-### 会话生命周期
+### 连接生命周期：`McpRegistry`
 
-一次生成内的所有 MCP 节点共享同一个 `McpSessionScope`：
+MCP 连接由 **`McpRegistry`（进程级静态单例，完全位于内置插件内）** 统一持有，
+聊天面板与前生成节点共用同一个连接池。
 
-- 作用域存放在 `PersistentEnv.Resources`（`GenerationResourceBag`）。
-  Tool Call 循环每轮都会重建 `TransientEnv`，但 `PersistentEnv` 不变，因此**同一端点不会重复拉起进程/重复握手**；
-- 生成结束时由 `GenerationManagerV2` 统一释放（`DisposeGenerationResourcesAsync`）。
-  SubAgent 的独立生成环境在 `SubAgentNode` / `PostSubAgentNode` / `SubAgentToolV2` 中各自释放；
-- 释放失败不会中断已完成的生成，但会写入 `IDebugOutputService`（不静默吞掉）。
+- **租约模型**：`AcquireAsync(config)` 增加引用计数并返回 `McpEndpointLease`；
+  释放租约只减计数，计数归零后进入 `IdleTimeout`（2 分钟）保活，超时才真正关闭连接。
+  因此同一对话的连续多轮生成、面板重载、面板与生成并发，**都不会重复拉起进程/重复握手**。
+- **配置驱动重建**：连接指纹只包含传输字段（命令/参数/环境/工作目录/URL/HTTP 模式/请求头/握手超时）。
+  暴露策略（工具勾选、资源注入、日志级别）变化**不会**触发重连；传输字段变化则自动丢弃旧连接重建。
+- **失败负缓存**：连接失败后进入 `FailureBackoff`（30 秒）窗口，窗口内直接回报同一次失败，
+  不再让每个调用方各自等满握手超时。配置非法（本地可判定）**不计入**负缓存。
+- **失效**：设置页保存后调用 `InvalidateAll()`；仍被租约占用的连接不立即打断，
+  会在租约全部释放后自然淘汰。
+- **进程退出**：通过 `AppDomain.ProcessExit` 尽力关闭全部连接，避免留下孤儿子进程。
+- **能力缓存**：`tools/resources/prompts` 缓存挂在会话实例上；连接复用时能力清单自动复用，
+  需要强制刷新时调用 `McpEndpointSession.InvalidateCapabilities()`。
+
+> 不依赖 `PersistentEnv.Resources`：连接不再随一次生成的生命周期被创建/销毁，
+> 而是跟着进程存活。这使 MCP 完全不需共享库或主项目提供任何专属机制。
 
 ---
 
@@ -138,8 +149,9 @@ Authorization: Bearer <token>
 
 - **不阻容渲染**：面板挂载/切对话时，生命周期方法**立即返回**，连接在后台进行。
   MCP 握手（含失败的端点要等满超时）若在 `OnParametersSetAsync` 中 await，会让整个对话界面在连接完成前不可交互。
-- **并行连接**：全部端点先以「连接中」列出，再**并行**建立（端点级锁，不同端点互不阻塞；同一端点并发调用合并为一条连接）。
+- **并行连接**：全部端点先以「连接中」列出，再**并行**取租约（不同端点互不阻塞；同一端点并发取用会合并）。
   串行会让总耗时随端点数线性叠加（N × 握手超时）。
+- **重载不重连**：点「重新加载」只重新取一次租约并刷新能力清单，连接仍由 `McpRegistry` 复用。
 - **自动重载开关**：勾选（默认）时进入面板即后台加载；取消勾选则不主动建连，只在点「重新加载」时连。
   切对话时仍会释放上一对话的连接，避免残留子进程。
 - **失败只在面板内提示**：连接失败、枚举失败、资源读取失败、发送失败都渲染为面板内的错误块，
@@ -229,5 +241,8 @@ mcp_{端点标识}_{净化后的工具名}
   避免为长连接引入额外生命周期管理。
 - **不做 OAuth**：HTTP 端点通过自定义 `Headers` 提供静态凭据；需要交互式 OAuth 的服务端暂不支持。
 - **二进制内容不入上下文**：图片/音频只标注省略，避免把 base64 灌进 prompt。
-- **`McpChatPanel` 与 `McpPreGenerationNode` 各自独立建连**：前者服务于 UI 浏览，
-  后者服务于生成；两者生命周期不同（面板随组件释放，节点随生成释放），互不共享连接。
+- **面板与节点共享连接**：`McpChatPanel` 与 `McpPreGenerationNode` 都通过 `McpRegistry` 取租约，
+  因此浏览面板期间触发生成不会为同一端点多拉一个子进程。
+- **静态单例而非 DI 服务**：插件服务由宿主按需实例化（无单例注册通道），
+  连接池必须跨组件存活，因此由 `McpRegistry.Instance` 静态持有；
+  代价是单元测试需显式 `ResetForTests()` 隔离。

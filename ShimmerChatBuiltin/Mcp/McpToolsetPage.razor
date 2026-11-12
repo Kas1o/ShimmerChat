@@ -426,6 +426,11 @@
         {
             McpEndpointCatalog.Save(KVData, configs);
             dirty = false;
+
+            // 已保存的配置是连接的唯一真源：丢弃缓存里的旧连接，下次取用时按新配置重建。
+            // 正在被租约占用的连接不立即打断，会在租约释放后自然淘汰。
+            McpRegistry.Instance.InvalidateAll();
+
             ShowStatus(Loc.Format("panel_mcp.saved", configs.Count), false);
         }
         catch (Exception ex)

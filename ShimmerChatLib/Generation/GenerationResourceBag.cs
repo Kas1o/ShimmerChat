@@ -2,10 +2,9 @@ namespace ShimmerChatLib.Generation
 {
     /// <summary>
     /// 生成作用域的资源袋。供节点注册需要跨「一次生成」存活、并在生成结束时释放的资源
-    /// （例如 MCP 子进程连接、HTTP 会话、临时文件句柄）。
+    /// （例如本地进程句柄、HTTP 会话、临时文件句柄）。
     /// <para>
-    /// 与 <see cref="PersistentEnv"/> 绑定：Tool Call 循环重建 <see cref="TransientEnv"/> 时
-    /// 本对象保持不变，因此同一次生成内的所有节点共享同一份资源。
+    /// 与 <see cref="PersistentEnv"/> 绑定：同一次生成内的所有节点共享同一份资源。
     /// 宿主（<c>GenerationManagerV2</c>）在生成结束时调用 <see cref="DisposeAsync"/>。
     /// </para>
     /// </summary>

@@ -285,7 +285,6 @@
     private readonly List<EndpointState> states = [];
     private readonly List<(McpEndpointConfig Endpoint, string Message)> failures = [];
 
-    private McpSessionScope? scope;
     private bool loading;
     private bool autoReload = true;
     private string panelMessage = "";
@@ -351,7 +350,7 @@
             loading = true;
             await SafeRefreshAsync();
 
-            await DisposeScopeAsync();
+            await DisposeLeasesAsync();
 
             states.Clear();
             lock (_uiGate)
@@ -425,8 +424,8 @@
         panelMessage = "";
         await SafeRefreshAsync();
 
-        // 上一轮的连接先释放，避免重复拉起子进程。
-        await DisposeScopeAsync();
+        // 上一轮持有的租约先归还；连接本身由注册表保活，不会因此重建。
+        await DisposeLeasesAsync();
 
         states.Clear();
         lock (_uiGate)
@@ -449,17 +448,14 @@
             return;
         }
 
-        var newScope = new McpSessionScope(endpoints, LoggerFactory);
-        scope = newScope;
-
-        // 先把全部端点以「连接中」列出，再并行建立连接。
+        // 先把全部端点以「连接中」列出，再并行取租约。
         // 串行连接会让总耗时随端点数线性叠加（N × 握手超时）。
         var pending = endpoints.Select(e => new EndpointState(e)).ToList();
         states.AddRange(pending);
         PublishStates();
         await SafeRefreshAsync();
 
-        await Task.WhenAll(pending.Select(state => LoadEndpointAsync(state, newScope, ct)));
+        await Task.WhenAll(pending.Select(state => LoadEndpointAsync(state, ct)));
 
         loading = false;
         if (states.Count > 0 && ConnectedCount == 0)
@@ -468,16 +464,22 @@
         await SafeRefreshAsync();
     }
 
-    /// <summary>连接并枚举单个端点的能力清单。失败只写进该端点的状态与面板错误列表。</summary>
-    private async Task LoadEndpointAsync(EndpointState state, McpSessionScope scope, CancellationToken ct)
+    /// <summary>取租约并枚举单个端点的能力清单。失败只写进该端点的状态与面板错误列表。</summary>
+    private async Task LoadEndpointAsync(EndpointState state, CancellationToken ct)
     {
+        McpEndpointLease? lease = null;
         try
         {
-            var session = await scope.EnsureConnectedAsync(state.Endpoint.Id, ct);
+            // 注意：这里不复用上一轮的连接（注册表已全局复用），面板重载只是重新取一次租约。
+            lease = await McpRegistry.Instance.AcquireAsync(state.Endpoint, LoggerFactory, ct);
+            var session = lease.Session;
+
             state.Session = session;
             state.Tools = McpDescriptorFactory.Tools(await session.GetToolsAsync(ct));
             state.Resources = McpDescriptorFactory.Resources(await session.GetResourcesAsync(ct));
             state.Prompts = McpDescriptorFactory.Prompts(await session.GetPromptsAsync(ct));
+            state.Lease = lease;
+            lease = null;   // 所有权已转移给 state
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -494,6 +496,12 @@
         {
             state.Error = ex.Message;
             PanelFail(state.Endpoint, ex.Message);
+        }
+        finally
+        {
+            // 仅在失败时还有未移交的租约；成功时已转给 state。
+            if (lease != null)
+                await lease.DisposeAsync();
         }
 
         await SafeRefreshAsync();
@@ -762,18 +770,33 @@
         _ => Loc["panel_mcp.resource_off"]
     };
 
-    private async Task DisposeScopeAsync()
+    /// <summary>
+    /// 释放面板持有的全部租约。只减少引用计数，不会立即关闭连接：
+    /// 注册表会按空闲超时回收，因此重载/切对话不会触发无意义的重新握手。
+    /// </summary>
+    private async Task DisposeLeasesAsync()
     {
-        if (scope == null) return;
-        var current = scope;
-        scope = null;
-        try
+        List<EndpointState> snapshot;
+        lock (_uiGate)
         {
-            await current.DisposeAsync();
+            snapshot = _stateSnapshot.ToList();
         }
-        catch (Exception ex)
+
+        foreach (var state in snapshot)
         {
-            PanelFail(new McpEndpointConfig { Id = "dispose", Name = "MCP" }, ex.Message);
+            var lease = state.Lease;
+            state.Lease = null;
+            state.Session = null;
+            if (lease == null) continue;
+
+            try
+            {
+                await lease.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                PanelFail(state.Endpoint, ex.Message);
+            }
         }
     }
 
@@ -793,7 +816,7 @@
         }
         _loadCts = null;
 
-        await DisposeScopeAsync();
+        await DisposeLeasesAsync();
     }
 
     private sealed class EndpointState
@@ -802,6 +825,10 @@
 
         public McpEndpointConfig Endpoint { get; }
         public McpEndpointSession? Session { get; set; }
+
+        /// <summary>本面板持有的连接租约（组件释放时归还）。</summary>
+        public McpEndpointLease? Lease { get; set; }
+
         public string? Error { get; set; }
         public List<McpToolDescriptor> Tools { get; set; } = [];
         public List<McpResourceDescriptor> Resources { get; set; } = [];
