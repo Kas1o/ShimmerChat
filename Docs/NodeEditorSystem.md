@@ -58,6 +58,7 @@ public class NodePropertyAttribute : Attribute
     public string? HintKey { get; init; } // Tooltip
     public int Order { get; init; }       // 排序，越小越靠前
     public bool MultiLine { get; init; }  // string 用 textarea
+    public NodePropertyEditor Editor { get; init; } // Auto / ImageList
 
     // —— 动态下拉选项（OptionsKey 系列） ——
     public string? OptionsKey { get; init; }              // 选项来源 Key
@@ -72,6 +73,7 @@ public class NodePropertyAttribute : Attribute
 | 属性类型 | 表单控件 |
 |----------|---------|
 | `string` | `<input>` / `<textarea>` (MultiLine) / `PropertyOptionsSelect` (OptionsKey) |
+| `string` + `Editor = ImageList` | ImageListEditor（上传 / 预览 / 删除 / JSON 源码） |
 | `int` | `<input type="number">` |
 | `float` | `<input type="number" step="0.1">` |
 | `bool` | `<input type="checkbox">` |
@@ -135,6 +137,24 @@ public sealed record NodePropertyOption(
 | `subagent_output_modes` | SubAgentNode / PostSubAgentNode | 常量（`LastMessage` / `FullJson` / `None`） |
 | `dyn_prompt_sets` | DynPromptNode | `DynPrompt/DynPromptSets`（值为集合名，规则名可搜索） |
 | `highlight_languages` | CodeHighlightNode | `SyntaxHighlighter.GetSupportedLanguages()` |
+
+---
+
+### 图像列表编辑器（Editor = ImageList）
+
+`string` 属性标记 `Editor = NodePropertyEditor.ImageList` 后由
+[`ImageListEditor`](../ShimmerChatLib/Components/ImageListEditor.razor) 渲染，不需要为节点写自定义编辑器。
+
+| 行为 | 说明 |
+|------|------|
+| 上传 | `InputFile` → `IImageAttachmentService.SaveAsync`，按全局图像存储设置落盘（默认 `UserUploadImage`）或内联 Base64 |
+| 值形态 | 仍是 `string` 属性里的 JSON 数组，元素为 `{ "mimeType": ..., "base64": ... }` 或 `{ "mimeType": ..., "fileName": ... }`；节点树序列化白名单不需要认识图像类型 |
+| 预览 | 复用 `IImageAttachmentService.GetDisplayUrl`；文件缺失显示可见提示，不渲染破图 |
+| 编辑 | 删除 / 前移 / 后移立即通过 `ValueChanged` 写回节点 |
+| 坏 JSON | 显示错误并自动打开「编辑 JSON」源码视图，绝不静默清空为 `[]` |
+| 共享约束 | MIME 列表、单张大小上限、`data:` URL 解析统一来自 `ImageAttachmentRules`，聊天上传与节点编辑读同一份 |
+
+需要把图像随节点配置一起分发时，可以继续用 JSON 源码模式直接粘贴 Base64；文件模式则依赖 `UserUploadImage` 中的文件仍然存在。
 
 ---
 

@@ -1,6 +1,21 @@
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
+    /// 自动生成表单时可选的专用属性编辑器。
+    /// </summary>
+    public enum NodePropertyEditor
+    {
+        /// <summary>按属性类型选择默认控件。</summary>
+        Auto = 0,
+
+        /// <summary>
+        /// 图像列表编辑器：上传 / 预览 / 删除图像，值仍以 JSON 字符串保存。
+        /// 仅对 <see cref="string"/> 属性生效。
+        /// </summary>
+        ImageList = 1
+    }
+
+    /// <summary>
     /// 节点属性的显示元数据，用于 GenericNodeEditor 自动生成表单。
     /// 所有 *Key 属性均为本地化 Key，由 LocService 解析为显示字符串。
     /// </summary>
@@ -21,6 +36,9 @@ namespace ShimmerChatLib.Generation
 
         /// <summary>标记字符串属性使用多行文本框编辑</summary>
         public bool MultiLine { get; init; }
+
+        /// <summary>显式选择专用编辑器；默认按属性类型自动选择。</summary>
+        public NodePropertyEditor Editor { get; init; } = NodePropertyEditor.Auto;
 
         /// <summary>
         /// 动态选项来源的 Key。设置后属性渲染为下拉选择器，选项由

@@ -80,6 +80,17 @@ public sealed class EmptyOptionsProvider : INodePropertyOptionsProvider
     public IReadOnlyList<NodePropertyOption> GetOptions(IServiceProvider services) => [];
 }
 
+/// <summary>带图像列表属性的测试节点（Editor = ImageList 的自动表单接线）。</summary>
+[NodeInfo("test.image_node", Icon = "I", Color = "#000000", CategoryKeys = ["category.test"])]
+public class TestImageNode : ITreeNode
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Name { get; set; } = "Images";
+
+    [NodeProperty("test.image_node.images", Order = 1, Editor = NodePropertyEditor.ImageList)]
+    public string ImagesJson { get; set; } = "";
+}
+
 /// <summary>节点编辑器测试共享辅助。</summary>
 public static class EditorTestHelpers
 {
@@ -96,11 +107,16 @@ public static class EditorTestHelpers
     }
 
     /// <summary>返回 key 本身的 ILocService：组件渲染时直接显示本地化 key。</summary>
-    public static ILocService CreateLocService()
+    public static ILocService CreateLocService() => new KeyLocService();
+
+    private sealed class KeyLocService : ILocService
     {
-        var loc = new Mock<ILocService>();
-        loc.Setup(s => s[It.IsAny<string>()]).Returns((string key) => key);
-        return loc.Object;
+        public string CurrentCulture => "en-US";
+        public IReadOnlyList<string> SupportedCultures => ["en-US"];
+        public string this[string key] => key;
+        public string Format(string key, params object[] args) => key;
+        public string Format(string key, params (string name, object value)[] args) => key;
+        public void SetCulture(string culture) { }
     }
 
     /// <summary>不提供任何属性选项提供者的插件加载器，避免编辑器测试依赖真实插件扫描。</summary>

@@ -148,13 +148,13 @@ public class PreGenerationPreset
 |------|------|
 | `From` | 片段角色，包含 `tool_result` |
 | `Content` | 文本内容，可为空（构造纯图像消息） |
-| `ImagesJson` | 图像数组：base64 字符串、data URL，或 `{ "mimeType": "image/png", "base64": "..." }` 对象 |
+| `ImagesJson` | 图像数组；编辑器可直接上传，JSON 元素支持 base64、data URL，或 `{ "mimeType": "image/png", "base64": "..." }` / `{ "mimeType": "image/png", "fileName": "..." }` |
 | `ToolCallId` | `tool_result` 必填，写入 `ChatMessage.id` |
 | `ToolCallsJson` | assistant 的 `tool_calls` 数组；`arguments` 为对象时自动序列化成字符串 |
 | `Thinking` | assistant 的 `reasoning_content`，留空表示不携带 |
 | `CustomPropertiesJson` | 消息级自定义参数，合并到请求体的 message 对象 |
 
-节点只做解析与构造，不判断角色“是否应该”携带某个字段——不同兼容端点与客户端 `as_is` 模式的接受范围不同；唯一的结构性校验是 `tool_result` 必须带 `ToolCallId`。图像或 JSON 非法时返回 `PARSE_ERROR` / `DATA_MISSING`，不会添加半成品片段。
+节点只做解析与构造，不判断角色“是否应该”携带某个字段——不同兼容端点与客户端 `as_is` 模式的接受范围不同；唯一的结构性校验是 `tool_result` 必须带 `ToolCallId`。图像或 JSON 非法时返回 `PARSE_ERROR` / `DATA_MISSING`，不会添加半成品片段。文件引用（`fileName`）在节点执行时通过 `IImageAttachmentService` 解析为 Base64，缺服务或文件缺失都会显式失败（`SERVICE_ERROR` / `DATA_MISSING`）。
 
 注意：OpenAI 客户端不会序列化 `tool_result` 消息的 `Images`（tool 分支只发 `content` 与 `tool_call_id`）。用本节点构造带图工具结果时，必须同时加入 `SpecialRoleImageCarrierNode`，否则图像会在请求构建阶段被丢弃。
 

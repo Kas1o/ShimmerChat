@@ -1,0 +1,386 @@
+@using Microsoft.Extensions.Logging
+@using Newtonsoft.Json
+@using Newtonsoft.Json.Linq
+@using SharperLLM.Util
+@inject IImageAttachmentService Attachments
+@inject ILocService Loc
+@inject ILogger<ImageListEditor> Logger
+
+@*
+    节点属性的图像列表编辑器：值始终以 JSON 字符串保存（节点树序列化白名单只认识节点类型），
+    图像本身交给 IImageAttachmentService 按全局存储方式落盘或内联，缩略图复用它的显示 URL。
+*@
+<div class="ge-image-editor">
+    <div class="ge-image-toolbar">
+        <span class="ge-image-summary">@Loc.Format("node_editor.image_count_label", _images.Count, MaxImages)</span>
+        @if (!_showJson)
+        {
+            <button type="button" class="ge-image-json-toggle" @onclick="ToggleJson">
+                @Loc["node_editor.image_json_edit"]
+            </button>
+        }
+    </div>
+
+    @if (_parseError != null)
+    {
+        <div class="ge-image-error" title="@_parseError">@Loc["node_editor.image_invalid_json"]</div>
+    }
+
+    @if (_showJson)
+    {
+        <div class="ge-image-json">
+            <textarea class="ge-textarea ge-image-json-text"
+                      spellcheck="false"
+                      @bind="_jsonDraft"
+                      @bind:event="oninput"></textarea>
+            <div class="ge-image-json-actions">
+                <button type="button" class="ge-image-primary" @onclick="ApplyJson">
+                    @Loc["node_editor.image_json_apply"]
+                </button>
+                <button type="button" class="ge-image-secondary" @onclick="ToggleJson">
+                    @Loc["node_editor.image_json_cancel"]
+                </button>
+            </div>
+            <div class="ge-image-hint">@Loc["node_editor.image_json_hint"]</div>
+        </div>
+    }
+    else
+    {
+        @if (_images.Count > 0)
+        {
+            <div class="ge-image-grid">
+                @for (int i = 0; i < _images.Count; i++)
+                {
+                    var index = i;
+                    var image = _images[index];
+                    var url = Attachments.GetDisplayUrl(image);
+                    <div class="ge-image-card">
+                        @if (url != null)
+                        {
+                            <img src="@url" alt="@image.MimeType" loading="lazy" />
+                        }
+                        else
+                        {
+                            <div class="ge-image-missing">@Loc["node_editor.image_missing"]</div>
+                        }
+
+                        <span class="ge-image-badge" title="@(image.FileName ?? image.MimeType)">
+                            @MimeLabel(image.MimeType)
+                        </span>
+
+                        <div class="ge-image-actions">
+                            <button type="button" class="ge-image-btn"
+                                    disabled="@(index == 0)"
+                                    title="@Loc["node_editor.image_move_left"]"
+                                    @onclick="() => MoveAsync(index, -1)">‹</button>
+                            <button type="button" class="ge-image-btn"
+                                    disabled="@(index == _images.Count - 1)"
+                                    title="@Loc["node_editor.image_move_right"]"
+                                    @onclick="() => MoveAsync(index, 1)">›</button>
+                            <button type="button" class="ge-image-btn ge-image-btn-danger"
+                                    title="@Loc["node_editor.image_remove"]"
+                                    @onclick="() => RemoveAsync(index)">✕</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="ge-image-empty">@Loc["node_editor.image_empty"]</div>
+        }
+
+        <label class="ge-image-add" for="@_inputId">
+            <span class="ge-image-plus">＋</span>
+            <span class="ge-image-add-text">@Loc["node_editor.image_add"]</span>
+        </label>
+        <InputFile id="@_inputId"
+                   class="ge-image-file"
+                   OnChange="OnFilesSelected"
+                   multiple
+                   accept="@ImageAttachmentRules.Accept" />
+
+        <div class="ge-image-hint">
+            @Loc.Format("node_editor.image_add_hint", ImageAttachmentRules.MaxBytes / 1024 / 1024)
+        </div>
+
+        @if (_uploading)
+        {
+            <div class="ge-image-uploading">@Loc["node_editor.image_uploading"]</div>
+        }
+        @if (_uploadError != null)
+        {
+            <div class="ge-image-error">@_uploadError</div>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>属性当前的 JSON 值；由 GenericNodeEditor 通过反射写回节点。</summary>
+    [Parameter] public string Value { get; set; } = "";
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>允许添加的最大图像数量。</summary>
+    [Parameter] public int MaxImages { get; set; } = ImageAttachmentRules.MaxPerMessage;
+
+    private readonly string _inputId = $"ge-image-input-{Guid.NewGuid():N}";
+    private List<MessageImage> _images = new();
+    private string? _parseError;
+    private string? _uploadError;
+    private string? _rawValue;
+    private string _jsonDraft = "";
+    private bool _showJson;
+    private bool _uploading;
+
+    protected override void OnParametersSet()
+    {
+        if (string.Equals(_rawValue, Value, StringComparison.Ordinal))
+            return;
+
+        _rawValue = Value ?? "";
+        ParseValue(_rawValue);
+    }
+
+    private void ParseValue(string json)
+    {
+        _jsonDraft = json;
+
+        if (TryParse(json, out var images, out var error))
+        {
+            _images = images;
+            _parseError = null;
+            return;
+        }
+
+        // 坏 JSON 不静默当成空列表：保留错误并直接切到源码视图，让用户能修
+        _images = new List<MessageImage>();
+        _parseError = error;
+        _showJson = true;
+    }
+
+    private async Task EmitAsync()
+    {
+        var json = Serialize(_images);
+        _rawValue = json;
+        _jsonDraft = json;
+        await ValueChanged.InvokeAsync(json);
+    }
+
+    private async Task OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        if (_uploading)
+            return;
+
+        IReadOnlyList<IBrowserFile> files;
+        try
+        {
+            files = e.GetMultipleFiles(MaxImages);
+        }
+        catch (InvalidOperationException)
+        {
+            _uploadError = Loc.Format("node_editor.image_count_exceeded", MaxImages);
+            return;
+        }
+
+        var remaining = MaxImages - _images.Count;
+        if (remaining <= 0 || files.Count > remaining)
+        {
+            _uploadError = Loc.Format("node_editor.image_count_exceeded", MaxImages);
+            return;
+        }
+
+        _uploadError = null;
+        _uploading = true;
+        StateHasChanged();
+
+        try
+        {
+            var added = 0;
+            foreach (var file in files)
+            {
+                if (!ImageAttachmentRules.IsSupportedMimeType(file.ContentType))
+                {
+                    _uploadError = Loc.Format("node_editor.image_type_unsupported", file.ContentType);
+                    continue;
+                }
+
+                if (file.Size > ImageAttachmentRules.MaxBytes)
+                {
+                    _uploadError = Loc.Format(
+                        "node_editor.image_too_large",
+                        file.Name,
+                        ImageAttachmentRules.MaxBytes / 1024 / 1024);
+                    continue;
+                }
+
+                try
+                {
+                    await using var stream = file.OpenReadStream(ImageAttachmentRules.MaxBytes);
+                    _images.Add(await Attachments.SaveAsync(stream, file.ContentType));
+                    added++;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(
+                        ex,
+                        "[ImageListEditor] Failed to store uploaded image {FileName} ({ContentType}).",
+                        file.Name,
+                        file.ContentType);
+                    _uploadError = Loc.Format("node_editor.image_upload_failed", file.Name);
+                }
+            }
+
+            if (added > 0)
+                await EmitAsync();
+        }
+        finally
+        {
+            _uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveAsync(int index)
+    {
+        if (index < 0 || index >= _images.Count)
+            return;
+
+        _images.RemoveAt(index);
+        _uploadError = null;
+        await EmitAsync();
+    }
+
+    private async Task MoveAsync(int index, int delta)
+    {
+        var target = index + delta;
+        if (index < 0 || index >= _images.Count || target < 0 || target >= _images.Count)
+            return;
+
+        (_images[index], _images[target]) = (_images[target], _images[index]);
+        await EmitAsync();
+    }
+
+    private void ToggleJson()
+    {
+        if (_showJson)
+        {
+            _showJson = false;
+            return;
+        }
+
+        _jsonDraft = Value ?? "";
+        _showJson = true;
+    }
+
+    private async Task ApplyJson()
+    {
+        if (!TryParse(_jsonDraft, out var images, out var error))
+        {
+            _parseError = error;
+            return;
+        }
+
+        _images = images;
+        _parseError = null;
+        _showJson = false;
+        await EmitAsync();
+    }
+
+    private static string MimeLabel(string mimeType)
+        => mimeType switch
+        {
+            "image/png" => "PNG",
+            "image/jpeg" => "JPEG",
+            "image/webp" => "WebP",
+            "image/gif" => "GIF",
+            _ => mimeType
+        };
+
+    private static string Serialize(IReadOnlyList<MessageImage> images)
+    {
+        var array = new JArray();
+        foreach (var image in images)
+        {
+            var obj = new JObject { ["mimeType"] = image.MimeType };
+            if (!string.IsNullOrEmpty(image.Base64))
+                obj["base64"] = image.Base64;
+            if (!string.IsNullOrEmpty(image.FileName))
+                obj["fileName"] = image.FileName;
+
+            array.Add(obj);
+        }
+
+        return array.ToString(Formatting.None);
+    }
+
+    /// <summary>
+    /// 解析图像 JSON：兼容 base64 字符串、data URL 与对象形式（base64 或 fileName），
+    /// 与 AdvancedFragmentNode 的输入保持一致。
+    /// </summary>
+    private static bool TryParse(string? json, out List<MessageImage> images, out string? error)
+    {
+        images = new List<MessageImage>();
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(json))
+            return true;
+
+        JArray array;
+        try
+        {
+            array = JArray.Parse(json);
+        }
+        catch (JsonException ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+
+        for (int i = 0; i < array.Count; i++)
+        {
+            var token = array[i];
+
+            if (token.Type == JTokenType.String)
+            {
+                var raw = token.Value<string>() ?? "";
+                if (ImageAttachmentRules.TryParseDataUrl(raw, out var base64, out var mimeType))
+                    images.Add(MessageImage.FromBase64(base64, mimeType));
+                else
+                    images.Add(MessageImage.FromBase64(raw, ChatImage.DefaultMimeType));
+
+                continue;
+            }
+
+            if (token is not JObject obj)
+            {
+                error = $"image #{i} must be a base64 string, a data URL, or an object.";
+                images = new List<MessageImage>();
+                return false;
+            }
+
+            var mime = GetString(obj, "mimeType") ?? ChatImage.DefaultMimeType;
+            var inlineBase64 = GetString(obj, "base64");
+            var fileName = GetString(obj, "fileName");
+
+            if (string.IsNullOrEmpty(inlineBase64) && string.IsNullOrEmpty(fileName))
+            {
+                error = $"image #{i} has neither base64 nor fileName.";
+                images = new List<MessageImage>();
+                return false;
+            }
+
+            images.Add(string.IsNullOrEmpty(inlineBase64)
+                ? MessageImage.FromFile(fileName!, mime)
+                : MessageImage.FromBase64(inlineBase64, mime));
+        }
+
+        return true;
+    }
+
+    private static string? GetString(JObject obj, string property)
+    {
+        var token = obj.GetValue(property, StringComparison.OrdinalIgnoreCase);
+        return token?.Type == JTokenType.String ? token.Value<string>() : null;
+    }
+}

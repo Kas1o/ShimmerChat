@@ -170,6 +170,76 @@ public class AdvancedFragmentNodeTests : NodeTestBase
     }
 
     [Fact]
+    public async Task FileBackedImage_IsResolvedThroughTheAttachmentService()
+    {
+        var node = new AdvancedFragmentNode
+        {
+            From = PromptBuilder.From.user,
+            Content = "look",
+            ImagesJson = """[{ "mimeType": "image/webp", "fileName": "abc.png" }]"""
+        };
+        var ctx = CreateContext();
+
+        var result = await node.ExecuteAsync(ctx);
+
+        result.Success.Should().BeTrue();
+        var image = ctx.Env.Transient.Fragments.Single().Message.Images.Should()
+            .ContainSingle().Subject;
+        image.MimeType.Should().Be("image/webp");
+        image.Base64.Should().Be("resolved");
+        ImageAttachmentsMock.Verify(s => s.ToChatImageAsync(
+            It.Is<MessageImage>(i => i.FileName == "abc.png" && i.MimeType == "image/webp"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task FileBackedImage_WithoutAttachmentService_FailsWithServiceError()
+    {
+        var node = new AdvancedFragmentNode
+        {
+            Content = "look",
+            ImagesJson = """[{ "mimeType": "image/png", "fileName": "abc.png" }]"""
+        };
+        var env = new PreGenerationEnv(new PersistentEnv
+        {
+            KVData = KvMock.Object,
+            ToolRegistry = ToolRegistryMock.Object,
+            Serializer = SerializerMock.Object,
+            LocService = LocMock.Object,
+            DebugOutput = DebugOutputMock.Object,
+            Chat = new Chat { Name = "TestChat" },
+            Agent = Agent.Create("TestAgent", "")
+        });
+
+        var result = await node.ExecuteAsync(new PreNodeExecutionContext(env));
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(NodeErrorCodes.ServiceError);
+        env.Transient.Fragments.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task UnresolvableFileBackedImage_FailsWithDataMissing()
+    {
+        ImageAttachmentsMock
+            .Setup(s => s.ToChatImageAsync(It.IsAny<MessageImage>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FileNotFoundException("missing"));
+
+        var node = new AdvancedFragmentNode
+        {
+            Content = "look",
+            ImagesJson = """[{ "mimeType": "image/png", "fileName": "missing.png" }]"""
+        };
+        var ctx = CreateContext();
+
+        var result = await node.ExecuteAsync(ctx);
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(NodeErrorCodes.DataMissing);
+        ctx.Env.Transient.Fragments.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ToolCallWithoutId_FailsWithParameterError()
     {
         var node = new AdvancedFragmentNode

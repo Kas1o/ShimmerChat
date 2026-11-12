@@ -600,15 +600,15 @@
 	private readonly string _imageDropKey = Guid.NewGuid().ToString("N");
 
 	/// <summary>单条消息最多携带的图像数量。</summary>
-	private const int MaxImagesPerMessage = 5;
+	private const int MaxImagesPerMessage = ImageAttachmentRules.MaxPerMessage;
 
-	/// <summary>单张图像的字节上限（SignalR 已放开到 50MiB，这里只做合理限制）。</summary>
-	private const long MaxImageBytes = 20L * 1024 * 1024;
+	/// <summary>单张图像的字节上限。</summary>
+	private const long MaxImageBytes = ImageAttachmentRules.MaxBytes;
 
 	/// <summary>允许选择的图像格式，与 <see cref="IImageAttachmentService"/> 支持的格式一致。</summary>
-	private const string SupportedImageAccept = "image/png,image/jpeg,image/webp,image/gif";
+	private static readonly string SupportedImageAccept = ImageAttachmentRules.Accept;
 
-	private static readonly string[] SupportedImageTypes = SupportedImageAccept.Split(',');
+	private static readonly IReadOnlyList<string> SupportedImageTypes = ImageAttachmentRules.SupportedMimeTypes;
 
 	/// <summary>已准备随下一条消息发送的图像附件（上传成功后立即生效）。</summary>
 	private readonly List<MessageImage> pendingImages = new();

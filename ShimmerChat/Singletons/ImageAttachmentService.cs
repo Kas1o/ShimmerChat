@@ -26,14 +26,12 @@ namespace ShimmerChat.Singletons
 		/// <summary>图像文件目录（同时由 Program.cs 以 /userimages 暴露为静态资源）。</summary>
 		public static readonly string UploadDirectory = Path.Combine(AppContext.BaseDirectory, "UserUploadImage");
 
-		/// <summary>支持的图像格式与落盘扩展名。</summary>
-		private static readonly Dictionary<string, string> SupportedTypes = new(StringComparer.OrdinalIgnoreCase)
-		{
-			["image/png"] = ".png",
-			["image/jpeg"] = ".jpg",
-			["image/webp"] = ".webp",
-			["image/gif"] = ".gif"
-		};
+		/// <summary>支持的图像格式与落盘扩展名（来源见 <see cref="ImageAttachmentRules"/>）。</summary>
+		private static readonly Dictionary<string, string> SupportedTypes =
+			ImageAttachmentRules.MimeToExtension.ToDictionary(
+				pair => pair.Key,
+				pair => pair.Value,
+				StringComparer.OrdinalIgnoreCase);
 
 		private readonly IKVDataService _kvData;
 		private readonly ILogger<ImageAttachmentService> _logger;

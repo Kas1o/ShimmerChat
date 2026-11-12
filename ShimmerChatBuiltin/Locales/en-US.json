@@ -846,7 +846,7 @@
   "prop.advanced_fragment.content": "Content",
   "prop.advanced_fragment.content.hint": "Text content; may be empty for image-only messages",
   "prop.advanced_fragment.images_json": "Images (JSON)",
-  "prop.advanced_fragment.images_json.hint": "JSON array of base64 strings, data URLs, or {\"mimeType\":\"image/png\",\"base64\":\"...\"} objects; tool_result images need the Special Role Image Carrier node",
+  "prop.advanced_fragment.images_json.hint": "Upload images or edit JSON (base64, data URL, or objects with base64 / fileName); tool_result images need the Special Role Image Carrier node",
   "prop.advanced_fragment.tool_call_id": "tool_call_id",
   "prop.advanced_fragment.tool_call_id.hint": "Tool call id this tool_result answers, written to ChatMessage.id",
   "prop.advanced_fragment.tool_calls_json": "tool_calls (JSON)",

@@ -129,7 +129,15 @@
     {
         var value = prop.GetValue(Node);
 
-        if (prop.OptionsKey is { Length: > 0 } optionsKey && prop.PropertyType == typeof(string))
+        if (prop.Editor == NodePropertyEditor.ImageList && prop.PropertyType == typeof(string))
+        {
+            builder.OpenComponent<ImageListEditor>(0);
+            builder.AddAttribute(1, nameof(ImageListEditor.Value), value as string ?? "");
+            builder.AddAttribute(2, nameof(ImageListEditor.ValueChanged),
+                EventCallback.Factory.Create<string>(this, v => prop.SetValue(Node, v)));
+            builder.CloseComponent();
+        }
+        else if (prop.OptionsKey is { Length: > 0 } optionsKey && prop.PropertyType == typeof(string))
         {
             // 原生 <select> 撑不住分组 / 副标题 / 搜索，统一交给 PropertyOptionsSelect。
             builder.OpenComponent<PropertyOptionsSelect>(0);
@@ -224,6 +232,7 @@
         public string? HintKey { get; }
         public int Order { get; }
         public bool MultiLine { get; }
+        public NodePropertyEditor Editor { get; }
         public string? OptionsKey { get; }
         public bool OptionsSearchable { get; }
         public bool ShowOptionDescription { get; }
@@ -240,6 +249,7 @@
             HintKey = attr?.HintKey;
             Order = attr?.Order ?? 0;
             MultiLine = attr?.MultiLine ?? false;
+            Editor = attr?.Editor ?? NodePropertyEditor.Auto;
             OptionsKey = attr?.OptionsKey;
             OptionsSearchable = attr?.OptionsSearchable ?? false;
             ShowOptionDescription = attr?.ShowOptionDescription ?? false;

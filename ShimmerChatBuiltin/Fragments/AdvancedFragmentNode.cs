@@ -1,8 +1,8 @@
-using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SharperLLM.API;
 using SharperLLM.Util;
+using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.Fragments
@@ -20,10 +20,6 @@ namespace ShimmerChatBuiltin.Fragments
     [NodeInfo("node.advanced_fragment", Icon = "▣", Color = "var(--node-fragment)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.advanced_fragment.desc")]
     public class AdvancedFragmentNode : IPreGenerationNode
     {
-        private static readonly Regex DataUrlPattern = new(
-            @"^data:(?<mime>[^;,]+)?;base64,(?<data>.*)$",
-            RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
-
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Advanced Fragment";
 
@@ -37,9 +33,11 @@ namespace ShimmerChatBuiltin.Fragments
 
         /// <summary>
         /// 图像内容块数组（JSON）。元素可以是 base64 字符串、data URL，或
-        /// { "mimeType": "image/png", "base64": "..." } 对象。
+        /// { "mimeType": "image/png", "base64": "..." } / { "mimeType": "image/png", "fileName": "..." } 对象。
+        /// 编辑器会以文件存储（fileName）或内联（base64）方式写入，取决于全局图像存储设置。
         /// </summary>
-        [NodeProperty("prop.advanced_fragment.images_json", HintKey = "prop.advanced_fragment.images_json.hint", MultiLine = true, Order = 2)]
+        [NodeProperty("prop.advanced_fragment.images_json", HintKey = "prop.advanced_fragment.images_json.hint",
+            Editor = NodePropertyEditor.ImageList, Order = 2)]
         public string ImagesJson { get; set; } = "";
 
         /// <summary>tool_result 消息对应的 tool_call_id（写入 ChatMessage.id）。</summary>
@@ -62,27 +60,27 @@ namespace ShimmerChatBuiltin.Fragments
         [NodeProperty("prop.advanced_fragment.custom_properties_json", HintKey = "prop.advanced_fragment.custom_properties_json.hint", MultiLine = true, Order = 6)]
         public string CustomPropertiesJson { get; set; } = "";
 
-        public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
+        public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             if (From == PromptBuilder.From.tool_result && string.IsNullOrWhiteSpace(ToolCallId))
             {
-                return Task.FromResult(Fail(
+                return Fail(
                     NodeErrorCodes.ParameterError,
                     "AdvancedFragment: tool_result fragments require a tool_call_id.",
-                    "Set ToolCallId to the id of the assistant tool call this result answers."));
+                    "Set ToolCallId to the id of the assistant tool call this result answers.");
             }
 
-            var (images, imageFailure) = ParseImages();
+            var (images, imageFailure) = await ParseAndResolveImagesAsync(context);
             if (imageFailure != null)
-                return Task.FromResult(imageFailure);
+                return imageFailure;
 
             var (toolCalls, toolCallFailure) = ParseToolCalls();
             if (toolCallFailure != null)
-                return Task.FromResult(toolCallFailure);
+                return toolCallFailure;
 
             var (customProperties, customFailure) = ParseCustomProperties();
             if (customFailure != null)
-                return Task.FromResult(customFailure);
+                return customFailure;
 
             var message = new ChatMessage
             {
@@ -104,13 +102,62 @@ namespace ShimmerChatBuiltin.Fragments
                 From = From
             });
 
-            return Task.FromResult(NodeResult.SuccessResult());
+            return NodeResult.SuccessResult();
         }
 
         private NodeResult Fail(string code, string message, string? details)
             => NodeResult.Failure(code, message, details, Id, Name);
 
-        private (List<ChatImage>? Images, NodeResult? Failure) ParseImages()
+        /// <summary>
+        /// 解析图像列表，并把文件引用解析为请求可用的 Base64 内容块。
+        /// 图像块必须在进入客户端之前解析好：SharperLLM 只处理 Base64，不接触文件系统。
+        /// </summary>
+        private async Task<(List<ChatImage>? Images, NodeResult? Failure)> ParseAndResolveImagesAsync(
+            PreNodeExecutionContext context)
+        {
+            var (parsed, failure) = ParseImages();
+            if (failure != null)
+                return (null, failure);
+
+            if (parsed is not { Count: > 0 })
+                return (null, null);
+
+            var attachments = context.Env.Persistent.ImageAttachments;
+            var resolved = new List<ChatImage>(parsed.Count);
+
+            foreach (var image in parsed)
+            {
+                if (!string.IsNullOrEmpty(image.Base64))
+                {
+                    resolved.Add(ChatImage.FromBase64(image.Base64, image.MimeType));
+                    continue;
+                }
+
+                if (attachments == null)
+                {
+                    return (null, Fail(
+                        NodeErrorCodes.ServiceError,
+                        "AdvancedFragment: image attachment service is unavailable; cannot resolve file-backed images.",
+                        $"Image file '{image.FileName}' (mime '{image.MimeType}') requires PersistentEnv.ImageAttachments."));
+                }
+
+                try
+                {
+                    resolved.Add(await attachments.ToChatImageAsync(image, context.CancellationToken));
+                }
+                catch (Exception ex)
+                {
+                    return (null, Fail(
+                        NodeErrorCodes.DataMissing,
+                        $"AdvancedFragment: failed to load image '{image.FileName ?? image.MimeType}': {ex.Message}",
+                        ex.ToString()));
+                }
+            }
+
+            return (resolved, null);
+        }
+
+        private (List<MessageImage>? Images, NodeResult? Failure) ParseImages()
         {
             if (string.IsNullOrWhiteSpace(ImagesJson))
                 return (null, null);
@@ -128,51 +175,23 @@ namespace ShimmerChatBuiltin.Fragments
                     ex.ToString()));
             }
 
-            var images = new List<ChatImage>(array.Count);
+            var images = new List<MessageImage>(array.Count);
             for (int i = 0; i < array.Count; i++)
             {
                 var item = array[i];
-                string? base64;
-                string mimeType = ChatImage.DefaultMimeType;
 
                 if (item.Type == JTokenType.String)
                 {
                     var raw = item.Value<string>() ?? string.Empty;
-                    var match = DataUrlPattern.Match(raw);
-                    if (match.Success)
-                    {
-                        var mime = match.Groups["mime"].Value;
-                        if (!string.IsNullOrWhiteSpace(mime))
-                            mimeType = mime;
-
-                        base64 = match.Groups["data"].Value;
-                    }
+                    if (ImageAttachmentRules.TryParseDataUrl(raw, out var dataUrlBase64, out var dataUrlMime))
+                        images.Add(MessageImage.FromBase64(dataUrlBase64, dataUrlMime));
                     else
-                    {
-                        base64 = raw;
-                    }
-                }
-                else if (item is JObject obj)
-                {
-                    var base64Token = obj["base64"];
-                    if (base64Token == null || base64Token.Type != JTokenType.String)
-                    {
-                        return (null, Fail(
-                            NodeErrorCodes.DataMissing,
-                            $"AdvancedFragment: image #{i} has no base64 data.",
-                            "Expected an object with a string 'base64' property."));
-                    }
+                        images.Add(MessageImage.FromBase64(raw, ChatImage.DefaultMimeType));
 
-                    base64 = base64Token.Value<string>();
-                    var mimeToken = obj["mimeType"];
-                    if (mimeToken != null
-                        && mimeToken.Type == JTokenType.String
-                        && !string.IsNullOrWhiteSpace(mimeToken.Value<string>()))
-                    {
-                        mimeType = mimeToken.Value<string>()!;
-                    }
+                    continue;
                 }
-                else
+
+                if (item is not JObject obj)
                 {
                     return (null, Fail(
                         NodeErrorCodes.ParseError,
@@ -180,18 +199,33 @@ namespace ShimmerChatBuiltin.Fragments
                         $"Actual token type: {item.Type}."));
                 }
 
-                if (string.IsNullOrEmpty(base64))
+                var mimeType = GetString(obj, "mimeType");
+                if (string.IsNullOrWhiteSpace(mimeType))
+                    mimeType = ChatImage.DefaultMimeType;
+
+                var base64 = GetString(obj, "base64");
+                var fileName = GetString(obj, "fileName");
+
+                if (string.IsNullOrEmpty(base64) && string.IsNullOrEmpty(fileName))
                 {
                     return (null, Fail(
                         NodeErrorCodes.DataMissing,
-                        $"AdvancedFragment: image #{i} carries no base64 data.",
-                        "An empty image block must not be sent to the API."));
+                        $"AdvancedFragment: image #{i} has neither base64 data nor a fileName.",
+                        "Expected an object with a string 'base64' or 'fileName' property."));
                 }
 
-                images.Add(ChatImage.FromBase64(base64, mimeType));
+                images.Add(string.IsNullOrEmpty(base64)
+                    ? MessageImage.FromFile(fileName!, mimeType)
+                    : MessageImage.FromBase64(base64, mimeType));
             }
 
             return (images, null);
+        }
+
+        private static string? GetString(JObject obj, string property)
+        {
+            var token = obj.GetValue(property, StringComparison.OrdinalIgnoreCase);
+            return token?.Type == JTokenType.String ? token.Value<string>() : null;
         }
 
         private (List<ToolCall>? ToolCalls, NodeResult? Failure) ParseToolCalls()
