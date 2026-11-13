@@ -133,7 +133,7 @@ public class CodeActToolTests
     }
 
     [Fact]
-    public async Task Execute_ForwardsImagesFromCalledTools()
+    public async Task Execute_DoesNotForwardToolImagesAutomatically()
     {
         var imageTool = Stub("read_image", (_, _) => Task.FromResult(
             ToolResult.Ok("image attached", [MessageImage.FromFile("a.png", "image/png")])));
@@ -144,31 +144,142 @@ public class CodeActToolTests
             Args("""await CallAsync("read_image")"""), CancellationToken.None);
 
         result.Status.Should().Be(ToolResultStatus.Completed);
+        result.Images.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Execute_ImagesAddResult_PutsToolImagesIntoTheContainer()
+    {
+        var imageTool = Stub("read_image", (_, _) => Task.FromResult(
+            ToolResult.Ok("image attached", [MessageImage.FromFile("a.png", "image/png")])));
+
+        var tool = new CodeActToolV2([imageTool], CreateEnv(new FakeImageAttachmentService()));
+
+        var result = await tool.ExecuteAsync(
+            Args("""
+                var r = await CallToolAsync("read_image");
+                Images.Add(r);
+                r.Content
+                """),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        result.Content.Should().Be("image attached");
         result.Images.Should().ContainSingle();
         result.Images![0].FileName.Should().Be("a.png");
     }
 
     [Fact]
-    public async Task Execute_ImageOutputDisabled_OmitsToolImagesAndBlocksAddImage()
+    public async Task Execute_ImagesAddSingleImage_BuildsInlineDataUrl()
+    {
+        var tool = new CodeActToolV2([], CreateEnv());
+
+        var result = await tool.ExecuteAsync(
+            Args($$"""
+                Images.Add(MessageImage.FromBase64("{{OnePixelPngBase64Header}}", "image/png"));
+                Images.Count + "|" + Images.Urls[0]
+                """),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        result.Content.Should().Contain("1|data:image/png;base64,");
+        result.Images.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Execute_ImagesContainer_CanFilterWhichToolImagesAreReturned()
+    {
+        var readTool = Stub("read_image", (_, _) => Task.FromResult(
+            ToolResult.Ok("read", [MessageImage.FromFile("a.png", "image/png")])));
+        var drawTool = Stub("generate_image", (_, _) => Task.FromResult(
+            ToolResult.Ok("generated", [MessageImage.FromFile("b.png", "image/png")])));
+
+        var tool = new CodeActToolV2([readTool, drawTool], CreateEnv(new FakeImageAttachmentService()));
+
+        var result = await tool.ExecuteAsync(
+            Args("""
+                var a = await CallToolAsync("read_image");
+                var b = await CallToolAsync("generate_image");
+                Images.Add(b);
+                a.Content + "|" + b.Content
+                """),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        result.Content.Should().Be("read|generated");
+        result.Images.Should().ContainSingle();
+        result.Images![0].FileName.Should().Be("b.png");
+    }
+
+    [Fact]
+    public async Task Execute_ImageOutputDisabled_BlocksAddingImages()
     {
         var imageTool = Stub("read_image", (_, _) => Task.FromResult(
             ToolResult.Ok("image attached", [MessageImage.FromFile("a.png", "image/png")])));
 
         var tool = new CodeActToolV2([imageTool], CreateEnv(), imageOutputEnabled: false);
 
-        var forwarded = await tool.ExecuteAsync(
-            Args("""await CallAsync("read_image")"""), CancellationToken.None);
+        var toolImagesStillVisible = await tool.ExecuteAsync(
+            Args("""
+                var r = await CallToolAsync("read_image");
+                r.Images.Count
+                """),
+            CancellationToken.None);
 
-        forwarded.Status.Should().Be(ToolResultStatus.Completed);
-        forwarded.Images.Should().BeNull();
-        forwarded.Content.Should().Contain("image(s) omitted");
+        // 工具结果本身仍可被脚本检查，只是不能放进返回容器。
+        toolImagesStillVisible.Status.Should().Be(ToolResultStatus.Completed);
+        toolImagesStillVisible.Content.Should().Be("1");
+        toolImagesStillVisible.Images.Should().BeNull();
 
-        var explicitImage = await tool.ExecuteAsync(
+        var addResult = await tool.ExecuteAsync(
+            Args("""
+                var r = await CallToolAsync("read_image");
+                Images.Add(r)
+                """),
+            CancellationToken.None);
+
+        addResult.Status.Should().Be(ToolResultStatus.Failed);
+        addResult.ErrorCode.Should().Be(ToolErrorCodes.ImageOutputDisabled);
+
+        var addImage = await tool.ExecuteAsync(
             Args($$"""await AddImageAsync(Convert.FromBase64String("{{OnePixelPngBase64Header}}"), "image/png")"""),
             CancellationToken.None);
 
-        explicitImage.Status.Should().Be(ToolResultStatus.Failed);
-        explicitImage.ErrorCode.Should().Be(ToolErrorCodes.ImageOutputDisabled);
+        addImage.Status.Should().Be(ToolResultStatus.Failed);
+        addImage.ErrorCode.Should().Be(ToolErrorCodes.ImageOutputDisabled);
+    }
+
+    [Fact]
+    public async Task Execute_ImagesContainer_RejectsMoreThanTheLimit()
+    {
+        var tool = new CodeActToolV2([], CreateEnv());
+
+        var result = await tool.ExecuteAsync(
+            Args($$"""
+                var image = MessageImage.FromBase64("{{OnePixelPngBase64Header}}", "image/png");
+                for (var i = 0; i <= CodeActGlobals.MaxImages; i++)
+                    Images.Add(image);
+                0
+                """),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Failed);
+        result.ErrorCode.Should().Be(ToolErrorCodes.OutputWriteFailed);
+        result.ErrorMessage.Should().Contain("Image limit reached");
+    }
+
+    [Fact]
+    public async Task Execute_ImagesAddStoredImageWithoutStorage_FailsExplicitly()
+    {
+        var tool = new CodeActToolV2([], CreateEnv(images: null));
+
+        var result = await tool.ExecuteAsync(
+            Args("""Images.Add(MessageImage.FromFile("missing.png", "image/png"))"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Failed);
+        result.ErrorCode.Should().Be(ToolErrorCodes.ConfigInvalid);
+        result.ErrorMessage.Should().Contain("image storage is unavailable");
     }
 
     [Fact]

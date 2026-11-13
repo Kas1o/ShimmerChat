@@ -57,13 +57,9 @@ namespace ShimmerChatBuiltin.CodeAct
         private readonly int _roundIndex;
         private readonly IImageAttachmentService? _imageAttachments;
         private readonly List<(Tool Definition, IToolV2 Tool)> _tools = new();
-        private readonly List<MessageImage> _images = new();
-        private readonly List<string> _imageUrls = new();
         private readonly StringBuilder _output = new();
         private readonly SemaphoreSlim _toolGate = new(1, 1);
         private int _nestedCalls;
-        private int _omittedImages;
-        private int _limitSkippedImages;
 
         public CodeActGlobals(
             PersistentEnv env,
@@ -80,6 +76,8 @@ namespace ShimmerChatBuiltin.CodeAct
             _parentCallId = parentCallId;
             _roundIndex = roundIndex;
             _imageAttachments = env.ImageAttachments;
+
+            Images = new CodeActImageBag(imageOutputEnabled, env.ImageAttachments);
 
             BuildToolIndex();
         }
@@ -102,20 +100,14 @@ namespace ShimmerChatBuiltin.CodeAct
         /// <summary>本轮可调用的工具名（去重，不包含 CodeAct 自身）。</summary>
         public IReadOnlyList<string> Tools => _tools.Select(t => t.Definition.name).ToList();
 
-        /// <summary>已随本次结果回传的图像 URL（与 <see cref="AddImageAsync"/> 的返回值一致）。</summary>
-        public IReadOnlyList<string> AttachedImageUrls => _imageUrls.ToList();
+        /// <summary>
+        /// 返回图像容器。被调用工具产生的图像不会自动回传，
+        /// 脚本需要显式 <c>Images.Add(result)</c> / <c>Images.Add(image)</c> 才会放进结果。
+        /// </summary>
+        public CodeActImageBag Images { get; }
 
         /// <summary><c>Print</c> 累积的文本；工具层会把它附在返回值之后一起交给模型。</summary>
         public string Output => _output.ToString();
-
-        /// <summary>被调用工具返回、但因“关闭图像输出”而没有回传的图像数量。</summary>
-        internal int OmittedImageCount => _omittedImages;
-
-        /// <summary>超过 <see cref="MaxImages"/> 而没有被回传的图像数量。</summary>
-        internal int LimitSkippedImageCount => _limitSkippedImages;
-
-        /// <summary>实际随结果回传的图像。</summary>
-        internal IReadOnlyList<MessageImage> Images => _images;
 
         /// <summary>把文本写入工具输出（不写控制台，避免污染宿主进程的标准输出）。</summary>
         public void Print(object? value)
@@ -213,17 +205,17 @@ namespace ShimmerChatBuiltin.CodeAct
                 _toolGate.Release();
             }
 
-            ForwardImages(result);
-
             Env.DebugOutput.Write("CodeAct", "ToolCall",
                 $"Round {_roundIndex}: '{definition.name}' (#{_nestedCalls}) " +
                 $"{(result.Status == ToolResultStatus.Completed ? "completed" : $"failed: {result.ErrorCode}")}");
 
+            // 图像不会自动进入结果：脚本必须显式 Images.Add(result) 才会回传，
+            // 从而可以检查、筛选，甚至读完图像后决定不返回。
             return result;
         }
 
         /// <summary>
-        /// 读取本地图像文件并附加到本次工具结果，返回可直接写进回复的显示 URL。
+        /// 读取本地图像文件、落盘后放入 <see cref="Images"/> 容器，返回可直接写进回复的显示 URL。
         /// MIME 类型按文件头识别；显式传入 <paramref name="mimeType"/> 时必须与文件头一致。
         /// </summary>
         public async Task<string> AddImageAsync(string path, string? mimeType = null)
@@ -281,7 +273,7 @@ namespace ShimmerChatBuiltin.CodeAct
         }
 
         /// <summary>
-        /// 把内存中的图像字节附加到本次工具结果，返回显示 URL。
+        /// 把内存中的图像字节落盘后放入 <see cref="Images"/> 容器，返回显示 URL。
         /// 只接受聊天图像规则支持的格式（PNG / JPEG / WebP / GIF），格式按文件头校验。
         /// </summary>
         public async Task<string> AddImageAsync(byte[] content, string mimeType)
@@ -343,10 +335,10 @@ namespace ShimmerChatBuiltin.CodeAct
                     "Image storage is unavailable in the current session, so images cannot be attached.");
             }
 
-            if (_images.Count >= MaxImages)
+            if (Images.Count >= MaxImages)
             {
                 throw new CodeActException(ToolErrorCodes.OutputWriteFailed,
-                    $"Image limit reached: at most {MaxImages} images can be attached to one CodeAct result.");
+                    $"Image limit reached: at most {MaxImages} images can be returned with one CodeAct result.");
             }
 
             MessageImage saved;
@@ -373,34 +365,8 @@ namespace ShimmerChatBuiltin.CodeAct
                     $"FileName={saved.FileName}, MimeType={saved.MimeType}");
             }
 
-            _images.Add(saved);
-            _imageUrls.Add(url);
+            Images.AddSaved(saved, url);
             return url;
-        }
-
-        /// <summary>被调用工具带回的图像自动随本次结果回传；关闭图像输出时只计数并留痕。</summary>
-        private void ForwardImages(ToolResult result)
-        {
-            if (result.Images is not { Count: > 0 } images)
-                return;
-
-            if (!_imageOutputEnabled)
-            {
-                _omittedImages += images.Count;
-                return;
-            }
-
-            foreach (var image in images)
-            {
-                if (_images.Count >= MaxImages)
-                {
-                    _limitSkippedImages++;
-                    continue;
-                }
-
-                _images.Add(image);
-                _imageUrls.Add(_imageAttachments?.GetDisplayUrl(image) ?? "");
-            }
         }
 
         private void BuildToolIndex()

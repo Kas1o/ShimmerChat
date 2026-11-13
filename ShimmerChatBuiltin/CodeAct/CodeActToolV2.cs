@@ -80,11 +80,13 @@ namespace ShimmerChatBuiltin.CodeAct
                     "- await CallToolAsync(\"tool_name\", args) returns the full ToolResult (Status / ErrorCode / Content) " +
                     "without throwing on tool failure.\n" +
                     "- Tools lists callable tool names; GetToolInfo(\"name\") shows a tool's description and parameters.\n" +
+                    "- Images is the result image container. Tool images are NOT added automatically: after " +
+                    "var r = await CallToolAsync(...), call Images.Add(r) or Images.Add(r.Images); " +
+                    "Images.Add(image) also accepts a single MessageImage. Only images in Images are returned with this result.\n" +
                     (this._imageOutputEnabled
-                        ? "- await AddImageAsync(\"C:\\\\path.png\") or AddImageAsync(byte[] bytes, \"image/png\") attaches an image " +
-                          "to this tool result and returns its display URL. Images returned by called tools are forwarded automatically.\n"
-                        : "- Image output is disabled for this tool: images returned by called tools are not forwarded, " +
-                          "and AddImageAsync throws.\n") +
+                        ? "- await AddImageAsync(\"C:\\\\path.png\") or AddImageAsync(byte[] bytes, \"image/png\") saves an image " +
+                          "and adds it to Images, returning its display URL.\n"
+                        : "- Image output is disabled for this tool: Images.Add(...) and AddImageAsync(...) throw.\n") +
                     "- Ct is this round's cancellation token; pass it to async calls and call Ct.ThrowIfCancellationRequested() " +
                     "inside long loops (cancellation of synchronous user code cannot be forced by the host).\n" +
                     "- Env, Chat, Agent and KVData expose the current session. Print(value) appends a line to the tool output.\n" +
@@ -173,7 +175,7 @@ namespace ShimmerChatBuiltin.CodeAct
                 var content = ComposeContent(returnValue, globals);
                 return ToolResult.Ok(
                     content,
-                    globals.Images is { Count: > 0 } ? globals.Images : null);
+                    globals.Images.Items is { Count: > 0 } images ? images : null);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -220,19 +222,6 @@ namespace ShimmerChatBuiltin.CodeAct
                 builder.Append(output.TrimEnd());
             }
 
-            if (globals.OmittedImageCount > 0)
-            {
-                AppendNote(builder,
-                    $"[{globals.OmittedImageCount} image(s) omitted: image output is disabled for this tool]");
-            }
-
-            if (globals.LimitSkippedImageCount > 0)
-            {
-                AppendNote(builder,
-                    $"[{globals.LimitSkippedImageCount} image(s) omitted: at most {CodeActGlobals.MaxImages} " +
-                    "images can be returned with one CodeAct result]");
-            }
-
             if (builder.Length == 0)
                 builder.Append("Code executed successfully (no output).");
 
@@ -242,13 +231,6 @@ namespace ShimmerChatBuiltin.CodeAct
 
             return content[..MaxResultChars] +
                    $"\n[output truncated: {content.Length} chars total, limit is {MaxResultChars}]";
-        }
-
-        private static void AppendNote(StringBuilder builder, string note)
-        {
-            if (builder.Length > 0)
-                builder.AppendLine();
-            builder.Append(note);
         }
 
         private string FormatReturnValue(object? value)

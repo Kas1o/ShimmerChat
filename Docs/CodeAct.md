@@ -35,8 +35,9 @@ CodeAct 工具自身不会出现在脚本的 `Tools` 列表里，避免脚本递
 | `Task<ToolResult> CallToolAsync(string toolName, object? arguments = null)` | 同上，但返回完整 `ToolResult`（`Status` / `ErrorCode` / `Content`），失败不抛异常。 |
 | `IReadOnlyList<string> Tools` | 本轮可调用的工具名（去重，不含 CodeAct 自身）。 |
 | `string GetToolInfo(string toolName)` | 查看工具的名称、描述与参数声明。 |
-| `Task<string> AddImageAsync(string path, string? mimeType = null)` | 读取本地图像并附加到本次结果，返回显示 URL。 |
-| `Task<string> AddImageAsync(byte[] content, string mimeType)` | 附加内存中的图像，返回显示 URL。 |
+| `CodeActImageBag Images` | **返回图像容器**。被调用工具的图像不会自动进入结果，需要显式 `Images.Add(result)` / `Images.Add(result.Images)` / `Images.Add(image)`；只有容器里的图像才会回传。 |
+| `Task<string> AddImageAsync(string path, string? mimeType = null)` | 读取本地图像、落盘后放入 `Images` 容器，返回显示 URL。 |
+| `Task<string> AddImageAsync(byte[] content, string mimeType)` | 保存内存中的图像并放入 `Images` 容器，返回显示 URL。 |
 | `CancellationToken Ct` | 本轮工具调用的取消令牌；应传给异步调用，并在长循环里调用 `Ct.ThrowIfCancellationRequested()`。 |
 | `PersistentEnv Env` | 持久化环境（服务入口）。 |
 | `Chat Chat` / `Agent Agent` / `IKVDataService KVData` | 当前会话、Agent 与 KV 存储。 |
@@ -70,24 +71,46 @@ CodeAct 工具自身不会出现在脚本的 `Tools` 列表里，避免脚本递
 同一次脚本内的工具调用**串行执行**（内部信号量），避免插件工具在并发下状态互相干扰；
 单次脚本最多发起 128 次嵌套工具调用，超限返回 `TOOL_CODE_EXECUTION_ERROR`。
 
-### 3.2 图像输出（可在节点上关闭）
+### 3.2 图像输出：手动放入返回容器（可在节点上关闭）
 
-节点属性 `EnableImageOutput` 默认开启。
+节点属性 `EnableImageOutput` 默认开启。图像输出是**手动**的：被调用工具返回的
+`ToolResult.Images` 不会自动进入最终结果，脚本必须显式放进 `Images` 容器。
 
-开启时：
+常用写法：
 
-- 被调用工具返回的 `ToolResult.Images` 自动随本次结果回传；
-- 脚本可调用 `AddImageAsync(path)` / `AddImageAsync(bytes, mimeType)`，图像统一经
-  `IImageAttachmentService.SaveGeneratedAsync` 落盘，返回 `/userimages/...` 链接；
-- 格式按文件头识别，只接受 PNG / JPEG / WebP / GIF，大小上限复用 `ImageAttachmentRules.MaxBytes`；
-- 单次结果最多 16 张图，超出部分会被丢弃并在结果中标注数量；显式 `AddImageAsync` 超限则直接失败。
+```csharp
+var result = await CallToolAsync("read_image", new { path = @"C:\images\a.png" });
 
-关闭时：
+// 需要返回就放进去；可以只挑一部分，也可以读完再决定不返回。
+Images.Add(result);              // 等价于 Images.Add(result.Images)
+// Images.Add(result.Images[0]); // 只挑第一张
+// Images.Clear();               // 全部丢弃
+```
 
-- 被调用工具的图像不会回传，结果中标注被省略的数量；
-- `AddImageAsync` 明确返回 `TOOL_IMAGE_OUTPUT_DISABLED`。
+容器能力：
 
-图像服务不可用（如子代理虚拟会话）时，`AddImageAsync` 返回 `TOOL_CONFIG_INVALID`，不会静默内联 Base64。
+| 成员 | 说明 |
+|------|------|
+| `Images.Add(ToolResult)` | 放入工具结果里的全部图像（失败结果也可取出其附带图像）。 |
+| `Images.Add(IEnumerable<MessageImage>)` | 放入一组图像，整批先校验再写入。 |
+| `Images.Add(MessageImage)` | 放入单张图像；常见于 `read_image` 等工具的返回值。 |
+| `Images.Clear()` | 清空容器。 |
+| `Images.Count` / `Images.Items` / `Images.Urls` | 查看数量、图像与可解析的显示地址。 |
+
+规则：
+
+- 内联图像（`Base64`）的显示地址为 `data:` URL；文件引用交给 `IImageAttachmentService` 解析；
+- `Images.Add` 会校验 MIME 类型、图像必须有 Base64 或 FileName、内联大小不超过
+  `ImageAttachmentRules.MaxBytes`，任何一项不满足都显式失败；
+- 单次结果最多 16 张图，超过上限时 `Images.Add` 直接失败（不会静默丢弃）；
+- `AddImageAsync(path)` / `AddImageAsync(bytes, mimeType)` 会先落盘再放入容器，返回
+  `/userimages/...` 链接；格式按文件头识别，只接受 PNG / JPEG / WebP / GIF；
+- 图像服务不可用（如子代理虚拟会话）时，`AddImageAsync` 返回 `TOOL_CONFIG_INVALID`，不会静默内联 Base64。
+
+关闭图像输出时：
+
+- `Images.Add(...)` 与 `AddImageAsync(...)` 都明确返回 `TOOL_IMAGE_OUTPUT_DISABLED`；
+- 脚本仍可用 `CallToolAsync(...).Images` 检查工具返回的图像，只是不能回传。
 
 ---
 
@@ -104,7 +127,7 @@ CodeAct 工具自身不会出现在脚本的 `Tools` 列表里，避免脚本递
 |--------|------|
 | `TOOL_CODE_COMPILATION_ERROR` | 脚本编译失败；`Details` 带完整 Roslyn 诊断 |
 | `TOOL_CODE_EXECUTION_ERROR` | 脚本运行期未处理异常，或嵌套工具调用超限 |
-| `TOOL_IMAGE_OUTPUT_DISABLED` | 图像输出已关闭却调用了 `AddImageAsync` |
+| `TOOL_IMAGE_OUTPUT_DISABLED` | 图像输出已关闭却调用了 `Images.Add` 或 `AddImageAsync` |
 | `TOOL_CONFIG_INVALID` | 当前会话没有图像存储服务 |
 | `TOOL_OUTPUT_WRITE_FAILED` | 图像落盘失败、无法解析显示 URL，或图像数量超限 |
 | `TOOL_INVALID_ARGUMENTS` | 参数缺失、工具名不存在、图像格式/大小/MIME 不匹配 |
@@ -133,7 +156,11 @@ Print(search.Substring(0, Math.Min(500, search.Length)));
 var info = GetToolInfo("read_image");
 Print(info);
 
-// 工具返回的图像会自动回传；也可以显式附加本地图像：
+// 工具图像不会自动返回：需要就放进容器，也可以只挑其中一张。
+var imageResult = await CallToolAsync("read_image", new { path = @"C:\images\diagram.png" });
+Images.Add(imageResult);
+
+// 或者显式保存一张本地图像到容器：
 // var url = await AddImageAsync(@"C:\images\diagram.png");
 
 search.Length
