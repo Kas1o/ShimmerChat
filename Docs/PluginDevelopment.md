@@ -632,6 +632,7 @@ if (PanelContext is LiveAgentPanelContext live)
 - 声明 `IsDefault = true` 的界面会成为「未指定界面」时的默认界面（仅应有一个）。
 - 界面指定的 `Id` 未注册时（例如插件被移除），宿主会回退到默认界面并显示警告、记录错误日志。
 - 消息的 Markdown→HTML 渲染仍走 `IMessageDisplayService`（可注入），与渲染修改管线保持独立。
+- 复用 `ChatViewShell` 时，消息正文（`.chat-msg-body`）内的图片会等比缩放到气泡宽度以内，超宽表格与行间公式在各自容器里横向滚动；渲染管线产出的任意 HTML 都不会撑破气泡。
 
 ---
 

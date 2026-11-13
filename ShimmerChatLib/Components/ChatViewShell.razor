@@ -251,7 +251,7 @@
 	/* ── Message bubble ───────────────────────────── */
 	.chat-msg {
 		margin: var(--su-space-2) 0;
-		max-width: 85%;
+		max-width: 85%; min-width: 0;
 		animation: msgIn 0.2s ease-out;
 	}
 	@@keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -353,6 +353,8 @@
 		font-size: var(--su-font-base); line-height: 1.65;
 		color: var(--su-text-0);
 		word-break: break-word;
+		/* 渲染管线可以产出任意 HTML：宽度必须以气泡为上限，而不是按内容撑开 */
+		min-width: 0; max-width: 100%; overflow-wrap: anywhere;
 	}
 	.chat-msg-body p { margin: 0 0 var(--su-space-2); }
 	.chat-msg-body p:last-child { margin-bottom: 0; }
@@ -360,6 +362,35 @@
 		background: var(--su-surface-3); border-radius: var(--su-radius-md);
 		padding: var(--su-space-3); overflow-x: auto;
 		font-family: var(--su-font-mono); font-size: var(--su-font-sm);
+	}
+	/* 图片（含 Markdown 嵌入的生成结果）：等比缩放到气泡宽度以内 */
+	.chat-msg-body img,
+	.chat-msg-thinking-body img {
+		max-width: 100%; height: auto;
+	}
+	/* 宽表格在自己的滚动容器里横向滚动，不撑破气泡 */
+	.chat-msg-body table,
+	.chat-msg-thinking-body table {
+		display: block; width: max-content; max-width: 100%;
+		overflow-x: auto;
+	}
+	/* 行间公式按 KaTeX 的 nowrap 布局，超宽时横向滚动；overflow-y 保持 hidden 以免裁掉上下标 */
+	.chat-msg-body .katex-display,
+	.chat-msg-thinking-body .katex-display {
+		max-width: 100%; overflow-x: auto; overflow-y: hidden;
+		padding-bottom: 2px;
+	}
+	/* 公式本体用 max-content + 自动外边距：放得下时居中，放不下时从左侧开始溢出，
+	   这样滚动条能滚到公式开头，而不是像 text-align:center 那样把左侧裁掉 */
+	.chat-msg-body .katex-display > .katex,
+	.chat-msg-thinking-body .katex-display > .katex {
+		width: max-content;
+		margin-left: auto; margin-right: auto;
+	}
+	/* MathML 输出形态没有 .katex-display 包裹，行间 math 自身作为滚动容器 */
+	.chat-msg-body :is(math[display="block"]),
+	.chat-msg-thinking-body :is(math[display="block"]) {
+		max-width: 100%; overflow-x: auto;
 	}
 	/* 行内代码：只作用于非 pre 内的 code，避免围栏代码块被套上第二层底色与内边距 */
 	.chat-msg-body :not(pre) > code {
