@@ -83,6 +83,28 @@ public class ImageAttachmentServiceTests
     }
 
     [Fact]
+    public async Task SaveGeneratedAsync_AlwaysWritesFileEvenInBase64Mode()
+    {
+        // 生成结果需要稳定的 /userimages/ 链接，不能跟随「上传图像内联」设置变成 data URL
+        var service = CreateService(nameof(ImageStorageMode.MessageBase64));
+
+        var image = await service.SaveGeneratedAsync(PngStream(), "image/png");
+
+        try
+        {
+            image.Base64.Should().BeNull();
+            image.FileName.Should().EndWith(".png");
+            File.Exists(PathOf(image)).Should().BeTrue();
+            File.ReadAllBytes(PathOf(image)).Should().Equal(PngBytes);
+            service.GetDisplayUrl(image).Should().Be($"/userimages/{image.FileName}");
+        }
+        finally
+        {
+            File.Delete(PathOf(image));
+        }
+    }
+
+    [Fact]
     public async Task ToChatImageAsync_ResolvesFileNameIntoBase64()
     {
         var service = CreateService(nameof(ImageStorageMode.UserUploadImage));

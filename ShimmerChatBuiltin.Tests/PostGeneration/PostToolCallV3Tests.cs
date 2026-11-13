@@ -61,6 +61,38 @@ public class PostToolCallV3Tests : PostNodeTestBase
     }
 
     [Fact]
+    public async Task CompletedResultWithImages_AttachesImagesToPersistedToolResult()
+    {
+        var image = MessageImage.FromFile("generated.png", "image/png");
+        var tool = new StubToolV3("generate_image", (_, _) =>
+            Task.FromResult(ToolResult.Ok(
+                "![generated image](/userimages/generated.png)",
+                [image])));
+
+        var node = new PostToolCallNode();
+        var ctx = CreateContext(
+            new ChatMessage { Content = "", toolCalls = [Call("generate_image")] },
+            [tool]);
+
+        var result = await node.ExecuteAsync(ctx);
+
+        result.Success.Should().BeTrue();
+
+        var written = TestChat.Messages.Should().ContainSingle().Subject;
+        written.Images.Should().ContainSingle();
+        written.Images![0].FileName.Should().Be("generated.png");
+        written.Images[0].MimeType.Should().Be("image/png");
+
+        // 图像引用必须在落库前挂到 Message 上，否则下一轮读历史时模型看不到
+        StoreMock.Verify(s => s.InsertMessage(
+            It.IsAny<Guid>(),
+            It.Is<Message>(m => m.Images != null
+                                && m.Images.Count == 1
+                                && m.Images[0].FileName == "generated.png")),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task FailedResult_StopsTheRoundWhenContinueOnErrorIsOff()
     {
         var tool = new StubToolV3("broken", (_, _) =>

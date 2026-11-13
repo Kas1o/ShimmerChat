@@ -75,19 +75,36 @@ namespace ShimmerChat.Singletons
 				return MessageImage.FromBase64(Convert.ToBase64String(buffer.ToArray()), mimeType);
 			}
 
+			return await SaveFileAsync(content, mimeType, cancellationToken: default);
+		}
+
+		/// <summary>
+		/// 生成结果始终落盘：工具返回的链接必须在消息之外也能被访问，
+		/// 因此不受 <see cref="Mode"/> 的 Base64 设置影响。
+		/// </summary>
+		public async Task<MessageImage> SaveGeneratedAsync(
+			Stream content, string contentType, CancellationToken cancellationToken = default)
+		{
+			var mimeType = ResolveMimeType(contentType);
+			return await SaveFileAsync(content, mimeType, cancellationToken);
+		}
+
+		private static async Task<MessageImage> SaveFileAsync(
+			Stream content, string mimeType, CancellationToken cancellationToken)
+		{
 			Directory.CreateDirectory(UploadDirectory);
 			var fileName = $"{Guid.NewGuid():N}{SupportedTypes[mimeType]}";
 			var filePath = Path.Combine(UploadDirectory, fileName);
 			await using (var file = File.Create(filePath))
 			{
-				await content.CopyToAsync(file);
+				await content.CopyToAsync(file, cancellationToken);
 			}
 
 			if (new FileInfo(filePath).Length == 0)
 			{
 				// 空文件不是有效图像：删除并显式报错，不留下无法使用的引用
 				File.Delete(filePath);
-				throw new InvalidDataException($"Uploaded image is empty ({contentType}).");
+				throw new InvalidDataException($"Image is empty ({mimeType}).");
 			}
 
 			return MessageImage.FromFile(fileName, mimeType);

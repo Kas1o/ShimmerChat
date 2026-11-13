@@ -25,6 +25,13 @@ namespace ShimmerChatLib.Generation
         /// <summary>写进 tool_result 的文本（<see cref="ToolResultStatus.Completed"/> 时有意义，允许为空串）。</summary>
         public string? Content { get; init; }
 
+        /// <summary>
+        /// 随工具结果一起返回、需要模型在下一轮"看到"的图像（与文本同一条 tool_result 消息）。
+        /// 执行节点会把它写到消息的 <c>Message.Images</c>，构建请求时再解析成多模态内容块；
+        /// 只返回链接不会让模型真正看到图像，因此能产出图像的工具应同时填充这里。
+        /// </summary>
+        public IReadOnlyList<MessageImage>? Images { get; init; }
+
         /// <summary>失败错误码（<see cref="ToolErrorCodes"/> 中的常量）。</summary>
         public string? ErrorCode { get; init; }
 
@@ -34,10 +41,11 @@ namespace ShimmerChatLib.Generation
         /// <summary>失败的技术细节，由节点写进 DebugOutput，不塞给模型。</summary>
         public string? Details { get; init; }
 
-        public static ToolResult Ok(string? content = null) => new()
+        public static ToolResult Ok(string? content = null, IReadOnlyList<MessageImage>? images = null) => new()
         {
             Status = ToolResultStatus.Completed,
-            Content = content ?? string.Empty
+            Content = content ?? string.Empty,
+            Images = images is { Count: > 0 } ? images : null
         };
 
         public static ToolResult Fail(string code, string message, string? details = null) => new()
@@ -68,5 +76,8 @@ namespace ShimmerChatLib.Generation
 
         /// <summary>工具声明的配置不可用。</summary>
         public const string ConfigInvalid = "TOOL_CONFIG_INVALID";
+
+        /// <summary>工具产生的结果无法写入预期的存储位置（如生成图像落盘失败）。</summary>
+        public const string OutputWriteFailed = "TOOL_OUTPUT_WRITE_FAILED";
     }
 }

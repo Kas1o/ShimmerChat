@@ -39,6 +39,20 @@ namespace ShimmerChatLib.Interface
         Task<MessageImage> SaveAsync(Stream content, string contentType);
 
         /// <summary>
+        /// 保存一张由工具生成的图像，并始终返回「文件引用」形态的附件
+        /// （即使当前上传存储方式配置为 Base64）：生成结果需要可被其它消息 / 界面
+        /// 通过稳定的 <c>/userimages/...</c> 链接再次访问。
+        /// <para>
+        /// 默认实现退化为 <see cref="SaveAsync"/>，用于兼容没有该能力的旧实现；
+        /// 调用方必须检查返回的 <see cref="MessageImage.FileName"/> 并使用
+        /// <see cref="GetDisplayUrl"/> 取链接，不能假定一定是文件。
+        /// </para>
+        /// </summary>
+        Task<MessageImage> SaveGeneratedAsync(
+            Stream content, string contentType, CancellationToken cancellationToken = default)
+            => SaveAsync(content, contentType);
+
+        /// <summary>
         /// 把消息中的图像附件解析为请求可用的内容块。
         /// 附件引用的文件缺失时抛出 <see cref="FileNotFoundException"/>，不静默跳过。
         /// </summary>

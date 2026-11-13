@@ -19,6 +19,7 @@
   "category.preset": "Preset",
   "category.sub_agent": "SubAgent",
   "category.web_search": "Web Search",
+  "category.image_generation": "Image Generation",
   "category.general": "General",
   "category.post": "Post-Generation",
   "category.render": "Render",

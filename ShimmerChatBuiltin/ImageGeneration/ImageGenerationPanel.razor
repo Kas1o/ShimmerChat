@@ -1,0 +1,665 @@
+@attribute [PluginPanelAttribute("panel.image_generation", "panel.image_generation.desc", PanelDisplayPlace.Settings, Order = 5)]
+
+@using System.Globalization
+@using Microsoft.Extensions.Logging
+@using ShimmerChatBuiltin.ImageGeneration
+@inject IKVDataService KVData
+@inject ILocService Loc
+@inject ILogger<ImageGenerationPanel> Logger
+
+<div class="shimmer-content su-p-4">
+    <h2 class="su-text-lg su-font-bold su-mb-4">@Loc["panel_imagegen.title"]</h2>
+    <p class="su-text-2 su-mb-4">@Loc["panel_imagegen.desc"]</p>
+
+    <div class="su-group">
+        <h3 class="su-text-lg su-font-bold">@Loc["panel_imagegen.connection"]</h3>
+        <div class="su-row su-gap-4">
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_imagegen.base_url"]</label>
+                <input class="su-input su-w-full" @bind="_baseUrl" placeholder="http://127.0.0.1:8188" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_imagegen.base_url_hint"]</p>
+            </div>
+            <div class="su-col-2">
+                <label class="su-label">@Loc["panel_imagegen.timeout"]</label>
+                <input class="su-input su-w-full" @bind="_timeoutSeconds" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_imagegen.timeout_hint"]</p>
+            </div>
+            <div class="su-col-2">
+                <label class="su-label">@Loc["panel_imagegen.max_wait"]</label>
+                <input class="su-input su-w-full" @bind="_maxWaitSeconds" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_imagegen.max_wait_hint"]</p>
+            </div>
+            <div class="su-col-2">
+                <label class="su-label">@Loc["panel_imagegen.poll_interval"]</label>
+                <input class="su-input su-w-full" @bind="_pollIntervalMs" />
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_imagegen.poll_interval_hint"]</p>
+            </div>
+        </div>
+        <div class="su-flex su-gap-3 su-flex-wrap su-mt-2" style="align-items:center;">
+            <button class="su-btn su-btn-outline" disabled="@_loadingServerInfo" @onclick="LoadServerInfoAsync">
+                @(_loadingServerInfo ? Loc["panel_imagegen.loading_server"] : Loc["panel_imagegen.load_server"])
+            </button>
+            @if (!string.IsNullOrEmpty(_serverMessage))
+            {
+                <span class="su-badge @(_serverFailed ? "su-badge-danger" : "su-badge-success")">@_serverMessage</span>
+            }
+        </div>
+    </div>
+
+    <div class="su-group su-mt-4">
+        <h3 class="su-text-lg su-font-bold">@Loc["panel_imagegen.default_workflow"]</h3>
+        <p class="su-text-sm su-text-2">@Loc["panel_imagegen.default_workflow_desc"]</p>
+
+        <div class="su-row su-gap-4 su-mt-2">
+            <div class="su-col-6">
+                <label class="su-label">@Loc["panel_imagegen.model"]</label>
+                <input class="su-input su-w-full" list="imagegen-model-options" @bind="_model" />
+                <datalist id="imagegen-model-options">
+                    @foreach (var model in _availableModels)
+                    {
+                        <option value="@model"></option>
+                    }
+                </datalist>
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_imagegen.model_hint"]</p>
+            </div>
+            <div class="su-col-2">
+                <label class="su-label">@Loc["panel_imagegen.width"]</label>
+                <input class="su-input su-w-full" @bind="_width" />
+            </div>
+            <div class="su-col-2">
+                <label class="su-label">@Loc["panel_imagegen.height"]</label>
+                <input class="su-input su-w-full" @bind="_height" />
+            </div>
+            <div class="su-col-2">
+                <label class="su-label">@Loc["panel_imagegen.batch_size"]</label>
+                <input class="su-input su-w-full" @bind="_batchSize" />
+            </div>
+
+            <div class="su-col-2">
+                <label class="su-label">@Loc["panel_imagegen.steps"]</label>
+                <input class="su-input su-w-full" @bind="_steps" />
+            </div>
+            <div class="su-col-2">
+                <label class="su-label">@Loc["panel_imagegen.cfg"]</label>
+                <input class="su-input su-w-full" @bind="_cfg" />
+            </div>
+            <div class="su-col-4">
+                <label class="su-label">@Loc["panel_imagegen.sampler"]</label>
+                <input class="su-input su-w-full" list="imagegen-sampler-options" @bind="_sampler" />
+                <datalist id="imagegen-sampler-options">
+                    @foreach (var sampler in _availableSamplers)
+                    {
+                        <option value="@sampler"></option>
+                    }
+                </datalist>
+            </div>
+            <div class="su-col-4">
+                <label class="su-label">@Loc["panel_imagegen.scheduler"]</label>
+                <input class="su-input su-w-full" list="imagegen-scheduler-options" @bind="_scheduler" />
+                <datalist id="imagegen-scheduler-options">
+                    @foreach (var scheduler in _availableSchedulers)
+                    {
+                        <option value="@scheduler"></option>
+                    }
+                </datalist>
+            </div>
+            <div class="su-col-12">
+                <label class="su-label">@Loc["panel_imagegen.negative_prompt"]</label>
+                <textarea class="su-input su-w-full" rows="2" @bind="_negativePrompt"></textarea>
+                <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_imagegen.negative_prompt_hint"]</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="su-group su-mt-4">
+        <div class="su-flex su-gap-3 su-flex-wrap" style="align-items:center; justify-content:space-between;">
+            <div>
+                <h3 class="su-text-lg su-font-bold">@Loc["panel_imagegen.custom_workflows"]</h3>
+                <p class="su-text-sm su-text-2">@Loc["panel_imagegen.custom_workflows_desc"]</p>
+            </div>
+            <button class="su-btn su-btn-primary" @onclick="AddWorkflow">@Loc["panel_imagegen.add_workflow"]</button>
+        </div>
+
+        @if (_workflows.Count == 0)
+        {
+            <p class="su-text-sm su-text-2 su-mt-3">@Loc["panel_imagegen.no_workflows"]</p>
+        }
+
+        @for (var wi = 0; wi < _workflows.Count; wi++)
+        {
+            var workflow = _workflows[wi];
+            var workflowIndex = wi;
+
+            <div class="su-card su-mt-3" @key="workflow">
+                <div class="su-card-body">
+                    <div class="su-flex su-gap-3 su-flex-wrap" style="align-items:center; justify-content:space-between;">
+                        <strong>@(string.IsNullOrWhiteSpace(workflow.Name) ? Loc["panel_imagegen.untitled_workflow"] : workflow.Name)</strong>
+                        <div class="su-flex su-gap-3" style="align-items:center;">
+                            <label class="su-text-sm">
+                                <input type="checkbox" @bind="workflow.Enabled" />
+                                @Loc["panel_imagegen.workflow_enabled"]
+                            </label>
+                            <button class="su-btn su-btn-sm su-btn-danger" @onclick="() => RemoveWorkflow(workflowIndex)">
+                                @Loc["panel_imagegen.remove_workflow"]
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="su-row su-gap-4 su-mt-2">
+                        <div class="su-col-4">
+                            <label class="su-label">@Loc["panel_imagegen.workflow_id"]</label>
+                            <input class="su-input su-w-full" @bind="workflow.Id" />
+                            <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_imagegen.workflow_id_hint"]</p>
+                        </div>
+                        <div class="su-col-4">
+                            <label class="su-label">@Loc["panel_imagegen.workflow_name"]</label>
+                            <input class="su-input su-w-full" @bind="workflow.Name" />
+                        </div>
+                        <div class="su-col-4">
+                            <label class="su-label">@Loc["panel_imagegen.workflow_description"]</label>
+                            <input class="su-input su-w-full" @bind="workflow.Description" />
+                        </div>
+                        <div class="su-col-12">
+                            <label class="su-label">@Loc["panel_imagegen.workflow_json"]</label>
+                            <textarea class="su-input su-w-full" rows="8" style="font-family:monospace;" @bind="workflow.WorkflowJson"></textarea>
+                            <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_imagegen.workflow_json_hint"]</p>
+                        </div>
+                    </div>
+
+                    <div class="su-mt-3">
+                        <div class="su-flex su-gap-3 su-flex-wrap" style="align-items:center; justify-content:space-between;">
+                            <strong>@Loc["panel_imagegen.workflow_parameters"]</strong>
+                            <button class="su-btn su-btn-sm su-btn-outline" @onclick="() => AddParameter(workflow)">
+                                @Loc["panel_imagegen.add_parameter"]
+                            </button>
+                        </div>
+
+                        @if (workflow.Parameters.Count == 0)
+                        {
+                            <p class="su-text-sm su-text-2 su-mt-2">@Loc["panel_imagegen.no_parameters"]</p>
+                        }
+
+                        @for (var pi = 0; pi < workflow.Parameters.Count; pi++)
+                        {
+                            var parameter = workflow.Parameters[pi];
+                            var parameterIndex = pi;
+
+                            <div class="su-card su-mt-2" @key="parameter">
+                                <div class="su-card-body">
+                                    <div class="su-row su-gap-3">
+                                        <div class="su-col-3">
+                                            <label class="su-label">@Loc["panel_imagegen.param_name"]</label>
+                                            <input class="su-input su-w-full" @bind="parameter.Name" />
+                                        </div>
+                                        <div class="su-col-3">
+                                            <label class="su-label">@Loc["panel_imagegen.param_type"]</label>
+                                            <select class="su-select su-w-full" @bind="parameter.Type">
+                                                @foreach (var type in Enum.GetValues<ImageWorkflowParameterType>())
+                                                {
+                                                    <option value="@type">@TypeLabel(type)</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="su-col-3">
+                                            <label class="su-label">@Loc["panel_imagegen.param_default"]</label>
+                                            <input class="su-input su-w-full" @bind="parameter.DefaultValue" />
+                                        </div>
+                                        <div class="su-col-3 su-flex su-gap-3" style="align-items:flex-end;">
+                                            <label class="su-text-sm" style="margin-bottom:8px;">
+                                                <input type="checkbox" @bind="parameter.Required" />
+                                                @Loc["panel_imagegen.param_required"]
+                                            </label>
+                                            <button class="su-btn su-btn-sm su-btn-danger" @onclick="() => RemoveParameter(workflow, parameterIndex)">
+                                                @Loc["panel_imagegen.remove_parameter"]
+                                            </button>
+                                        </div>
+                                        <div class="su-col-12">
+                                            <label class="su-label">@Loc["panel_imagegen.param_description"]</label>
+                                            <input class="su-input su-w-full" @bind="parameter.Description" />
+                                        </div>
+                                        <div class="su-col-4">
+                                            <label class="su-label">@Loc["panel_imagegen.param_enum_values"]</label>
+                                            <input class="su-input su-w-full" @bind="parameter.EnumValuesText" />
+                                            <p class="su-text-sm su-text-2 su-mt-1">@Loc["panel_imagegen.param_enum_values_hint"]</p>
+                                        </div>
+                                        <div class="su-col-4">
+                                            <label class="su-label">@Loc["panel_imagegen.param_min"]</label>
+                                            <input class="su-input su-w-full" @bind="parameter.MinText" />
+                                        </div>
+                                        <div class="su-col-4">
+                                            <label class="su-label">@Loc["panel_imagegen.param_max"]</label>
+                                            <input class="su-input su-w-full" @bind="parameter.MaxText" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <p class="su-text-sm su-text-2 su-mt-3">@Loc["panel_imagegen.template_help"]</p>
+    </div>
+
+    <div class="su-mt-5 su-pt-3 su-border-top su-flex su-gap-3" style="align-items:center;">
+        <button class="su-btn su-btn-primary" @onclick="SaveConfig">@Loc["panel_imagegen.save"]</button>
+        <button class="su-btn su-btn-outline" @onclick="ResetToDefaults">@Loc["panel_imagegen.reset"]</button>
+        @if (!string.IsNullOrEmpty(_statusMessage))
+        {
+            <span class="su-badge @(_statusFailed ? "su-badge-danger" : "su-badge-success")">@_statusMessage</span>
+        }
+    </div>
+</div>
+
+@code {
+    private string _baseUrl = "";
+    private string _timeoutSeconds = "";
+    private string _maxWaitSeconds = "";
+    private string _pollIntervalMs = "";
+
+    private string _model = "";
+    private string _width = "";
+    private string _height = "";
+    private string _steps = "";
+    private string _cfg = "";
+    private string _sampler = "";
+    private string _scheduler = "";
+    private string _negativePrompt = "";
+    private string _batchSize = "";
+
+    private List<string> _availableModels = [];
+    private List<string> _availableSamplers = [];
+    private List<string> _availableSchedulers = [];
+
+    private List<WorkflowEditor> _workflows = [];
+
+    private string _statusMessage = "";
+    private bool _statusFailed;
+
+    private string _serverMessage = "";
+    private bool _serverFailed;
+    private bool _loadingServerInfo;
+
+    protected override void OnInitialized()
+    {
+        var (config, error) = ImageGenerationConfigManager.Load(KVData);
+        if (config == null)
+        {
+            ApplyToForm(new ImageGenerationConfig());
+            ShowStatus(Loc.Format("panel_imagegen.msg_load_failed", error ?? "unknown error"), failed: true);
+            return;
+        }
+
+        ApplyToForm(config);
+    }
+
+    private void ApplyToForm(ImageGenerationConfig config)
+    {
+        _baseUrl = config.ComfyUiBaseUrl;
+        _timeoutSeconds = config.TimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+        _maxWaitSeconds = config.MaxWaitSeconds.ToString(CultureInfo.InvariantCulture);
+        _pollIntervalMs = config.PollIntervalMilliseconds.ToString(CultureInfo.InvariantCulture);
+
+        _model = config.DefaultWorkflow.Model;
+        _width = config.DefaultWorkflow.Width.ToString(CultureInfo.InvariantCulture);
+        _height = config.DefaultWorkflow.Height.ToString(CultureInfo.InvariantCulture);
+        _steps = config.DefaultWorkflow.Steps.ToString(CultureInfo.InvariantCulture);
+        _cfg = config.DefaultWorkflow.CfgScale.ToString("R", CultureInfo.InvariantCulture);
+        _sampler = config.DefaultWorkflow.Sampler;
+        _scheduler = config.DefaultWorkflow.Scheduler;
+        _negativePrompt = config.DefaultWorkflow.NegativePrompt;
+        _batchSize = config.DefaultWorkflow.BatchSize.ToString(CultureInfo.InvariantCulture);
+
+        _workflows = config.CustomWorkflows.Select(ToEditor).ToList();
+    }
+
+    private static WorkflowEditor ToEditor(CustomImageWorkflow workflow) => new()
+    {
+        Id = workflow.Id,
+        Name = workflow.Name,
+        Description = workflow.Description,
+        Enabled = workflow.Enabled,
+        WorkflowJson = workflow.WorkflowJson,
+        Parameters = workflow.Parameters.Select(ToEditor).ToList()
+    };
+
+    private static ParameterEditor ToEditor(ImageWorkflowParameter parameter) => new()
+    {
+        Name = parameter.Name,
+        Type = parameter.Type,
+        Description = parameter.Description,
+        Required = parameter.Required,
+        DefaultValue = parameter.DefaultValue,
+        EnumValuesText = string.Join(", ", parameter.EnumValues),
+        MinText = parameter.Min?.ToString("R", CultureInfo.InvariantCulture) ?? "",
+        MaxText = parameter.Max?.ToString("R", CultureInfo.InvariantCulture) ?? ""
+    };
+
+    private ImageGenerationConfig? BuildConfig(out string? error)
+    {
+        error = null;
+
+        if (!TryParseInt(_timeoutSeconds, out var timeout))
+        {
+            error = Loc.Format("panel_imagegen.msg_invalid_int", Loc["panel_imagegen.timeout"]);
+            return null;
+        }
+
+        if (!TryParseInt(_maxWaitSeconds, out var maxWait))
+        {
+            error = Loc.Format("panel_imagegen.msg_invalid_int", Loc["panel_imagegen.max_wait"]);
+            return null;
+        }
+
+        if (!TryParseInt(_pollIntervalMs, out var pollInterval))
+        {
+            error = Loc.Format("panel_imagegen.msg_invalid_int", Loc["panel_imagegen.poll_interval"]);
+            return null;
+        }
+
+        if (!TryParseInt(_width, out var width))
+        {
+            error = Loc.Format("panel_imagegen.msg_invalid_int", Loc["panel_imagegen.width"]);
+            return null;
+        }
+
+        if (!TryParseInt(_height, out var height))
+        {
+            error = Loc.Format("panel_imagegen.msg_invalid_int", Loc["panel_imagegen.height"]);
+            return null;
+        }
+
+        if (!TryParseInt(_steps, out var steps))
+        {
+            error = Loc.Format("panel_imagegen.msg_invalid_int", Loc["panel_imagegen.steps"]);
+            return null;
+        }
+
+        if (!TryParseDouble(_cfg, out var cfg))
+        {
+            error = Loc.Format("panel_imagegen.msg_invalid_number", Loc["panel_imagegen.cfg"]);
+            return null;
+        }
+
+        if (!TryParseInt(_batchSize, out var batchSize))
+        {
+            error = Loc.Format("panel_imagegen.msg_invalid_int", Loc["panel_imagegen.batch_size"]);
+            return null;
+        }
+
+        var workflows = new List<CustomImageWorkflow>(_workflows.Count);
+        foreach (var editor in _workflows)
+        {
+            var parameters = new List<ImageWorkflowParameter>(editor.Parameters.Count);
+            foreach (var parameterEditor in editor.Parameters)
+            {
+                double? min = null;
+                if (!string.IsNullOrWhiteSpace(parameterEditor.MinText))
+                {
+                    if (!TryParseDouble(parameterEditor.MinText, out var parsedMin))
+                    {
+                        error = Loc.Format("panel_imagegen.msg_invalid_param_number",
+                            editor.Name, parameterEditor.Name, Loc["panel_imagegen.param_min"]);
+                        return null;
+                    }
+
+                    min = parsedMin;
+                }
+
+                double? max = null;
+                if (!string.IsNullOrWhiteSpace(parameterEditor.MaxText))
+                {
+                    if (!TryParseDouble(parameterEditor.MaxText, out var parsedMax))
+                    {
+                        error = Loc.Format("panel_imagegen.msg_invalid_param_number",
+                            editor.Name, parameterEditor.Name, Loc["panel_imagegen.param_max"]);
+                        return null;
+                    }
+
+                    max = parsedMax;
+                }
+
+                var enumValues = parameterEditor.EnumValuesText
+                    .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                    .Select(v => v.Trim())
+                    .Where(v => v.Length > 0)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                parameters.Add(new ImageWorkflowParameter
+                {
+                    Name = parameterEditor.Name?.Trim() ?? "",
+                    Type = parameterEditor.Type,
+                    Description = parameterEditor.Description ?? "",
+                    Required = parameterEditor.Required,
+                    DefaultValue = parameterEditor.DefaultValue ?? "",
+                    EnumValues = enumValues,
+                    Min = min,
+                    Max = max
+                });
+            }
+
+            workflows.Add(new CustomImageWorkflow
+            {
+                Id = editor.Id?.Trim() ?? "",
+                Name = editor.Name?.Trim() ?? "",
+                Description = editor.Description ?? "",
+                Enabled = editor.Enabled,
+                WorkflowJson = editor.WorkflowJson ?? "",
+                Parameters = parameters
+            });
+        }
+
+        var config = new ImageGenerationConfig
+        {
+            ComfyUiBaseUrl = _baseUrl.Trim(),
+            TimeoutSeconds = timeout,
+            MaxWaitSeconds = maxWait,
+            PollIntervalMilliseconds = pollInterval,
+            DefaultWorkflow = new DefaultImageWorkflowSettings
+            {
+                Model = _model.Trim(),
+                Width = width,
+                Height = height,
+                Steps = steps,
+                CfgScale = cfg,
+                Sampler = _sampler.Trim(),
+                Scheduler = _scheduler.Trim(),
+                NegativePrompt = _negativePrompt,
+                BatchSize = batchSize
+            },
+            CustomWorkflows = workflows
+        };
+
+        var validationError = ImageGenerationConfigManager.Validate(config);
+        if (validationError != null)
+        {
+            error = Loc.Format("panel_imagegen.msg_invalid_config", validationError);
+            return null;
+        }
+
+        return config;
+    }
+
+    private void SaveConfig()
+    {
+        var config = BuildConfig(out var error);
+        if (config == null)
+        {
+            ShowStatus(error!, failed: true);
+            return;
+        }
+
+        try
+        {
+            ImageGenerationConfigManager.Save(KVData, config);
+            ShowStatus(Loc["panel_imagegen.msg_saved"], failed: false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save image generation configuration.");
+            ShowStatus(Loc.Format("panel_imagegen.msg_save_failed", ex.Message), failed: true);
+        }
+    }
+
+    private void ResetToDefaults()
+    {
+        ApplyToForm(new ImageGenerationConfig());
+        ShowStatus(Loc["panel_imagegen.msg_reset"], failed: false);
+    }
+
+    /// <summary>
+    /// 只验证连接字段后向 ComfyUI 读取模型 / 采样器列表，用于填写默认工作流。
+    /// 读取失败只影响下拉候选，不阻止用户手动输入，也不自动保存配置。
+    /// </summary>
+    private async Task LoadServerInfoAsync()
+    {
+        var baseUrl = _baseUrl.Trim();
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            _serverFailed = true;
+            _serverMessage = Loc["panel_imagegen.msg_invalid_base_url"];
+            return;
+        }
+
+        if (!TryParseInt(_timeoutSeconds, out var timeout) || timeout <= 0)
+        {
+            _serverFailed = true;
+            _serverMessage = Loc.Format("panel_imagegen.msg_invalid_int", Loc["panel_imagegen.timeout"]);
+            return;
+        }
+
+        _loadingServerInfo = true;
+        _serverFailed = false;
+        _serverMessage = Loc["panel_imagegen.msg_loading_server"];
+
+        try
+        {
+            var timeoutSpan = TimeSpan.FromSeconds(timeout);
+            var modelsTask = ComfyUiProbe.FetchCheckpointModelsAsync(baseUrl, timeoutSpan);
+            var samplersTask = ComfyUiProbe.FetchSamplerOptionsAsync(baseUrl, timeoutSpan);
+
+            await Task.WhenAll(modelsTask, samplersTask);
+
+            var (models, modelsError) = await modelsTask;
+            var (samplerOptions, samplersError) = await samplersTask;
+
+            if (models == null)
+            {
+                // 读取失败时清空旧列表，避免用户切换服务后仍看到上一个服务的模型候选
+                _availableModels = [];
+                _availableSamplers = [];
+                _availableSchedulers = [];
+                _serverFailed = true;
+                _serverMessage = Loc.Format("panel_imagegen.msg_server_failed", modelsError);
+                return;
+            }
+
+            _availableModels = [.. models];
+
+            if (samplerOptions == null)
+            {
+                // 模型列表已经可用；采样器读取失败单独提示，避免丢弃已有结果。
+                _availableSamplers = [];
+                _availableSchedulers = [];
+                _serverFailed = true;
+                _serverMessage = Loc.Format("panel_imagegen.msg_sampler_failed", samplersError);
+            }
+            else
+            {
+                _availableSamplers = [.. samplerOptions.Samplers];
+                _availableSchedulers = [.. samplerOptions.Schedulers];
+                _serverMessage = Loc.Format(
+                    "panel_imagegen.msg_server_loaded",
+                    _availableModels.Count,
+                    _availableSamplers.Count,
+                    _availableSchedulers.Count);
+            }
+
+            if (string.IsNullOrWhiteSpace(_model) && _availableModels.Count > 0)
+                _model = _availableModels[0];
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load ComfyUI object info from {BaseUrl}.", baseUrl);
+            _serverFailed = true;
+            _serverMessage = Loc.Format("panel_imagegen.msg_server_failed", ex.Message);
+        }
+        finally
+        {
+            _loadingServerInfo = false;
+        }
+    }
+
+    private void AddWorkflow()
+    {
+        _workflows.Add(new WorkflowEditor
+        {
+            Id = "wf_" + Guid.NewGuid().ToString("N")[..12],
+            Enabled = false,
+            WorkflowJson = ""
+        });
+    }
+
+    private void RemoveWorkflow(int index)
+    {
+        if (index >= 0 && index < _workflows.Count)
+            _workflows.RemoveAt(index);
+    }
+
+    private void AddParameter(WorkflowEditor workflow)
+    {
+        workflow.Parameters.Add(new ParameterEditor
+        {
+            Name = workflow.Parameters.Count == 0 ? "prompt" : $"param{workflow.Parameters.Count + 1}",
+            Type = ImageWorkflowParameterType.String,
+            Required = workflow.Parameters.Count == 0
+        });
+    }
+
+    private void RemoveParameter(WorkflowEditor workflow, int index)
+    {
+        if (index >= 0 && index < workflow.Parameters.Count)
+            workflow.Parameters.RemoveAt(index);
+    }
+
+    private string TypeLabel(ImageWorkflowParameterType type) =>
+        Loc[$"panel_imagegen.param_type_{type.ToString().ToLowerInvariant()}"];
+
+    private void ShowStatus(string message, bool failed)
+    {
+        _statusMessage = message;
+        _statusFailed = failed;
+    }
+
+    private static bool TryParseInt(string? text, out int value) =>
+        int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+
+    private static bool TryParseDouble(string? text, out double value) =>
+        double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
+        && double.IsFinite(value);
+
+    private sealed class WorkflowEditor
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public bool Enabled { get; set; } = true;
+        public string WorkflowJson { get; set; } = "";
+        public List<ParameterEditor> Parameters { get; set; } = [];
+    }
+
+    private sealed class ParameterEditor
+    {
+        public string Name { get; set; } = "";
+        public ImageWorkflowParameterType Type { get; set; } = ImageWorkflowParameterType.String;
+        public string Description { get; set; } = "";
+        public bool Required { get; set; }
+        public string DefaultValue { get; set; } = "";
+        public string EnumValuesText { get; set; } = "";
+        public string MinText { get; set; } = "";
+        public string MaxText { get; set; } = "";
+    }
+}

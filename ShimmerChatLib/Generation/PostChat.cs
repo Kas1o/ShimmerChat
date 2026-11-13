@@ -9,14 +9,22 @@ namespace ShimmerChatLib.Generation
     /// </summary>
     public static class PostChat
     {
-        /// <summary>追加一条消息到对话末尾，并落库（虚拟会话只改内存）。</summary>
-        public static Message Append(PostGenerationEnv env, ChatMessage message, string sender)
+        /// <summary>
+        /// 追加一条消息到对话末尾，并落库（虚拟会话只改内存）。
+        /// <paramref name="images"/> 会在写入存储前挂到消息上，保证图像引用与消息原子落库。
+        /// </summary>
+        public static Message Append(
+            PostGenerationEnv env,
+            ChatMessage message,
+            string sender,
+            IReadOnlyList<MessageImage>? images = null)
         {
             var msg = new Message
             {
                 message = message,
                 sender = sender,
-                timestamp = DateTime.Now
+                timestamp = DateTime.Now,
+                Images = images is { Count: > 0 } ? [.. images] : null
             };
 
             env.Chat.AddMessage(msg);

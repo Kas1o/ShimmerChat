@@ -62,8 +62,14 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
             HintKey = "prop.post_tool_call.no_tool_call.hint", Order = 40)]
         public PostNoToolCallBehavior NoToolCallBehavior { get; set; } = PostNoToolCallBehavior.LeaveDirective;
 
-        /// <summary>一次工具调用的执行结论：要么有内容可写，要么是一个真相失败。</summary>
-        private readonly record struct ToolCallOutcome(string? Content, string? FailCode, string? FailMessage);
+        /// <summary>
+        /// 一次工具调用的执行结论：要么有内容（以及可选的图像）可写，要么是一个真相失败。
+        /// </summary>
+        private readonly record struct ToolCallOutcome(
+            string? Content,
+            string? FailCode,
+            string? FailMessage,
+            IReadOnlyList<MessageImage>? Images);
 
         public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
         {
@@ -107,7 +113,8 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
 
                 PostChat.Append(env,
                     new ChatMessage { Content = outcome.Content ?? string.Empty, id = toolCall.id },
-                    ResolveSender());
+                    ResolveSender(),
+                    outcome.Images);
             }
 
             // 本轮产生了工具结果，模型需要看到它们才能继续（或收尾）
@@ -123,11 +130,11 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
             {
                 if (!ContinueOnError)
                     return new ToolCallOutcome(null, NodeErrorCodes.ToolNotFound,
-                        $"Tool '{toolCall.name}' is not available in the current round.");
+                        $"Tool '{toolCall.name}' is not available in the current round.", null);
 
                 env.Persistent.DebugOutput.Write("PostToolCallNode", "ToolCall",
                     $"Round {env.RoundIndex}: tool '{toolCall.name}' not found, reporting to the model.");
-                return new ToolCallOutcome($"[Tool error] Tool '{toolCall.name}' not found.", null, null);
+                return new ToolCallOutcome($"[Tool error] Tool '{toolCall.name}' not found.", null, null, null);
             }
 
             try
@@ -147,14 +154,14 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
                     $"Round {env.RoundIndex}: tool '{toolCall.name}' was cancelled internally: {ex.Message}");
                 if (!ContinueOnError)
                     throw;
-                return new ToolCallOutcome("[Tool error] The tool timed out.", null, null);
+                return new ToolCallOutcome("[Tool error] The tool timed out.", null, null, null);
             }
             catch (Exception ex) when (ContinueOnError)
             {
                 // 吞异常必须留痕：模型看到的是错误文本，排查依赖 DebugOutput
                 env.Persistent.DebugOutput.Write("PostToolCallNode", "ToolCall",
                     $"Round {env.RoundIndex}: tool '{toolCall.name}' threw {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
-                return new ToolCallOutcome($"[Tool error] {ex.Message}", null, null);
+                return new ToolCallOutcome($"[Tool error] {ex.Message}", null, null, null);
             }
         }
 
@@ -181,7 +188,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
         private ToolCallOutcome Interpret(PostGenerationEnv env, ToolCall toolCall, ToolResult result)
         {
             if (result.Status == ToolResultStatus.Completed)
-                return new ToolCallOutcome(result.Content ?? string.Empty, null, null);
+                return new ToolCallOutcome(result.Content ?? string.Empty, null, null, result.Images);
 
             env.Persistent.DebugOutput.Write("PostToolCallNode", "ToolCall",
                 $"Round {env.RoundIndex}: tool '{toolCall.name}' failed ({result.ErrorCode}): " +
@@ -190,10 +197,11 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
             if (!ContinueOnError)
                 return new ToolCallOutcome(null,
                     result.ErrorCode ?? NodeErrorCodes.CommonError,
-                    result.ErrorMessage ?? $"Tool '{toolCall.name}' failed.");
+                    result.ErrorMessage ?? $"Tool '{toolCall.name}' failed.", null);
 
             return new ToolCallOutcome(
-                $"[Tool error] {result.ErrorCode ?? NodeErrorCodes.CommonError}: {result.ErrorMessage}", null, null);
+                $"[Tool error] {result.ErrorCode ?? NodeErrorCodes.CommonError}: {result.ErrorMessage}",
+                null, null, null);
         }
         private string ResolveSender() => EmitSender switch
         {
