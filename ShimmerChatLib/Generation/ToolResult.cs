@@ -82,5 +82,14 @@ namespace ShimmerChatLib.Generation
 
         /// <summary>工具要访问的文件或资源被访问策略拒绝。</summary>
         public const string AccessDenied = "TOOL_ACCESS_DENIED";
+
+        /// <summary>工具执行的动态代码存在编译错误（语法、缺少引用或类型不匹配）。</summary>
+        public const string CodeCompilationError = "TOOL_CODE_COMPILATION_ERROR";
+
+        /// <summary>动态代码在运行期抛出未处理异常，或违反了代码工具的调用约束。</summary>
+        public const string CodeExecutionError = "TOOL_CODE_EXECUTION_ERROR";
+
+        /// <summary>代码工具被配置为不输出图像，却尝试附加图像。</summary>
+        public const string ImageOutputDisabled = "TOOL_IMAGE_OUTPUT_DISABLED";
     }
 }

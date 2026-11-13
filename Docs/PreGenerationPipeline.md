@@ -136,6 +136,7 @@ public class PreGenerationPreset
 | `APISelectNode` | 选择 API 配置 |
 | `ToolPresetNode` | 按预设名加载工具列表 |
 | `ToolInstantiateNode` | 实例化单个工具 |
+| `CodeActNode` | 加入 CodeAct C# 工具，脚本可调用本轮全部工具（见 [CodeAct.md](CodeAct.md)） |
 | `IfNode` / `AdvancedIfNode` | 条件分支 |
 | `SubAgentNode` | 嵌套子代理调用 |
 | `DynPromptNode` | 动态模板提示 |

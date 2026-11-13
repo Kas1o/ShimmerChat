@@ -160,6 +160,7 @@ Place plugins in the `Plugins/` directory — they are automatically discovered 
 | **FileSystem** | File read/write toolset |
 | **RegexModifier** | Regex replacement render modifier |
 | **InvokeCSharp** | Custom C# code execution |
+| **CodeAct** | C# code execution that can call every tool in the round and output images |
 
 ---
 

@@ -160,6 +160,7 @@ dotnet run
 | **FileSystem** | 文件读写工具集 |
 | **RegexModifier** | 正则替换渲染修改器 |
 | **InvokeCSharp** | 自定义 C# 代码执行 |
+| **CodeAct** | 可调用本轮全部工具、输出图像的 C# 代码执行 |
 
 ---
 
