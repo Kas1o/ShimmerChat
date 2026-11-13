@@ -156,11 +156,13 @@ public class PreGenerationPreset
 
 节点只做解析与构造，不判断角色“是否应该”携带某个字段——不同兼容端点与客户端 `as_is` 模式的接受范围不同；唯一的结构性校验是 `tool_result` 必须带 `ToolCallId`。图像或 JSON 非法时返回 `PARSE_ERROR` / `DATA_MISSING`，不会添加半成品片段。文件引用（`fileName`）在节点执行时通过 `IImageAttachmentService` 解析为 Base64，缺服务或文件缺失都会显式失败（`SERVICE_ERROR` / `DATA_MISSING`）。
 
-注意：OpenAI 客户端不会序列化 `tool_result` 消息的 `Images`（tool 分支只发 `content` 与 `tool_call_id`）。用本节点构造带图工具结果时，必须同时加入 `SpecialRoleImageCarrierNode`，否则图像会在请求构建阶段被丢弃。
+OpenAI 客户端对 `tool_result` 消息的图像与其他角色使用同一套逻辑：携带 `Images` 时把 `content` 序列化为内容块数组（`text` + 每个图像一个 `image_url`），纯文本时仍保持字符串 `content`，并始终保留 `tool_call_id`。图像数据缺失会在请求构建阶段显式抛异常，不会被静默丢弃。
+
+是否接受 `tool` 角色携带图像取决于目标端点；端点只允许 `user` 携带 `image_url` 时，仍需加入 `SpecialRoleImageCarrierNode` 把图像搬到伪 `user` 消息。
 
 ### 特殊角色图像搬运 `SpecialRoleImageCarrierNode`
 
-OpenAI Chat Completions 规范中只有 `user` 消息允许 `image_url`；`system` / `assistant` / `tool` 携带图像属于部分兼容端点的扩展。该节点把这些角色消息中的图像拆到一条相邻的伪 `user` 消息里，原消息保留文本、`tool_calls`、`tool_call_id`、`thinking` 与自定义参数，两者通过片段 `Metadata["image_carrier_group"]` 标记为同一组（伪消息另有 `Metadata["image_carrier"] = "synthetic"`）。
+OpenAI Chat Completions 规范中只有 `user` 消息允许 `image_url`；`system` / `assistant` / `tool` 携带图像属于部分兼容端点的扩展（SharperLLM 客户端会原样序列化这些角色的图像）。该节点把这些角色消息中的图像拆到一条相邻的伪 `user` 消息里，原消息保留文本、`tool_calls`、`tool_call_id`、`thinking` 与自定义参数，两者通过片段 `Metadata["image_carrier_group"]` 标记为同一组（伪消息另有 `Metadata["image_carrier"] = "synthetic"`）。
 
 拆分位置按协议约束决定：
 

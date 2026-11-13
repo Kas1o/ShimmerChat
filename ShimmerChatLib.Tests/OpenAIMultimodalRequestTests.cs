@@ -53,6 +53,60 @@ public class OpenAIMultimodalRequestTests
     }
 
     [Fact]
+    public void ToolMessage_WithImages_UsesContentPartsAndKeepsToolCallId()
+    {
+        // tool 角色与 user / assistant 使用同一套多模态内容构建逻辑，
+        // 同时必须保留 tool 消息的 tool_call_id 关联。
+        var message = new ChatMessage
+        {
+            Content = "tool output",
+            id = "call_123",
+            Images = new List<ChatImage> { ChatImage.FromBase64("AAA", "image/png") }
+        };
+
+        var json = BuildMessage(message, PromptBuilder.From.tool_result);
+
+        json["role"]!.ToString().Should().Be("tool");
+        json["tool_call_id"]!.ToString().Should().Be("call_123");
+        json["content"]!.Type.Should().Be(JTokenType.Array);
+        var parts = (JArray)json["content"]!;
+        parts.Count.Should().Be(2);
+        parts[0]!["type"]!.ToString().Should().Be("text");
+        parts[0]!["text"]!.ToString().Should().Be("tool output");
+        parts[1]!["type"]!.ToString().Should().Be("image_url");
+        parts[1]!["image_url"]!["url"]!.ToString().Should().Be("data:image/png;base64,AAA");
+    }
+
+    [Fact]
+    public void ToolMessage_TextOnly_KeepsStringContent()
+    {
+        var message = new ChatMessage { Content = "tool output", id = "call_123" };
+
+        var json = BuildMessage(message, PromptBuilder.From.tool_result);
+
+        json["role"]!.ToString().Should().Be("tool");
+        json["tool_call_id"]!.ToString().Should().Be("call_123");
+        json["content"]!.Type.Should().Be(JTokenType.String);
+        json["content"]!.ToString().Should().Be("tool output");
+    }
+
+    [Fact]
+    public void ToolMessage_ImageWithoutData_FailsRequestBuilding()
+    {
+        // tool 图像同样不能被静默丢弃：缺数据必须显式失败。
+        var message = new ChatMessage
+        {
+            Content = "",
+            id = "call_123",
+            Images = new List<ChatImage> { new() { MimeType = "image/png", Base64 = "" } }
+        };
+
+        var act = () => BuildMessage(message, PromptBuilder.From.tool_result);
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void ImageWithoutData_FailsRequestBuilding()
     {
         // 图像块必须在进入客户端之前解析好：这里缺数据要明确失败，不能发出空图像
