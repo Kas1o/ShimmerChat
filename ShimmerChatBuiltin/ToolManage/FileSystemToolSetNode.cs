@@ -37,24 +37,27 @@ namespace ShimmerChatBuiltin.ToolManage
         [NodeProperty("prop.fs_tool_set.enable_read", Order = 2)]
         public bool EnableRead { get; set; } = true;
 
-        [NodeProperty("prop.fs_tool_set.enable_write", Order = 3)]
+        [NodeProperty("prop.fs_tool_set.enable_image_read", Order = 3)]
+        public bool EnableImageRead { get; set; } = true;
+
+        [NodeProperty("prop.fs_tool_set.enable_write", Order = 4)]
         public bool EnableWrite { get; set; } = true;
 
-        [NodeProperty("prop.fs_tool_set.enable_edit", Order = 4)]
+        [NodeProperty("prop.fs_tool_set.enable_edit", Order = 5)]
         public bool EnableEdit { get; set; } = true;
 
-        [NodeProperty("prop.fs_tool_set.enable_overview", Order = 5)]
+        [NodeProperty("prop.fs_tool_set.enable_overview", Order = 6)]
         public bool EnableOverview { get; set; } = true;
 
         // -- 范围配置 --
 
-        [NodeProperty("prop.fs_tool_set.allow_list", Order = 6, MultiLine = true)]
+        [NodeProperty("prop.fs_tool_set.allow_list", Order = 7, MultiLine = true)]
         public string AllowList { get; set; } = "";
 
-        [NodeProperty("prop.fs_tool_set.ban_list", Order = 7, MultiLine = true)]
+        [NodeProperty("prop.fs_tool_set.ban_list", Order = 8, MultiLine = true)]
         public string BanList { get; set; } = "";
 
-        [NodeProperty("prop.fs_tool_set.scope_mode", Order = 8)]
+        [NodeProperty("prop.fs_tool_set.scope_mode", Order = 9)]
         public FileScopeMergeMode ScopeMode { get; set; } = FileScopeMergeMode.Override;
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
@@ -70,6 +73,7 @@ namespace ShimmerChatBuiltin.ToolManage
 
             if (EnableBrowse) AddScopedTool(registry, FileSystemBrowseToolV2.NameKey, persistent, nodeConfig, context);
             if (EnableRead) AddScopedTool(registry, FileSystemReadToolV2.NameKey, persistent, nodeConfig, context);
+            if (EnableImageRead) AddScopedTool(registry, FileSystemImageReadToolV2.NameKey, persistent, nodeConfig, context);
             if (EnableWrite) AddScopedTool(registry, FileSystemWriteToolV2.NameKey, persistent, nodeConfig, context);
             if (EnableEdit) AddScopedTool(registry, FileSystemEditToolV2.NameKey, persistent, nodeConfig, context);
             if (EnableOverview) AddScopedTool(registry, FileSystemOverviewToolV2.NameKey, persistent, nodeConfig, context);
@@ -111,8 +115,13 @@ namespace ShimmerChatBuiltin.ToolManage
         /// <summary>
         /// 文件系统工具的作用域包装器。
         /// 在执行时根据合并模式检查路径是否允许，然后再委托给原始工具。
+        /// <para>
+        /// 同时实现 <see cref="IToolV3"/>：结构化工具（如 read_image）必须连同取消令牌和
+        /// <see cref="ToolResult.Images"/> 一起被转发，否则包装层会把图像结果吞成纯文本。
+        /// 旧工具仍走 <see cref="IToolV2"/> 的字符串路径。
+        /// </para>
         /// </summary>
-        private class ScopedFileSystemTool : IToolV2
+        private class ScopedFileSystemTool : IToolV2, IToolV3
         {
             private readonly IToolV2 _inner;
             private readonly FileSystemConfig _nodeConfig;
@@ -130,11 +139,58 @@ namespace ShimmerChatBuiltin.ToolManage
 
             public Tool GetDefinition() => _inner.GetDefinition();
 
+            public async Task<ToolResult> ExecuteAsync(ToolInvocationContext context, CancellationToken ct)
+            {
+                var (code, message) = CheckPathScope(context.ArgumentsJson);
+                if (code != null)
+                {
+                    // 旧工具返回字符串，宿主一直把它当作成功文本；保持这一语义，
+                    // 结构化工具则给出真正的失败，让节点按 ContinueOnError 决定是否中止。
+                    return _inner is IToolV3
+                        ? ToolResult.Fail(code, message!)
+                        : ToolResult.Ok(message);
+                }
+
+                if (_inner is IToolV3 v3)
+                    return await v3.ExecuteAsync(context, ct);
+
+                var text = await _inner.ExecuteAsync(context.ArgumentsJson);
+                return ToolResult.Ok(text);
+            }
+
             public async Task<string> ExecuteAsync(string input)
+            {
+                var (code, message) = CheckPathScope(input);
+                if (code != null)
+                    return message!;
+
+                if (_inner is IToolV3 v3)
+                {
+                    var result = await v3.ExecuteAsync(new ToolInvocationContext
+                    {
+                        ToolCallId = string.Empty,
+                        ToolName = GetDefinition().name,
+                        ArgumentsJson = input,
+                        RoundIndex = 0
+                    }, CancellationToken.None);
+
+                    return result.Status == ToolResultStatus.Completed
+                        ? result.Content ?? string.Empty
+                        : $"[Tool error] {result.ErrorCode ?? ToolErrorCodes.ServiceError}: {result.ErrorMessage}";
+                }
+
+                return await _inner.ExecuteAsync(input);
+            }
+
+            /// <summary>
+            /// 返回 null 表示放行；否则给出明确的错误码与信息。没有 path 参数的工具
+            /// （如 file_system_overview）不参与路径范围检查。
+            /// </summary>
+            private (string? Code, string? Message) CheckPathScope(string input)
             {
                 var path = TryExtractPath(input);
                 if (string.IsNullOrEmpty(path))
-                    return await _inner.ExecuteAsync(input);
+                    return (null, null);
 
                 try
                 {
@@ -142,7 +198,7 @@ namespace ShimmerChatBuiltin.ToolManage
                 }
                 catch
                 {
-                    return $"Invalid path: '{path}'.";
+                    return (ToolErrorCodes.InvalidArguments, $"Invalid path: '{path}'.");
                 }
 
                 var globalConfig = FileSystemConfigManager.Load(_kvData);
@@ -163,10 +219,10 @@ namespace ShimmerChatBuiltin.ToolManage
                     _ => FileSystemConfigManager.IsPathAllowed(path, _nodeConfig)
                 };
 
-                if (!allowed)
-                    return $"Access denied by node scope: '{path}' is not allowed.";
-
-                return await _inner.ExecuteAsync(input);
+                return allowed
+                    ? (null, null)
+                    : (ToolErrorCodes.AccessDenied,
+                        $"Access denied by node scope: '{path}' is not allowed.");
             }
 
             private static string? TryExtractPath(string input)
@@ -174,7 +230,7 @@ namespace ShimmerChatBuiltin.ToolManage
                 if (string.IsNullOrWhiteSpace(input)) return null;
                 try
                 {
-                    return JObject.Parse(input).Value<string>("path");
+                    return JObject.Parse(input).Value<string?>("path");
                 }
                 catch
                 {

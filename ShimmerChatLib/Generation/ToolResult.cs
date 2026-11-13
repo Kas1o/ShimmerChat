@@ -79,5 +79,8 @@ namespace ShimmerChatLib.Generation
 
         /// <summary>工具产生的结果无法写入预期的存储位置（如生成图像落盘失败）。</summary>
         public const string OutputWriteFailed = "TOOL_OUTPUT_WRITE_FAILED";
+
+        /// <summary>工具要访问的文件或资源被访问策略拒绝。</summary>
+        public const string AccessDenied = "TOOL_ACCESS_DENIED";
     }
 }
