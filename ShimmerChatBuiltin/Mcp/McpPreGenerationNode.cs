@@ -53,7 +53,9 @@ namespace ShimmerChatBuiltin.Mcp
         public string Name { get; set; } = "MCP Toolset";
 
         /// <summary>目标端点 Id（对应 MCP 工具集设置页中的标识）。</summary>
-        [NodeProperty("prop.mcp_toolset.endpoint", HintKey = "prop.mcp_toolset.endpoint.hint")]
+        [NodeProperty("prop.mcp_toolset.endpoint", HintKey = "prop.mcp_toolset.endpoint.hint",
+            OptionsKey = "mcp_endpoints", OptionsSearchable = true, ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "prop.mcp_toolset.endpoint.default")]
         public string EndpointId { get; set; } = "";
 
         /// <summary>是否暴露该端点的工具列表。</summary>

@@ -81,7 +81,8 @@
   "node.mcp_toolset": "MCP Toolset",
   "node.mcp_toolset.desc": "Apply a configured MCP endpoint: register its tools and inject its resources",
   "prop.mcp_toolset.endpoint": "Endpoint",
-  "prop.mcp_toolset.endpoint.hint": "Identifier shown in the MCP Toolset settings page (for example: filesystem)",
+  "prop.mcp_toolset.endpoint.hint": "Choose an endpoint configured in the MCP Toolset settings page",
+  "prop.mcp_toolset.endpoint.default": "Choose an endpoint (required)",
   "prop.mcp_toolset.expose_tools": "Expose tools",
   "prop.mcp_toolset.expose_tools.hint": "Register this endpoint's tools as callable tools for the model",
   "prop.mcp_toolset.tools_selected_only": "Only checked tools",
@@ -96,7 +97,7 @@
   "prop.mcp_toolset.failure_policy.hint": "When connecting or enumerating fails, abort this round or skip the endpoint and continue",
   "category.mcp": "MCP",
 
-  "node_err.mcp_endpoint_empty": "No MCP endpoint selected. Set the endpoint identifier in the node.",
+  "node_err.mcp_endpoint_empty": "No MCP endpoint selected. Choose a configured endpoint in this node.",
   "node_err.mcp_no_endpoints": "No MCP endpoint is configured. Add one in the MCP Toolset settings page.",
   "node_err.mcp_endpoint_not_found": "MCP endpoint '{0}' was not found. Check the identifier in the MCP Toolset settings page.",
   "node_err.mcp_endpoint_disabled": "MCP endpoint '{0}' ({1}) is disabled.",
@@ -451,7 +452,10 @@
   "prop.image_generation_tool_set.enable_default": "Enable default workflow tool",
   "prop.image_generation_tool_set.enable_default.hint": "Adds generate_image, which uses the default ComfyUI workflow and lets the model pick model, size and sampling parameters",
   "prop.image_generation_tool_set.enable_custom": "Enable custom workflow tools",
-  "prop.image_generation_tool_set.enable_custom.hint": "Adds one generate_image_{id} tool for every custom workflow enabled in the Image Generation settings panel",
+  "prop.image_generation_tool_set.enable_custom.hint": "Adds generate_image_{id} tools for custom workflows defined in the settings panel",
+  "prop.image_generation_tool_set.custom_workflow": "Custom workflow",
+  "prop.image_generation_tool_set.custom_workflow.hint": "Leave empty to expose every enabled custom workflow; select one to expose only that workflow",
+  "prop.image_generation_tool_set.custom_workflow.default": "All enabled custom workflows",
 
   "prop.set_value.target": "Target",
   "prop.set_value.target.hint": "Where to write the value: SharedState (this generation only) or KVData (persisted)",
@@ -947,6 +951,8 @@
   "node_err.image_generation_attachments_unavailable": "Image generation requires the image storage service, but it is unavailable in the current session.",
   "node_err.image_generation_model_missing": "Image generation is enabled but no checkpoint model is configured. Select a model in Settings → Image Generation, or disable the default workflow tool.",
   "node_err.image_generation_duplicate_tool": "Two image generation workflows resolve to the same tool name '{0}'. Check the custom workflow ids in the Image Generation settings.",
+  "node_err.image_generation_workflow_not_found": "The custom workflow '{0}' selected by this node does not exist. Please choose another workflow.",
+  "node_err.image_generation_workflow_disabled": "The custom workflow '{0}' ({1}) selected by this node is disabled. Enable it in the Image Generation settings panel first.",
 
   "node_err.web_search_config_invalid": "Web search configuration is invalid. Please review and save it in the Web Search settings panel.",
   "node_err.web_search_no_user_input": "Auto web search: no user message is available in the chat to use as a query.",
@@ -1224,5 +1230,8 @@
   "options.dyn_prompt_set.desc": "{0} rules",
   "options.subagent_output.last_message": "Inject the sub-agent's last message only",
   "options.subagent_output.full_json": "Inject the sub-agent's full message JSON",
-  "options.subagent_output.none": "Inject nothing"
+  "options.subagent_output.none": "Inject nothing",
+  "options.disabled": "Disabled",
+  "options.image_workflow.enabled": "Enabled",
+  "options.image_workflow.disabled": "Not enabled"
 }

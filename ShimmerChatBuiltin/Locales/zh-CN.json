@@ -80,8 +80,9 @@
 
   "node.mcp_toolset": "MCP 工具集",
   "node.mcp_toolset.desc": "应用已配置的 MCP 端点：注册其工具并把资源注入上下文",
-  "prop.mcp_toolset.endpoint": "端点标识",
-  "prop.mcp_toolset.endpoint.hint": "MCP 工具集设置页中显示的标识，例如 filesystem",
+  "prop.mcp_toolset.endpoint": "端点",
+  "prop.mcp_toolset.endpoint.hint": "从 MCP 工具集设置页中已配置的端点里选择",
+  "prop.mcp_toolset.endpoint.default": "选择端点（必填）",
   "prop.mcp_toolset.expose_tools": "暴露工具",
   "prop.mcp_toolset.expose_tools.hint": "把该端点的工具注册为模型可调用的工具",
   "prop.mcp_toolset.tools_selected_only": "仅暴露勾选的工具",
@@ -96,7 +97,7 @@
   "prop.mcp_toolset.failure_policy.hint": "连接或枚举失败时是中止本轮生成，还是跳过该端点继续生成",
   "category.mcp": "MCP",
 
-  "node_err.mcp_endpoint_empty": "未选择 MCP 端点，请在节点中填写端点标识。",
+  "node_err.mcp_endpoint_empty": "未选择 MCP 端点，请在节点中选择一个已配置的端点。",
   "node_err.mcp_no_endpoints": "尚未配置任何 MCP 端点，请先在 MCP 工具集设置页中添加。",
   "node_err.mcp_endpoint_not_found": "未找到 MCP 端点「{0}」，请核对 MCP 工具集设置页中的标识。",
   "node_err.mcp_endpoint_disabled": "MCP 端点「{0}」（{1}）已禁用。",
@@ -451,7 +452,10 @@
   "prop.image_generation_tool_set.enable_default": "启用默认工作流工具",
   "prop.image_generation_tool_set.enable_default.hint": "添加 generate_image 工具，使用默认 ComfyUI 工作流，并允许模型选择模型、宽高与采样参数",
   "prop.image_generation_tool_set.enable_custom": "启用自定义工作流工具",
-  "prop.image_generation_tool_set.enable_custom.hint": "为「文生图」设置面板中每个已启用的自定义工作流添加一个 generate_image_{id} 工具",
+  "prop.image_generation_tool_set.enable_custom.hint": "为设置面板中的自定义工作流添加 generate_image_{id} 工具",
+  "prop.image_generation_tool_set.custom_workflow": "指定自定义工作流",
+  "prop.image_generation_tool_set.custom_workflow.hint": "留空时暴露所有已启用的自定义工作流；选择后只暴露该工作流",
+  "prop.image_generation_tool_set.custom_workflow.default": "全部已启用的自定义工作流",
 
   "prop.set_value.target": "写入目标",
   "prop.set_value.target.hint": "值写入位置：SharedState（仅本次生成有效）或 KVData（持久保存）",
@@ -947,6 +951,8 @@
   "node_err.image_generation_attachments_unavailable": "文生图需要图像存储服务，但当前会话无法使用该服务。",
   "node_err.image_generation_model_missing": "已启用文生图，但未选择 checkpoint 模型。请在「设置 → 文生图」中选择模型，或关闭默认工作流工具。",
   "node_err.image_generation_duplicate_tool": "两个文生图工作流解析出了相同的工具名「{0}」，请检查「文生图」设置中的自定义工作流 Id。",
+  "node_err.image_generation_workflow_not_found": "节点指定的自定义工作流「{0}」不存在，请重新选择。",
+  "node_err.image_generation_workflow_disabled": "节点指定的自定义工作流「{0}」（{1}）未启用，请先在「文生图」设置面板中启用。",
 
   "node_err.web_search_config_invalid": "联网搜索配置无效，请在「联网搜索」设置面板中检查并保存配置。",
   "node_err.web_search_no_user_input": "自动联网搜索：会话中没有可用的用户消息作为查询词。",
@@ -1224,5 +1230,8 @@
   "options.dyn_prompt_set.desc": "{0} 条规则",
   "options.subagent_output.last_message": "只注入子代理最后一条消息",
   "options.subagent_output.full_json": "注入子代理的完整消息 JSON",
-  "options.subagent_output.none": "不注入任何输出"
+  "options.subagent_output.none": "不注入任何输出",
+  "options.disabled": "已停用",
+  "options.image_workflow.enabled": "已启用",
+  "options.image_workflow.disabled": "未启用"
 }

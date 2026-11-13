@@ -137,6 +137,8 @@ public sealed record NodePropertyOption(
 | `subagent_output_modes` | SubAgentNode / PostSubAgentNode | 常量（`LastMessage` / `FullJson` / `None`） |
 | `dyn_prompt_sets` | DynPromptNode | `DynPrompt/DynPromptSets`（值为集合名，规则名可搜索） |
 | `highlight_languages` | CodeHighlightNode | `SyntaxHighlighter.GetSupportedLanguages()` |
+| `mcp_endpoints` | McpPreGenerationNode | `Mcp/servers`（`McpEndpointCatalog`；分组为传输方式，副标题为命令/URL，停用端点带标记） |
+| `image_generation_workflows` | ImageGenerationToolSetNode | `ImageGeneration/Config` 的自定义工作流（按启用状态分组，副标题为工具说明或工具名，参数名可搜索） |
 
 ---
 

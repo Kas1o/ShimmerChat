@@ -117,6 +117,76 @@ public class ImageGenerationToolSetNodeTests : NodeTestBase
     }
 
     [Fact]
+    public async Task SelectedCustomWorkflow_ExposesOnlyThatTool()
+    {
+        var second = ImageGenerationTestData.CreateCustomWorkflow();
+        second.Id = "landscape";
+        second.Name = "Landscape";
+
+        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
+            c.CustomWorkflows =
+            [
+                ImageGenerationTestData.CreateCustomWorkflow(),
+                second
+            ]));
+
+        var node = new ImageGenerationToolSetNode
+        {
+            EnableDefaultWorkflow = false,
+            CustomWorkflowId = "portrait"
+        };
+
+        var context = CreateContext();
+        var result = await node.ExecuteAsync(context);
+
+        result.Success.Should().BeTrue();
+        context.Env.Transient.Tools.Select(t => t.GetDefinition().name)
+            .Should().Equal("generate_image_portrait");
+    }
+
+    [Fact]
+    public async Task SelectedCustomWorkflow_NotFound_Fails()
+    {
+        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
+            c.CustomWorkflows = [ImageGenerationTestData.CreateCustomWorkflow()]));
+
+        var node = new ImageGenerationToolSetNode
+        {
+            EnableDefaultWorkflow = false,
+            CustomWorkflowId = "missing"
+        };
+
+        var result = await node.ExecuteAsync(CreateContext());
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(NodeErrorCodes.ConfigNotFound);
+        result.Message.Should().Contain("node_err.image_generation_workflow_not_found");
+    }
+
+    [Fact]
+    public async Task SelectedCustomWorkflow_Disabled_FailsInsteadOfSilentlySkipping()
+    {
+        var draft = ImageGenerationTestData.CreateCustomWorkflow(enabled: false);
+        draft.Id = "draft";
+        draft.Name = "Draft";
+
+        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
+            c.CustomWorkflows = [draft]));
+
+        var node = new ImageGenerationToolSetNode
+        {
+            EnableDefaultWorkflow = false,
+            CustomWorkflowId = "draft"
+        };
+
+        var result = await node.ExecuteAsync(CreateContext());
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(NodeErrorCodes.ConfigNotFound);
+        result.Message.Should().Contain("node_err.image_generation_workflow_disabled");
+    }
+
+    [Fact]
     public async Task NoEnabledCustomWorkflows_AddsDefaultAndLogs()
     {
         var disabledDraft = ImageGenerationTestData.CreateCustomWorkflow(enabled: false);

@@ -121,7 +121,7 @@ Authorization: Bearer <token>
 
 | 属性 | 说明 |
 |------|------|
-| `EndpointId` | 端点标识（设置页中显示的 `Id`） |
+| `EndpointId` | 端点标识，编辑器通过 `mcp_endpoints` 选项提供器从设置页已配置的端点中选择；留空时节点显式失败 |
 | `ExposeTools` | 是否把该端点的工具注册进 `TransientEnv.Tools` |
 | `ToolsSelectedOnly` | 只暴露设置页中显式勾选的工具 |
 | `ResourceInjection` | 资源注入模式：`沿用端点配置` / `不注入` / `按勾选` / `全部` |
@@ -251,6 +251,7 @@ mcp_{端点标识}_{净化后的工具名}
 | `panel.mcp_chat*` / `panel_mcp_chat.*` | 聊天面板 |
 | `node.mcp_toolset*` / `prop.mcp_toolset.*` | 前生成节点 |
 | `node_err.mcp_*` | 节点错误信息 |
+| `options.disabled` | 节点下拉选项里停用端点的标记 |
 | `mcp_err.*` | 配置校验错误 |
 
 ---

@@ -67,7 +67,8 @@
 | 属性 | 默认 | 作用 |
 |------|------|------|
 | 启用默认工作流工具 | 开 | 添加 `generate_image` |
-| 启用自定义工作流工具 | 开 | 为设置面板中每个 `Enabled = true` 的自定义工作流添加 `generate_image_{id}` |
+| 启用自定义工作流工具 | 开 | 启用下方「指定自定义工作流」选择；关闭时不添加任何自定义工具 |
+| 指定自定义工作流 | 空（全部） | 留空时沿用旧行为，为设置面板中每个 `Enabled = true` 的自定义工作流添加 `generate_image_{id}`；选择某个工作流时只添加该工作流。选项来自设置面板（`OptionsKey = image_generation_workflows`），停用与不存在的选择都会显式失败 |
 
 执行期行为：
 
@@ -75,6 +76,8 @@
 - 启用默认工作流但未选择模型 → 节点失败（`CONFIG_NOT_FOUND`），提示选择模型或关闭默认工具。
 - 当前会话没有 `IImageAttachmentService` → 节点失败，不添加必然无法落盘的工具。
 - 没有任何启用的自定义工作流 → 只添加默认工具，并写一条 DebugOutput。
+- 指定了自定义工作流但配置中不存在 → 节点失败（`CONFIG_NOT_FOUND`），提示重新选择。
+- 指定的自定义工作流已停用 → 节点失败（`CONFIG_NOT_FOUND`），不静默跳过。
 - 工具名冲突 → 节点失败并指出冲突的工具名。
 
 ---
@@ -283,6 +286,7 @@ GET  /view?filename=...      → 下载所有输出图像
 | `ShimmerChatLib/Generation/PostChat.cs` | 追加消息时原子写入图像引用 |
 | `ShimmerChatBuiltin/NodeBasic/PostGeneration/PostToolCallNode.cs` | 把工具结果图像写入 tool_result 消息 |
 | `ShimmerChatBuiltin/ImageGeneration/ImageGenerationToolSetNode.cs` | 工具集节点 |
+| `ShimmerChatBuiltin/Options/ImageGenerationWorkflowOptionsProvider.cs` | 节点属性 `image_generation_workflows` 的选项来源 |
 | `ShimmerChatBuiltin/ImageGeneration/ImageGenerationPanel.razor` | 设置面板 |
 | `ShimmerChat/Singletons/ImageAttachmentService.cs` | `SaveGeneratedAsync` 文件落盘实现 |
 

@@ -30,6 +30,16 @@ namespace ShimmerChatBuiltin.ImageGeneration
             HintKey = "prop.image_generation_tool_set.enable_custom.hint", Order = 2)]
         public bool EnableCustomWorkflows { get; set; } = true;
 
+        /// <summary>
+        /// 指定只暴露某一个自定义工作流；留空表示沿用旧行为（暴露全部已启用工作流）。
+        /// 值来自「文生图」设置面板中的工作流 Id。
+        /// </summary>
+        [NodeProperty("prop.image_generation_tool_set.custom_workflow",
+            HintKey = "prop.image_generation_tool_set.custom_workflow.hint", Order = 3,
+            OptionsKey = "image_generation_workflows", OptionsSearchable = true, ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "prop.image_generation_tool_set.custom_workflow.default")]
+        public string CustomWorkflowId { get; set; } = "";
+
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
             var loc = context.Env.Persistent.LocService;
@@ -82,14 +92,40 @@ namespace ShimmerChatBuiltin.ImageGeneration
 
             if (EnableCustomWorkflows)
             {
-                var enabled = config.CustomWorkflows.Where(w => w.Enabled).ToList();
-                if (enabled.Count == 0)
+                List<CustomImageWorkflow> selected;
+                if (string.IsNullOrWhiteSpace(CustomWorkflowId))
                 {
-                    WriteLog(context,
-                        $"[{Name}] no custom image workflow is enabled; only the default tool (if enabled) was added.");
+                    // 留空 = 旧行为：暴露设置页里所有已启用的自定义工作流。
+                    selected = config.CustomWorkflows.Where(w => w.Enabled).ToList();
+                    if (selected.Count == 0)
+                    {
+                        WriteLog(context,
+                            $"[{Name}] no custom image workflow is enabled; only the default tool (if enabled) was added.");
+                    }
+                }
+                else
+                {
+                    var workflow = config.FindCustomWorkflow(CustomWorkflowId.Trim());
+                    if (workflow == null)
+                    {
+                        return Task.FromResult(NodeResult.Failure(
+                            NodeErrorCodes.ConfigNotFound,
+                            loc.Format("node_err.image_generation_workflow_not_found", CustomWorkflowId),
+                            nodeId: Id, nodeName: Name));
+                    }
+
+                    if (!workflow.Enabled)
+                    {
+                        return Task.FromResult(NodeResult.Failure(
+                            NodeErrorCodes.ConfigNotFound,
+                            loc.Format("node_err.image_generation_workflow_disabled", workflow.Name, workflow.Id),
+                            nodeId: Id, nodeName: Name));
+                    }
+
+                    selected = [workflow];
                 }
 
-                foreach (var workflow in enabled)
+                foreach (var workflow in selected)
                 {
                     var tool = new ImageGenerationToolV2(kvData, attachments, workflow.Id);
                     var toolName = tool.GetDefinition().name;

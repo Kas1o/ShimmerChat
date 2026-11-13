@@ -1,11 +1,16 @@
 using Meziantou.Framework.SyntaxHighlighting;
 using Newtonsoft.Json;
+using System.Reflection;
 using ShimmerChatBuiltin.DynPrompt.Options;
+using ShimmerChatBuiltin.ImageGeneration;
+using ShimmerChatBuiltin.Mcp;
 using ShimmerChatBuiltin.Misc.Node.Render.Options;
 using ShimmerChatBuiltin.Options;
 using ShimmerChatBuiltin.SubAgent;
 using ShimmerChatBuiltin.SubAgent.Options;
+using ShimmerChatBuiltin.Tests.ImageGeneration;
 using ShimmerChatBuiltin.Tests.SubAgent;
+using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Tests.Options;
@@ -219,6 +224,102 @@ public class OptionsProviderTests
         options.Should().NotBeEmpty();
         options.Should().OnlyContain(o => SyntaxHighlighter.IsSupported(o.Value));
         options.Select(o => o.Value).Should().BeInAscendingOrder(StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void McpEndpoints_UseIdAsValueAndShowTransportAndTarget()
+    {
+        var kv = new FakeKVDataService();
+        McpEndpointCatalog.Save(kv,
+        [
+            new McpEndpointConfig
+            {
+                Id = "filesystem", Name = "Filesystem", Enabled = true,
+                Transport = McpTransportType.Stdio, Command = "npx", Arguments = ["-y", "server-filesystem"]
+            },
+            new McpEndpointConfig
+            {
+                Id = "remote", Name = "Remote", Enabled = false,
+                Transport = McpTransportType.Http, Url = "https://example.com/mcp"
+            }
+        ]);
+
+        var options = new McpEndpointOptionsProvider().GetOptions(Services(kv: kv));
+
+        options.Should().HaveCount(2);
+
+        var local = options.Single(o => o.Value == "filesystem");
+        local.Label.Should().Be("Filesystem");
+        local.Group.Should().Be("Stdio");
+        local.Description.Should().Be("npx -y server-filesystem");
+        local.SearchTerms.Should().Contain("server-filesystem");
+
+        var remote = options.Single(o => o.Value == "remote");
+        remote.Group.Should().Be("Http");
+        remote.Description.Should().Contain("https://example.com/mcp")
+            .And.StartWith("Disabled");
+    }
+
+    [Fact]
+    public void McpEndpoints_CorruptCatalogOrMissingService_ReturnsEmpty()
+    {
+        var kv = new FakeKVDataService();
+        kv.Write("Mcp", "servers", "{ broken");
+
+        new McpEndpointOptionsProvider().GetOptions(Services(kv: kv)).Should().BeEmpty();
+        new McpEndpointOptionsProvider().GetOptions(Services()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ImageWorkflows_GroupByEnabledStateAndExposeToolName()
+    {
+        var draft = ImageGenerationTestData.CreateCustomWorkflow(enabled: false);
+        draft.Id = "draft";
+        draft.Name = "Draft";
+        draft.Description = "";
+
+        var kv = new FakeKVDataService();
+        kv.Write("ImageGeneration", "Config", ImageGenerationTestData.ConfigJson(c =>
+            c.CustomWorkflows = [ImageGenerationTestData.CreateCustomWorkflow(), draft]));
+
+        var options = new ImageGenerationWorkflowOptionsProvider().GetOptions(Services(kv: kv));
+
+        options.Should().HaveCount(2);
+
+        var portrait = options.Single(o => o.Value == ImageGenerationTestData.CustomWorkflowId);
+        portrait.Label.Should().Be("Portrait");
+        portrait.Group.Should().Be("Enabled");
+        portrait.Description.Should().Be("Portrait workflow");
+        portrait.SearchTerms.Should().Contain("generate_image_portrait");
+
+        var disabled = options.Single(o => o.Value == "draft");
+        disabled.Group.Should().Be("Disabled");
+        disabled.Description.Should().StartWith("Disabled");
+        disabled.SearchTerms.Should().Contain("generate_image_draft");
+    }
+
+    [Fact]
+    public void ImageWorkflows_InvalidConfigOrMissingService_ReturnsEmpty()
+    {
+        var kv = new FakeKVDataService();
+        kv.Write("ImageGeneration", "Config", "{ broken");
+
+        new ImageGenerationWorkflowOptionsProvider().GetOptions(Services(kv: kv)).Should().BeEmpty();
+        new ImageGenerationWorkflowOptionsProvider().GetOptions(Services()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NodeProperties_ReferenceTheMatchingProviderKeys()
+    {
+        var mcp = typeof(McpPreGenerationNode)
+            .GetProperty(nameof(McpPreGenerationNode.EndpointId))!
+            .GetCustomAttribute<NodePropertyAttribute>()!;
+        mcp.OptionsKey.Should().Be(new McpEndpointOptionsProvider().Key);
+
+        var image = typeof(ImageGenerationToolSetNode)
+            .GetProperty(nameof(ImageGenerationToolSetNode.CustomWorkflowId))!
+            .GetCustomAttribute<NodePropertyAttribute>()!;
+        image.OptionsKey.Should().Be(new ImageGenerationWorkflowOptionsProvider().Key);
     }
 
     /// <summary>只做类型 → 实例映射的服务容器桩，避免测试工程额外引入 DI 包。</summary>
