@@ -1,418 +1,1223 @@
 @page "/agentselect"
+@using System.Text
+@using System.Text.Json
 @inject NavigationManager navigation
 @inject ILocService Loc
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService
+@inject IJSRuntime JS
+@inject ILogger<AgentSelectPage> Logger
+@implements IAsyncDisposable
 
-<h3>@Loc["AgentSelectPage"]</h3>
-<div class="agent-toolbar">
-	<div class="toolbar-left">
-		<button class="su-btn su-btn-primary" @onclick="OpenCreateAgentMenu">@Loc["Create New Agent"]</button>
-		<div class="import-group">
-			<InputFile OnChange="InputFileChanged" accept=".json" class="import-file-input" id="agent-import-file" />
-			<label for="agent-import-file" class="su-btn su-btn-secondary import-label">
-				<i class="bi bi-upload"></i> @Loc["agent_select.import"]
-			</label>
-		</div>
-	</div>
-	<div class="toolbar-right">
-		<button class="su-btn su-btn-secondary view-toggle-btn" @onclick="ToggleViewMode" title="@(IsDetailMode ? Loc["Switch to Grid View"] : Loc["Switch to Detail View"])">
-			<i class="bi @(IsDetailMode ? "bi-grid-3x3-gap-fill" : "bi-list-ul")"></i>
-		</button>
-	</div>
+<div class="agent-select-page" @onkeydown="HandlePageKeyDown">
+    <header class="agent-hero">
+        <div class="agent-hero-copy">
+            <div class="agent-hero-icon"><i class="bi bi-robot"></i></div>
+            <div class="agent-hero-text">
+                <h1>@Loc["AgentSelectPage"]</h1>
+                <p>@Loc["agent_select.subtitle"]</p>
+            </div>
+        </div>
+
+        <div class="agent-hero-stats">
+            <div class="agent-hero-stat">
+                <span class="agent-hero-stat-value">@AllAgents.Count</span>
+                <span class="agent-hero-stat-label">@Loc["agent_select.stat_agents"]</span>
+            </div>
+            <div class="agent-hero-stat">
+                <span class="agent-hero-stat-value">@TotalChatCount</span>
+                <span class="agent-hero-stat-label">@Loc["agent_select.stat_chats"]</span>
+            </div>
+            <div class="agent-hero-stat">
+                <span class="agent-hero-stat-value">@TagCounts.Count</span>
+                <span class="agent-hero-stat-label">@Loc["agent_select.stat_tags"]</span>
+            </div>
+        </div>
+
+        <div class="agent-hero-actions">
+            <button type="button" class="su-btn su-btn-primary agent-create-btn" @onclick="OpenCreateAgentMenu">
+                <i class="bi bi-plus-lg"></i>
+                <span>@Loc["Create New Agent"]</span>
+            </button>
+            <div class="import-group">
+                <InputFile OnChange="InputFileChanged" accept=".json" class="import-file-input" id="agent-import-file" />
+                <label for="agent-import-file" class="su-btn su-btn-secondary import-label">
+                    <i class="bi bi-upload"></i>
+                    <span>@Loc["agent_select.import"]</span>
+                </label>
+            </div>
+        </div>
+    </header>
+
+    @if (_loadErrorMessage != null)
+    {
+        <div class="su-alert su-alert-danger agent-load-banner">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+            <span class="agent-load-banner-text">@_loadErrorMessage</span>
+            <button type="button" class="su-btn su-btn-sm su-btn-secondary" @onclick="ReloadAgents">
+                <i class="bi bi-arrow-clockwise"></i> @Loc["agent_select.retry"]
+            </button>
+        </div>
+    }
+    else if (_failedLoads > 0)
+    {
+        <div class="su-alert su-alert-warning agent-load-banner">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span class="agent-load-banner-text">@Loc.Format("agent_select.skipped_load", _failedLoads)</span>
+            <button type="button" class="su-btn su-btn-sm su-btn-secondary" @onclick="ReloadAgents">
+                <i class="bi bi-arrow-clockwise"></i> @Loc["agent_select.retry"]
+            </button>
+        </div>
+    }
+
+    <section class="agent-controls">
+        <div class="agent-search">
+            <i class="bi bi-search agent-search-icon"></i>
+            <input @ref="_searchInput"
+                   class="agent-search-input"
+                   type="text"
+                   value="@SearchQuery"
+                   placeholder="@Loc["Search agents..."]"
+                   aria-label="@Loc["Search agents..."]"
+                   @oninput="OnSearchInput"
+                   @onkeydown="OnSearchKeyDown" />
+            @if (!string.IsNullOrEmpty(SearchQuery))
+            {
+                <button type="button" class="agent-search-clear" title="@Loc["agent_select.clear_search"]"
+                        aria-label="@Loc["agent_select.clear_search"]" @onclick="ClearSearchQuery">
+                    <i class="bi bi-x-circle-fill"></i>
+                </button>
+            }
+            else
+            {
+                <kbd class="agent-search-kbd">/</kbd>
+            }
+        </div>
+
+        <div class="agent-sort">
+            <i class="bi bi-sort-down agent-sort-icon"></i>
+            <select class="su-select agent-sort-select" value="@SortMode" @onchange="OnSortModeChanged"
+                    aria-label="@Loc["agent_select.sort_label"]">
+                <option value="@AgentSortMode.Default">@Loc["agent_select.sort.default"]</option>
+                <option value="@AgentSortMode.NameAscending">@Loc["agent_select.sort.name_asc"]</option>
+                <option value="@AgentSortMode.NameDescending">@Loc["agent_select.sort.name_desc"]</option>
+                <option value="@AgentSortMode.ChatsDescending">@Loc["agent_select.sort.chats_desc"]</option>
+                <option value="@AgentSortMode.ChatsAscending">@Loc["agent_select.sort.chats_asc"]</option>
+                <option value="@AgentSortMode.TagsDescending">@Loc["agent_select.sort.tags_desc"]</option>
+            </select>
+        </div>
+
+        <div class="agent-view-switch" role="group" aria-label="@Loc["agent_select.view_label"]">
+            <button type="button" class="agent-view-btn @(ViewMode == "grid" ? "active" : "")"
+                    title="@Loc["Switch to Grid View"]" aria-label="@Loc["Switch to Grid View"]"
+                    aria-pressed="@(ViewMode == "grid" ? "true" : "false")" @onclick='() => SetViewMode("grid")'>
+                <i class="bi bi-grid-3x3-gap-fill"></i>
+            </button>
+            <button type="button" class="agent-view-btn @(ViewMode == "list" ? "active" : "")"
+                    title="@Loc["Switch to Detail View"]" aria-label="@Loc["Switch to Detail View"]"
+                    aria-pressed="@(ViewMode == "list" ? "true" : "false")" @onclick='() => SetViewMode("list")'>
+                <i class="bi bi-list-ul"></i>
+            </button>
+        </div>
+    </section>
+
+    @if (TagCounts.Count > 0)
+    {
+        <div class="agent-tagbar">
+            <span class="agent-tagbar-label"><i class="bi bi-tags"></i> @Loc["agent_select.filter_label"]</span>
+            <div class="agent-tag-mode" role="group" aria-label="@Loc["agent_select.tag_mode"]">
+                <button type="button" class="agent-tag-mode-btn @(TagMatchMode == AgentTagMatchMode.Include ? "active" : "")"
+                        title="@Loc["agent_select.tag_mode.include_title"]"
+                        aria-pressed="@(TagMatchMode == AgentTagMatchMode.Include ? "true" : "false")"
+                        @onclick="() => SetTagMatchMode(AgentTagMatchMode.Include)">
+                    @Loc["agent_select.tag_mode.include"]
+                </button>
+                <button type="button" class="agent-tag-mode-btn agent-tag-mode-exclude @(TagMatchMode == AgentTagMatchMode.Exclude ? "active" : "")"
+                        title="@Loc["agent_select.tag_mode.exclude_title"]"
+                        aria-pressed="@(TagMatchMode == AgentTagMatchMode.Exclude ? "true" : "false")"
+                        @onclick="() => SetTagMatchMode(AgentTagMatchMode.Exclude)">
+                    <i class="bi bi-slash-circle"></i> @Loc["agent_select.tag_mode.exclude"]
+                </button>
+            </div>
+            <button type="button" class="agent-tag-filter @(SelectedTags.Count == 0 ? "active" : "")"
+                    @onclick="ClearTagFilter">
+                @Loc["agent_select.all_tags"]
+                <span class="agent-tag-filter-count">@AllAgents.Count</span>
+            </button>
+            @foreach (var tag in TagCounts)
+            {
+                <button type="button" class="@GetTagFilterClass(tag.Tag)"
+                        @onclick="() => ToggleTag(tag.Tag)">
+                    <span class="agent-tag-dot" style="background-color: @GetTagColor(tag.Tag)"></span>
+                    <span>@tag.Tag</span>
+                    <span class="agent-tag-filter-count">@tag.Count</span>
+                </button>
+            }
+        </div>
+    }
+
+    @if (_loadErrorMessage == null)
+    {
+        <div class="agent-result-bar">
+            <span class="agent-result-count">
+                <i class="bi bi-collection"></i>
+                @Loc.Format("agent_select.result_count", FilteredAgents.Count, AllAgents.Count)
+                @if (TagMatchMode == AgentTagMatchMode.Exclude && SelectedTags.Count > 0)
+                {
+                    <span class="agent-result-mode">@Loc["agent_select.tag_mode.excluding"]</span>
+                }
+            </span>
+            <div class="agent-result-actions">
+                <button type="button" class="agent-lock-btn @(IsFilterLocked ? "active" : "")"
+                        title="@(IsFilterLocked ? Loc["agent_select.unlock_filters"] : Loc["agent_select.lock_filters"])"
+                        aria-pressed="@(IsFilterLocked ? "true" : "false")"
+                        @onclick="ToggleFilterLock">
+                    <i class="bi @(IsFilterLocked ? "bi-lock-fill" : "bi-unlock")"></i>
+                    <span>@(IsFilterLocked ? Loc["agent_select.filters_locked"] : Loc["agent_select.lock_filters"])</span>
+                </button>
+                @if (HasActiveFilters)
+                {
+                    <button type="button" class="agent-clear-filters" @onclick="ClearFilters">
+                        <i class="bi bi-x-lg"></i> @Loc["agent_select.clear_filters"]
+                    </button>
+                }
+            </div>
+        </div>
+
+        @if (FilteredAgents.Count == 0)
+        {
+            <div class="agent-empty">
+                <div class="agent-empty-icon">
+                    <i class="bi @(AllAgents.Count == 0 ? "bi-robot" : "bi-search")"></i>
+                </div>
+                <h2>@(AllAgents.Count == 0 ? Loc["agent_select.empty_title"] : Loc["agent_select.no_results_title"])</h2>
+                <p>@(AllAgents.Count == 0 ? Loc["agent_select.empty_description"] : Loc["agent_select.no_results_description"])</p>
+                @if (AllAgents.Count == 0)
+                {
+                    <button type="button" class="su-btn su-btn-primary" @onclick="OpenCreateAgentMenu">
+                        <i class="bi bi-plus-lg"></i> @Loc["Create New Agent"]
+                    </button>
+                }
+                else
+                {
+                    <button type="button" class="su-btn su-btn-secondary" @onclick="ClearFilters">
+                        <i class="bi bi-arrow-counterclockwise"></i> @Loc["agent_select.clear_filters"]
+                    </button>
+                }
+            </div>
+        }
+        else if (ViewMode == "list")
+        {
+            <div class="agent-list">
+                @foreach (var agent in FilteredAgents)
+                {
+                    <article class="agent-list-row" tabindex="0" aria-label="@agent.Name"
+                             @onclick="() => NavigateToAgent(agent)"
+                             @onkeydown="e => OnAgentRowKeyDown(e, agent)">
+                        <div class="agent-list-avatar" style="background-color: @GetAvatarColor(agent.Name)">
+                            @if (agent.AvatarGuid != null)
+                            {
+                                <img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
+                            }
+                            else
+                            {
+                                <span>@GetAvatarInitial(agent.Name)</span>
+                            }
+                        </div>
+
+                        <div class="agent-list-main">
+                            <div class="agent-list-title-row">
+                                <h3 class="agent-list-name">@agent.Name</h3>
+                                <span class="agent-chat-count">
+                                    <i class="bi bi-chat-dots"></i> @Loc.Format("agent_select.chat_count", GetChatCount(agent))
+                                </span>
+                                @foreach (var tag in GetVisibleTags(agent).Take(3))
+                                {
+                                    <span class="agent-tag-pill" style="@GetTagStyle(tag)">@tag</span>
+                                }
+                                @if (GetVisibleTagCount(agent) > 3)
+                                {
+                                    <span class="agent-tag-pill agent-tag-more">+@(GetVisibleTagCount(agent) - 3)</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(agent.UserIntro))
+                            {
+                                <p class="agent-list-intro">@agent.UserIntro</p>
+                            }
+                            else
+                            {
+                                <p class="agent-list-intro agent-intro-placeholder">@Loc["agent_select.no_intro"]</p>
+                            }
+                        </div>
+
+                        <div class="agent-list-hint">
+                            <i class="bi bi-arrow-right"></i>
+                        </div>
+
+                        @AgentActions(agent, "agent-list-actions")
+                    </article>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="agent-grid">
+                @foreach (var agent in FilteredAgents)
+                {
+                    <article class="agent-card" tabindex="0" aria-label="@agent.Name"
+                             @onclick="() => NavigateToAgent(agent)"
+                             @onkeydown="e => OnAgentRowKeyDown(e, agent)">
+                        <div class="agent-card-cover" style="@GetCoverStyle(agent)">
+                            <span class="agent-card-chat-badge">
+                                <i class="bi bi-chat-dots-fill"></i> @GetChatCount(agent)
+                            </span>
+
+                            <div class="agent-card-avatar" style="background-color: @GetAvatarColor(agent.Name)">
+                                @if (agent.AvatarGuid != null)
+                                {
+                                    <img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
+                                }
+                                else
+                                {
+                                    <span>@GetAvatarInitial(agent.Name)</span>
+                                }
+                            </div>
+
+                            @AgentActions(agent, "agent-card-actions")
+                        </div>
+
+                        <div class="agent-card-body">
+                            <h3 class="agent-card-name" title="@agent.Name">@agent.Name</h3>
+                            @if (!string.IsNullOrWhiteSpace(agent.UserIntro))
+                            {
+                                <p class="agent-card-intro">@agent.UserIntro</p>
+                            }
+                            else
+                            {
+                                <p class="agent-card-intro agent-intro-placeholder">@Loc["agent_select.no_intro"]</p>
+                            }
+
+                            <div class="agent-card-tags">
+                                @foreach (var tag in GetVisibleTags(agent).Take(3))
+                                {
+                                    <span class="agent-tag-pill" style="@GetTagStyle(tag)">@tag</span>
+                                }
+                                @if (GetVisibleTagCount(agent) > 3)
+                                {
+                                    <span class="agent-tag-pill agent-tag-more">+@(GetVisibleTagCount(agent) - 3)</span>
+                                }
+                                else if (GetVisibleTagCount(agent) == 0)
+                                {
+                                    <span class="agent-tag-empty">@Loc["agent_select.no_tags"]</span>
+                                }
+                            </div>
+
+                            <div class="agent-card-footer">
+                                <span class="agent-card-open">@Loc["agent_select.open"] <i class="bi bi-arrow-right"></i></span>
+                            </div>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    }
 </div>
-
-<div class="search-filter-bar">
-	<div class="search-input-wrapper">
-		<input class="shimmer-input search-input" type="text" @bind="SearchQuery" @bind:event="oninput" placeholder="@Loc["Search agents..."]" />
-	</div>
-	<div class="filter-input-wrapper">
-		<input class="shimmer-input filter-input" type="text" @bind="FilterTag" @bind:event="oninput"
-			@onfocus="OnFilterFocus" @onfocusout="OnFilterFocusOut" placeholder="@Loc["Filter by tag..."]" />
-		@if (ShowTagSuggestions && TagSuggestions.Count > 0)
-		{
-			<div class="tag-suggestions-dropdown">
-				@foreach (var suggestion in TagSuggestions)
-				{
-					<div class="tag-suggestion-item" @onmousedown="() => SelectTagSuggestion(suggestion)" @onmousedown:preventDefault>
-						<span class="mini-tag" style="@GetTagStyle(suggestion)">@suggestion</span>
-					</div>
-				}
-			</div>
-		}
-	</div>
-</div>
-
-@if (IsDetailMode)
-{
-	<div class="su-group">
-		<div class="agent-detail-list">
-			@foreach (var agent in FilteredAgents)
-			{
-				<div class="agent-detail-row" @onclick="()=> NavigateToAgent(agent.Guid.ToString())">
-					<div class="agent-detail-avatar">
-						@if (agent.AvatarGuid != null)
-						{
-							<img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
-						}
-						else
-						{
-							<div class="agent-avatar-placeholder" style="background-color: @GetAvatarColor(agent.Name)">
-								@GetAvatarInitial(agent.Name)
-							</div>
-						}
-					</div>
-					<div class="agent-detail-divider"></div>
-					<div class="agent-detail-info">
-						<div class="agent-detail-name">@agent.Name</div>
-						@if (agent.Tags != null && agent.Tags.Count > 0)
-						{
-							<div class="agent-detail-tags">
-								@foreach (var tag in agent.Tags)
-								{
-									<span class="agent-tag" style="@GetTagStyle(tag)">@tag</span>
-								}
-							</div>
-						}
-						@if (!string.IsNullOrEmpty(agent.UserIntro))
-						{
-							<div class="agent-detail-intro">@agent.UserIntro</div>
-						}
-					</div>
-					<button class="agent-delete-btn" @onclick:stopPropagation @onclick="()=> ShowDeleteConfirmation(agent)">
-						×
-					</button>
-				</div>
-			}
-			@if (!FilteredAgents.Any())
-			{
-				<div class="agent-empty">@Loc["No agents found"]</div>
-			}
-		</div>
-	</div>
-}
-else
-{
-	<div class="su-group">
-		<div class="shimmer-grid">
-			@foreach (var agent in FilteredAgents)
-			{
-				<div class="shimmer-grid-item shimmer-grid-agent-item fixed-size">
-					<div class="content-wrapper">
-						@if (agent.AvatarGuid != null)
-						{
-							<div class="agent-item-content" style="background-image: url('/userimages/@(agent.AvatarGuid).png');" @onclick="()=> NavigateToAgent( agent.Guid.ToString())">
-								@agent.Name
-							</div>
-						}
-						else
-						{
-							<div class="agent-item-content agent-item-placeholder" style="background-color: @GetAvatarColor(agent.Name)" @onclick="()=> NavigateToAgent( agent.Guid.ToString())">
-								<span class="agent-placeholder-initial">@GetAvatarInitial(agent.Name)</span>
-								@agent.Name
-							</div>
-						}
-					</div>
-					<button class="agent-delete-btn" @onclick:stopPropagation @onclick="()=> ShowDeleteConfirmation(agent)">
-						×
-					</button>
-				</div>
-			}
-			@if (!FilteredAgents.Any())
-			{
-				<div class="agent-empty" style="grid-column: 1 / -1; text-align: center; padding: 40px;">@Loc["No agents found"]</div>
-			}
-		</div>
-	</div>
-}
 
 @if (CreatePopupVisible)
 {
-	<div class="su-modal-mask" @onclick="() => CreatePopupVisible=false">
-		<div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
-			<h5>@Loc["Create new Agent popup title"]</h5>
-			<div class="su-form-group">
-				<label class="su-label">@Loc["Name:"]</label>
-				<input class="su-input" @bind=popupNewAgentName/>
-			</div>
-			<div class="su-form-group">
-				<label class="su-label">@Loc["Description:"]</label>
-				<textarea class="su-textarea" @bind=popupNewAgentDescription/>
-			</div>
-			<div class="su-form-group">
-				<label class="su-label">@Loc["Greeting:"]</label>
-				<textarea class="su-textarea" @bind=popupNewAgentGreeting/>
-			</div>
-			<div style="display:flex;justify-content:flex-end;margin-top:12px;">
-				<button class="su-btn su-btn-primary" @onclick="CreateNewAgent">@Loc["Create"]</button>
-			</div>
-		</div>
-	</div>
+    <div class="su-modal-mask" @onclick="CloseCreatePopup" @onkeydown="HandleModalKeyDown">
+        <div class="agent-dialog" role="dialog" aria-modal="true" aria-labelledby="agent-create-title"
+             @onclick:stopPropagation="true">
+            <div class="agent-dialog-header">
+                <div class="agent-dialog-icon"><i class="bi bi-stars"></i></div>
+                <div class="agent-dialog-heading">
+                    <h2 id="agent-create-title">@Loc["Create new Agent popup title"]</h2>
+                    <p>@Loc["agent_select.create_subtitle"]</p>
+                </div>
+                <button type="button" class="agent-dialog-close" aria-label="@Loc["Cancel"]" @onclick="CloseCreatePopup">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="agent-dialog-body">
+                <div class="agent-create-preview">
+                    <div class="agent-preview-avatar" style="background-color: @GetAvatarColor(popupNewAgentName)">
+                        @GetAvatarInitial(popupNewAgentName)
+                    </div>
+                    <div class="agent-preview-text">
+                        <span class="agent-preview-name">
+                            @(string.IsNullOrWhiteSpace(popupNewAgentName) ? Loc["agent_select.untitled"] : popupNewAgentName)
+                        </span>
+                        <span class="agent-preview-sub">@Loc["agent_select.create_preview"]</span>
+                    </div>
+                </div>
+
+                <div class="su-form-group">
+                    <label class="su-label">@Loc["Name:"]</label>
+                    <input @ref="_createNameInput" class="su-input" @bind="popupNewAgentName" @bind:event="oninput"
+                           @onkeydown="OnCreateNameKeyDown" placeholder="@Loc["agent_select.name_placeholder"]" />
+                </div>
+                <div class="su-form-group">
+                    <label class="su-label">@Loc["Description:"]</label>
+                    <textarea class="su-textarea" rows="3" @bind="popupNewAgentDescription"
+                              placeholder="@Loc["agent_select.description_placeholder"]"></textarea>
+                </div>
+                <div class="su-form-group">
+                    <label class="su-label">@Loc["Greeting:"]</label>
+                    <textarea class="su-textarea" rows="3" @bind="popupNewAgentGreeting"
+                              placeholder="@Loc["agent_select.greeting_placeholder"]"></textarea>
+                </div>
+                <div class="su-form-group">
+                    <label class="su-label">@Loc["agent_select.tags_label"]</label>
+                    <input class="su-input" @bind="popupNewAgentTags" @bind:event="oninput"
+                           @onkeydown="OnCreateNameKeyDown"
+                           placeholder="@Loc["agent_select.tags_placeholder"]" />
+                    @if (TagCounts.Count > 0)
+                    {
+                        <div class="agent-tag-suggestions">
+                            @foreach (var tag in TagCounts.Take(8))
+                            {
+                                <button type="button" class="agent-tag-suggestion" @onclick="() => AddTagToCreate(tag.Tag)">
+                                    <i class="bi bi-plus"></i> @tag.Tag
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(createError))
+                {
+                    <div class="su-alert su-alert-danger agent-create-error">
+                        <i class="bi bi-exclamation-circle-fill"></i> @createError
+                    </div>
+                }
+            </div>
+
+            <div class="agent-dialog-footer">
+                <button type="button" class="su-btn su-btn-secondary" @onclick="CloseCreatePopup">@Loc["Cancel"]</button>
+                <button type="button" class="su-btn su-btn-primary" @onclick="CreateNewAgent">
+                    <i class="bi bi-plus-lg"></i> @Loc["Create"]
+                </button>
+            </div>
+        </div>
+    </div>
 }
 
 @if (DeletePopupVisible)
 {
-	<div class="su-modal-mask" @onclick="() => DeletePopupVisible=false">
-		<div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
-			<h5>@Loc["Delete Agent popup title"]</h5>
-			<p>@string.Format(Loc["Delete Agent confirmation message"], AgentToDelete?.Name)</p>
-			<div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-				<button class="su-btn su-btn-secondary" @onclick="() => DeletePopupVisible=false">@Loc["Cancel"]</button>
-				<button class="su-btn su-btn-danger" @onclick="DeleteAgentConfirmed">@Loc["Delete"]</button>
-			</div>
-		</div>
-	</div>
+    <div class="su-modal-mask" @onclick="CloseDeletePopup" @onkeydown="HandleModalKeyDown">
+        <div class="agent-dialog agent-dialog-sm" role="dialog" aria-modal="true" aria-labelledby="agent-delete-title"
+             @onclick:stopPropagation="true">
+            <div class="agent-dialog-header">
+                <div class="agent-dialog-icon agent-dialog-icon-danger"><i class="bi bi-trash3"></i></div>
+                <div class="agent-dialog-heading">
+                    <h2 id="agent-delete-title">@Loc["Delete Agent popup title"]</h2>
+                    <p>@Loc["agent_select.delete_subtitle"]</p>
+                </div>
+                <button type="button" class="agent-dialog-close" aria-label="@Loc["Cancel"]" @onclick="CloseDeletePopup">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="agent-dialog-body">
+                <div class="agent-delete-target">
+                    <div class="agent-preview-avatar" style="background-color: @GetAvatarColor(AgentToDelete?.Name ?? "")">
+                        @GetAvatarInitial(AgentToDelete?.Name ?? "")
+                    </div>
+                    <div class="agent-preview-text">
+                        <span class="agent-preview-name">@AgentToDelete?.Name</span>
+                        <span class="agent-preview-sub">
+                            @Loc.Format("agent_select.chat_count", GetChatCount(AgentToDelete))
+                        </span>
+                    </div>
+                </div>
+                <p class="agent-delete-message">@Loc.Format("Delete Agent confirmation message", AgentToDelete?.Name ?? "")</p>
+            </div>
+
+            <div class="agent-dialog-footer">
+                <button @ref="_deleteCancelButton" type="button" class="su-btn su-btn-secondary"
+                        @onclick="CloseDeletePopup">@Loc["Cancel"]</button>
+                <button type="button" class="su-btn su-btn-danger" @onclick="DeleteAgentConfirmed">
+                    <i class="bi bi-trash3"></i> @Loc["Delete"]
+                </button>
+            </div>
+        </div>
+    </div>
 }
 
-
 @code {
-	bool CreatePopupVisible { get; set; } = false;
-	bool DeletePopupVisible { get; set; } = false;
-	Agent? AgentToDelete { get; set; } = null;
-	bool IsDetailMode { get; set; } = false;
+    const string ViewModeKey = "AgentSelectViewModeV2";
+    const string LegacyViewModeKey = "AgentSelectViewMode";
+    const string SortModeKey = "AgentSelectSortMode";
+    const string FilterStateKey = "AgentSelectFilters";
 
-	string SearchQuery { get; set; } = "";
-	string FilterTag { get; set; } = "";
-	bool ShowTagSuggestions { get; set; } = false;
+    List<Agent> AllAgents { get; set; } = new();
+    List<Agent> FilteredAgents { get; set; } = new();
+    IReadOnlyList<AgentTagCount> TagCounts { get; set; } = Array.Empty<AgentTagCount>();
 
-	static readonly string[] TagPalette = new[]
-	{
-		"#e74c3c", "#e67e22", "#f1c40f", "#2ecc71", "#1abc9c",
-		"#3498db", "#9b59b6", "#e91e63", "#00bcd4", "#ff5722",
-		"#795548", "#607d8b", "#8bc34a", "#ff9800", "#03a9f4",
-	};
+    string SearchQuery { get; set; } = "";
+    HashSet<string> SelectedTags { get; } = new(StringComparer.OrdinalIgnoreCase);
+    string ViewMode { get; set; } = "grid";
+    AgentSortMode SortMode { get; set; } = AgentSortMode.Default;
+    AgentTagMatchMode TagMatchMode { get; set; } = AgentTagMatchMode.Include;
+    bool IsFilterLocked { get; set; }
 
-	static string GetTagColor(string tag)
-	{
-		var hash = 0;
-		foreach (var c in tag)
-		{
-			hash = ((hash << 5) + hash) ^ c; // DJB2 variant
-		}
-		return TagPalette[Math.Abs(hash) % TagPalette.Length];
-	}
+    int _failedLoads;
+    string? _loadErrorMessage;
 
-	static string GetTagStyle(string tag)
-	{
-		var color = GetTagColor(tag);
-		return $"background-color: {color}22; color: {color}; border: 1px solid {color}66;";
-	}
+    bool CreatePopupVisible { get; set; }
+    bool DeletePopupVisible { get; set; }
+    Agent? AgentToDelete { get; set; }
 
-	List<string> AllTags
-	{
-		get
-		{
-			return AllAgents
-				.Where(a => a.Tags != null)
-				.SelectMany(a => a.Tags)
-				.Distinct(StringComparer.OrdinalIgnoreCase)
-				.OrderBy(t => t)
-				.ToList();
-		}
-	}
+    string popupNewAgentName { get; set; } = "";
+    string popupNewAgentDescription { get; set; } = "";
+    string popupNewAgentGreeting { get; set; } = "";
+    string popupNewAgentTags { get; set; } = "";
+    string? createError { get; set; }
 
-	List<string> TagSuggestions
-	{
-		get
-		{
-			var input = (FilterTag ?? "").Trim();
-			if (string.IsNullOrEmpty(input))
-				return AllTags;
-			return AllTags
-				.Where(t => t.Contains(input, StringComparison.OrdinalIgnoreCase))
-				.ToList();
-		}
-	}
+    IBrowserFile? File { get; set; }
 
-	#region Popup
-	string popupNewAgentName { get; set; } = "";
-	string popupNewAgentDescription { get; set; } = "";
-	string popupNewAgentGreeting { get; set; } = "";
-	#endregion
+    ElementReference _searchInput;
+    ElementReference _createNameInput;
+    ElementReference _deleteCancelButton;
+    bool _focusCreateName;
+    bool _focusDeleteCancel;
+    DotNetObjectReference<AgentSelectPage>? _shortcutRef;
 
-	List<Agent> AllAgents { get; set; } = new();
+    bool HasActiveFilters => !string.IsNullOrWhiteSpace(SearchQuery) || SelectedTags.Count > 0;
+    int TotalChatCount => AllAgents.Sum(GetChatCount);
 
-	List<Agent> FilteredAgents
-	{
-		get
-		{
-			var query = (SearchQuery ?? "").Trim();
-			var tag = (FilterTag ?? "").Trim();
+    sealed record PersistedFilterState(bool Locked, string Search, List<string> Tags, AgentTagMatchMode TagMode);
 
-			var filtered = AllAgents.AsEnumerable();
+    static readonly string[] TagPalette =
+    [
+        "#e74c3c", "#e67e22", "#f1c40f", "#2ecc71", "#1abc9c",
+        "#3498db", "#9b59b6", "#e91e63", "#00bcd4", "#ff5722",
+        "#795548", "#607d8b", "#8bc34a", "#ff9800", "#03a9f4",
+    ];
 
-			if (!string.IsNullOrEmpty(query))
-			{
-				filtered = filtered.Where(a =>
-					(a.Name != null && a.Name.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-					(a.UserIntro != null && a.UserIntro.Contains(query, StringComparison.OrdinalIgnoreCase))
-				);
-			}
+    static readonly string[] _avatarColors =
+    [
+        "#5e6ad2", "#e74c3c", "#2ecc71", "#f39c12", "#1abc9c",
+        "#3498db", "#9b59b6", "#e67e22", "#27ae60", "#c0392b",
+    ];
 
-			if (!string.IsNullOrEmpty(tag))
-			{
-				filtered = filtered.Where(a =>
-					a.Tags != null && a.Tags.Any(t => t.Contains(tag, StringComparison.OrdinalIgnoreCase))
-				);
-			}
+    protected override void OnInitialized()
+    {
+        LoadViewPreferences();
+        LoadFilterState();
+        LoadAgents();
+    }
 
-			return filtered.ToList();
-		}
-	}
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _shortcutRef = DotNetObjectReference.Create(this);
+            try
+            {
+                await JS.InvokeVoidAsync("agentSelectShortcuts.register", _shortcutRef);
+            }
+            catch (JSDisconnectedException)
+            {
+                // 电路已断开时无法注册快捷键；页面其余功能不受影响。
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
 
-	protected override void OnInitialized()
-	{
-		LoadAgents();
-		var saved = kvDataService.Read("Settings", "AgentSelectViewMode");
-		if (saved != null && bool.TryParse(saved, out var mode))
-			IsDetailMode = mode;
-	}
+        if (_focusCreateName)
+        {
+            _focusCreateName = false;
+            try
+            {
+                await _createNameInput.FocusAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // 电路已断开时无法执行 JS，聚焦失败不影响页面状态。
+            }
+        }
 
-	void LoadAgents()
-	{
-		var agentGuids = Agent.GetAllAgentGuids(kvDataService);
-		var result = new List<Agent>();
-		foreach (var guid in agentGuids)
-		{
-			try
-			{
-				result.Add(Agent.Load(guid, kvDataService));
-			}
-			catch (Exception)
-			{
-			}
-		}
-		AllAgents = result;
-	}
+        if (_focusDeleteCancel)
+        {
+            _focusDeleteCancel = false;
+            try
+            {
+                await _deleteCancelButton.FocusAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+    }
 
-	void ToggleViewMode()
-	{
-		IsDetailMode = !IsDetailMode;
-		kvDataService.Write("Settings", "AgentSelectViewMode", IsDetailMode.ToString());
-	}
+    public async ValueTask DisposeAsync()
+    {
+        if (_shortcutRef == null)
+            return;
 
-	void OnFilterFocus()
-	{
-		ShowTagSuggestions = true;
-	}
+        try
+        {
+            await JS.InvokeVoidAsync("agentSelectShortcuts.unregister");
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
 
-	async Task OnFilterFocusOut()
-	{
-		await Task.Delay(200);
-		ShowTagSuggestions = false;
-	}
+        _shortcutRef.Dispose();
+        _shortcutRef = null;
+    }
 
-	void SelectTagSuggestion(string tag)
-	{
-		FilterTag = tag;
-		ShowTagSuggestions = false;
-	}
+    void LoadViewPreferences()
+    {
+        var savedView = kvDataService.Read("Settings", ViewModeKey);
+        if (savedView is "grid" or "list")
+        {
+            ViewMode = savedView;
+        }
+        else
+        {
+            if (savedView != null)
+                Logger.LogWarning("Invalid agent view mode '{ViewMode}' from settings; falling back to grid.", savedView);
 
-	static readonly string[] _avatarColors = new[]
-	{
-		"#5e6ad2", "#e74c3c", "#2ecc71", "#f39c12", "#1abc9c",
-		"#3498db", "#9b59b6", "#e67e22", "#27ae60", "#c0392b",
-	};
+            // 兼容旧版本保存的 bool（true = 详细列表）。
+            var legacy = kvDataService.Read("Settings", LegacyViewModeKey);
+            if (bool.TryParse(legacy, out var isListView))
+            {
+                ViewMode = isListView ? "list" : "grid";
+                PersistViewMode(ViewMode);
+            }
+            else if (legacy != null)
+            {
+                Logger.LogWarning("Invalid legacy agent view mode '{ViewMode}' from settings; falling back to grid.", legacy);
+            }
+        }
 
-	static string GetAvatarColor(string name)
-	{
-		var hash = 0;
-		foreach (var c in name ?? "?")
-			hash = ((hash << 5) + hash) ^ c;
-		return _avatarColors[Math.Abs(hash) % _avatarColors.Length];
-	}
+        var savedSort = kvDataService.Read("Settings", SortModeKey);
+        if (savedSort == null)
+        {
+            SortMode = AgentSortMode.Default;
+        }
+        else if (AgentListQuery.TryParseSortMode(savedSort, out var sortMode))
+        {
+            SortMode = sortMode;
+        }
+        else
+        {
+            Logger.LogWarning("Invalid agent sort mode '{SortMode}' from settings; falling back to default.", savedSort);
+            SortMode = AgentSortMode.Default;
+        }
+    }
 
-	static string GetAvatarInitial(string name)
-	{
-		if (string.IsNullOrWhiteSpace(name)) return "?";
-		return char.ToUpper(name.TrimStart()[0]).ToString();
-	}
+    void LoadFilterState()
+    {
+        var raw = kvDataService.Read("Settings", FilterStateKey);
+        if (raw == null)
+            return;
 
-	void OpenCreateAgentMenu()
-	{
-		popupNewAgentName = Loc["agent_select.default_name"];
-		popupNewAgentDescription = Loc["agent_select.default_description"];
-		popupNewAgentGreeting = Loc["agent_select.default_greeting"];
-		CreatePopupVisible = true;
-	}
+        PersistedFilterState? state;
+        try
+        {
+            state = JsonSerializer.Deserialize<PersistedFilterState>(raw);
+        }
+        catch (JsonException ex)
+        {
+            Logger.LogWarning(ex, "Invalid persisted agent filter state; ignoring it.");
+            return;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to read persisted agent filter state.");
+            return;
+        }
 
-	void CreateNewAgent()
-	{
-		if (popupNewAgentName == "")
-			popupNewAgentName = Loc["agent_select.default_name"];
+        if (state == null)
+        {
+            Logger.LogWarning("Persisted agent filter state was empty; ignoring it.");
+            return;
+        }
 
-		var newAgent = Agent.Create
-		(
-			popupNewAgentName,
-			popupNewAgentDescription,
-			popupNewAgentGreeting
-		);
+        IsFilterLocked = state.Locked;
+        if (!IsFilterLocked)
+            return;
 
-		newAgent.Save(kvDataService);
-		Agent.AddAgentToAll(newAgent, kvDataService);
-		LoadAgents();
-		CreatePopupVisible = false;
-	}
+        SearchQuery = state.Search ?? "";
+        SelectedTags.Clear();
+        if (state.Tags != null)
+        {
+            foreach (var rawTag in state.Tags)
+            {
+                var tag = rawTag?.Trim();
+                if (!string.IsNullOrEmpty(tag))
+                    SelectedTags.Add(tag);
+            }
+        }
 
-	void NavigateToAgent(string guid)
-	{
-		navigation.NavigateTo($"/agent/{guid}");
-	}
+        if (Enum.IsDefined(typeof(AgentTagMatchMode), state.TagMode))
+        {
+            TagMatchMode = state.TagMode;
+        }
+        else
+        {
+            Logger.LogWarning("Invalid persisted tag match mode '{TagMatchMode}'; falling back to include.", state.TagMode);
+            TagMatchMode = AgentTagMatchMode.Include;
+        }
+    }
 
-	void ShowDeleteConfirmation(Agent agent)
-	{
-		AgentToDelete = agent;
-		DeletePopupVisible = true;
-	}
+    void PersistFilters()
+    {
+        try
+        {
+            var tags = IsFilterLocked
+                ? SelectedTags.OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase).ToList()
+                : new List<string>();
+            var state = new PersistedFilterState(
+                IsFilterLocked,
+                IsFilterLocked ? SearchQuery : "",
+                tags,
+                IsFilterLocked ? TagMatchMode : AgentTagMatchMode.Include);
 
-	void DeleteAgentConfirmed()
-	{
-		if (AgentToDelete != null)
-		{
-			Agent.RemoveAgentFromAll(AgentToDelete, kvDataService);
-			LoadAgents();
-			DeletePopupVisible = false;
-			AgentToDelete = null;
-		}
-	}
+            kvDataService.Write("Settings", FilterStateKey, JsonSerializer.Serialize(state));
+        }
+        catch (Exception ex)
+        {
+            // 筛选偏好写入失败不应阻断列表操作，但必须留下可追踪的记录。
+            Logger.LogError(ex, "Failed to persist agent filters.");
+        }
+    }
 
-	IBrowserFile? File { get; set; }
-	async Task InputFileChanged(InputFileChangeEventArgs e)
-	{
-		File = e.File;
-		await Import();
-	}
+    void PersistFiltersIfLocked()
+    {
+        if (IsFilterLocked)
+            PersistFilters();
+    }
 
-	async Task<byte[]> ReadFullyAsync(Stream stream)
-	{
-		using var memoryStream = new MemoryStream();
-		var buffer = new byte[16384];
-		int bytesRead;
-		while ((bytesRead = await stream.ReadAsync(buffer)) > 0)
-		{
-			await memoryStream.WriteAsync(buffer.AsMemory(0, bytesRead));
-		}
-		return memoryStream.ToArray();
-	}
+    void ToggleFilterLock()
+    {
+        IsFilterLocked = !IsFilterLocked;
+        PersistFilters();
+    }
 
-	async Task Import()
-	{
-		if(File == null)
-		{
-			await PopupService.ShowAsync(Loc["agent_select.no_file_selected"]);
-			return;
-		}
-		var originStream = File.OpenReadStream(maxAllowedSize: 1024 * 1024 * 80);
-		var buffer = await ReadFullyAsync(originStream);
-		var content = System.Text.Encoding.UTF8.GetString(buffer);
+    void SetTagMatchMode(AgentTagMatchMode mode)
+    {
+        if (TagMatchMode == mode)
+            return;
 
-		var newAgent = Agent.Import(content);
-		if (AllAgents.Any(x => x.Guid == newAgent.Guid))
-		{
-			await PopupService.ShowAsync(Loc["agent_select.duplicate_agent"]);
-		}
+        TagMatchMode = mode;
+        ApplyQuery();
+        PersistFiltersIfLocked();
+    }
 
-		Agent.AddAgentToAll(newAgent, kvDataService);
-		LoadAgents();
-	}
+    string GetTagFilterClass(string tag)
+    {
+        if (!SelectedTags.Contains(tag))
+            return "agent-tag-filter";
+
+        return TagMatchMode == AgentTagMatchMode.Exclude
+            ? "agent-tag-filter active exclude"
+            : "agent-tag-filter active";
+    }
+
+    void LoadAgents()
+    {
+        _loadErrorMessage = null;
+        _failedLoads = 0;
+
+        List<Guid> agentGuids;
+        try
+        {
+            agentGuids = Agent.GetAllAgentGuids(kvDataService);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load the agent index from storage.");
+            AllAgents = new List<Agent>();
+            FilteredAgents = new List<Agent>();
+            TagCounts = Array.Empty<AgentTagCount>();
+            _loadErrorMessage = Loc.Format("agent_select.load_failed", ex.Message);
+            return;
+        }
+
+        var loaded = new List<Agent>(agentGuids.Count);
+        foreach (var guid in agentGuids)
+        {
+            try
+            {
+                loaded.Add(Agent.Load(guid, kvDataService));
+            }
+            catch (Exception ex)
+            {
+                _failedLoads++;
+                Logger.LogWarning(ex, "Failed to load agent '{AgentGuid}'; it is skipped in the agent list.", guid);
+            }
+        }
+
+        AllAgents = loaded;
+        TagCounts = AgentListQuery.CollectTagCounts(loaded);
+
+        // 标签被删光后不应继续用旧筛选条件制造“空列表”的错觉。
+        var prunedTags = false;
+        if (SelectedTags.Count > 0)
+        {
+            var existing = new HashSet<string>(TagCounts.Select(tag => tag.Tag), StringComparer.OrdinalIgnoreCase);
+            prunedTags = SelectedTags.RemoveWhere(tag => !existing.Contains(tag)) > 0;
+        }
+
+        if (prunedTags && IsFilterLocked)
+            PersistFilters();
+
+        ApplyQuery();
+    }
+
+    void ReloadAgents()
+    {
+        LoadAgents();
+    }
+
+    void ApplyQuery()
+    {
+        FilteredAgents = AgentListQuery.FilterAndSort(
+            AllAgents,
+            SearchQuery,
+            SelectedTags,
+            SortMode,
+            TagMatchMode);
+    }
+
+    void OnSearchInput(ChangeEventArgs e)
+    {
+        SearchQuery = e.Value?.ToString() ?? "";
+        ApplyQuery();
+        PersistFiltersIfLocked();
+    }
+
+    void ClearSearchQuery()
+    {
+        SearchQuery = "";
+        ApplyQuery();
+        PersistFiltersIfLocked();
+    }
+
+    void OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && !string.IsNullOrEmpty(SearchQuery))
+            ClearSearchQuery();
+    }
+
+    [JSInvokable]
+    public async Task FocusSearchFromShortcut()
+    {
+        try
+        {
+            await _searchInput.FocusAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // 电路已断开时无法聚焦，忽略即可。
+        }
+    }
+
+    void HandlePageKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Escape")
+            return;
+
+        if (CreatePopupVisible)
+        {
+            CloseCreatePopup();
+            return;
+        }
+
+        if (DeletePopupVisible)
+        {
+            CloseDeletePopup();
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(SearchQuery))
+            ClearSearchQuery();
+    }
+
+    void HandleModalKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Escape")
+            return;
+
+        if (CreatePopupVisible)
+            CloseCreatePopup();
+        else if (DeletePopupVisible)
+            CloseDeletePopup();
+    }
+
+    void OnSortModeChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        if (!AgentListQuery.TryParseSortMode(raw, out var sortMode))
+        {
+            Logger.LogWarning("Unknown agent sort mode '{SortMode}' from the sort selector; falling back to default.", raw);
+            sortMode = AgentSortMode.Default;
+        }
+
+        SortMode = sortMode;
+        try
+        {
+            kvDataService.Write("Settings", SortModeKey, sortMode.ToString());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to persist agent sort mode '{SortMode}'.", sortMode);
+        }
+
+        ApplyQuery();
+    }
+
+    void SetViewMode(string viewMode)
+    {
+        if (ViewMode == viewMode)
+            return;
+
+        ViewMode = viewMode;
+        PersistViewMode(viewMode);
+    }
+
+    void PersistViewMode(string viewMode)
+    {
+        try
+        {
+            kvDataService.Write("Settings", ViewModeKey, viewMode);
+        }
+        catch (Exception ex)
+        {
+            // 偏好写入失败不应阻断页面操作，但必须留下可追踪的记录。
+            Logger.LogError(ex, "Failed to persist agent view mode '{ViewMode}'.", viewMode);
+        }
+    }
+
+    void ToggleTag(string tag)
+    {
+        if (!SelectedTags.Add(tag))
+            SelectedTags.Remove(tag);
+
+        ApplyQuery();
+        PersistFiltersIfLocked();
+    }
+
+    void ClearTagFilter()
+    {
+        if (SelectedTags.Count == 0)
+            return;
+
+        SelectedTags.Clear();
+        ApplyQuery();
+        PersistFiltersIfLocked();
+    }
+
+    void ClearFilters()
+    {
+        SearchQuery = "";
+        SelectedTags.Clear();
+        ApplyQuery();
+        PersistFiltersIfLocked();
+    }
+
+    void OpenCreateAgentMenu()
+    {
+        popupNewAgentName = Loc["agent_select.default_name"];
+        popupNewAgentDescription = Loc["agent_select.default_description"];
+        popupNewAgentGreeting = Loc["agent_select.default_greeting"];
+        popupNewAgentTags = "";
+        createError = null;
+        CreatePopupVisible = true;
+        _focusCreateName = true;
+    }
+
+    void CloseCreatePopup()
+    {
+        CreatePopupVisible = false;
+        createError = null;
+    }
+
+    void OnCreateNameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            CreateNewAgent();
+    }
+
+    void CreateNewAgent()
+    {
+        createError = null;
+        var name = (popupNewAgentName ?? "").Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            createError = Loc["agent_select.name_required"];
+            return;
+        }
+
+        try
+        {
+            var newAgent = Agent.Create(
+                name,
+                popupNewAgentDescription ?? "",
+                popupNewAgentGreeting ?? "");
+            newAgent.Tags = ParseTags(popupNewAgentTags);
+
+            newAgent.Save(kvDataService);
+            Agent.AddAgentToAll(newAgent, kvDataService);
+
+            CreatePopupVisible = false;
+            LoadAgents();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create agent '{AgentName}'.", name);
+            createError = Loc.Format("agent_select.create_failed", ex.Message);
+        }
+    }
+
+    void AddTagToCreate(string tag)
+    {
+        var tags = ParseTags(popupNewAgentTags);
+        if (!tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+            tags.Add(tag);
+        popupNewAgentTags = string.Join(", ", tags);
+    }
+
+    static List<string> ParseTags(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return new List<string>();
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<string>();
+        foreach (var raw in value.Split([',', '，', ';', '；'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (seen.Add(raw))
+                result.Add(raw);
+        }
+
+        return result;
+    }
+
+    void NavigateToAgent(Agent agent)
+    {
+        navigation.NavigateTo($"/agent/{agent.Guid}");
+    }
+
+    void OnAgentRowKeyDown(KeyboardEventArgs e, Agent agent)
+    {
+        if (e.Key == "Enter")
+            NavigateToAgent(agent);
+    }
+
+    void ShowDeleteConfirmation(Agent agent)
+    {
+        AgentToDelete = agent;
+        DeletePopupVisible = true;
+        _focusDeleteCancel = true;
+    }
+
+    void CloseDeletePopup()
+    {
+        DeletePopupVisible = false;
+        AgentToDelete = null;
+    }
+
+    async Task DeleteAgentConfirmed()
+    {
+        if (AgentToDelete is null)
+            return;
+
+        var name = AgentToDelete.Name;
+        try
+        {
+            Agent.RemoveAgentFromAll(AgentToDelete, kvDataService);
+            CloseDeletePopup();
+            LoadAgents();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete agent '{AgentName}'.", name);
+            await PopupService.ShowAsync(Loc.Format("agent_select.delete_failed", ex.Message));
+        }
+    }
+
+    async Task DuplicateAgent(Agent agent)
+    {
+        try
+        {
+            var copy = Agent.Create(
+                $"{agent.Name}{Loc["agent_select.copy_suffix"]}",
+                agent.UserIntro ?? "",
+                agent.Greeting,
+                agent.AlternativeGreetings?.ToList());
+            copy.Tags = agent.Tags?.ToList() ?? new List<string>();
+            copy.AvatarGuid = agent.AvatarGuid;
+            copy.BackgroundGuid = agent.BackgroundGuid;
+            copy.ChatViewId = agent.ChatViewId;
+            copy.PreGenerationTreeJson = agent.PreGenerationTreeJson;
+            copy.PostGenerationTreeJson = agent.PostGenerationTreeJson;
+            copy.RenderModifierTreeJson = agent.RenderModifierTreeJson;
+
+            copy.Save(kvDataService);
+            Agent.AddAgentToAll(copy, kvDataService);
+            LoadAgents();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to duplicate agent '{AgentName}'.", agent.Name);
+            await PopupService.ShowAsync(Loc.Format("agent_select.duplicate_failed", ex.Message));
+        }
+    }
+
+    async Task ExportAgent(Agent agent)
+    {
+        try
+        {
+            var content = agent.Export();
+            var bytes = Encoding.UTF8.GetBytes(content);
+            using var stream = new MemoryStream(bytes);
+            using var streamRef = new DotNetStreamReference(stream);
+            await JS.InvokeVoidAsync("downloadFileFromStream", BuildFileName(agent.Name), streamRef);
+        }
+        catch (JSDisconnectedException ex)
+        {
+            // 电路断开后无法再弹提示，只能保留日志。
+            Logger.LogError(ex, "Failed to export agent '{AgentName}' because the circuit disconnected.", agent.Name);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to export agent '{AgentName}'.", agent.Name);
+            await PopupService.ShowAsync(Loc.Format("agent_select.export_failed", ex.Message));
+        }
+    }
+
+    static string BuildFileName(string? name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var cleaned = new string((name ?? "").Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim();
+        if (string.IsNullOrEmpty(cleaned))
+            cleaned = "agent";
+        return $"{cleaned}.json";
+    }
+
+    RenderFragment AgentActions(Agent agent, string cssClass) => @<div class="@cssClass" @onclick:stopPropagation="true">
+        <button type="button" class="agent-action-btn" title="@Loc["agent_select.action_duplicate"]"
+                aria-label="@Loc["agent_select.action_duplicate"]" @onclick="() => DuplicateAgent(agent)">
+            <i class="bi bi-files"></i>
+        </button>
+        <button type="button" class="agent-action-btn" title="@Loc["agent_select.action_export"]"
+                aria-label="@Loc["agent_select.action_export"]" @onclick="() => ExportAgent(agent)">
+            <i class="bi bi-download"></i>
+        </button>
+        <button type="button" class="agent-action-btn agent-action-danger" title="@Loc["Delete"]"
+                aria-label="@Loc["Delete"]" @onclick="() => ShowDeleteConfirmation(agent)">
+            <i class="bi bi-trash3"></i>
+        </button>
+    </div>;
+
+    async Task InputFileChanged(InputFileChangeEventArgs e)
+    {
+        File = e.File;
+        await Import();
+    }
+
+    async Task Import()
+    {
+        if (File == null)
+        {
+            await PopupService.ShowAsync(Loc["agent_select.no_file_selected"]);
+            return;
+        }
+
+        Agent imported;
+        try
+        {
+            using var originStream = File.OpenReadStream(maxAllowedSize: 1024 * 1024 * 80);
+            using var memoryStream = new MemoryStream();
+            await originStream.CopyToAsync(memoryStream);
+            var content = Encoding.UTF8.GetString(memoryStream.ToArray());
+            imported = Agent.Import(content);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to import agent from file '{FileName}'.", File.Name);
+            await PopupService.ShowAsync(Loc.Format("agent_select.import_failed", ex.Message), Loc["agent_select.import_failed_title"]);
+            return;
+        }
+
+        var duplicate = AllAgents.Any(agent => agent.Guid == imported.Guid);
+        if (duplicate)
+            imported.Guid = Guid.NewGuid();
+
+        try
+        {
+            imported.Save(kvDataService);
+            Agent.AddAgentToAll(imported, kvDataService);
+            LoadAgents();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save imported agent '{AgentName}'.", imported.Name);
+            await PopupService.ShowAsync(Loc.Format("agent_select.import_save_failed", ex.Message), Loc["agent_select.import_failed_title"]);
+            return;
+        }
+
+        if (duplicate)
+            await PopupService.ShowAsync(Loc["agent_select.duplicate_imported"]);
+    }
+
+    static int GetChatCount(Agent? agent) => agent?.ChatGuids?.Count ?? 0;
+
+    static IEnumerable<string> GetVisibleTags(Agent agent)
+    {
+        return (agent.Tags ?? new List<string>()).Where(tag => !string.IsNullOrWhiteSpace(tag));
+    }
+
+    static int GetVisibleTagCount(Agent agent) => GetVisibleTags(agent).Count();
+
+    static string GetTagColor(string? tag)
+    {
+        var hash = 0;
+        foreach (var c in tag ?? "")
+            hash = ((hash << 5) + hash) ^ c; // DJB2 variant
+        return TagPalette[(hash & 0x7FFFFFFF) % TagPalette.Length];
+    }
+
+    static string GetTagStyle(string tag)
+    {
+        var color = GetTagColor(tag);
+        return $"background-color: {color}22; color: {color}; border: 1px solid {color}66;";
+    }
+
+    static string GetAvatarColor(string? name)
+    {
+        var hash = 0;
+        foreach (var c in string.IsNullOrEmpty(name) ? "?" : name)
+            hash = ((hash << 5) + hash) ^ c;
+        return _avatarColors[(hash & 0x7FFFFFFF) % _avatarColors.Length];
+    }
+
+    static string GetAvatarInitial(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "?";
+        return char.ToUpper(name.TrimStart()[0]).ToString();
+    }
+
+    static string GetCoverStyle(Agent agent)
+    {
+        if (agent.BackgroundGuid != null)
+            return $"background-image: linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 100%), url('/userimages/{agent.BackgroundGuid}.png');";
+
+        if (agent.AvatarGuid != null)
+            return $"background-image: linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.45) 100%), url('/userimages/{agent.AvatarGuid}.png');";
+
+        var color = GetAvatarColor(agent.Name);
+        return $"background-image: radial-gradient(circle at 18% 18%, {color} 0%, {color}b3 48%, {color}66 100%);";
+    }
 }

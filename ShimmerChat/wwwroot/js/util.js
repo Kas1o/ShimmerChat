@@ -13,6 +13,38 @@ window.copyTextToClipboard = (text) => {
     }
 };
 
+// 判断当前焦点是否位于可编辑控件内，供页面级快捷键使用。
+window.isEditableTarget = () => {
+    const element = document.activeElement;
+    if (!element) return false;
+    const tagName = element.tagName;
+    return tagName === 'INPUT'
+        || tagName === 'TEXTAREA'
+        || tagName === 'SELECT'
+        || element.isContentEditable === true;
+};
+
+// 智能体选择页的页面级快捷键：不在输入框、且没有弹窗时，按 "/" 聚焦搜索框。
+window.agentSelectShortcuts = {
+    handler: null,
+    register(dotNetRef) {
+        window.agentSelectShortcuts.unregister();
+        window.agentSelectShortcuts.handler = (event) => {
+            if (event.key !== '/' || event.defaultPrevented) return;
+            if (document.querySelector('.su-modal-mask')) return;
+            if (window.isEditableTarget()) return;
+            event.preventDefault();
+            dotNetRef.invokeMethodAsync('FocusSearchFromShortcut');
+        };
+        document.addEventListener('keydown', window.agentSelectShortcuts.handler);
+    },
+    unregister() {
+        if (!window.agentSelectShortcuts.handler) return;
+        document.removeEventListener('keydown', window.agentSelectShortcuts.handler);
+        window.agentSelectShortcuts.handler = null;
+    },
+};
+
 window.downloadFileFromStream = async (fileName, contentStreamReference) => {
     const arrayBuffer = await contentStreamReference.arrayBuffer();
     const blob = new Blob([arrayBuffer]);
