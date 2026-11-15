@@ -1,0 +1,182 @@
+@using System.Globalization
+@using System.Reflection
+@using ShimmerChatLib.HomeWidget
+@attribute [HomeWidget(
+    "github-release",
+    "widget.release.name",
+    DescriptionKey = "widget.release.desc",
+    Icon = "bi-github",
+    Order = 20,
+    AllowMultiple = false,
+    IsDefault = true)]
+@inject IGitHubReleaseService Releases
+@inject ILocService Loc
+@inject ILogger<GitHubReleaseWidget> Logger
+@implements IHomeWidget
+@implements IAsyncDisposable
+
+<article class="home-release">
+    <div class="home-release-top">
+        <div class="home-release-repo" title="@Releases.Repository">
+            <i class="bi bi-github"></i>
+            <span>@Releases.Repository</span>
+        </div>
+        <button type="button" class="home-release-refresh"
+                title="@Loc["widget.release.refresh"]" aria-label="@Loc["widget.release.refresh"]"
+                @onclick="() => CheckAsync(true)" disabled="@_loading">
+            <i class="bi bi-arrow-clockwise @(_loading ? "home-release-spin" : "")"></i>
+        </button>
+    </div>
+
+    <div class="home-release-current">
+        <span>@Loc["widget.release.current_version"]</span>
+        <code>@_currentVersion</code>
+    </div>
+
+    @if (_loading && _result == null)
+    {
+        <div class="home-release-loading">
+            <span class="home-release-loader" aria-hidden="true"></span>
+            <span>@Loc["widget.release.checking"]</span>
+        </div>
+    }
+    else if (_errorCode != null)
+    {
+        <div class="home-release-error">
+            <div class="home-release-error-title">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span>@GetErrorMessage(_errorCode)</span>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <details class="home-release-error-details">
+                    <summary>@Loc["widget.release.error_details"]</summary>
+                    <pre>@_errorMessage</pre>
+                </details>
+            }
+            <button type="button" class="su-btn su-btn-secondary su-btn-sm" @onclick="() => CheckAsync(true)" disabled="@_loading">
+                <i class="bi bi-arrow-clockwise"></i> @Loc["widget.release.retry"]
+            </button>
+        </div>
+    }
+    else if (_result is { } release)
+    {
+        <div class="home-release-headline">
+            <span class="home-release-tag">@release.TagName</span>
+            @if (release.IsPrerelease)
+            {
+                <span class="home-release-prerelease">@Loc["widget.release.prerelease"]</span>
+            }
+            <span class="home-release-name">@release.Name</span>
+        </div>
+
+        <div class="home-release-meta">
+            @if (release.PublishedAt is { } publishedAt)
+            {
+                <span class="home-release-date">
+                    <i class="bi bi-calendar3"></i>
+                    @publishedAt.ToLocalTime().ToString("d", CultureInfo.GetCultureInfo(Loc.CurrentCulture))
+                </span>
+            }
+            @if (!string.IsNullOrWhiteSpace(release.HtmlUrl))
+            {
+                <a class="home-release-link" href="@release.HtmlUrl" target="_blank" rel="noopener noreferrer">
+                    @Loc["widget.release.view_release"] <i class="bi bi-box-arrow-up-right"></i>
+                </a>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(release.Body))
+        {
+            <details class="home-release-notes">
+                <summary>@Loc["widget.release.notes"]</summary>
+                <div class="home-release-body">@release.Body</div>
+            </details>
+        }
+        else
+        {
+            <p class="home-release-no-notes">@Loc["widget.release.no_notes"]</p>
+        }
+
+        @if (_lastCheckedLocal != null)
+        {
+            <p class="home-release-checked">@Loc.Format("widget.release.last_checked", _lastCheckedLocal.Value.ToString("g", CultureInfo.GetCultureInfo(Loc.CurrentCulture)))</p>
+        }
+    }
+</article>
+
+@code {
+    private readonly CancellationTokenSource _cts = new();
+    private readonly string _currentVersion = GetCurrentVersion();
+
+    private GitHubReleaseInfo? _result;
+    private string? _errorCode;
+    private string? _errorMessage;
+    private DateTime? _lastCheckedLocal;
+    private bool _loading;
+
+    [Parameter]
+    public HomeWidgetContext Context { get; set; } = default!;
+
+    protected override Task OnInitializedAsync() => CheckAsync(false);
+
+    private async Task CheckAsync(bool forceRefresh)
+    {
+        if (_loading)
+            return;
+
+        _loading = true;
+        _errorCode = null;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await Releases.GetLatestReleaseAsync(forceRefresh, _cts.Token);
+            _result = result.Release;
+            _errorCode = result.ErrorCode;
+            _errorMessage = result.ErrorMessage;
+            _lastCheckedLocal = result.CheckedAtUtc.ToLocalTime();
+        }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+            // 页面已销毁：主动取消不是一次失败检查。
+            return;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "[GitHubReleaseWidget] Unexpected error while checking the latest release.");
+            _result = null;
+            _errorCode = GitHubReleaseErrorCodes.Unexpected;
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string GetErrorMessage(string code) => code switch
+    {
+        GitHubReleaseErrorCodes.NotFound => Loc["widget.release.error.not_found"],
+        GitHubReleaseErrorCodes.RateLimited => Loc["widget.release.error.rate_limited"],
+        GitHubReleaseErrorCodes.Network => Loc["widget.release.error.network"],
+        GitHubReleaseErrorCodes.HttpError => Loc["widget.release.error.http"],
+        GitHubReleaseErrorCodes.Timeout => Loc["widget.release.error.timeout"],
+        GitHubReleaseErrorCodes.InvalidResponse => Loc["widget.release.error.invalid_response"],
+        GitHubReleaseErrorCodes.Configuration => Loc["widget.release.error.configuration"],
+        _ => Loc["widget.release.error.unexpected"]
+    };
+
+    private static string GetCurrentVersion()
+        => Assembly.GetEntryAssembly()
+            ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion
+            ?? "—";
+
+    public ValueTask DisposeAsync()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

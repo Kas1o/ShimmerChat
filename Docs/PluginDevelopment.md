@@ -634,6 +634,41 @@ if (PanelContext is LiveAgentPanelContext live)
 - 消息的 Markdown→HTML 渲染仍走 `IMessageDisplayService`（可注入），与渲染修改管线保持独立。
 - 复用 `ChatViewShell` 时，消息正文（`.chat-msg-body`）内的图片会等比缩放到气泡宽度以内，超宽表格与行间公式在各自容器里横向滚动；渲染管线产出的任意 HTML 都不会撑破气泡。
 
+### 首页 Widget（IHomeWidget）
+
+首页是可自定义的 Widget 工作台。实现 `IHomeWidget` 的组件会在插件加载时被自动发现，
+可以由用户在首页的「添加 Widget」面板中加入、排序或移除；布局按 Widget 实例持久化，
+因此同一个 Widget 可以出现多次（`AllowMultiple = true`）。
+
+```razor
+@attribute [HomeWidget(
+    "my.plugin.widget",
+    "widget.my.name",
+    DescriptionKey = "widget.my.desc",
+    Icon = "bi-stars",
+    Order = 100)]
+@implements IHomeWidget
+
+<article>
+    @Loc["widget.my.body"]
+</article>
+
+@code {
+    [Parameter] public HomeWidgetContext Context { get; set; } = default!;
+}
+```
+
+注意：
+
+- 组件必须声明 `[Parameter] HomeWidgetContext Context`，且不要声明其它 `[Parameter]`——宿主只传这一个。
+- `Id` 是布局持久化标识，已发布的 Widget 不要修改它。
+- `IsDefault = true` 的 Widget 会在首次运行（尚无布局数据）时自动出现；用户保存过布局后不会再被强制加回。
+- `NameKey` / `DescriptionKey` 与所有用户可见文本都必须本地化。
+- 通过 `Context.SaveSettingsAsync` 保存实例配置；返回 `false` 时必须显式提示用户。
+- 未知的 Widget Id 不会被静默丢弃：首页显示占位卡并记录错误，用户可移除。
+
+完整设计、布局格式与错误处理约定见 [首页 Widget 系统](HomeWidgets.md)。
+
 ---
 
 ## 8. 本地化

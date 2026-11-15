@@ -1,57 +1,494 @@
 @page "/"
 @using System.Timers
-@using ShimmerChatLib.Models
+@using System.Globalization
+@using ShimmerChatLib.HomeWidget
 @inject IThemeService ThemeService
 @inject ILocService Loc
+@inject IHomeWidgetRegistry WidgetRegistry
+@inject IHomeWidgetLayoutService LayoutService
+@inject ILogger<Home> Logger
 @implements IDisposable
-<div id="bg-region" style="background-image: url('@BackgroundImagePath')">
-	<div id="main-content">
-		<div id="title">
-			@Loc["home.title"]
-		</div>
-		<div id="time">
-			<p>@currentTime</p>
-		</div>
-	</div>
 
+<PageTitle>@Loc["home.title"]</PageTitle>
+
+<div id="bg-region" style="background-image: linear-gradient(180deg, rgba(8, 10, 16, 0.52) 0%, rgba(8, 10, 16, 0.78) 100%), url('@BackgroundImagePath')">
+    <div class="home-dashboard">
+        <header class="home-header">
+            <div class="home-heading">
+                <span class="home-eyebrow">@Loc["home.eyebrow"]</span>
+                <h1>@Loc["home.title"]</h1>
+                <p>@Loc["home.subtitle"]</p>
+            </div>
+
+            <div class="home-header-side">
+                <div class="home-clock">
+                    <span class="home-clock-time">@_currentTime</span>
+                    <span class="home-clock-date">@_currentDate</span>
+                </div>
+                <div class="home-toolbar">
+                    @if (_isCustomizing)
+                    {
+                        <button type="button" class="home-tool-btn home-tool-btn-primary" @onclick="OpenAddPicker">
+                            <i class="bi bi-plus-lg"></i>
+                            <span>@Loc["home.add_widget"]</span>
+                        </button>
+                    }
+                    <button type="button" class="home-tool-btn" @onclick="ToggleCustomize">
+                        <i class="bi @(_isCustomizing ? "bi-check-lg" : "bi-sliders")"></i>
+                        <span>@Loc[_isCustomizing ? "home.customize_done" : "home.customize"]</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        @if (_loadError != null)
+        {
+            <div class="home-banner home-banner-danger" role="alert">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+                <div class="home-banner-copy">
+                    <strong>@Loc["home.widget.load_failed_title"]</strong>
+                    <span>@Loc.Format("home.widget.load_failed", _loadError.ErrorMessage ?? _loadError.ErrorCode ?? string.Empty)</span>
+                </div>
+                <button type="button" class="home-banner-btn" @onclick="RetryLoad">
+                    <i class="bi bi-arrow-clockwise"></i> @Loc["home.widget.retry"]
+                </button>
+                <button type="button" class="home-banner-btn" @onclick="ResetLayout">
+                    <i class="bi bi-stars"></i> @Loc["home.widget.reset"]
+                </button>
+            </div>
+        }
+
+        @if (_saveError != null)
+        {
+            <div class="home-banner home-banner-warning" role="alert">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <div class="home-banner-copy">
+                    <strong>@Loc["home.widget.save_failed_title"]</strong>
+                    <span>@_saveError</span>
+                </div>
+                <button type="button" class="home-banner-btn" @onclick="DismissSaveError">
+                    <i class="bi bi-x-lg"></i> @Loc["home.widget.dismiss"]
+                </button>
+            </div>
+        }
+
+        @if (!_loaded)
+        {
+            <div class="home-widget-grid" aria-busy="true">
+                <div class="home-widget-skeleton shimmer-loading"></div>
+                <div class="home-widget-skeleton shimmer-loading"></div>
+            </div>
+        }
+        else if (_widgets.Count == 0 && _loadError == null)
+        {
+            <div class="home-empty">
+                <div class="home-empty-icon"><i class="bi bi-grid-1x2"></i></div>
+                <h2>@Loc["home.empty_title"]</h2>
+                <p>@Loc["home.empty_desc"]</p>
+                <button type="button" class="home-tool-btn home-tool-btn-primary" @onclick="OpenAddPicker">
+                    <i class="bi bi-plus-lg"></i> @Loc["home.add_widget"]
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="home-widget-grid">
+                @for (var index = 0; index < _widgets.Count; index++)
+                {
+                    var instance = _widgets[index];
+                    var info = WidgetRegistry.GetById(instance.WidgetId);
+                    var isFirst = index == 0;
+                    var isLast = index == _widgets.Count - 1;
+
+                    <section class="home-widget @GetSizeClass(info) @(_isCustomizing ? "is-customizing" : string.Empty)"
+                             @key="instance.InstanceId">
+                        <div class="home-widget-frame">
+                            <header class="home-widget-titlebar">
+                                <div class="home-widget-title">
+                                    <span class="home-widget-icon">
+                                        <i class="bi @(info?.Icon ?? "bi-question-lg")"></i>
+                                    </span>
+                                    <div class="home-widget-heading">
+                                        <h2>@(info != null ? Loc[info.NameKey] : Loc["home.widget.missing_title"])</h2>
+                                        @if (info?.DescriptionKey is { } descriptionKey)
+                                        {
+                                            <p>@Loc[descriptionKey]</p>
+                                        }
+                                        else if (info == null)
+                                        {
+                                            <p>@Loc["home.widget.missing_desc"]</p>
+                                        }
+                                    </div>
+                                </div>
+
+                                @if (_isCustomizing)
+                                {
+                                    <div class="home-widget-controls">
+                                        <button type="button" class="home-widget-control"
+                                                title="@Loc["home.widget.move_up"]" aria-label="@Loc["home.widget.move_up"]"
+                                                disabled="@isFirst" @onclick="() => MoveWidget(instance, -1)">
+                                            <i class="bi bi-arrow-up"></i>
+                                        </button>
+                                        <button type="button" class="home-widget-control"
+                                                title="@Loc["home.widget.move_down"]" aria-label="@Loc["home.widget.move_down"]"
+                                                disabled="@isLast" @onclick="() => MoveWidget(instance, 1)">
+                                            <i class="bi bi-arrow-down"></i>
+                                        </button>
+                                        <button type="button" class="home-widget-control home-widget-control-danger"
+                                                title="@Loc["home.widget.remove"]" aria-label="@Loc["home.widget.remove"]"
+                                                @onclick="() => RemoveWidget(instance)">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+                                }
+                            </header>
+
+                            <div class="home-widget-body">
+                                @if (info == null)
+                                {
+                                    <div class="home-widget-missing">
+                                        <p>@Loc.Format("home.widget.missing_detail", instance.WidgetId)</p>
+                                        <button type="button" class="su-btn su-btn-secondary su-btn-sm" @onclick="() => RemoveWidget(instance)">
+                                            <i class="bi bi-trash3"></i> @Loc["home.widget.remove"]
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <DynamicComponent Type="info.ComponentType" Parameters="GetWidgetParameters(instance)" />
+                                }
+                            </div>
+                        </div>
+                    </section>
+                }
+            </div>
+        }
+    </div>
 </div>
 
+@if (_addPickerOpen)
+{
+    <div class="home-modal-mask" @onclick="CloseAddPicker">
+        <div class="home-modal" role="dialog" aria-modal="true" aria-labelledby="home-add-widget-title"
+             @onclick:stopPropagation="true">
+            <header class="home-modal-header">
+                <div class="home-modal-heading">
+                    <span class="home-modal-icon"><i class="bi bi-grid-1x2"></i></span>
+                    <div>
+                        <h2 id="home-add-widget-title">@Loc["home.add_widget_title"]</h2>
+                        <p>@Loc["home.add_widget_desc"]</p>
+                    </div>
+                </div>
+                <button type="button" class="home-modal-close" aria-label="@Loc["Cancel"]" @onclick="CloseAddPicker">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </header>
+
+            <div class="home-picker-grid">
+                @foreach (var info in WidgetRegistry.GetAll())
+                {
+                    var alreadyAdded = IsAlreadyAdded(info);
+                    <button type="button" class="home-picker-item" disabled="@alreadyAdded" @onclick="() => AddWidget(info)">
+                        <span class="home-picker-icon"><i class="bi @info.Icon"></i></span>
+                        <span class="home-picker-copy">
+                            <strong>@Loc[info.NameKey]</strong>
+                            @if (info.DescriptionKey is { } descriptionKey)
+                            {
+                                <small>@Loc[descriptionKey]</small>
+                            }
+                        </span>
+                        @if (alreadyAdded)
+                        {
+                            <span class="home-picker-added">@Loc["home.widget.already_added"]</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-plus-lg home-picker-add"></i>
+                        }
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
 @code {
-	private string currentTime = DateTime.Now.ToString("T");
-	private Timer? timer;
-	private string BackgroundImagePath => ThemeService.CurrentTheme.IsDarkMode ? "/shimmer-chat-bg.png" : "/shimmer-chat-bg-light-theme.png";
+    private string _currentTime = string.Empty;
+    private string _currentDate = string.Empty;
+    private Timer? _timer;
+    private bool _disposed;
 
-	protected override void OnInitialized()
-	{
-		// 每隔一秒更新一次时间
-		timer = new Timer(1000);
-		timer.Elapsed += UpdateTime!;
-		timer.AutoReset = true;
-		timer.Enabled = true;
-		
-		// 订阅主题变更事件
-		ThemeService.OnThemeChanged += HandleThemeChanged;
-	}
-	
-	private void HandleThemeChanged(Theme _)
-	{
-		// 触发组件重新渲染，更新背景图片
-		InvokeAsync(StateHasChanged);
-	}
+    private bool _loaded;
+    private bool _isCustomizing;
+    private bool _addPickerOpen;
+    private List<HomeWidgetInstance> _widgets = new();
+    private readonly Dictionary<Guid, HomeWidgetContext> _contexts = new();
+    private HomeWidgetLayoutResult? _loadError;
+    private string? _saveError;
 
-	private void UpdateTime(object source, ElapsedEventArgs e)
-	{
-		currentTime = DateTime.Now.ToString("T");
-		InvokeAsync(StateHasChanged); // 请求刷新 UI
-	}
+    private string BackgroundImagePath => ThemeService.CurrentTheme.IsDarkMode
+        ? "/shimmer-chat-bg.png"
+        : "/shimmer-chat-bg-light-theme.png";
 
-	public void Dispose()
-	{
-		// 停止计时器
-		timer?.Stop();
-		timer?.Dispose();
-		
-		// 取消订阅主题变更事件
-		ThemeService.OnThemeChanged -= HandleThemeChanged;
-	}
+    protected override void OnInitialized()
+    {
+        var culture = CultureInfo.GetCultureInfo(Loc.CurrentCulture);
+        _currentTime = DateTime.Now.ToString("T", culture);
+        _currentDate = DateTime.Now.ToString("D", culture);
+
+        _timer = new Timer(1000);
+        _timer.Elapsed += UpdateTime!;
+        _timer.AutoReset = true;
+        _timer.Enabled = true;
+
+        ThemeService.OnThemeChanged += HandleThemeChanged;
+
+        LoadLayout();
+    }
+
+    private void LoadLayout()
+    {
+        _loadError = null;
+        _saveError = null;
+
+        var result = LayoutService.Load();
+        _loaded = true;
+
+        if (!result.Success)
+        {
+            Logger.LogError(
+                "[Home] Failed to load the widget layout: {ErrorCode} {ErrorMessage}",
+                result.ErrorCode, result.ErrorMessage);
+            _widgets = new();
+            _contexts.Clear();
+            _loadError = result;
+            return;
+        }
+
+        _widgets = result.Widgets.ToList();
+        RebuildContexts();
+
+        foreach (var instance in _widgets)
+        {
+            if (WidgetRegistry.GetById(instance.WidgetId) == null)
+            {
+                Logger.LogError(
+                    "[Home] Widget '{WidgetId}' (instance {InstanceId}) is not registered; " +
+                    "the dashboard shows a removal placeholder instead of a silent fallback.",
+                    instance.WidgetId, instance.InstanceId);
+            }
+        }
+    }
+
+    private void RetryLoad() => LoadLayout();
+
+    private void ResetLayout()
+    {
+        var defaults = LayoutService.CreateDefaultLayout();
+        var previous = _widgets;
+        _widgets = defaults.ToList();
+
+        var save = LayoutService.Save(_widgets);
+        if (!save.Success)
+        {
+            _widgets = previous;
+            _saveError = Loc.Format(
+                "home.widget.save_failed",
+                save.ErrorMessage ?? save.ErrorCode ?? string.Empty);
+            Logger.LogError(
+                "[Home] Failed to persist the default widget layout: {ErrorCode} {ErrorMessage}",
+                save.ErrorCode, save.ErrorMessage);
+            return;
+        }
+
+        _loadError = null;
+        RebuildContexts();
+    }
+
+    private void DismissSaveError() => _saveError = null;
+
+    private void RebuildContexts()
+    {
+        _contexts.Clear();
+        foreach (var instance in _widgets)
+            _contexts[instance.InstanceId] = CreateContext(instance);
+    }
+
+    private HomeWidgetContext CreateContext(HomeWidgetInstance instance) => new()
+    {
+        Instance = instance,
+        SaveSettingsAsync = settings => SaveWidgetSettingsAsync(instance, settings),
+        RequestRefreshAsync = () => InvokeAsync(StateHasChanged)
+    };
+
+    private Dictionary<string, object> GetWidgetParameters(HomeWidgetInstance instance)
+    {
+        if (!_contexts.TryGetValue(instance.InstanceId, out var context))
+        {
+            context = CreateContext(instance);
+            _contexts[instance.InstanceId] = context;
+        }
+
+        return new Dictionary<string, object>
+        {
+            ["Context"] = context
+        };
+    }
+
+    private async Task<bool> SaveWidgetSettingsAsync(
+        HomeWidgetInstance instance,
+        IReadOnlyDictionary<string, string> settings)
+    {
+        var previous = instance.Settings;
+        instance.Settings = settings.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.OrdinalIgnoreCase);
+
+        var save = LayoutService.Save(_widgets);
+        if (!save.Success)
+        {
+            instance.Settings = previous;
+            _saveError = Loc.Format(
+                "home.widget.save_failed",
+                save.ErrorMessage ?? save.ErrorCode ?? string.Empty);
+            Logger.LogError(
+                "[Home] Failed to persist settings for widget {WidgetId} ({InstanceId}): {ErrorCode} {ErrorMessage}",
+                instance.WidgetId, instance.InstanceId, save.ErrorCode, save.ErrorMessage);
+            await InvokeAsync(StateHasChanged);
+            return false;
+        }
+
+        _saveError = null;
+        // 成功写入即意味着当前内存布局已成为新的持久化事实，
+        // 之前“读取失败”的提示不再成立。
+        _loadError = null;
+        await InvokeAsync(StateHasChanged);
+        return true;
+    }
+
+    private void ToggleCustomize()
+    {
+        _isCustomizing = !_isCustomizing;
+        if (!_isCustomizing)
+            _addPickerOpen = false;
+    }
+
+    private void OpenAddPicker() => _addPickerOpen = true;
+
+    private void CloseAddPicker() => _addPickerOpen = false;
+
+    private bool IsAlreadyAdded(HomeWidgetInfo info)
+        => !info.AllowMultiple && _widgets.Any(widget => string.Equals(widget.WidgetId, info.Id, StringComparison.Ordinal));
+
+    private void AddWidget(HomeWidgetInfo info)
+    {
+        if (IsAlreadyAdded(info))
+            return;
+
+        var instance = new HomeWidgetInstance
+        {
+            InstanceId = Guid.NewGuid(),
+            WidgetId = info.Id
+        };
+        _widgets.Add(instance);
+
+        var save = LayoutService.Save(_widgets);
+        if (!save.Success)
+        {
+            _widgets.Remove(instance);
+            _saveError = Loc.Format(
+                "home.widget.save_failed",
+                save.ErrorMessage ?? save.ErrorCode ?? string.Empty);
+            Logger.LogError(
+                "[Home] Failed to add widget {WidgetId}: {ErrorCode} {ErrorMessage}",
+                info.Id, save.ErrorCode, save.ErrorMessage);
+            return;
+        }
+
+        _saveError = null;
+        _loadError = null;
+        _contexts[instance.InstanceId] = CreateContext(instance);
+        _addPickerOpen = false;
+    }
+
+    private void RemoveWidget(HomeWidgetInstance instance)
+    {
+        var index = _widgets.FindIndex(widget => widget.InstanceId == instance.InstanceId);
+        if (index < 0)
+            return;
+
+        var removed = _widgets[index];
+        _widgets.RemoveAt(index);
+
+        var save = LayoutService.Save(_widgets);
+        if (!save.Success)
+        {
+            _widgets.Insert(index, removed);
+            _saveError = Loc.Format(
+                "home.widget.save_failed",
+                save.ErrorMessage ?? save.ErrorCode ?? string.Empty);
+            Logger.LogError(
+                "[Home] Failed to remove widget {WidgetId} ({InstanceId}): {ErrorCode} {ErrorMessage}",
+                instance.WidgetId, instance.InstanceId, save.ErrorCode, save.ErrorMessage);
+            return;
+        }
+
+        _saveError = null;
+        _loadError = null;
+        _contexts.Remove(instance.InstanceId);
+    }
+
+    private void MoveWidget(HomeWidgetInstance instance, int offset)
+    {
+        var index = _widgets.FindIndex(widget => widget.InstanceId == instance.InstanceId);
+        var target = index + offset;
+        if (index < 0 || target < 0 || target >= _widgets.Count)
+            return;
+
+        (_widgets[index], _widgets[target]) = (_widgets[target], _widgets[index]);
+
+        var save = LayoutService.Save(_widgets);
+        if (!save.Success)
+        {
+            (_widgets[index], _widgets[target]) = (_widgets[target], _widgets[index]);
+            _saveError = Loc.Format(
+                "home.widget.save_failed",
+                save.ErrorMessage ?? save.ErrorCode ?? string.Empty);
+            Logger.LogError(
+                "[Home] Failed to reorder widget {WidgetId} ({InstanceId}): {ErrorCode} {ErrorMessage}",
+                instance.WidgetId, instance.InstanceId, save.ErrorCode, save.ErrorMessage);
+            return;
+        }
+
+        _saveError = null;
+        _loadError = null;
+    }
+
+    private static string GetSizeClass(HomeWidgetInfo? info)
+        => info?.Size == HomeWidgetSize.Wide ? "home-widget-wide" : string.Empty;
+
+    private void HandleThemeChanged(ShimmerChatLib.Models.Theme _)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateTime(object source, ElapsedEventArgs e)
+    {
+        if (_disposed)
+            return;
+
+        var culture = CultureInfo.GetCultureInfo(Loc.CurrentCulture);
+        _currentTime = DateTime.Now.ToString("T", culture);
+        _currentDate = DateTime.Now.ToString("D", culture);
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _timer?.Stop();
+        _timer?.Dispose();
+        ThemeService.OnThemeChanged -= HandleThemeChanged;
+    }
 }

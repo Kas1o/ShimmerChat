@@ -1,0 +1,117 @@
+.home-tutorial {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    color: var(--su-text-0);
+}
+
+.home-tutorial-wip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--su-warning-soft);
+    color: var(--su-warning);
+    font-size: var(--su-font-sm);
+    line-height: 1.45;
+}
+
+.home-tutorial-wip-badge {
+    flex: none;
+    padding: 1px 6px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.home-tutorial-intro {
+    margin: 0;
+    color: var(--su-text-1);
+    font-size: var(--su-font-md);
+    line-height: 1.65;
+}
+
+.home-tutorial-steps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.home-tutorial-steps > li {
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--su-surface-3) 72%, transparent);
+    border: 1px solid color-mix(in srgb, var(--su-border-0) 68%, transparent);
+}
+
+.home-tutorial-step-index {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--su-accent);
+    color: #fff;
+    font-size: var(--su-font-sm);
+    font-weight: 700;
+}
+
+.home-tutorial-step-body {
+    min-width: 0;
+}
+
+.home-tutorial-step-body h3 {
+    margin: 0 0 4px;
+    font-size: var(--su-font-md);
+    font-weight: 600;
+}
+
+.home-tutorial-step-body p {
+    margin: 0 0 8px;
+    color: var(--su-text-1);
+    font-size: var(--su-font-sm);
+    line-height: 1.55;
+}
+
+.home-tutorial-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--su-accent);
+    font-size: var(--su-font-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.home-tutorial-link:hover {
+    color: var(--su-accent-hover);
+    text-decoration: underline;
+}
+
+.home-tutorial-footer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: var(--su-text-2);
+    font-size: var(--su-font-sm);
+}
+
+@media (max-width: 760px) {
+    .home-tutorial-steps {
+        grid-template-columns: 1fr;
+    }
+}

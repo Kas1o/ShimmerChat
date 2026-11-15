@@ -19,6 +19,7 @@
 @inject IGenerationEventStore EventStore
 @inject IGenerationProviderRegistry ProviderRegistry
 @inject IChatViewRegistry ChatViewRegistry
+@inject IChatCreationService ChatCreationService
 @inject GenerationProviderHostService ProviderHost
 @inject ILogger<AgentPage> logger
 @inject IPanelDraftStore PanelDrafts
@@ -1226,61 +1227,32 @@
             return;
         }
 
-        var swCreate = Stopwatch.StartNew();
-        var chat = new Chat
+        var result = await ChatCreationService.CreateChatAsync(agent.Guid);
+        if (!result.Success)
         {
-            Guid = Guid.NewGuid(),
-            Name = $"{DateTime.Now.ToString().Replace(" ","-").Replace("/","-").Replace(":","-")}",
-            CreateTime = DateTime.Now,
-            LastModifyTime = DateTime.Now
-        };
-        swCreate.Stop();
-        PerfLog($"NewChat create model done: elapsedMs={swCreate.ElapsedMilliseconds}");
-
-        var swGreeting = Stopwatch.StartNew();
-        if (!string.IsNullOrEmpty(agent.Greeting) || (agent.AlternativeGreetings != null && agent.AlternativeGreetings.Count > 0))
-        {
-            var welcomeMessage = new Message
-            {
-                sender = Sender.AI,
-                timestamp = DateTime.Now,
-                message = new SharperLLM.Util.ChatMessage
-                {
-                    Content = agent.Greeting ?? ""
-                }
-            };
-
-            // 如果有替代问候语，将它们添加为版本
-            if (agent.AlternativeGreetings != null)
-            {
-                foreach (var altGreeting in agent.AlternativeGreetings)
-                {
-                    if (!string.IsNullOrEmpty(altGreeting) && altGreeting != agent.Greeting)
-                    {
-                        var altMessage = new SharperLLM.Util.ChatMessage
-                        {
-                            Content = altGreeting
-                        };
-                        welcomeMessage.AddVersion(altMessage);
-                    }
-                }
-            }
-            welcomeMessage.CurrentVersionIndex = 0;
-
-            chat.AddMessage(welcomeMessage);
-            chat.SaveMessage(messageStore, welcomeMessage);
+            logger.LogError(
+                "[AgentPage] Failed to create a chat for agent {AgentGuid}: {ErrorCode} {ErrorMessage}",
+                agent.Guid, result.ErrorCode, result.ErrorMessage);
+            await PopupService.ShowAsync(Loc.Format(
+                "agent.new_chat_failed",
+                result.ErrorMessage ?? result.ErrorCode ?? ""));
+            swTotal.Stop();
+            PerfLog($"NewChat failed: errorCode={result.ErrorCode}, elapsedMs={swTotal.ElapsedMilliseconds}");
+            return;
         }
-        swGreeting.Stop();
-        PerfLog($"NewChat greeting+saveMessage done: elapsedMs={swGreeting.ElapsedMilliseconds}");
 
-        var swSave = Stopwatch.StartNew();
-        // Save the chat first
-        chat.Save(kvDataService);
-        agent.AddChatGuid(chat.Guid);
-        // Save the agent
-        agent.Save(kvDataService);
-        swSave.Stop();
-        PerfLog($"NewChat save chat+agent done: elapsedMs={swSave.ElapsedMilliseconds}");
+        // 服务通过 Agent.Update 写回了 ChatGuids；页面持有的 Agent 是旧快照，
+        // 重新加载后才能让对话列表和后续跳转看到新对话。
+        try
+        {
+            agent = Agent.Load(agent.Guid, kvDataService);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "[AgentPage] Chat {ChatGuid} was created, but the agent list could not be reloaded.",
+                result.ChatGuid);
+        }
 
         // Refresh the Virtualize component to show the new chat
         var swRefresh = Stopwatch.StartNew();
@@ -1289,7 +1261,7 @@
         PerfLog($"NewChat RefreshChatsAsync done: elapsedMs={swRefresh.ElapsedMilliseconds}");
 
         var swNav = Stopwatch.StartNew();
-        OpenChat(chat);
+        navigation.NavigateTo($"/agent/{agent.Guid}/{result.ChatGuid}");
         swNav.Stop();
         PerfLog($"NewChat navigate done: elapsedMs={swNav.ElapsedMilliseconds}");
 

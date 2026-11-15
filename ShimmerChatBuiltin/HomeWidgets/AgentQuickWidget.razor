@@ -1,0 +1,420 @@
+@using System.Globalization
+@using ShimmerChatLib.HomeWidget
+@using ShimmerChatLib.Models
+@attribute [HomeWidget(
+    "agent-quick",
+    "widget.agent.name",
+    DescriptionKey = "widget.agent.desc",
+    Icon = "bi-lightning-charge",
+    Order = 0,
+    AllowMultiple = true,
+    IsDefault = false)]
+@inject IKVDataService KVData
+@inject IChatCreationService ChatCreationService
+@inject NavigationManager Navigation
+@inject ILocService Loc
+@inject ILogger<AgentQuickWidget> Logger
+@implements IHomeWidget
+
+<article class="home-agent">
+    @if (_loadError != null)
+    {
+        <div class="home-agent-alert home-agent-alert-danger">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+            <span>@_loadError</span>
+            <button type="button" class="home-agent-mini-btn" @onclick="Reload">@Loc["widget.agent.retry"]</button>
+        </div>
+    }
+    else if (_agents.Count == 0)
+    {
+        <div class="home-agent-empty">
+            <div class="home-agent-empty-icon"><i class="bi bi-robot"></i></div>
+            <h3>@Loc["widget.agent.empty_title"]</h3>
+            <p>@Loc["widget.agent.empty_desc"]</p>
+            <button type="button" class="su-btn su-btn-primary su-btn-sm" @onclick="OpenAgentSelect">
+                <i class="bi bi-plus-lg"></i> @Loc["widget.agent.create_agent"]
+            </button>
+        </div>
+    }
+    else if (_selectedAgent == null)
+    {
+        <div class="home-agent-choose">
+            <div class="home-agent-choose-heading">
+                <span class="home-agent-choose-icon"><i class="bi bi-person-plus"></i></span>
+                <div>
+                    <h3>@Loc["widget.agent.choose_title"]</h3>
+                    <p>@Loc["widget.agent.choose_desc"]</p>
+                </div>
+            </div>
+
+            @if (_selectionWarning != null)
+            {
+                <div class="home-agent-alert home-agent-alert-warning">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>@_selectionWarning</span>
+                </div>
+            }
+
+            <label class="home-agent-select-label" for="home-agent-select-@Context.Instance.InstanceId">
+                @Loc["widget.agent.choose_label"]
+            </label>
+            <select id="home-agent-select-@Context.Instance.InstanceId"
+                    class="su-select"
+                    value=""
+                    @onchange="OnAgentSelected">
+                <option value="">@Loc["widget.agent.choose_placeholder"]</option>
+                @foreach (var candidate in _agents)
+                {
+                    <option value="@candidate.Guid">@candidate.Name</option>
+                }
+            </select>
+
+            @if (_loadWarning != null)
+            {
+                <p class="home-agent-hint">@_loadWarning</p>
+            }
+
+            @if (_actionError != null)
+            {
+                <div class="home-agent-alert home-agent-alert-danger">
+                    <i class="bi bi-exclamation-circle-fill"></i>
+                    <span>@_actionError</span>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="home-agent-identity">
+            <div class="home-agent-avatar" style="background-color: @GetAvatarColor(_selectedAgent.Name)">
+                @if (_selectedAgent.AvatarGuid != null)
+                {
+                    <img src="/userimages/@(_selectedAgent.AvatarGuid).png" alt="@_selectedAgent.Name" />
+                }
+                else
+                {
+                    <span>@GetAvatarInitial(_selectedAgent.Name)</span>
+                }
+            </div>
+
+            <div class="home-agent-copy">
+                <h3>@_selectedAgent.Name</h3>
+                @if (!string.IsNullOrWhiteSpace(_selectedAgent.UserIntro))
+                {
+                    <p>@_selectedAgent.UserIntro</p>
+                }
+                else
+                {
+                    <p class="home-agent-muted">@Loc["widget.agent.no_intro"]</p>
+                }
+            </div>
+
+            <select class="su-select home-agent-switch"
+                    value="@_selectedAgent.Guid"
+                    title="@Loc["widget.agent.switch_agent"]"
+                    aria-label="@Loc["widget.agent.switch_agent"]"
+                    @onchange="OnAgentSelected">
+                @foreach (var candidate in _agents)
+                {
+                    <option value="@candidate.Guid">@candidate.Name</option>
+                }
+            </select>
+        </div>
+
+        @if (_selectionWarning != null)
+        {
+            <div class="home-agent-alert home-agent-alert-warning">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span>@_selectionWarning</span>
+            </div>
+        }
+
+        <div class="home-agent-meta">
+            <span><i class="bi bi-chat-dots"></i> @Loc.Format("widget.agent.chat_count", GetChatCount(_selectedAgent))</span>
+            @if (_latestChat != null)
+            {
+                <span class="home-agent-meta-time">
+                    <i class="bi bi-clock-history"></i>
+                    @FormatTime(_latestChat.LastModifyTime)
+                </span>
+            }
+        </div>
+
+        @if (_latestChat != null)
+        {
+            <div class="home-agent-latest">
+                <div class="home-agent-latest-label">
+                    <i class="bi bi-arrow-counterclockwise"></i> @Loc["widget.agent.latest_chat"]
+                </div>
+                <div class="home-agent-latest-name">@_latestChat.Name</div>
+                @if (!string.IsNullOrWhiteSpace(_latestChat.LastMessagePreview))
+                {
+                    <p class="home-agent-latest-preview">@_latestChat.LastMessagePreview</p>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="home-agent-latest home-agent-latest-empty">
+                <i class="bi bi-chat-square"></i>
+                <span>@Loc["widget.agent.no_chats"]</span>
+            </div>
+        }
+
+        <div class="home-agent-actions">
+            <button type="button" class="su-btn su-btn-primary" @onclick="CreateChatAsync" disabled="@_busy">
+                @if (_busy)
+                {
+                    <span class="home-agent-spinner" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <i class="bi bi-plus-lg"></i>
+                }
+                @Loc["widget.agent.new_chat"]
+            </button>
+            <button type="button" class="su-btn su-btn-secondary" @onclick="ContinueLatestChat"
+                    disabled="@(_busy || _latestChatGuid == null)">
+                <i class="bi bi-box-arrow-in-right"></i>
+                @Loc["widget.agent.continue_chat"]
+            </button>
+        </div>
+
+        @if (_actionError != null)
+        {
+            <div class="home-agent-alert home-agent-alert-danger">
+                <i class="bi bi-exclamation-circle-fill"></i>
+                <span>@_actionError</span>
+            </div>
+        }
+    }
+</article>
+
+@code {
+    private const string AgentSettingKey = "agentGuid";
+
+    private List<Agent> _agents = new();
+    private Agent? _selectedAgent;
+    private ChatSummary? _latestChat;
+    private Guid? _latestChatGuid;
+    private bool _busy;
+    private string? _loadError;
+    private string? _loadWarning;
+    private string? _selectionWarning;
+    private string? _actionError;
+
+    [Parameter]
+    public HomeWidgetContext Context { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        LoadAgents();
+    }
+
+    private void Reload()
+    {
+        _loadError = null;
+        _loadWarning = null;
+        _selectionWarning = null;
+        _actionError = null;
+        LoadAgents();
+    }
+
+    private void LoadAgents()
+    {
+        List<Guid> agentGuids;
+        try
+        {
+            agentGuids = Agent.GetAllAgentGuids(KVData);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "[AgentQuickWidget] Failed to read the agent index.");
+            _loadError = Loc.Format("widget.agent.load_failed", ex.Message);
+            return;
+        }
+
+        var loaded = new List<Agent>(agentGuids.Count);
+        var failed = 0;
+        foreach (var guid in agentGuids)
+        {
+            try
+            {
+                loaded.Add(Agent.Load(guid, KVData));
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                Logger.LogWarning(ex, "[AgentQuickWidget] Failed to load agent {AgentGuid}.", guid);
+            }
+        }
+
+        _agents = loaded;
+        _loadWarning = failed > 0
+            ? Loc.Format("widget.agent.partial_load", failed)
+            : null;
+
+        var configured = ReadConfiguredAgentGuid();
+        if (configured == null)
+        {
+            _selectedAgent = null;
+            _latestChat = null;
+            _latestChatGuid = null;
+            return;
+        }
+
+        _selectedAgent = _agents.FirstOrDefault(a => a.Guid == configured.Value);
+        if (_selectedAgent == null)
+        {
+            Logger.LogError(
+                "[AgentQuickWidget] Configured agent {AgentGuid} no longer exists; the widget asks for a new selection.",
+                configured.Value);
+            _selectionWarning = Loc["widget.agent.agent_missing"];
+            _latestChat = null;
+            _latestChatGuid = null;
+            return;
+        }
+
+        LoadLatestChat();
+    }
+
+    private Guid? ReadConfiguredAgentGuid()
+    {
+        if (!Context.Instance.Settings.TryGetValue(AgentSettingKey, out var raw) || string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        if (!Guid.TryParse(raw, out var guid) || guid == Guid.Empty)
+        {
+            Logger.LogError(
+                "[AgentQuickWidget] Invalid agent guid '{RawValue}' in widget settings.",
+                raw);
+            _selectionWarning = Loc["widget.agent.invalid_setting"];
+            return null;
+        }
+
+        return guid;
+    }
+
+    private void LoadLatestChat()
+    {
+        _latestChat = null;
+        _latestChatGuid = null;
+
+        if (_selectedAgent?.ChatGuids is not { Count: > 0 } chatGuids)
+            return;
+
+        var chatGuid = chatGuids[0];
+        try
+        {
+            _latestChat = _selectedAgent.GetChatSummary(chatGuid, KVData);
+            _latestChatGuid = chatGuid;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex,
+                "[AgentQuickWidget] Failed to load the latest chat {ChatGuid} of agent {AgentGuid}.",
+                chatGuid, _selectedAgent.Guid);
+            _actionError = Loc.Format("widget.agent.latest_load_failed", ex.Message);
+        }
+    }
+
+    private async Task OnAgentSelected(ChangeEventArgs e)
+    {
+        _actionError = null;
+
+        var raw = e.Value?.ToString();
+        if (!Guid.TryParse(raw, out var guid) || guid == Guid.Empty)
+        {
+            _actionError = Loc["widget.agent.invalid_selection"];
+            return;
+        }
+
+        var settings = new Dictionary<string, string>(Context.Instance.Settings, StringComparer.OrdinalIgnoreCase)
+        {
+            [AgentSettingKey] = guid.ToString()
+        };
+
+        var saved = await Context.SaveSettingsAsync(settings);
+        if (!saved)
+        {
+            _actionError = Loc["widget.agent.save_failed"];
+            return;
+        }
+
+        _selectedAgent = _agents.FirstOrDefault(a => a.Guid == guid);
+        _selectionWarning = null;
+        LoadLatestChat();
+    }
+
+    private async Task CreateChatAsync()
+    {
+        if (_selectedAgent == null || _busy)
+            return;
+
+        _busy = true;
+        _actionError = null;
+        var agentGuid = _selectedAgent.Guid;
+
+        try
+        {
+            var result = await ChatCreationService.CreateChatAsync(agentGuid);
+            if (!result.Success)
+            {
+                Logger.LogError(
+                    "[AgentQuickWidget] Failed to create a chat for agent {AgentGuid}: {ErrorCode} {ErrorMessage}",
+                    agentGuid, result.ErrorCode, result.ErrorMessage);
+                _actionError = Loc.Format(
+                    "widget.agent.create_failed",
+                    result.ErrorMessage ?? result.ErrorCode ?? string.Empty);
+                return;
+            }
+
+            Navigation.NavigateTo($"/agent/{agentGuid}/{result.ChatGuid}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "[AgentQuickWidget] Unexpected error while creating a chat.");
+            _actionError = Loc.Format("widget.agent.create_failed", ex.Message);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void ContinueLatestChat()
+    {
+        if (_selectedAgent == null || _latestChatGuid is not Guid chatGuid)
+            return;
+
+        Navigation.NavigateTo($"/agent/{_selectedAgent.Guid}/{chatGuid}");
+    }
+
+    private void OpenAgentSelect() => Navigation.NavigateTo("agentselect");
+
+    private static int GetChatCount(Agent agent) => agent.ChatGuids?.Count ?? 0;
+
+    private string FormatTime(DateTime value)
+        => value.ToLocalTime().ToString("g", CultureInfo.GetCultureInfo(Loc.CurrentCulture));
+
+    private static string GetAvatarInitial(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "?";
+        return char.ToUpper(name.TrimStart()[0]).ToString();
+    }
+
+    private static readonly string[] AvatarColors =
+    [
+        "#5e6ad2", "#e74c3c", "#2ecc71", "#f39c12", "#1abc9c",
+        "#3498db", "#9b59b6", "#e67e22", "#27ae60", "#c0392b",
+    ];
+
+    private static string GetAvatarColor(string? name)
+    {
+        var hash = 0;
+        foreach (var c in string.IsNullOrEmpty(name) ? "?" : name)
+            hash = ((hash << 5) + hash) ^ c;
+        return AvatarColors[(hash & 0x7FFFFFFF) % AvatarColors.Length];
+    }
+}

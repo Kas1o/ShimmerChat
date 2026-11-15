@@ -1,0 +1,81 @@
+@using ShimmerChatLib.HomeWidget
+@attribute [HomeWidget(
+    "getting-started",
+    "widget.getting_started.name",
+    DescriptionKey = "widget.getting_started.desc",
+    Icon = "bi-rocket-takeoff",
+    Order = 10,
+    Size = HomeWidgetSize.Wide,
+    AllowMultiple = false,
+    IsDefault = true)]
+@inject ILocService Loc
+@inject NavigationManager Navigation
+@implements IHomeWidget
+
+<article class="home-tutorial">
+    <div class="home-tutorial-wip">
+        <span class="home-tutorial-wip-badge">WIP</span>
+        <span>@Loc["widget.getting_started.wip_note"]</span>
+    </div>
+
+    <p class="home-tutorial-intro">@Loc["widget.getting_started.intro"]</p>
+
+    <ol class="home-tutorial-steps">
+        <li>
+            <span class="home-tutorial-step-index">1</span>
+            <div class="home-tutorial-step-body">
+                <h3>@Loc["widget.getting_started.step1_title"]</h3>
+                <p>@Loc["widget.getting_started.step1_desc"]</p>
+                <button type="button" class="home-tutorial-link" @onclick="OpenAgentSelect">
+                    @Loc["widget.getting_started.step1_action"] <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </li>
+        <li>
+            <span class="home-tutorial-step-index">2</span>
+            <div class="home-tutorial-step-body">
+                <h3>@Loc["widget.getting_started.step2_title"]</h3>
+                <p>@Loc["widget.getting_started.step2_desc"]</p>
+                <button type="button" class="home-tutorial-link" @onclick="OpenGenerationManager">
+                    @Loc["widget.getting_started.step2_action"] <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </li>
+        <li>
+            <span class="home-tutorial-step-index">3</span>
+            <div class="home-tutorial-step-body">
+                <h3>@Loc["widget.getting_started.step3_title"]</h3>
+                <p>@Loc["widget.getting_started.step3_desc"]</p>
+                <button type="button" class="home-tutorial-link" @onclick="OpenMiscSettings">
+                    @Loc["widget.getting_started.step3_action"] <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </li>
+        <li>
+            <span class="home-tutorial-step-index">4</span>
+            <div class="home-tutorial-step-body">
+                <h3>@Loc["widget.getting_started.step4_title"]</h3>
+                <p>@Loc["widget.getting_started.step4_desc"]</p>
+                <button type="button" class="home-tutorial-link" @onclick="OpenAgentSelect">
+                    @Loc["widget.getting_started.step4_action"] <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </li>
+    </ol>
+
+    <p class="home-tutorial-footer">
+        <i class="bi bi-info-circle"></i>
+        @Loc["widget.getting_started.footer_hint"]
+    </p>
+</article>
+
+@code {
+    [Parameter]
+    public HomeWidgetContext Context { get; set; } = default!;
+
+    private void OpenAgentSelect() => Navigation.NavigateTo("agentselect");
+
+    private void OpenGenerationManager() => Navigation.NavigateTo("generationmanager");
+
+    private void OpenMiscSettings() => Navigation.NavigateTo("misc");
+}

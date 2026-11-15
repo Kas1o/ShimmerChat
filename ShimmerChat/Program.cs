@@ -3,6 +3,7 @@ using ShimmerChat.Singletons;
 using ShimmerChat.Singletons.VectorStore;
 using ShimmerChatLib.ChatView;
 using ShimmerChatLib.Generation;
+using ShimmerChatLib.HomeWidget;
 using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
@@ -66,6 +67,11 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<GenerationProvider
 
 builder.Services.AddSingleton<IAgentMigrationService, AgentMigrationService>();
 builder.Services.AddSingleton<IChatViewRegistry, ChatViewRegistry>();
+builder.Services.AddSingleton<IHomeWidgetRegistry, HomeWidgetRegistry>();
+builder.Services.AddSingleton<IHomeWidgetLayoutService, HomeWidgetLayoutService>();
+builder.Services.AddSingleton<IChatCreationService, ChatCreationService>();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<IGitHubReleaseService, GitHubReleaseService>();
 builder.Services.AddSingleton<IToolInteractionService, ToolInteractionService>();
 builder.Services.AddSingleton<ShimmerChatLib.ChatView.ToolUi.IToolUiViewRegistry,
     ShimmerChatLib.ChatView.ToolUi.ToolUiViewRegistry>();
