@@ -28,7 +28,7 @@
 			var block = Unit.Blocks[i];
 			if (block is ChatToolActivityBlock activity)
 			{
-				<ChatActivityView Context="Context" Block="activity" />
+				<ChatActivityView Context="Context" Block="activity" IsActiveTurn="IsActive" />
 			}
 			else if (block is ChatTextBlock text)
 			{
@@ -48,6 +48,12 @@
 	[Parameter, EditorRequired] public ChatViewContext Context { get; set; } = default!;
 
 	[Parameter, EditorRequired] public ChatDisplayUnit Unit { get; set; } = default!;
+
+	/// <summary>
+	/// 该回合是否仍在生成 / 后处理 / 等待用户回答。
+	/// 工具执行期间单条消息可能已结束生成，但回合仍然是活跃的。
+	/// </summary>
+	[Parameter] public bool IsActive { get; set; }
 
 	private int AssistantCount => Unit.Messages.Count(m => m.sender == Sender.AI);
 

@@ -5,10 +5,16 @@
 	工具调用活动块：把回合内的工具调用交互合并成一块可折叠内容。
 	无论一次还是多次调用（包括周围没有其它调用的单独调用）都归入这里，
 	使界面保持「正文 + 一行工具活动」的整洁形态；展开后仍是完整的思考、参数与返回内容。
+
+	折叠状态由组件持有，而不是交给 <details> 自由维护：
+	展开必须跟随「整个回合是否仍在进行」，不能只看单条消息的生成状态。
+	工具执行 / 后处理 / 等待用户回答时，当前这条 AI 消息已经结束生成，
+	但回合仍在交互中，活动块必须保持展开；否则每轮工具调用结束都会把它收起来。
+	用户手动开合后以用户的选择为准，重渲染不得改回去。
 *@
 
-<details class="chat-activity" open="@Block.IsOpen">
-	<summary class="chat-activity-summary">
+<details class="chat-activity" open="@_open">
+	<summary class="chat-activity-summary" @onclick="Toggle" @onclick:preventDefault>
 		<span class="chat-activity-title">🔧 @Loc["chatview.agg.tool_activity"]</span>
 		<span class="chat-activity-meta">@Loc.Format("chatview.agg.tool_activity_meta", Block.Interactions.Count, Block.ToolCount)</span>
 	</summary>
@@ -24,4 +30,27 @@
 	[Parameter, EditorRequired] public ChatViewContext Context { get; set; } = default!;
 
 	[Parameter, EditorRequired] public ChatToolActivityBlock Block { get; set; } = default!;
+
+	/// <summary>
+	/// 该活动块所属回合是否仍在生成 / 后处理 / 等待用户回答。
+	/// 只有当前回合为 true；历史回合保持 false。
+	/// </summary>
+	[Parameter] public bool IsActiveTurn { get; set; }
+
+	private bool _open;
+	private bool _userToggled;
+
+	protected override void OnParametersSet()
+	{
+		// 回合进行中默认展开（不只看 Block.IsOpen：单条消息在工具执行期间已结束生成），
+		// 回合结束后回到默认折叠。用户手动开合后不再自动覆盖。
+		if (!_userToggled)
+			_open = Block.IsOpen || IsActiveTurn;
+	}
+
+	private void Toggle()
+	{
+		_userToggled = true;
+		_open = !_open;
+	}
 }

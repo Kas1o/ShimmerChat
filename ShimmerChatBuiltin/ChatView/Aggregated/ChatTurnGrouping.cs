@@ -41,6 +41,12 @@ public sealed record ChatTextBlock(Message Assistant) : ChatTurnBlock;
 /// 因此界面始终是「正文 + 一行可折叠的工具活动」。默认折叠；
 /// 其中仍有交互在生成时默认展开，避免把实时进度藏起来。
 /// </para>
+/// <para>
+/// 注意：<see cref="IsOpen"/> 只描述「这条消息本身是否仍在生成」。
+/// 工具执行、后处理与等待用户回答期间消息已经结束生成，但回合仍在交互中，
+/// 因此界面还要叠加「回合是否活跃」（见 ChatActivityView.IsActiveTurn），
+/// 否则活动块会在每轮工具调用结束时被收起。
+/// </para>
 /// </summary>
 public sealed record ChatToolActivityBlock : ChatTurnBlock
 {
@@ -49,7 +55,7 @@ public sealed record ChatToolActivityBlock : ChatTurnBlock
 	/// <summary>该活动块的工具调用总次数。</summary>
 	public int ToolCount => Interactions.Sum(i => i.ToolCount);
 
-	/// <summary>是否默认展开。</summary>
+	/// <summary>当前是否有交互仍在生成（仅消息级状态，不代表整个回合已结束）。</summary>
 	public bool IsOpen => Interactions.Any(i => i.IsGenerating);
 }
 

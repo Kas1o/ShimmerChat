@@ -80,11 +80,18 @@
 </style>
 
 <ChatViewShell ViewContext="Context" RootClass="chatview-aggregated">
-	@foreach (var unit in ChatTurnGrouping.Build(Context.Messages))
+	@{
+		var units = ChatTurnGrouping.Build(Context.Messages);
+		// 只有最后一个显示单元可能属于正在进行中的回合：生成一开始最后一个单元还可能是用户消息，
+		// 此时不存在活跃回合，前面的历史回合保持默认折叠。
+		var activeIndex = Context.IsGenerating() ? units.Count - 1 : -1;
+	}
+	@for (int i = 0; i < units.Count; i++)
 	{
+		var unit = units[i];
 		if (unit.IsTurn)
 		{
-			<ChatTurnView Context="Context" Unit="unit" />
+			<ChatTurnView Context="Context" Unit="unit" IsActive="i == activeIndex" />
 		}
 		else
 		{

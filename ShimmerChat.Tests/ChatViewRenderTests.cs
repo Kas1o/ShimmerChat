@@ -66,11 +66,11 @@ public class ChatViewRenderTests
         return chat;
     }
 
-    private static ChatViewContext BuildContext(Chat chat) => new()
+    private static ChatViewContext BuildContext(Chat chat, bool isGenerating = false) => new()
     {
         Chat = chat,
         Agent = Agent.Create("TestAgent", "intro"),
-        IsGenerating = () => false,
+        IsGenerating = () => isGenerating,
         GenerationPhase = () => null,
         SendAsync = _ => Task.CompletedTask,
         SendWithImagesAsync = (_, _) => Task.CompletedTask,
@@ -192,6 +192,37 @@ public class ChatViewRenderTests
 
         // 回合的收尾步骤必须仍可重新生成（合并气泡不能吞掉这个操作）
         CountOccurrences(html, "BUTTON_REGENERATE").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AggregatedChatView_KeepsActivityOpenWhileTheTurnIsActive()
+    {
+        // 工具执行 / 后处理 / 等待用户回答期间，单条消息已经结束生成（全部为 Completed），
+        // 但整个回合仍在进行；活动块必须保持展开，否则每轮工具调用结束都会把它收起来。
+        var html = await RenderAsync<AggregatedChatView>(
+            BuildContext(BuildToolLoopChat(), isGenerating: true));
+
+        CountOccurrences(html, "<details class=\"chat-activity\" open>").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AggregatedChatView_OnlyTheActiveTurnKeepsItsActivityOpen()
+    {
+        // 两个已完成的历史回合：生成中的只有最后一个回合，前面的历史回合仍默认折叠。
+        var chat = BuildChat(
+            UserMessage("first"),
+            AssistantMessage("", ("c1", "read_file")),
+            ToolResultMessage("body one", "c1"),
+            AssistantMessage("answer one"),
+            UserMessage("second"),
+            AssistantMessage("", ("c2", "grep")),
+            ToolResultMessage("body two", "c2"),
+            AssistantMessage("answer two"));
+
+        var html = await RenderAsync<AggregatedChatView>(BuildContext(chat, isGenerating: true));
+
+        CountOccurrences(html, "<details class=\"chat-activity\">").Should().Be(1);
+        CountOccurrences(html, "<details class=\"chat-activity\" open>").Should().Be(1);
     }
 
     [Fact]
