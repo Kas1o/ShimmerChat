@@ -140,26 +140,21 @@ public class FileSystemImageReadToolTests : IDisposable
     }
 
     [Fact]
-    public void DetectImageMimeType_RecognizesSupportedHeaders()
+    public void ImageMimeDetector_RecognizesSupportedHeaders()
     {
-        FileSystemImageReadToolV2.DetectImageMimeType([0xFF, 0xD8, 0xFF, 0xE0])
-            .Should().Be("image/jpeg");
-        FileSystemImageReadToolV2.DetectImageMimeType([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
-            .Should().Be("image/gif");
-        FileSystemImageReadToolV2.DetectImageMimeType(
-                [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])
+        ImageMimeDetector.Detect([0xFF, 0xD8, 0xFF, 0xE0]).Should().Be("image/jpeg");
+        ImageMimeDetector.Detect([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]).Should().Be("image/gif");
+        ImageMimeDetector.Detect([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])
             .Should().Be("image/webp");
-        FileSystemImageReadToolV2.DetectImageMimeType(
-                [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        ImageMimeDetector.Detect([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
             .Should().Be("image/png");
     }
 
     [Fact]
-    public void DetectImageMimeType_RejectsUnsupportedHeaders()
+    public void ImageMimeDetector_RejectsUnsupportedHeaders()
     {
-        FileSystemImageReadToolV2.DetectImageMimeType([]).Should().BeNull();
-        FileSystemImageReadToolV2.DetectImageMimeType([0x42, 0x4D, 0x00]).Should().BeNull();
-        FileSystemImageReadToolV2.DetectImageMimeType([0x47, 0x49, 0x46, 0x38, 0x38, 0x61])
-            .Should().BeNull();
+        ImageMimeDetector.Detect([]).Should().BeNull();
+        ImageMimeDetector.Detect([0x42, 0x4D, 0x00]).Should().BeNull();
+        ImageMimeDetector.Detect([0x47, 0x49, 0x46, 0x38, 0x38, 0x61]).Should().BeNull();
     }
 }

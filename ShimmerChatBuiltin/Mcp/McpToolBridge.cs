@@ -1,8 +1,11 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
 using SharperLLM.FunctionCalling;
+using ShimmerChatLib;
 using ShimmerChatLib.Generation;
+using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Mcp
 {
@@ -198,12 +201,15 @@ namespace ShimmerChatBuiltin.Mcp
         private readonly McpEndpointSession _session;
         private readonly McpToolDescriptor _descriptor;
         private readonly string _exposedName;
+        private readonly IImageAttachmentService? _imageAttachments;
 
-        public McpToolBridge(McpEndpointSession session, McpToolDescriptor descriptor, string? exposedName = null)
+        public McpToolBridge(McpEndpointSession session, McpToolDescriptor descriptor,
+            string? exposedName = null, IImageAttachmentService? imageAttachments = null)
         {
             _session = session;
             _descriptor = descriptor;
             _exposedName = exposedName ?? BuildExposedName(session.Config.Key, descriptor.Name);
+            _imageAttachments = imageAttachments;
         }
 
         /// <summary>暴露给 LLM 的工具名。</summary>
@@ -218,8 +224,20 @@ namespace ShimmerChatBuiltin.Mcp
         {
             try
             {
-                var text = await _session.CallToolAsync(_descriptor.Name, context.ArgumentsJson, ct).ConfigureAwait(false);
-                return ToolResult.Ok(text);
+                // 没有图像存储时退化为纯文本：宁可明确标注省略，也不收集注定无法附加的字节。
+                var content = await _session.CallToolAsync(
+                    _descriptor.Name,
+                    context.ArgumentsJson,
+                    ct,
+                    _imageAttachments == null ? McpImageOutput.DescribeOnly : McpImageOutput.Attach)
+                    .ConfigureAwait(false);
+
+                return await McpToolResultImages.ToToolResultAsync(
+                    content,
+                    $"tool '{_descriptor.Name}'",
+                    _imageAttachments,
+                    _session.DiagnosticsLogger,
+                    ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -317,11 +335,13 @@ namespace ShimmerChatBuiltin.Mcp
     {
         private readonly McpEndpointSession _session;
         private readonly string _exposedName;
+        private readonly IImageAttachmentService? _imageAttachments;
 
-        public McpResourceReadToolBridge(McpEndpointSession session)
+        public McpResourceReadToolBridge(McpEndpointSession session, IImageAttachmentService? imageAttachments = null)
         {
             _session = session;
             _exposedName = McpToolBridge.BuildExposedName(session.Config.Key, "read_mcp_resource");
+            _imageAttachments = imageAttachments;
         }
 
         public string ExposedName => _exposedName;
@@ -348,10 +368,27 @@ namespace ShimmerChatBuiltin.Mcp
             try
             {
                 var uri = ExtractUri(context.ArgumentsJson);
-                var text = string.IsNullOrWhiteSpace(uri)
-                    ? await ListResourcesAsync(ct).ConfigureAwait(false)
-                    : await _session.ReadResourceAsync(uri, ct).ConfigureAwait(false);
-                return ToolResult.Ok(text);
+
+                McpContentResult content;
+                if (string.IsNullOrWhiteSpace(uri))
+                {
+                    content = McpContentResult.TextOnly(await ListResourcesAsync(ct).ConfigureAwait(false));
+                }
+                else
+                {
+                    content = await _session.ReadResourceAsync(
+                        uri,
+                        ct,
+                        _imageAttachments == null ? McpImageOutput.DescribeOnly : McpImageOutput.Attach)
+                        .ConfigureAwait(false);
+                }
+
+                return await McpToolResultImages.ToToolResultAsync(
+                    content,
+                    string.IsNullOrWhiteSpace(uri) ? "resource list" : $"resource '{uri}'",
+                    _imageAttachments,
+                    _session.DiagnosticsLogger,
+                    ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -404,6 +441,71 @@ namespace ShimmerChatBuiltin.Mcp
 
             var trimmed = input.Trim().Trim('"');
             return trimmed.Length == 0 || trimmed == "{}" ? null : trimmed;
+        }
+    }
+
+    /// <summary>
+    /// 把 MCP 返回的图像写入图像存储并附加到 <see cref="ToolResult.Images"/>。
+    /// <para>
+    /// 只返回链接不会让模型真正看到图像，因此这里必须落盘 + 附加；
+    /// 落盘失败属于显式失败（<see cref="ToolErrorCodes.OutputWriteFailed"/>），不静默丢弃图像。
+    /// </para>
+    /// </summary>
+    internal static class McpToolResultImages
+    {
+        public static async Task<ToolResult> ToToolResultAsync(
+            McpContentResult content,
+            string source,
+            IImageAttachmentService? attachments,
+            ILogger? logger,
+            CancellationToken ct)
+        {
+            if (content.Images.Count == 0)
+                return ToolResult.Ok(content.Text);
+
+            if (attachments == null)
+            {
+                // 调用方本应在无存储时选 DescribeOnly；走到这里说明契约被破坏，必须显式失败。
+                logger?.LogError(
+                    "[MCP] {Source} returned {Count} image(s), but image storage is unavailable in this session.",
+                    source, content.Images.Count);
+                return ToolResult.Fail(
+                    ToolErrorCodes.ConfigInvalid,
+                    $"{source} returned images, but image storage is unavailable in this session.");
+            }
+
+            var saved = new List<MessageImage>(content.Images.Count);
+            try
+            {
+                foreach (var image in content.Images)
+                {
+                    using var stream = new MemoryStream(image.Data, writable: false);
+                    saved.Add(await attachments.SaveGeneratedAsync(stream, image.MimeType, ct).ConfigureAwait(false));
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // 用户/宿主取消：清掉已落盘的部分，避免留下孤儿文件，然后上抛。
+                DeleteSaved();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "[MCP] Failed to save image returned by {Source}: {Message}", source, ex.Message);
+                DeleteSaved();
+                return ToolResult.Fail(
+                    ToolErrorCodes.OutputWriteFailed,
+                    $"Failed to save an image returned by {source}: {ex.Message}",
+                    ex.ToString());
+            }
+
+            return ToolResult.Ok(content.Text, saved);
+
+            void DeleteSaved()
+            {
+                foreach (var messageImage in saved)
+                    attachments.DeleteStoredFile(messageImage);
+            }
         }
     }
 }

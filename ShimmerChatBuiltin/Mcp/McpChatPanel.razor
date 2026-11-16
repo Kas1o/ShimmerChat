@@ -732,7 +732,7 @@
         {
             using var opCts = CreateOperationTimeout();
             var content = await state.Session.ReadResourceAsync(uri, opCts.Token);
-            insertedText = McpResources.Truncate(content, McpResources.PerResourceCharLimit, uri);
+            insertedText = McpResources.Truncate(content.Text, McpResources.PerResourceCharLimit, uri);
             insertedTextSource = $"{state.Endpoint.Name}/{uri}";
             panelMessage = Loc["panel_mcp_chat.preview_ready"];
         }

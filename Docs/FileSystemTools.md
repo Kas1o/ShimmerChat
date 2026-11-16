@@ -53,6 +53,7 @@
 - 支持格式：`image/png`、`image/jpeg`、`image/webp`、`image/gif`，来自 `ImageAttachmentRules.SupportedMimeTypes`。
 - 单文件上限：`ImageAttachmentRules.MaxBytes`（20 MiB），与聊天上传、生成图像使用同一份上限。
 - 格式按**文件头**识别（PNG/JPEG/GIF/WebP 魔数），不信任扩展名；扩展名是 `.png` 的文本文件会明确报错。
+  识别逻辑由 `ImageMimeDetector` 统一提供，MCP、CodeAct 等其它图像入口共用同一份实现。
 - 图像以 Base64 内联进 `MessageImage`，不依赖 `UserUploadImage` 目录。
 - 工具响应取消令牌；读取期间用户取消会抛 `OperationCanceledException`，由执行节点中止本轮，不写伪造结果。
 
@@ -95,10 +96,11 @@ The image is attached to this tool result so you can see it.
 
 | 文件 | 职责 |
 |------|------|
-| `ShimmerChatBuiltin/FileSystem/FileSystemImageReadToolV2.cs` | `read_image` 工具、图像头识别、结构化结果 |
+| `ShimmerChatBuiltin/FileSystem/FileSystemImageReadToolV2.cs` | `read_image` 工具与结构化结果 |
 | `ShimmerChatBuiltin/FileSystem/FileSystemConfig.cs` | 全局路径规则与 KV 读写 |
 | `ShimmerChatBuiltin/ToolManage/FileSystemToolSetNode.cs` | 工具勾选与节点级作用域包装 |
 | `ShimmerChatBuiltin/FileSystem/FileSystemPanel.razor` | 全局 AllowList / BanList 设置面板 |
 | `ShimmerChatLib/ImageAttachmentRules.cs` | 支持格式与大小上限的唯一来源 |
+| `ShimmerChatLib/ImageMimeDetector.cs` | 图像文件头识别与声明 MIME 校验的唯一来源 |
 | `ShimmerChatLib/Generation/ToolResult.cs` | `ToolResult.Images` 与工具错误码 |
 | `ShimmerChatBuiltin.Tests/FileSystem/*` | 图像读取、格式识别、节点作用域测试 |

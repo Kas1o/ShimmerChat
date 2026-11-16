@@ -304,29 +304,10 @@ namespace ShimmerChatBuiltin.CodeAct
                     $"Image is too large: {content.Length} bytes, the limit is {ImageAttachmentRules.MaxBytes} bytes.");
             }
 
-            var detectedMimeType = FileSystemImageReadToolV2.DetectImageMimeType(content);
-            if (detectedMimeType == null)
+            if (!ImageMimeDetector.TryResolve(declaredMimeType, content, out var mimeType, out var mimeError))
             {
                 throw new CodeActException(ToolErrorCodes.InvalidArguments,
-                    $"Unsupported or unrecognized image format in {source}. " +
-                    $"Supported formats: {string.Join(", ", ImageAttachmentRules.SupportedMimeTypes)}.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(declaredMimeType))
-            {
-                var declared = declaredMimeType.Trim();
-                if (!ImageAttachmentRules.IsSupportedMimeType(declared))
-                {
-                    throw new CodeActException(ToolErrorCodes.InvalidArguments,
-                        $"Unsupported image MIME type: '{declared}'. " +
-                        $"Supported formats: {string.Join(", ", ImageAttachmentRules.SupportedMimeTypes)}.");
-                }
-
-                if (!string.Equals(declared, detectedMimeType, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new CodeActException(ToolErrorCodes.InvalidArguments,
-                        $"Declared image MIME type '{declared}' does not match the file content ('{detectedMimeType}').");
-                }
+                    $"Invalid image in {source}: {mimeError}.");
             }
 
             if (_imageAttachments == null)
@@ -345,7 +326,7 @@ namespace ShimmerChatBuiltin.CodeAct
             try
             {
                 using var stream = new MemoryStream(content, writable: false);
-                saved = await _imageAttachments.SaveGeneratedAsync(stream, detectedMimeType, _ct);
+                saved = await _imageAttachments.SaveGeneratedAsync(stream, mimeType, _ct);
             }
             catch (OperationCanceledException) when (_ct.IsCancellationRequested)
             {

@@ -49,6 +49,9 @@ namespace ShimmerChatBuiltin.Mcp
 
         private ILogger? Logger => _loggerFactory?.CreateLogger("ShimmerChat.Mcp");
 
+        /// <summary>供工具桥记录「图像未能附加」等降级警告；没有日志工厂时为 null。</summary>
+        internal ILogger? DiagnosticsLogger => Logger;
+
         /// <summary>
         /// 建立连接并完成 initialize 握手。
         /// 失败时抛出 <see cref="McpConnectException"/>，其中包含面向用户的端点标识与原始异常。
@@ -229,19 +232,24 @@ namespace ShimmerChatBuiltin.Mcp
         private static bool IsUnsupportedMethod(McpProtocolException ex) =>
             ex.ErrorCode == McpErrorCode.MethodNotFound || ex.ErrorCode == McpErrorCode.InvalidParams;
 
-        /// <summary>调用工具并格式化为文本。JSON-RPC 层错误直接抛出，工具自身的 isError 转为文本。</summary>
-        public async Task<string> CallToolAsync(string toolName, string argumentsJson, CancellationToken ct)
+        /// <summary>
+        /// 调用工具，返回文本与可附加图像。JSON-RPC 层错误直接抛出，工具自身的 isError 转为文本。
+        /// </summary>
+        public async Task<McpContentResult> CallToolAsync(
+            string toolName, string argumentsJson, CancellationToken ct,
+            McpImageOutput imageOutput = McpImageOutput.Attach)
         {
             var arguments = McpJsonArguments.Parse(argumentsJson);
             var result = await _client.CallToolAsync(toolName, arguments, cancellationToken: ct).ConfigureAwait(false);
-            return FormatToolResult(result, toolName);
+            return FormatToolResult(result, toolName, imageOutput);
         }
 
-        /// <summary>读取资源并格式化为文本。</summary>
-        public async Task<string> ReadResourceAsync(string uri, CancellationToken ct)
+        /// <summary>读取资源，返回文本与可附加图像。</summary>
+        public async Task<McpContentResult> ReadResourceAsync(
+            string uri, CancellationToken ct, McpImageOutput imageOutput = McpImageOutput.DescribeOnly)
         {
             var result = await _client.ReadResourceAsync(uri, cancellationToken: ct).ConfigureAwait(false);
-            return FormatResourceResult(result, uri);
+            return FormatResourceResult(result, uri, imageOutput);
         }
 
         /// <summary>获取提示词模板渲染结果。</summary>
@@ -264,93 +272,21 @@ namespace ShimmerChatBuiltin.Mcp
             }
         }
 
-        /// <summary>把 CallToolResult 转为文本：文本块原样拼接，二进制块标注摘要，内嵌资源转为文本或标注。</summary>
-        public static string FormatToolResult(CallToolResult result, string toolName)
-        {
-            var sb = new StringBuilder();
-            if (result.IsError == true)
-                sb.AppendLine($"[MCP tool '{toolName}' reported an error]");
+        /// <summary>
+        /// 把 CallToolResult 渲染为文本：文本块原样拼接，图像块按 <paramref name="imageOutput"/> 附加或标注省略，
+        /// 音频与非图像二进制只标注摘要；<c>structuredContent</c> 以 JSON 追加。
+        /// </summary>
+        public McpContentResult FormatToolResult(
+            CallToolResult result, string toolName, McpImageOutput imageOutput = McpImageOutput.Attach)
+            => new McpContentFormatter(Config.Id, Logger).FormatToolResult(result, toolName, imageOutput);
 
-            if (result.Content is { Count: > 0 })
-            {
-                foreach (var block in result.Content)
-                    AppendContentBlock(sb, block);
-            }
-
-            if (result.StructuredContent is { } structured)
-            {
-                if (sb.Length > 0) sb.AppendLine();
-                sb.AppendLine("structuredContent:");
-                sb.AppendLine(structured.GetRawText());
-            }
-
-            if (sb.Length == 0)
-                sb.Append($"[MCP tool '{toolName}' returned no content]");
-
-            return sb.ToString().TrimEnd();
-        }
-
-        /// <summary>把 ReadResourceResult 转为文本：文本内容原样返回，二进制内容标注大小与类型。</summary>
-        public static string FormatResourceResult(ReadResourceResult result, string uri)
-        {
-            var sb = new StringBuilder();
-            foreach (var contents in result.Contents)
-            {
-                switch (contents)
-                {
-                    case TextResourceContents text:
-                        sb.AppendLine(text.Text);
-                        break;
-                    case BlobResourceContents blob:
-                        sb.AppendLine($"[binary resource {blob.Uri} ({blob.MimeType ?? "unknown type"}, {blob.DecodedData.Length} bytes) omitted]");
-                        break;
-                    default:
-                        sb.AppendLine($"[unsupported resource contents {contents.GetType().Name} for {contents.Uri}]");
-                        break;
-                }
-            }
-
-            if (sb.Length == 0)
-                sb.Append($"[resource '{uri}' returned no content]");
-
-            return sb.ToString().TrimEnd();
-        }
-
-        private static void AppendContentBlock(StringBuilder sb, ContentBlock block)
-        {
-            switch (block)
-            {
-                case TextContentBlock text:
-                    sb.AppendLine(text.Text);
-                    break;
-                case EmbeddedResourceBlock embedded:
-                    switch (embedded.Resource)
-                    {
-                        case TextResourceContents textResource:
-                            sb.AppendLine(textResource.Text);
-                            break;
-                        case BlobResourceContents blob:
-                            sb.AppendLine($"[embedded binary resource {blob.Uri} ({blob.MimeType ?? "unknown type"}, {blob.DecodedData.Length} bytes) omitted]");
-                            break;
-                        default:
-                            sb.AppendLine("[embedded resource with unsupported contents omitted]");
-                            break;
-                    }
-                    break;
-                case ResourceLinkBlock link:
-                    sb.AppendLine($"[resource link: {link.Uri}{(string.IsNullOrWhiteSpace(link.Name) ? "" : $" ({link.Name})")}]");
-                    break;
-                case ImageContentBlock image:
-                    sb.AppendLine($"[image content omitted ({image.MimeType ?? "unknown type"}, {image.DecodedData.Length} bytes)]");
-                    break;
-                case AudioContentBlock audio:
-                    sb.AppendLine($"[audio content omitted ({audio.MimeType ?? "unknown type"}, {audio.DecodedData.Length} bytes)]");
-                    break;
-                default:
-                    sb.AppendLine($"[unsupported content block '{block.Type}' omitted]");
-                    break;
-            }
-        }
+        /// <summary>
+        /// 把 ReadResourceResult 渲染为文本：文本内容原样返回，图像资源按 <paramref name="imageOutput"/> 处理，
+        /// 其它二进制内容标注类型与大小。
+        /// </summary>
+        public McpContentResult FormatResourceResult(
+            ReadResourceResult result, string uri, McpImageOutput imageOutput = McpImageOutput.DescribeOnly)
+            => new McpContentFormatter(Config.Id, Logger).FormatResourceResult(result, uri, imageOutput);
 
         /// <summary>
         /// 宽松释放：SDK 的 IClientTransport / ITransport 释放接口并不统一，
@@ -389,6 +325,7 @@ namespace ShimmerChatBuiltin.Mcp
         public McpConnectException(string message) : base(message) { }
         public McpConnectException(string message, Exception inner) : base(message, inner) { }
     }
+
 
     /// <summary>MCP 客户端标识信息。</summary>
     public static class McpClientInfo

@@ -117,7 +117,7 @@ namespace ShimmerChatBuiltin.FileSystem
                     ex.ToString());
             }
 
-            var mimeType = DetectImageMimeType(bytes);
+            var mimeType = ImageMimeDetector.Detect(bytes);
             if (mimeType == null)
                 return ToolResult.Fail(
                     ToolErrorCodes.InvalidArguments,
@@ -133,40 +133,6 @@ namespace ShimmerChatBuiltin.FileSystem
 
             var image = MessageImage.FromBase64(Convert.ToBase64String(bytes), mimeType);
             return ToolResult.Ok(sb.ToString(), [image]);
-        }
-
-        /// <summary>
-        /// 按文件头识别受支持的图像格式。返回 null 表示不是本工具支持的图像，
-        /// 调用方必须显式报错而不是按扩展名猜测。
-        /// </summary>
-        internal static string? DetectImageMimeType(ReadOnlySpan<byte> bytes)
-        {
-            if (bytes.Length >= 8
-                && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47
-                && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A)
-            {
-                return "image/png";
-            }
-
-            if (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
-                return "image/jpeg";
-
-            if (bytes.Length >= 6
-                && bytes[0] == (byte)'G' && bytes[1] == (byte)'I' && bytes[2] == (byte)'F'
-                && bytes[3] == (byte)'8' && (bytes[4] == (byte)'7' || bytes[4] == (byte)'9')
-                && bytes[5] == (byte)'a')
-            {
-                return "image/gif";
-            }
-
-            if (bytes.Length >= 12
-                && bytes[0] == (byte)'R' && bytes[1] == (byte)'I' && bytes[2] == (byte)'F' && bytes[3] == (byte)'F'
-                && bytes[8] == (byte)'W' && bytes[9] == (byte)'E' && bytes[10] == (byte)'B' && bytes[11] == (byte)'P')
-            {
-                return "image/webp";
-            }
-
-            return null;
         }
 
         private sealed class ReadImageArguments

@@ -284,7 +284,8 @@ namespace ShimmerChatBuiltin.Mcp
                 }
 
                 existingNames.Add(exposedName);
-                env.Transient.Tools.Add(new McpToolBridge(session, descriptor, exposedName));
+                env.Transient.Tools.Add(new McpToolBridge(
+                    session, descriptor, exposedName, env.Persistent.ImageAttachments));
                 added++;
             }
 
@@ -293,7 +294,7 @@ namespace ShimmerChatBuiltin.Mcp
 
         private static int AddResourceReadTool(PreGenerationEnv env, McpEndpointSession session, HashSet<string> existingNames)
         {
-            var bridge = new McpResourceReadToolBridge(session);
+            var bridge = new McpResourceReadToolBridge(session, env.Persistent.ImageAttachments);
             if (!existingNames.Add(bridge.ExposedName))
                 return 0;
 
@@ -322,10 +323,10 @@ namespace ShimmerChatBuiltin.Mcp
                 if (!seen.Add(uri)) continue;
                 if (!byUri.TryGetValue(uri, out var resource)) continue;
 
-                var content = await session.ReadResourceAsync(uri, ct).ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(content)) continue;
+                var result = await session.ReadResourceAsync(uri, ct).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(result.Text)) continue;
 
-                content = McpResources.Truncate(content, McpResources.PerResourceCharLimit, uri);
+                var content = McpResources.Truncate(result.Text, McpResources.PerResourceCharLimit, uri);
                 blocks.Add((uri, McpResources.Render(endpoint.Name, endpoint.Id, uri, resource.Name, content)));
             }
 

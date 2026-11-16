@@ -233,9 +233,23 @@ mcp_{端点标识}_{净化后的工具名}
 - `required` 数组决定参数的必填标记；`enum` 映射为参数枚举；
 - Object / Array 参数会把原始 schema 片段写进参数描述，让模型知道如何构造合法 JSON。
 
-工具返回内容：`text` 原样拼接；`resource_link` 转为链接标注；`image` / `audio` / 二进制内嵌资源
-按「类型 + 字节数」标注省略（不入上下文）；`structuredContent` 以 JSON 追加；
-`isError=true` 时在开头标注 `[MCP tool '...' reported an error]`。
+工具返回内容：`text` 原样拼接；`resource_link` 转为链接标注；`audio` 与非图像二进制标注「类型 + 字节数」省略；
+`structuredContent` 以 JSON 追加；`isError=true` 时在开头标注 `[MCP tool '...' reported an error]`。
+
+图像（`image` 内容块，以及声明为 `image/*` 或未声明类型的二进制资源）会被**附加到工具结果**，
+不再只留一行省略标注：
+
+- 格式按文件头识别（`ImageMimeDetector`），声明类型必须与内容一致；不一致、格式不支持、超过
+  `ImageAttachmentRules.MaxBytes`（20 MiB）或超过单条结果 `MaxPerMessage`（5 张）时，该张图像被跳过，
+  文本里写明原因，同时写 `LogWarning`——不静默丢弃，也不把坏数据硬塞给模型。
+- 通过校验的图像经 `IImageAttachmentService.SaveGeneratedAsync` 落盘（与生成图像一样获得稳定的
+  `/userimages/...` 链接），再写入 `ToolResult.Images`；`PostToolCallNode` 把它写进 tool_result 消息的
+  `Message.Images`，下一轮构建请求时变成多模态内容块。
+- 落盘失败返回 `TOOL_OUTPUT_WRITE_FAILED`（并清理已写入的部分），不返回「看似成功但没有图」的结果。
+- 无图像存储服务时退化得更早：会话直接以 `DescribeOnly` 渲染，文本明确写「未注入上下文」。
+- 资源注入（`McpPreGenerationNode` 的 fragments）与设置页的资源预览只能放文本，因此使用
+  `McpImageOutput.DescribeOnly`，资源里的图像只标注省略。
+
 工具执行走 `IToolV3` 结构化接口：参数 JSON 非法返回 `ToolResult.Fail(TOOL_INVALID_ARGUMENTS)`，
 协议/连接/服务端拒绝等预期内失败返回 `ToolResult.Fail(TOOL_SERVICE_ERROR)`（附技术详情，由执行节点写进 DebugOutput）；
 `CancellationToken` 贯穿到 SDK 调用，用户/宿主取消时抛 `OperationCanceledException` 而不是伪造失败。
@@ -261,7 +275,8 @@ mcp_{端点标识}_{净化后的工具名}
 - **不做 resources/subscribe 与 prompts 变更订阅**：面板按需重载（`Reload` / `Auto reload`），
   避免为长连接引入额外生命周期管理。
 - **不做 OAuth**：HTTP 端点通过自定义 `Headers` 提供静态凭据；需要交互式 OAuth 的服务端暂不支持。
-- **二进制内容不入上下文**：图片/音频只标注省略，避免把 base64 灌进 prompt。
+- **音频与其它二进制不入上下文**：图像会落盘并附加到 tool_result（见 §6），音频与非图像二进制仍只标注省略，
+  避免把无用的 base64 灌进 prompt。
 - **面板与节点共享连接**：`McpChatPanel` 与 `McpPreGenerationNode` 都通过 `McpRegistry` 取租约，
   因此浏览面板期间触发生成不会为同一端点多拉一个子进程。
 - **静态单例而非 DI 服务**：插件服务由宿主按需实例化（无单例注册通道），
