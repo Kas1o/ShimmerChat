@@ -51,6 +51,30 @@ internal sealed class FakeComfyUiClient : IComfyUiClient
     }
 }
 
+/// <summary>记录 txt2img 请求并返回预置结果的 A1111 客户端桩。</summary>
+internal sealed class FakeA1111Client : IA1111Client
+{
+    public A1111Txt2ImgRequest? LastRequest { get; private set; }
+
+    public A1111GenerationResult Result { get; set; } = A1111GenerationResult.Ok(
+    [
+        new A1111Image
+        {
+            FileName = "a1111_0001.png",
+            ContentType = "image/png",
+            Content = [0x89, 0x50, 0x4E, 0x47]
+        }
+    ]);
+
+    public Func<A1111Txt2ImgRequest, CancellationToken, Task<A1111GenerationResult>>? Handler { get; set; }
+
+    public Task<A1111GenerationResult> GenerateAsync(A1111Txt2ImgRequest request, CancellationToken ct)
+    {
+        LastRequest = request;
+        return Handler != null ? Handler(request, ct) : Task.FromResult(Result);
+    }
+}
+
 /// <summary>内存版图像附件服务：记录落盘内容，并返回稳定的 /userimages/ 链接。</summary>
 internal sealed class FakeImageAttachmentService : IImageAttachmentService
 {
@@ -97,10 +121,13 @@ internal sealed class ComfyUiStubHttpHandler : HttpMessageHandler
 
     public List<string> RequestPaths { get; } = [];
 
+    public List<HttpRequestMessage> Requests { get; } = [];
+
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
         RequestPaths.Add(request.RequestUri?.PathAndQuery ?? "");
+        Requests.Add(request);
         return Task.FromResult(_responder(request));
     }
 
@@ -114,6 +141,8 @@ internal sealed class ComfyUiStubHttpHandler : HttpMessageHandler
 internal static class ImageGenerationTestData
 {
     public const string CustomWorkflowId = "portrait";
+
+    public const string A1111ProfileId = "a1111";
 
     public const string CustomWorkflowTemplate = """
         {
@@ -135,32 +164,45 @@ internal static class ImageGenerationTestData
 
     public static ImageGenerationConfig CreateConfig(Action<ImageGenerationConfig>? configure = null)
     {
-        var config = new ImageGenerationConfig
-        {
-            ComfyUiBaseUrl = "http://127.0.0.1:8188",
-            TimeoutSeconds = 30,
-            MaxWaitSeconds = 300,
-            PollIntervalMilliseconds = 1000,
-            DefaultWorkflow = new DefaultImageWorkflowSettings
-            {
-                Model = "sd_xl_base_1.0.safetensors",
-                Width = 512,
-                Height = 512,
-                Steps = 20,
-                CfgScale = 7,
-                Sampler = "euler",
-                Scheduler = "normal",
-                NegativePrompt = "blurry",
-                BatchSize = 1
-            }
-        };
-
+        var config = ImageGenerationConfig.CreateDefault();
+        config.Profiles[0].DefaultWorkflow.Model = "sd_xl_base_1.0.safetensors";
+        config.Profiles[0].DefaultWorkflow.NegativePrompt = "blurry";
         configure?.Invoke(config);
         return config;
     }
 
     public static string ConfigJson(Action<ImageGenerationConfig>? configure = null) =>
         JsonConvert.SerializeObject(CreateConfig(configure));
+
+    /// <summary>旧版（Version 0）配置 JSON，用于验证迁移。</summary>
+    public static string LegacyConfigJson(
+        bool includeDefault = true,
+        IReadOnlyList<CustomImageWorkflow>? customWorkflows = null) =>
+        JsonConvert.SerializeObject(new
+        {
+            ComfyUiBaseUrl = "http://legacy.test:8188",
+            TimeoutSeconds = 15,
+            MaxWaitSeconds = 120,
+            PollIntervalMilliseconds = 500,
+            DefaultWorkflow = includeDefault
+                ? new DefaultImageWorkflowSettings
+                {
+                    Model = "legacy.safetensors",
+                    Width = 640,
+                    Height = 768,
+                    Steps = 18,
+                    CfgScale = 6.5,
+                    Sampler = "dpmpp_2m",
+                    Scheduler = "karras",
+                    NegativePrompt = "legacy negative",
+                    BatchSize = 2
+                }
+                : null,
+            CustomWorkflows = customWorkflows
+        });
+
+    public static ImageGenerationProfile DefaultProfile(this ImageGenerationConfig config) =>
+        config.Profiles.Single(p => p.Id == ImageGenerationConfigManager.DefaultProfileId);
 
     public static CustomImageWorkflow CreateCustomWorkflow(bool enabled = true) => new()
     {
@@ -213,6 +255,57 @@ internal static class ImageGenerationTestData
                 EnumValues = ["anime", "photo"]
             }
         ]
+    };
+
+    public static ImageGenerationProfile CreateCustomProfile(bool enabled = true) => new()
+    {
+        Id = CustomWorkflowId,
+        Name = "Portrait",
+        Description = "Portrait workflow",
+        Enabled = enabled,
+        Provider = ImageApiProvider.ComfyUi,
+        BaseUrl = "http://127.0.0.1:8188",
+        WorkflowMode = ImageWorkflowMode.Custom,
+        DefaultWorkflow = new DefaultImageWorkflowSettings
+        {
+            Model = "sd_xl_base_1.0.safetensors",
+            Width = 512,
+            Height = 512,
+            Steps = 20,
+            CfgScale = 7,
+            Sampler = "euler",
+            Scheduler = "normal",
+            NegativePrompt = "blurry",
+            BatchSize = 1
+        },
+        CustomWorkflowJson = CustomWorkflowTemplate,
+        CustomWorkflowParameters = CreateCustomWorkflow().Parameters
+    };
+
+    public static ImageGenerationProfile CreateA1111Profile(bool enabled = true) => new()
+    {
+        Id = A1111ProfileId,
+        Name = "A1111 shared",
+        Description = "Shared A1111 endpoint",
+        Enabled = enabled,
+        Provider = ImageApiProvider.Automatic1111,
+        BaseUrl = "http://127.0.0.1:7860",
+        TimeoutSeconds = 20,
+        MaxWaitSeconds = 180,
+        PollIntervalMilliseconds = 1000,
+        WorkflowMode = ImageWorkflowMode.Default,
+        DefaultWorkflow = new DefaultImageWorkflowSettings
+        {
+            Model = "",
+            Width = 512,
+            Height = 512,
+            Steps = 28,
+            CfgScale = 8,
+            Sampler = "Euler a",
+            Scheduler = "",
+            NegativePrompt = "low quality",
+            BatchSize = 3
+        }
     };
 
     public static ToolInvocationContext Arguments(string json) => new()

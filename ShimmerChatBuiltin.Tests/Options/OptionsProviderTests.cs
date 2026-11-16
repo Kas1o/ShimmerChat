@@ -271,26 +271,40 @@ public class OptionsProviderTests
     }
 
     [Fact]
-    public void ImageWorkflows_GroupByEnabledStateAndExposeToolName()
+    public void ImageConfigurations_GroupByEnabledStateAndExposeToolName()
     {
-        var draft = ImageGenerationTestData.CreateCustomWorkflow(enabled: false);
+        var draft = ImageGenerationTestData.CreateCustomProfile(enabled: false);
         draft.Id = "draft";
         draft.Name = "Draft";
         draft.Description = "";
 
         var kv = new FakeKVDataService();
         kv.Write("ImageGeneration", "Config", ImageGenerationTestData.ConfigJson(c =>
-            c.CustomWorkflows = [ImageGenerationTestData.CreateCustomWorkflow(), draft]));
+        {
+            c.Profiles.Add(ImageGenerationTestData.CreateCustomProfile());
+            c.Profiles.Add(ImageGenerationTestData.CreateA1111Profile());
+            c.Profiles.Add(draft);
+        }));
 
-        var options = new ImageGenerationWorkflowOptionsProvider().GetOptions(Services(kv: kv));
+        var options = new ImageGenerationConfigOptionsProvider().GetOptions(Services(kv: kv));
 
-        options.Should().HaveCount(2);
+        options.Should().HaveCount(4);
+
+        var defaultProfile = options.Single(o => o.Value == ImageGenerationConfigManager.DefaultProfileId);
+        defaultProfile.Label.Should().Be("Default");
+        defaultProfile.Group.Should().Be("Enabled");
+        defaultProfile.Description.Should().Contain("ComfyUI");
+        defaultProfile.SearchTerms.Should().Contain("generate_image");
 
         var portrait = options.Single(o => o.Value == ImageGenerationTestData.CustomWorkflowId);
         portrait.Label.Should().Be("Portrait");
         portrait.Group.Should().Be("Enabled");
-        portrait.Description.Should().Be("Portrait workflow");
+        portrait.Description.Should().Contain("Portrait workflow");
         portrait.SearchTerms.Should().Contain("generate_image_portrait");
+
+        var a1111 = options.Single(o => o.Value == ImageGenerationTestData.A1111ProfileId);
+        a1111.Description.Should().Contain("A1111");
+        a1111.SearchTerms.Should().Contain("generate_image_a1111");
 
         var disabled = options.Single(o => o.Value == "draft");
         disabled.Group.Should().Be("Disabled");
@@ -299,13 +313,13 @@ public class OptionsProviderTests
     }
 
     [Fact]
-    public void ImageWorkflows_InvalidConfigOrMissingService_ReturnsEmpty()
+    public void ImageConfigurations_InvalidConfigOrMissingService_ReturnsEmpty()
     {
         var kv = new FakeKVDataService();
         kv.Write("ImageGeneration", "Config", "{ broken");
 
-        new ImageGenerationWorkflowOptionsProvider().GetOptions(Services(kv: kv)).Should().BeEmpty();
-        new ImageGenerationWorkflowOptionsProvider().GetOptions(Services()).Should().BeEmpty();
+        new ImageGenerationConfigOptionsProvider().GetOptions(Services(kv: kv)).Should().BeEmpty();
+        new ImageGenerationConfigOptionsProvider().GetOptions(Services()).Should().BeEmpty();
     }
 
     [Fact]
@@ -317,9 +331,9 @@ public class OptionsProviderTests
         mcp.OptionsKey.Should().Be(new McpEndpointOptionsProvider().Key);
 
         var image = typeof(ImageGenerationToolSetNode)
-            .GetProperty(nameof(ImageGenerationToolSetNode.CustomWorkflowId))!
+            .GetProperty(nameof(ImageGenerationToolSetNode.ConfigurationId))!
             .GetCustomAttribute<NodePropertyAttribute>()!;
-        image.OptionsKey.Should().Be(new ImageGenerationWorkflowOptionsProvider().Key);
+        image.OptionsKey.Should().Be(new ImageGenerationConfigOptionsProvider().Key);
     }
 
     /// <summary>只做类型 → 实例映射的服务容器桩，避免测试工程额外引入 DI 包。</summary>

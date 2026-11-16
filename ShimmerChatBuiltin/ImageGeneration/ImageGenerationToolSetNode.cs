@@ -4,11 +4,11 @@ using ShimmerChatLib.Interface;
 namespace ShimmerChatBuiltin.ImageGeneration
 {
     /// <summary>
-    /// 文生图工具集节点：把「默认工作流」工具与设置面板中启用的自定义工作流工具
-    /// 加入本次生成的工具列表。每个自定义工作流暴露为独立工具
-    /// （<c>generate_image_{id}</c>），工具形参来自该工作流的参数声明。
+    /// 文生图工具集节点：把设置面板中启用的一份或多份 <see cref="ImageGenerationProfile"/>
+    /// 变成独立工具（<c>generate_image_{id}</c>，Id 为 <c>default</c> 时是 <c>generate_image</c>）。
     /// <para>
-    /// 配置不合法 / 默认工作流没选模型 / 当前会话没有图像存储服务时直接失败，
+    /// 不指定配置时暴露所有启用的配置；指定后只暴露该配置。配置不存在或已停用时节点失败，
+    /// 不静默跳过。配置不合法 / 缺少模型 / 当前会话没有图像存储服务时同样直接失败，
     /// 不添加一个执行时必然失败的工具。
     /// </para>
     /// </summary>
@@ -20,25 +20,15 @@ namespace ShimmerChatBuiltin.ImageGeneration
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Image Generation Tools";
 
-        /// <summary>是否暴露默认工作流工具 <c>generate_image</c>。</summary>
-        [NodeProperty("prop.image_generation_tool_set.enable_default",
-            HintKey = "prop.image_generation_tool_set.enable_default.hint", Order = 1)]
-        public bool EnableDefaultWorkflow { get; set; } = true;
-
-        /// <summary>是否暴露所有启用的自定义工作流工具。</summary>
-        [NodeProperty("prop.image_generation_tool_set.enable_custom",
-            HintKey = "prop.image_generation_tool_set.enable_custom.hint", Order = 2)]
-        public bool EnableCustomWorkflows { get; set; } = true;
-
         /// <summary>
-        /// 指定只暴露某一个自定义工作流；留空表示沿用旧行为（暴露全部已启用工作流）。
-        /// 值来自「文生图」设置面板中的工作流 Id。
+        /// 指定只暴露某一份配置；留空表示暴露所有已启用的配置。
+        /// 值来自「文生图」设置面板中的配置 Id。
         /// </summary>
-        [NodeProperty("prop.image_generation_tool_set.custom_workflow",
-            HintKey = "prop.image_generation_tool_set.custom_workflow.hint", Order = 3,
-            OptionsKey = "image_generation_workflows", OptionsSearchable = true, ShowOptionDescription = true,
-            OptionsDefaultLabelKey = "prop.image_generation_tool_set.custom_workflow.default")]
-        public string CustomWorkflowId { get; set; } = "";
+        [NodeProperty("prop.image_generation_tool_set.configuration",
+            HintKey = "prop.image_generation_tool_set.configuration.hint", Order = 1,
+            OptionsKey = "image_generation_configs", OptionsSearchable = true, ShowOptionDescription = true,
+            OptionsDefaultLabelKey = "prop.image_generation_tool_set.configuration.default")]
+        public string ConfigurationId { get; set; } = "";
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
@@ -55,12 +45,6 @@ namespace ShimmerChatBuiltin.ImageGeneration
                     details: configError, nodeId: Id, nodeName: Name));
             }
 
-            if (!EnableDefaultWorkflow && !EnableCustomWorkflows)
-            {
-                WriteLog(context, $"[{Name}] both tool sources are disabled; nothing was added.");
-                return Task.FromResult(NodeResult.SuccessResult());
-            }
-
             if (attachments == null)
             {
                 return Task.FromResult(NodeResult.Failure(
@@ -69,74 +53,61 @@ namespace ShimmerChatBuiltin.ImageGeneration
                     nodeId: Id, nodeName: Name));
             }
 
-            var addedNames = new HashSet<string>(StringComparer.Ordinal);
-
-            if (EnableDefaultWorkflow)
+            List<ImageGenerationProfile> selected;
+            if (string.IsNullOrWhiteSpace(ConfigurationId))
             {
-                if (string.IsNullOrWhiteSpace(config.DefaultWorkflow.Model))
+                // 留空 = 多配置模式：把设置页里所有启用的配置都暴露给模型。
+                selected = config.Profiles.Where(p => p.Enabled).ToList();
+                if (selected.Count == 0)
+                {
+                    WriteLog(context,
+                        $"[{Name}] no enabled image generation configuration was found; nothing was added.");
+                    return Task.FromResult(NodeResult.SuccessResult());
+                }
+            }
+            else
+            {
+                var profile = config.FindProfile(ConfigurationId.Trim());
+                if (profile == null)
                 {
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ConfigNotFound,
-                        loc["node_err.image_generation_model_missing"],
+                        loc.Format("node_err.image_generation_config_not_found", ConfigurationId),
                         nodeId: Id, nodeName: Name));
                 }
 
-                var tool = new ImageGenerationToolV2(kvData, attachments, customWorkflowId: null);
-                if (!addedNames.Add(tool.GetDefinition().name))
+                if (!profile.Enabled)
                 {
-                    return Task.FromResult(DuplicateToolFailure(loc, tool.GetDefinition().name));
+                    return Task.FromResult(NodeResult.Failure(
+                        NodeErrorCodes.ConfigNotFound,
+                        loc.Format("node_err.image_generation_config_disabled", profile.Name, profile.Id),
+                        nodeId: Id, nodeName: Name));
                 }
 
-                context.Env.Transient.Tools.Add(tool);
+                selected = [profile];
             }
 
-            if (EnableCustomWorkflows)
+            var addedNames = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var profile in selected)
             {
-                List<CustomImageWorkflow> selected;
-                if (string.IsNullOrWhiteSpace(CustomWorkflowId))
+                if (profile.Provider == ImageApiProvider.ComfyUi
+                    && profile.WorkflowMode == ImageWorkflowMode.Default
+                    && string.IsNullOrWhiteSpace(profile.DefaultWorkflow.Model))
                 {
-                    // 留空 = 旧行为：暴露设置页里所有已启用的自定义工作流。
-                    selected = config.CustomWorkflows.Where(w => w.Enabled).ToList();
-                    if (selected.Count == 0)
-                    {
-                        WriteLog(context,
-                            $"[{Name}] no custom image workflow is enabled; only the default tool (if enabled) was added.");
-                    }
-                }
-                else
-                {
-                    var workflow = config.FindCustomWorkflow(CustomWorkflowId.Trim());
-                    if (workflow == null)
-                    {
-                        return Task.FromResult(NodeResult.Failure(
-                            NodeErrorCodes.ConfigNotFound,
-                            loc.Format("node_err.image_generation_workflow_not_found", CustomWorkflowId),
-                            nodeId: Id, nodeName: Name));
-                    }
-
-                    if (!workflow.Enabled)
-                    {
-                        return Task.FromResult(NodeResult.Failure(
-                            NodeErrorCodes.ConfigNotFound,
-                            loc.Format("node_err.image_generation_workflow_disabled", workflow.Name, workflow.Id),
-                            nodeId: Id, nodeName: Name));
-                    }
-
-                    selected = [workflow];
+                    return Task.FromResult(NodeResult.Failure(
+                        NodeErrorCodes.ConfigNotFound,
+                        loc.Format("node_err.image_generation_model_missing", profile.Name),
+                        nodeId: Id, nodeName: Name));
                 }
 
-                foreach (var workflow in selected)
-                {
-                    var tool = new ImageGenerationToolV2(kvData, attachments, workflow.Id);
-                    var toolName = tool.GetDefinition().name;
+                var tool = new ImageGenerationToolV2(kvData, attachments, profile.Id);
+                var toolName = tool.GetDefinition().name;
 
-                    if (!addedNames.Add(toolName))
-                    {
-                        return Task.FromResult(DuplicateToolFailure(loc, toolName));
-                    }
+                if (!addedNames.Add(toolName))
+                    return Task.FromResult(DuplicateToolFailure(loc, toolName));
 
-                    context.Env.Transient.Tools.Add(tool);
-                }
+                context.Env.Transient.Tools.Add(tool);
             }
 
             return Task.FromResult(NodeResult.SuccessResult());

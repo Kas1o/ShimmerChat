@@ -15,7 +15,8 @@ public class ImageGenerationToolTests
 
         var client = new FakeComfyUiClient();
         var attachments = new FakeImageAttachmentService { ThrowOnSave = throwOnSave };
-        var tool = new ImageGenerationToolV2(kv, attachments, customWorkflowId: null, _ => client);
+        var tool = new ImageGenerationToolV2(
+            kv, attachments, profileId: null, _ => client);
 
         return (tool, client, attachments, kv);
     }
@@ -27,7 +28,7 @@ public class ImageGenerationToolTests
         var kv = new FakeKVDataService();
         kv.Write("ImageGeneration", "Config", ImageGenerationTestData.ConfigJson(c =>
         {
-            c.CustomWorkflows = [ImageGenerationTestData.CreateCustomWorkflow()];
+            c.Profiles.Add(ImageGenerationTestData.CreateCustomProfile());
             configure?.Invoke(c);
         }));
 
@@ -35,6 +36,25 @@ public class ImageGenerationToolTests
         var attachments = new FakeImageAttachmentService();
         var tool = new ImageGenerationToolV2(
             kv, attachments, ImageGenerationTestData.CustomWorkflowId, _ => client);
+
+        return (tool, client, attachments, kv);
+    }
+
+    private static (ImageGenerationToolV2 Tool, FakeA1111Client Client,
+        FakeImageAttachmentService Attachments, FakeKVDataService Kv)
+        CreateA1111Tool(Action<ImageGenerationConfig>? configure = null)
+    {
+        var kv = new FakeKVDataService();
+        kv.Write("ImageGeneration", "Config", ImageGenerationTestData.ConfigJson(c =>
+        {
+            c.Profiles.Add(ImageGenerationTestData.CreateA1111Profile());
+            configure?.Invoke(c);
+        }));
+
+        var client = new FakeA1111Client();
+        var attachments = new FakeImageAttachmentService();
+        var tool = new ImageGenerationToolV2(
+            kv, attachments, ImageGenerationTestData.A1111ProfileId, null, _ => client);
 
         return (tool, client, attachments, kv);
     }
@@ -59,7 +79,7 @@ public class ImageGenerationToolTests
             """), CancellationToken.None);
 
         result.Status.Should().Be(ToolResultStatus.Completed);
-        result.Content.Should().Contain("Generated 1 image(s)");
+        result.Content.Should().Contain("Generated 1 image(s) (Default)");
         result.Content.Should().Contain("![generated image 1](/userimages/0001.png)");
         result.Content.Should().Contain("Image URL: /userimages/0001.png");
         result.Content.Should().Contain("Seed: 123");
@@ -136,7 +156,7 @@ public class ImageGenerationToolTests
         var kv = new FakeKVDataService();
         kv.Write("ImageGeneration", "Config", "{ broken");
         var tool = new ImageGenerationToolV2(
-            kv, new FakeImageAttachmentService(), customWorkflowId: null, _ => new FakeComfyUiClient());
+            kv, new FakeImageAttachmentService(), profileId: null, _ => new FakeComfyUiClient());
 
         var result = await tool.ExecuteAsync(
             ImageGenerationTestData.Arguments("""{"prompt":"a cat"}"""), CancellationToken.None);
@@ -149,7 +169,8 @@ public class ImageGenerationToolTests
     [Fact]
     public async Task MissingModel_FailsAndTellsUserToConfigureIt()
     {
-        var (tool, _, _, _) = CreateDefaultTool(c => c.DefaultWorkflow.Model = "");
+        var (tool, _, _, _) = CreateDefaultTool(c =>
+            c.DefaultProfile().DefaultWorkflow.Model = "");
 
         var result = await tool.ExecuteAsync(
             ImageGenerationTestData.Arguments("""{"prompt":"a cat"}"""), CancellationToken.None);
@@ -235,7 +256,7 @@ public class ImageGenerationToolTests
     public async Task CustomWorkflow_Disabled_Fails()
     {
         var (tool, _, _, _) = CreateCustomTool(c =>
-            c.CustomWorkflows[0].Enabled = false);
+            c.FindProfile(ImageGenerationTestData.CustomWorkflowId)!.Enabled = false);
 
         var result = await tool.ExecuteAsync(
             ImageGenerationTestData.Arguments(
@@ -245,6 +266,88 @@ public class ImageGenerationToolTests
         result.Status.Should().Be(ToolResultStatus.Failed);
         result.ErrorCode.Should().Be(ToolErrorCodes.ConfigInvalid);
         result.ErrorMessage.Should().Contain("disabled");
+    }
+
+    [Fact]
+    public void A1111_DefinitionExposesStandardParametersWithoutScheduler()
+    {
+        var (tool, _, _, _) = CreateA1111Tool();
+
+        var definition = tool.GetDefinition();
+
+        definition.name.Should().Be("generate_image_a1111");
+        definition.description.Should().Contain("A1111");
+        definition.parameters!.Select(p => p.parameter.name).Should().Equal(
+            "prompt", "negative_prompt", "model", "width", "height", "steps", "cfg",
+            "sampler", "seed", "batch_size");
+    }
+
+    [Fact]
+    public async Task A1111_UsesConfiguredDefaultsAndArguments()
+    {
+        var (tool, client, attachments, _) = CreateA1111Tool();
+
+        var result = await tool.ExecuteAsync(
+            ImageGenerationTestData.Arguments("""
+                {
+                  "prompt": "a dog",
+                  "width": 768,
+                  "height": 768,
+                  "steps": 30,
+                  "cfg": 6.5,
+                  "sampler": "DPM++ 2M",
+                  "seed": 99,
+                  "batch_size": 2
+                }
+                """),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        result.Content.Should().Contain("Generated 1 image(s) (A1111 shared)");
+        result.Content.Should().Contain("Seed: 99");
+        attachments.Saved.Should().ContainSingle();
+
+        var request = client.LastRequest!;
+        request.Prompt.Should().Be("a dog");
+        request.NegativePrompt.Should().Be("low quality");
+        request.Model.Should().BeEmpty(); // A1111 允许使用服务当前模型
+        request.Width.Should().Be(768);
+        request.Height.Should().Be(768);
+        request.Steps.Should().Be(30);
+        request.CfgScale.Should().Be(6.5);
+        request.Sampler.Should().Be("DPM++ 2M");
+        request.Seed.Should().Be(99);
+        request.BatchSize.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task A1111_RejectsSchedulerArgument()
+    {
+        var (tool, _, _, _) = CreateA1111Tool();
+
+        var result = await tool.ExecuteAsync(
+            ImageGenerationTestData.Arguments("""{"prompt":"a dog","scheduler":"karras"}"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Failed);
+        result.ErrorCode.Should().Be(ToolErrorCodes.InvalidArguments);
+        result.ErrorMessage.Should().Contain("Unknown parameter(s): scheduler");
+    }
+
+    [Fact]
+    public async Task A1111_ServiceFailure_FailsWithServiceError()
+    {
+        var (tool, client, _, _) = CreateA1111Tool();
+        client.Result = A1111GenerationResult.Fail("CUDA out of memory", "trace");
+
+        var result = await tool.ExecuteAsync(
+            ImageGenerationTestData.Arguments("""{"prompt":"a dog"}"""), CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Failed);
+        result.ErrorCode.Should().Be(ToolErrorCodes.ServiceError);
+        result.ErrorMessage.Should().Contain("A1111");
+        result.ErrorMessage.Should().Contain("CUDA out of memory");
+        result.Details.Should().Be("trace");
     }
 
     [Fact]

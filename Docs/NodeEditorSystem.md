@@ -138,7 +138,7 @@ public sealed record NodePropertyOption(
 | `dyn_prompt_sets` | DynPromptNode | `DynPrompt/DynPromptSets`（值为集合名，规则名可搜索） |
 | `highlight_languages` | CodeHighlightNode | `SyntaxHighlighter.GetSupportedLanguages()` |
 | `mcp_endpoints` | McpPreGenerationNode | `Mcp/servers`（`McpEndpointCatalog`；分组为传输方式，副标题为命令/URL，停用端点带标记） |
-| `image_generation_workflows` | ImageGenerationToolSetNode | `ImageGeneration/Config` 的自定义工作流（按启用状态分组，副标题为工具说明或工具名，参数名可搜索） |
+| `image_generation_configs` | ImageGenerationToolSetNode | `ImageGeneration/Config` 的多份配置（按启用状态分组，副标题为协议 + 工作流模式 + 地址 + 工具说明，参数名可搜索；空值表示全部启用的配置） |
 
 ---
 

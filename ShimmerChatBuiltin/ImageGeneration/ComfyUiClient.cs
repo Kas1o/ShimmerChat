@@ -11,7 +11,8 @@ namespace ShimmerChatBuiltin.ImageGeneration
         string BaseUrl,
         TimeSpan RequestTimeout,
         TimeSpan MaxWait,
-        TimeSpan PollInterval);
+        TimeSpan PollInterval,
+        string ApiKey = "");
 
     /// <summary>ComfyUI 返回的一张图像。内容是原始字节，落盘由调用方经 IImageAttachmentService 完成。</summary>
     public sealed class ComfyUiImage
@@ -97,6 +98,8 @@ namespace ShimmerChatBuiltin.ImageGeneration
                 Content = new StringContent(payload.ToString(Formatting.None), Encoding.UTF8, "application/json")
             };
 
+            ImageGenerationHttp.ApplyAuthorization(request, _options.ApiKey);
+
             var (body, error) = await SendTextAsync(request, ct, "queueing the prompt");
             if (body == null)
                 return (null, error, null);
@@ -144,6 +147,8 @@ namespace ShimmerChatBuiltin.ImageGeneration
 
                 using var request = new HttpRequestMessage(
                     HttpMethod.Get, $"{_baseUrl}/history/{Uri.EscapeDataString(promptId)}");
+
+                ImageGenerationHttp.ApplyAuthorization(request, _options.ApiKey);
 
                 var (body, error) = await SendTextAsync(request, ct, "reading the prompt history");
                 if (body == null)
@@ -221,7 +226,10 @@ namespace ShimmerChatBuiltin.ImageGeneration
 
             try
             {
-                using var response = await _http.GetAsync(url, timeoutCts.Token);
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                ImageGenerationHttp.ApplyAuthorization(request, _options.ApiKey);
+
+                using var response = await _http.SendAsync(request, timeoutCts.Token);
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorBody = await response.Content.ReadAsStringAsync(timeoutCts.Token);
@@ -434,6 +442,29 @@ namespace ShimmerChatBuiltin.ImageGeneration
         {
             Timeout = Timeout.InfiniteTimeSpan
         };
+
+        /// <summary>
+        /// 按配置发送可选凭据：含冒号按 Basic（user:password），否则按 Bearer Token。
+        /// 留空时不添加 Authorization 头。
+        /// </summary>
+        public static void ApplyAuthorization(HttpRequestMessage request, string? apiKey)
+        {
+            var key = apiKey?.Trim();
+            if (string.IsNullOrEmpty(key))
+                return;
+
+            if (key.Contains(':', StringComparison.Ordinal))
+            {
+                var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes(key));
+                request.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+            }
+            else
+            {
+                request.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
+            }
+        }
     }
 
     /// <summary>设置面板用的连接探测：读取 ComfyUI 的模型 / 采样器下拉数据。</summary>
@@ -442,19 +473,19 @@ namespace ShimmerChatBuiltin.ImageGeneration
         public sealed record SamplerOptions(IReadOnlyList<string> Samplers, IReadOnlyList<string> Schedulers);
 
         public static Task<(IReadOnlyList<string>? Values, string? Error)> FetchCheckpointModelsAsync(
-            string baseUrl, TimeSpan timeout, CancellationToken ct = default) =>
-            FetchComboAsync(baseUrl, "CheckpointLoaderSimple", "ckpt_name", timeout, ct);
+            string baseUrl, string apiKey, TimeSpan timeout, CancellationToken ct = default) =>
+            FetchComboAsync(baseUrl, apiKey, "CheckpointLoaderSimple", "ckpt_name", timeout, ct);
 
         public static async Task<(SamplerOptions? Options, string? Error)> FetchSamplerOptionsAsync(
-            string baseUrl, TimeSpan timeout, CancellationToken ct = default)
+            string baseUrl, string apiKey, TimeSpan timeout, CancellationToken ct = default)
         {
             var (samplers, samplerError) =
-                await FetchComboAsync(baseUrl, "KSampler", "sampler_name", timeout, ct);
+                await FetchComboAsync(baseUrl, apiKey, "KSampler", "sampler_name", timeout, ct);
             if (samplers == null)
                 return (null, samplerError);
 
             var (schedulers, schedulerError) =
-                await FetchComboAsync(baseUrl, "KSampler", "scheduler", timeout, ct);
+                await FetchComboAsync(baseUrl, apiKey, "KSampler", "scheduler", timeout, ct);
             if (schedulers == null)
                 return (null, schedulerError);
 
@@ -462,7 +493,8 @@ namespace ShimmerChatBuiltin.ImageGeneration
         }
 
         private static async Task<(IReadOnlyList<string>? Values, string? Error)> FetchComboAsync(
-            string baseUrl, string nodeName, string inputName, TimeSpan timeout, CancellationToken ct)
+            string baseUrl, string apiKey, string nodeName, string inputName, TimeSpan timeout,
+            CancellationToken ct)
         {
             var url = $"{baseUrl.Trim().TrimEnd('/')}/object_info/{nodeName}";
 
@@ -471,7 +503,10 @@ namespace ShimmerChatBuiltin.ImageGeneration
 
             try
             {
-                using var response = await ImageGenerationHttp.Client.GetAsync(url, timeoutCts.Token);
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                ImageGenerationHttp.ApplyAuthorization(request, apiKey);
+
+                using var response = await ImageGenerationHttp.Client.SendAsync(request, timeoutCts.Token);
                 var body = await response.Content.ReadAsStringAsync(timeoutCts.Token);
 
                 if (!response.IsSuccessStatusCode)

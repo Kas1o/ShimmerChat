@@ -1,0 +1,375 @@
+/* 文生图设置：左侧配置列表 + 右侧编辑器。宽屏并排，窄屏切换为二级页。 */
+.imagegen-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 100%;
+}
+
+/* ── 头部 ─────────────────────────────────────── */
+.imagegen-hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.imagegen-hero-text h2 { margin: 0; font-size: 1.4rem; }
+.imagegen-hero-text p { margin: 6px 0 0; max-width: 78ch; color: var(--su-text-2); font-size: var(--su-font-sm); }
+
+/* ── 布局 ─────────────────────────────────────── */
+.imagegen-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    min-height: 460px;
+}
+
+.imagegen-sidebar {
+    flex: 0 0 320px;
+    max-width: 320px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    max-height: calc(100vh - 190px);
+    overflow-y: auto;
+    padding: 14px;
+    background: var(--su-surface-3);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-lg);
+}
+
+.imagegen-sidebar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--su-border-1);
+    font-weight: 600;
+}
+
+.imagegen-config-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.imagegen-config-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    text-align: left;
+    font: inherit;
+    color: var(--su-text-1);
+    background: var(--su-surface-2);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+    cursor: pointer;
+    transition: border-color var(--su-transition), background var(--su-transition);
+}
+.imagegen-config-card:hover { border-color: var(--su-border-1); background: var(--su-surface-1); }
+.imagegen-config-card.is-active {
+    background: var(--su-accent-soft);
+    border-color: var(--su-accent);
+}
+
+.imagegen-config-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--su-radius-md);
+    font-size: 1rem;
+}
+.imagegen-config-icon.is-comfy { background: rgba(120, 90, 220, 0.16); color: #9d8cff; }
+.imagegen-config-icon.is-a1111 { background: rgba(60, 170, 120, 0.16); color: #54c492; }
+
+.imagegen-config-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.imagegen-config-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.imagegen-config-meta { font-size: var(--su-font-xs); color: var(--su-text-2); }
+.imagegen-config-url {
+    font-size: var(--su-font-xs);
+    color: var(--su-text-2);
+    opacity: 0.8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.imagegen-config-state {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    margin-top: 5px;
+    border-radius: 50%;
+}
+.imagegen-config-state.is-on { background: var(--su-success, #38b26b); }
+.imagegen-config-state.is-off { background: var(--su-text-2); opacity: 0.45; }
+
+.imagegen-empty-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 36px 14px;
+    text-align: center;
+    color: var(--su-text-2);
+}
+.imagegen-empty-list i { font-size: 2.2rem; opacity: 0.35; }
+.imagegen-empty-list p { margin: 0; font-size: var(--su-font-sm); }
+
+/* ── 编辑区 ───────────────────────────────────── */
+.imagegen-editor {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    background: var(--su-surface-3);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-lg);
+}
+
+.imagegen-editor-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--su-border-1);
+}
+.imagegen-editor-title { min-width: 0; flex: 1; }
+.imagegen-editor-title h3 {
+    margin: 0;
+    font-size: var(--su-font-lg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.imagegen-editor-title code {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: var(--su-font-xs);
+    color: var(--su-text-2);
+    background: var(--su-surface-1);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-sm);
+    padding: 1px 6px;
+}
+
+.imagegen-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--su-font-sm);
+    color: var(--su-text-2);
+    cursor: pointer;
+    user-select: none;
+}
+.imagegen-switch input { accent-color: var(--su-accent); }
+
+.imagegen-icon-btn { padding: 4px 8px; }
+.imagegen-danger:hover { color: var(--su-danger); background: var(--su-danger-soft); }
+
+.imagegen-back { display: none; padding: 4px 8px; }
+
+.imagegen-confirm {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    background: var(--su-danger-soft);
+    border: 1px solid var(--su-danger);
+    border-radius: var(--su-radius-md);
+    font-size: var(--su-font-sm);
+}
+.imagegen-confirm-actions { display: inline-flex; gap: 8px; }
+
+/* ── 分区与表单 ───────────────────────────────── */
+.imagegen-section {
+    padding: 14px;
+    background: var(--su-surface-2);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+}
+.imagegen-section h4 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    font-size: var(--su-font-base);
+    border-bottom: 1px solid var(--su-border-1);
+}
+
+.imagegen-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 12px;
+}
+.imagegen-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.imagegen-field .su-label { margin: 0; }
+.imagegen-field .su-input,
+.imagegen-field .su-select { width: 100%; }
+.imagegen-span-3 { grid-column: span 3; }
+.imagegen-span-4 { grid-column: span 4; }
+.imagegen-span-6 { grid-column: span 6; }
+.imagegen-span-8 { grid-column: span 8; }
+.imagegen-span-12 { grid-column: span 12; }
+
+.imagegen-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    tab-size: 2;
+}
+
+/* ── 单选卡片（服务方 / 工作流模式） ────────────── */
+.imagegen-provider-label { display: block; margin: 14px 0 6px; }
+.imagegen-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 10px;
+}
+.imagegen-choice-grid-tight { margin-top: 2px; }
+
+.imagegen-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    background: var(--su-surface-1);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+    cursor: pointer;
+    transition: border-color var(--su-transition), background var(--su-transition);
+}
+.imagegen-choice:hover { border-color: var(--su-border-1); }
+.imagegen-choice:focus-within { outline: 2px solid var(--su-accent); outline-offset: 1px; }
+.imagegen-choice.is-selected { border-color: var(--su-accent); background: var(--su-accent-soft); }
+.imagegen-choice input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.imagegen-choice-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--su-radius-md);
+    background: var(--su-surface-2);
+    font-size: 1rem;
+}
+.imagegen-choice-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.imagegen-choice-text strong { font-size: var(--su-font-sm); }
+.imagegen-choice-text span { font-size: var(--su-font-xs); color: var(--su-text-2); line-height: 1.4; }
+
+/* ── 连接探测 ─────────────────────────────────── */
+.imagegen-inline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.imagegen-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    font-size: var(--su-font-sm);
+    color: var(--su-text-2);
+    background: var(--su-surface-2);
+    border: 1px dashed var(--su-border-1);
+    border-radius: var(--su-radius-md);
+}
+
+/* ── 自定义工作流参数 ─────────────────────────── */
+.imagegen-subhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 16px 0 8px;
+    flex-wrap: wrap;
+}
+.imagegen-param {
+    margin-top: 10px;
+    padding: 10px;
+    background: var(--su-surface-1);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+}
+.imagegen-param-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.imagegen-param-name { flex: 1 1 160px; }
+.imagegen-param-head .su-select { flex: 0 1 130px; }
+.imagegen-inline-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--su-font-sm);
+    color: var(--su-text-2);
+    white-space: nowrap;
+}
+
+/* ── 底部操作栏 ───────────────────────────────── */
+.imagegen-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 14px;
+    border-top: 1px solid var(--su-border-1);
+}
+
+.imagegen-empty-editor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 360px;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--su-text-2);
+}
+.imagegen-empty-editor i { font-size: 3rem; opacity: 0.3; }
+.imagegen-empty-editor h3 { margin: 0; color: var(--su-text-1); }
+.imagegen-empty-editor p { margin: 0; max-width: 48ch; font-size: var(--su-font-sm); }
+
+/* ── 窄屏：列表 ↔ 编辑器二级切换 ──────────────── */
+@media (max-width: 899px) {
+    .imagegen-layout { display: block; }
+    .imagegen-sidebar {
+        max-width: none;
+        position: static;
+        max-height: none;
+        display: block;
+    }
+    .imagegen-editor { display: none; }
+    .imagegen-layout.show-editor .imagegen-sidebar { display: none; }
+    .imagegen-layout.show-editor .imagegen-editor { display: block; }
+    .imagegen-back { display: inline-flex; }
+
+    .imagegen-span-3,
+    .imagegen-span-4,
+    .imagegen-span-6,
+    .imagegen-span-8 { grid-column: span 12; }
+}

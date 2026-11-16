@@ -27,39 +27,58 @@ public class ImageGenerationToolSetNodeTests : NodeTestBase
         KvMock.Setup(k => k.Read("ImageGeneration", "Config")).Returns(json);
 
     [Fact]
-    public async Task ConfiguresExpectedToolNames()
+    public async Task ConfiguresEveryEnabledProfile()
     {
-        var disabledDraft = ImageGenerationTestData.CreateCustomWorkflow(enabled: false);
+        var disabledDraft = ImageGenerationTestData.CreateCustomProfile(enabled: false);
         disabledDraft.Id = "draft";
         disabledDraft.Name = "Draft";
-        disabledDraft.WorkflowJson = "";
-        disabledDraft.Parameters = [];
+        disabledDraft.CustomWorkflowJson = "";
+        disabledDraft.CustomWorkflowParameters = [];
 
         SetupConfig(ImageGenerationTestData.ConfigJson(c =>
-            c.CustomWorkflows =
-            [
-                ImageGenerationTestData.CreateCustomWorkflow(),
-                disabledDraft
-            ]));
+        {
+            c.Profiles.Add(ImageGenerationTestData.CreateCustomProfile());
+            c.Profiles.Add(ImageGenerationTestData.CreateA1111Profile());
+            c.Profiles.Add(disabledDraft);
+        }));
 
         var context = CreateContext();
         var result = await new ImageGenerationToolSetNode().ExecuteAsync(context);
 
         result.Success.Should().BeTrue();
         context.Env.Transient.Tools.Select(t => t.GetDefinition().name)
-            .Should().Equal("generate_image", "generate_image_portrait");
+            .Should().Equal("generate_image", "generate_image_portrait", "generate_image_a1111");
     }
 
     [Fact]
-    public async Task MissingModel_Fails()
+    public async Task MissingModelForComfyDefaultProfile_Fails()
     {
-        SetupConfig(ImageGenerationTestData.ConfigJson(c => c.DefaultWorkflow.Model = ""));
+        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
+            c.DefaultProfile().DefaultWorkflow.Model = ""));
 
         var result = await new ImageGenerationToolSetNode().ExecuteAsync(CreateContext());
 
         result.Success.Should().BeFalse();
         result.Code.Should().Be(NodeErrorCodes.ConfigNotFound);
         result.Message.Should().Contain("node_err.image_generation_model_missing");
+        result.Message.Should().Contain("Default");
+    }
+
+    [Fact]
+    public async Task A1111WithoutModel_DoesNotFail()
+    {
+        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
+        {
+            c.Profiles[0].Enabled = false;
+            c.Profiles.Add(ImageGenerationTestData.CreateA1111Profile());
+        }));
+
+        var context = CreateContext();
+        var result = await new ImageGenerationToolSetNode().ExecuteAsync(context);
+
+        result.Success.Should().BeTrue();
+        context.Env.Transient.Tools.Select(t => t.GetDefinition().name)
+            .Should().Equal("generate_image_a1111");
     }
 
     [Fact]
@@ -100,109 +119,75 @@ public class ImageGenerationToolSetNodeTests : NodeTestBase
     }
 
     [Fact]
-    public async Task BothSourcesDisabled_AddsNothing()
+    public async Task NoEnabledProfile_AddsNothingAndLogs()
     {
-        SetupConfig(ImageGenerationTestData.ConfigJson());
-        var node = new ImageGenerationToolSetNode
-        {
-            EnableDefaultWorkflow = false,
-            EnableCustomWorkflows = false
-        };
-
-        var context = CreateContext();
-        var result = await node.ExecuteAsync(context);
-
-        result.Success.Should().BeTrue();
-        context.Env.Transient.Tools.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task SelectedCustomWorkflow_ExposesOnlyThatTool()
-    {
-        var second = ImageGenerationTestData.CreateCustomWorkflow();
-        second.Id = "landscape";
-        second.Name = "Landscape";
-
-        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
-            c.CustomWorkflows =
-            [
-                ImageGenerationTestData.CreateCustomWorkflow(),
-                second
-            ]));
-
-        var node = new ImageGenerationToolSetNode
-        {
-            EnableDefaultWorkflow = false,
-            CustomWorkflowId = "portrait"
-        };
-
-        var context = CreateContext();
-        var result = await node.ExecuteAsync(context);
-
-        result.Success.Should().BeTrue();
-        context.Env.Transient.Tools.Select(t => t.GetDefinition().name)
-            .Should().Equal("generate_image_portrait");
-    }
-
-    [Fact]
-    public async Task SelectedCustomWorkflow_NotFound_Fails()
-    {
-        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
-            c.CustomWorkflows = [ImageGenerationTestData.CreateCustomWorkflow()]));
-
-        var node = new ImageGenerationToolSetNode
-        {
-            EnableDefaultWorkflow = false,
-            CustomWorkflowId = "missing"
-        };
-
-        var result = await node.ExecuteAsync(CreateContext());
-
-        result.Success.Should().BeFalse();
-        result.Code.Should().Be(NodeErrorCodes.ConfigNotFound);
-        result.Message.Should().Contain("node_err.image_generation_workflow_not_found");
-    }
-
-    [Fact]
-    public async Task SelectedCustomWorkflow_Disabled_FailsInsteadOfSilentlySkipping()
-    {
-        var draft = ImageGenerationTestData.CreateCustomWorkflow(enabled: false);
-        draft.Id = "draft";
-        draft.Name = "Draft";
-
-        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
-            c.CustomWorkflows = [draft]));
-
-        var node = new ImageGenerationToolSetNode
-        {
-            EnableDefaultWorkflow = false,
-            CustomWorkflowId = "draft"
-        };
-
-        var result = await node.ExecuteAsync(CreateContext());
-
-        result.Success.Should().BeFalse();
-        result.Code.Should().Be(NodeErrorCodes.ConfigNotFound);
-        result.Message.Should().Contain("node_err.image_generation_workflow_disabled");
-    }
-
-    [Fact]
-    public async Task NoEnabledCustomWorkflows_AddsDefaultAndLogs()
-    {
-        var disabledDraft = ImageGenerationTestData.CreateCustomWorkflow(enabled: false);
-        disabledDraft.WorkflowJson = "";
-        disabledDraft.Parameters = [];
-
-        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
-            c.CustomWorkflows = [disabledDraft]));
+        SetupConfig(ImageGenerationTestData.ConfigJson(c => c.Profiles[0].Enabled = false));
 
         var context = CreateContext();
         var result = await new ImageGenerationToolSetNode().ExecuteAsync(context);
 
         result.Success.Should().BeTrue();
-        context.Env.Transient.Tools.Select(t => t.GetDefinition().name)
-            .Should().Equal("generate_image");
+        context.Env.Transient.Tools.Should().BeEmpty();
         DebugOutputMock.Verify(d => d.Write("ImageGenerationToolSetNode", "ImageGeneration",
-            It.Is<string>(m => m.Contains("no custom image workflow is enabled"))), Times.Once);
+            It.Is<string>(m => m.Contains("no enabled image generation configuration"))), Times.Once);
+    }
+
+    [Fact]
+    public async Task SelectedConfiguration_ExposesOnlyThatTool()
+    {
+        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
+        {
+            c.Profiles.Add(ImageGenerationTestData.CreateCustomProfile());
+            c.Profiles.Add(ImageGenerationTestData.CreateA1111Profile());
+        }));
+
+        var node = new ImageGenerationToolSetNode
+        {
+            ConfigurationId = ImageGenerationTestData.A1111ProfileId
+        };
+
+        var context = CreateContext();
+        var result = await node.ExecuteAsync(context);
+
+        result.Success.Should().BeTrue();
+        context.Env.Transient.Tools.Select(t => t.GetDefinition().name)
+            .Should().Equal("generate_image_a1111");
+    }
+
+    [Fact]
+    public async Task SelectedConfiguration_NotFound_Fails()
+    {
+        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
+            c.Profiles.Add(ImageGenerationTestData.CreateCustomProfile())));
+
+        var node = new ImageGenerationToolSetNode { ConfigurationId = "missing" };
+
+        var result = await node.ExecuteAsync(CreateContext());
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(NodeErrorCodes.ConfigNotFound);
+        result.Message.Should().Contain("node_err.image_generation_config_not_found");
+    }
+
+    [Fact]
+    public async Task SelectedConfiguration_Disabled_FailsInsteadOfSilentlySkipping()
+    {
+        var draft = ImageGenerationTestData.CreateCustomProfile(enabled: false);
+        draft.Id = "draft";
+        draft.Name = "Draft";
+
+        SetupConfig(ImageGenerationTestData.ConfigJson(c =>
+        {
+            c.Profiles.Add(draft);
+        }));
+
+        var node = new ImageGenerationToolSetNode { ConfigurationId = "draft" };
+
+        var result = await node.ExecuteAsync(CreateContext());
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(NodeErrorCodes.ConfigNotFound);
+        result.Message.Should().Contain("node_err.image_generation_config_disabled");
+        result.Message.Should().Contain("Draft");
     }
 }

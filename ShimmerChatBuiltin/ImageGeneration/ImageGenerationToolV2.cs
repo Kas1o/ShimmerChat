@@ -9,26 +9,27 @@ using ShimmerChatLib.Interface;
 namespace ShimmerChatBuiltin.ImageGeneration
 {
     /// <summary>
-    /// 文生图工具。同一个实现服务两种工作流：
+    /// 文生图工具。一份 <see cref="ImageGenerationProfile"/> 对应一个工具：
     /// <list type="bullet">
-    /// <item>默认工作流（<c>_customWorkflowId == null</c>）：模型、宽高、采样参数可由工具参数覆盖；</item>
-    /// <item>自定义工作流：工具形参完全来自工作流配置中的参数声明，工作流 JSON 由模板引擎替换。</item>
+    /// <item>ComfyUI 默认工作流：模型、宽高、采样参数可由工具参数覆盖；</item>
+    /// <item>ComfyUI 自定义工作流：工具形参完全来自配置中的参数声明，工作流 JSON 由模板引擎替换；</item>
+    /// <item>A1111：标准 txt2img 参数，模型 / 宽高 / 采样参数可由工具参数覆盖。</item>
     /// </list>
     /// 生成结果经 <see cref="IImageAttachmentService.SaveGeneratedAsync"/> 落到 UserUploadImage，
     /// 返回内容里带上 <c>/userimages/...</c> 的 Markdown 链接，供模型直接嵌入回复。
     /// </summary>
     public sealed class ImageGenerationToolV2 : IAutoCreateToolV2, IToolV3
     {
-        public const string DefaultToolName = "generate_image";
+        public const string DefaultToolName = ImageGenerationConfigManager.DefaultToolName;
 
         public static string NameKey => "tool.generate_image";
         public static string DescriptionKey => "tool.generate_image.desc";
         public static string[] CategoryKeys => ["category.image_generation", "category.content"];
 
         public static IAutoCreateToolV2 Create(PersistentEnv env) =>
-            new ImageGenerationToolV2(env.KVData, env.ImageAttachments, customWorkflowId: null);
+            new ImageGenerationToolV2(env.KVData, env.ImageAttachments, profileId: null);
 
-        private static readonly HashSet<string> DefaultArgumentNames = new(StringComparer.Ordinal)
+        private static readonly HashSet<string> ComfyArgumentNames = new(StringComparer.Ordinal)
         {
             "prompt",
             "negative_prompt",
@@ -43,68 +44,86 @@ namespace ShimmerChatBuiltin.ImageGeneration
             "batch_size"
         };
 
+        private static readonly HashSet<string> A1111ArgumentNames = new(StringComparer.Ordinal)
+        {
+            "prompt",
+            "negative_prompt",
+            "model",
+            "width",
+            "height",
+            "steps",
+            "cfg",
+            "sampler",
+            "seed",
+            "batch_size"
+        };
+
         private readonly IImageAttachmentService? _imageAttachments;
-        private readonly string? _customWorkflowId;
-        private readonly Func<ImageGenerationConfig, IComfyUiClient> _clientFactory;
+        private readonly string? _profileId;
+        private readonly Func<ImageGenerationProfile, IComfyUiClient> _comfyClientFactory;
+        private readonly Func<ImageGenerationProfile, IA1111Client> _a1111ClientFactory;
         private readonly ImageGenerationConfig? _config;
         private readonly string? _configError;
 
         public ImageGenerationToolV2(
             IKVDataService kvData,
             IImageAttachmentService? imageAttachments,
-            string? customWorkflowId)
-            : this(kvData, imageAttachments, customWorkflowId, clientFactory: null)
+            string? profileId)
+            : this(kvData, imageAttachments, profileId, comfyClientFactory: null, a1111ClientFactory: null)
         {
         }
 
         internal ImageGenerationToolV2(
             IKVDataService kvData,
             IImageAttachmentService? imageAttachments,
-            string? customWorkflowId,
-            Func<ImageGenerationConfig, IComfyUiClient>? clientFactory)
+            string? profileId,
+            Func<ImageGenerationProfile, IComfyUiClient>? comfyClientFactory,
+            Func<ImageGenerationProfile, IA1111Client>? a1111ClientFactory = null)
         {
             _imageAttachments = imageAttachments;
-            _customWorkflowId = customWorkflowId;
-            _clientFactory = clientFactory ?? CreateClient;
+            _profileId = profileId;
+            _comfyClientFactory = comfyClientFactory ?? CreateComfyClient;
+            _a1111ClientFactory = a1111ClientFactory ?? CreateA1111Client;
 
             (_config, _configError) = ImageGenerationConfigManager.Load(kvData);
         }
 
-        /// <summary>自定义工作流的工具名：<c>generate_image_{id}</c>。Id 已由配置校验限定字符集。</summary>
-        public static string GetCustomToolName(string workflowId) =>
-            $"{DefaultToolName}_{workflowId}";
-
         public Tool GetDefinition()
         {
-            if (_customWorkflowId != null)
-            {
-                var workflow = _config?.FindCustomWorkflow(_customWorkflowId);
-                if (workflow == null)
-                {
-                    return new Tool
-                    {
-                        name = GetCustomToolName(_customWorkflowId),
-                        description =
-                            $"Custom image workflow '{_customWorkflowId}' is not configured. " +
-                            "Ask the user to check the Image Generation settings before using this tool.",
-                        parameters = []
-                    };
-                }
+            var profile = ResolveProfile();
 
+            if (profile == null)
+            {
                 return new Tool
                 {
-                    name = GetCustomToolName(workflow.Id),
-                    description = BuildCustomDescription(workflow),
-                    parameters = BuildCustomParameters(workflow.Parameters)
+                    name = ResolveToolName(),
+                    description = _profileId == null
+                        ? "Image generation is not configured correctly. " +
+                          "Ask the user to check the Image Generation settings panel."
+                        : $"Image generation configuration '{_profileId}' is not configured or is disabled. " +
+                          "Ask the user to check the Image Generation settings panel.",
+                    parameters = []
                 };
             }
 
-            var defaults = _config?.DefaultWorkflow ?? new DefaultImageWorkflowSettings();
+            var descriptor = ImageApiProviderCatalog.Get(profile.Provider);
+
+            if (profile.Provider == ImageApiProvider.ComfyUi
+                && profile.WorkflowMode == ImageWorkflowMode.Custom)
+            {
+                return new Tool
+                {
+                    name = ImageGenerationConfigManager.GetToolName(profile.Id),
+                    description = BuildCustomDescription(profile),
+                    parameters = BuildCustomParameters(profile.CustomWorkflowParameters ?? [])
+                };
+            }
+
             return new Tool
             {
-                name = DefaultToolName,
-                description = BuildDefaultDescription(defaults),
-                parameters = BuildDefaultParameters(defaults)
+                name = ImageGenerationConfigManager.GetToolName(profile.Id),
+                description = BuildStandardDescription(profile, descriptor),
+                parameters = BuildStandardParameters(profile, descriptor)
             };
         }
 
@@ -118,6 +137,23 @@ namespace ShimmerChatBuiltin.ImageGeneration
                     _configError);
             }
 
+            var profile = ResolveProfile();
+            if (profile == null)
+            {
+                return ToolResult.Fail(
+                    ToolErrorCodes.ConfigInvalid,
+                    _profileId == null
+                        ? "No enabled image generation configuration is available."
+                        : $"Image generation configuration '{_profileId}' is not configured.");
+            }
+
+            if (!profile.Enabled)
+            {
+                return ToolResult.Fail(
+                    ToolErrorCodes.ConfigInvalid,
+                    $"Image generation configuration '{profile.Name}' is disabled in the settings.");
+            }
+
             if (_imageAttachments == null)
             {
                 return ToolResult.Fail(
@@ -129,82 +165,16 @@ namespace ShimmerChatBuiltin.ImageGeneration
             if (arguments == null)
                 return ToolResult.Fail(ToolErrorCodes.InvalidArguments, "Arguments must be a JSON object.");
 
-            JObject workflow;
-            string workflowLabel;
-            long? seed = null;
+            var (images, label, seed, errorCode, error, details) =
+                await GenerateImagesAsync(profile, arguments, ct);
 
-            if (_customWorkflowId == null)
-            {
-                var (request, error) = ResolveDefaultArguments(arguments, _config);
-                if (request == null)
-                    return ToolResult.Fail(ToolErrorCodes.InvalidArguments, error!);
+            if (images == null)
+                return ToolResult.Fail(errorCode!, error!, details);
 
-                workflow = DefaultImageWorkflow.Build(
-                    request.Model,
-                    request.Prompt,
-                    request.NegativePrompt,
-                    request.Width,
-                    request.Height,
-                    request.Steps,
-                    request.CfgScale,
-                    request.Sampler,
-                    request.Scheduler,
-                    request.Seed,
-                    request.BatchSize);
+            var links = new List<string>(images.Count);
+            var savedImages = new List<MessageImage>(images.Count);
 
-                workflowLabel = "default workflow";
-                seed = request.Seed;
-            }
-            else
-            {
-                var customWorkflow = _config.FindCustomWorkflow(_customWorkflowId);
-                if (customWorkflow == null)
-                {
-                    return ToolResult.Fail(
-                        ToolErrorCodes.ConfigInvalid,
-                        $"Custom image workflow '{_customWorkflowId}' is not configured.");
-                }
-
-                if (!customWorkflow.Enabled)
-                {
-                    return ToolResult.Fail(
-                        ToolErrorCodes.ConfigInvalid,
-                        $"Custom image workflow '{customWorkflow.Name}' is disabled in the Image Generation settings.");
-                }
-
-                var (values, bindError) = WorkflowTemplateEngine.Bind(customWorkflow.Parameters, arguments);
-                if (values == null)
-                    return ToolResult.Fail(ToolErrorCodes.InvalidArguments, bindError!);
-
-                var (rendered, renderError) =
-                    WorkflowTemplateEngine.Render(customWorkflow.WorkflowJson, values);
-                if (rendered == null)
-                {
-                    return ToolResult.Fail(
-                        ToolErrorCodes.ConfigInvalid,
-                        $"Custom image workflow '{customWorkflow.Name}' could not be rendered.",
-                        renderError);
-                }
-
-                workflow = rendered;
-                workflowLabel = customWorkflow.Name;
-            }
-
-            var client = _clientFactory(_config);
-            var generation = await client.GenerateAsync(workflow, ct);
-
-            if (!generation.Success)
-            {
-                return ToolResult.Fail(
-                    ToolErrorCodes.ServiceError,
-                    $"ComfyUI image generation failed: {generation.Error}",
-                    generation.Details);
-            }
-
-            var links = new List<string>(generation.Images.Count);
-            var savedImages = new List<MessageImage>(generation.Images.Count);
-
-            foreach (var image in generation.Images)
+            foreach (var image in images)
             {
                 MessageImage saved;
                 try
@@ -238,39 +208,189 @@ namespace ShimmerChatBuiltin.ImageGeneration
             }
 
             // 链接给"回复里展示"，图像附件给模型"下一轮真正看到"；两者缺一不可。
-            return ToolResult.Ok(FormatResult(links, workflowLabel, seed), savedImages);
+            return ToolResult.Ok(FormatResult(links, label, seed), savedImages);
         }
 
-        private static string BuildDefaultDescription(DefaultImageWorkflowSettings settings)
+        private async Task<(List<GeneratedImage>? Images, string Label, long? Seed,
+            string? ErrorCode, string? Error, string? Details)> GenerateImagesAsync(
+            ImageGenerationProfile profile, JObject arguments, CancellationToken ct)
         {
-            var model = string.IsNullOrWhiteSpace(settings.Model)
-                ? "not configured"
-                : settings.Model;
+            var label = profile.Name;
 
-            return "Generate an image from a text prompt with ComfyUI using the default workflow. " +
-                   $"Configured checkpoint: {model}. Width, height, steps, CFG, sampler, scheduler, seed and batch size " +
-                   "can be overridden per call. On success the tool returns /userimages/... links; " +
-                   "embed the returned Markdown image snippet in your reply so the user can see the image.";
+            if (profile.Provider == ImageApiProvider.Automatic1111)
+            {
+                var descriptor = ImageApiProviderCatalog.Get(profile.Provider);
+                var (request, argumentError) =
+                    ResolveStandardArguments(arguments, profile, descriptor);
+
+                if (request == null)
+                    return (null, label, null, ToolErrorCodes.InvalidArguments, argumentError, null);
+
+                var client = _a1111ClientFactory(profile);
+                var generation = await client.GenerateAsync(
+                    new A1111Txt2ImgRequest(
+                        request.Prompt,
+                        request.NegativePrompt,
+                        request.Model,
+                        request.Sampler,
+                        request.Width,
+                        request.Height,
+                        request.Steps,
+                        request.CfgScale,
+                        request.Seed,
+                        request.BatchSize),
+                    ct);
+
+                if (!generation.Success)
+                {
+                    return (null, label, null, ToolErrorCodes.ServiceError,
+                        $"{descriptor.DisplayName} image generation failed: {generation.Error}",
+                        generation.Details);
+                }
+
+                return (
+                    generation.Images
+                        .Select(i => new GeneratedImage(i.FileName, i.ContentType, i.Content))
+                        .ToList(),
+                    label,
+                    request.Seed,
+                    null,
+                    null,
+                    null);
+            }
+
+            var comfyDescriptor = ImageApiProviderCatalog.Get(ImageApiProvider.ComfyUi);
+            JObject workflow;
+            long? seed;
+
+            if (profile.WorkflowMode == ImageWorkflowMode.Custom)
+            {
+                var (values, bindError) =
+                    WorkflowTemplateEngine.Bind(profile.CustomWorkflowParameters ?? [], arguments);
+                if (values == null)
+                    return (null, label, null, ToolErrorCodes.InvalidArguments, bindError, null);
+
+                var (rendered, renderError) =
+                    WorkflowTemplateEngine.Render(profile.CustomWorkflowJson, values);
+                if (rendered == null)
+                {
+                    return (null, label, null, ToolErrorCodes.ConfigInvalid,
+                        $"Image generation configuration '{profile.Name}' could not be rendered.",
+                        renderError);
+                }
+
+                workflow = rendered;
+                seed = null;
+            }
+            else
+            {
+                var (request, argumentError) =
+                    ResolveStandardArguments(arguments, profile, comfyDescriptor);
+
+                if (request == null)
+                    return (null, label, null, ToolErrorCodes.InvalidArguments, argumentError, null);
+
+                workflow = DefaultImageWorkflow.Build(
+                    request.Model,
+                    request.Prompt,
+                    request.NegativePrompt,
+                    request.Width,
+                    request.Height,
+                    request.Steps,
+                    request.CfgScale,
+                    request.Sampler,
+                    request.Scheduler,
+                    request.Seed,
+                    request.BatchSize);
+
+                seed = request.Seed;
+            }
+
+            var comfyClient = _comfyClientFactory(profile);
+            var comfyGeneration = await comfyClient.GenerateAsync(workflow, ct);
+
+            if (!comfyGeneration.Success)
+            {
+                return (null, label, null, ToolErrorCodes.ServiceError,
+                    $"{comfyDescriptor.DisplayName} image generation failed: {comfyGeneration.Error}",
+                    comfyGeneration.Details);
+            }
+
+            return (
+                comfyGeneration.Images
+                    .Select(i => new GeneratedImage(i.FileName, i.ContentType, i.Content))
+                    .ToList(),
+                label,
+                seed,
+                null,
+                null,
+                null);
         }
 
-        private static string BuildCustomDescription(CustomImageWorkflow workflow)
+        private ImageGenerationProfile? ResolveProfile()
         {
+            if (_config == null)
+                return null;
+
+            if (!string.IsNullOrWhiteSpace(_profileId))
+                return _config.FindProfile(_profileId);
+
+            // 自动创建的工具（没有指定 Id）优先使用默认配置，否则使用第一份启用的配置。
+            var defaultProfile = _config.FindProfile(ImageGenerationConfigManager.DefaultProfileId);
+            if (defaultProfile != null && defaultProfile.Enabled)
+                return defaultProfile;
+
+            return _config.Profiles.FirstOrDefault(p => p.Enabled);
+        }
+
+        private string ResolveToolName() =>
+            string.IsNullOrWhiteSpace(_profileId)
+                ? DefaultToolName
+                : ImageGenerationConfigManager.GetToolName(_profileId!);
+
+        private static string BuildStandardDescription(
+            ImageGenerationProfile profile, ImageApiProviderDescriptor descriptor)
+        {
+            var model = string.IsNullOrWhiteSpace(profile.DefaultWorkflow.Model)
+                ? "not configured (uses the server's current model)"
+                : profile.DefaultWorkflow.Model;
+
+            var parameters = descriptor.SupportsScheduler
+                ? "Width, height, steps, CFG, sampler, scheduler, seed and batch size"
+                : "Width, height, steps, CFG, sampler, seed and batch size";
+
             var description =
-                $"Generate an image with the ComfyUI custom workflow '{workflow.Name}'.";
+                $"Generate an image from a text prompt with {descriptor.DisplayName} " +
+                $"using the image configuration '{profile.Name}'. Configured model: {model}. " +
+                $"{parameters} can be overridden per call.";
 
-            if (!string.IsNullOrWhiteSpace(workflow.Description))
-                description += " " + workflow.Description.Trim();
+            if (!string.IsNullOrWhiteSpace(profile.Description))
+                description += " " + profile.Description.Trim();
 
             return description +
                    " On success the tool returns /userimages/... links; embed the returned Markdown image " +
                    "snippet in your reply so the user can see the image.";
         }
 
-        private static List<(ToolParameter Parameter, bool Required)> BuildDefaultParameters(
-            DefaultImageWorkflowSettings settings)
+        private static string BuildCustomDescription(ImageGenerationProfile profile)
         {
-            return
-            [
+            var description =
+                $"Generate an image with the ComfyUI custom workflow '{profile.Name}'.";
+
+            if (!string.IsNullOrWhiteSpace(profile.Description))
+                description += " " + profile.Description.Trim();
+
+            return description +
+                   " On success the tool returns /userimages/... links; embed the returned Markdown image " +
+                   "snippet in your reply so the user can see the image.";
+        }
+
+        private static List<(ToolParameter Parameter, bool Required)> BuildStandardParameters(
+            ImageGenerationProfile profile, ImageApiProviderDescriptor descriptor)
+        {
+            var settings = profile.DefaultWorkflow;
+            var parameters = new List<(ToolParameter, bool)>
+            {
                 (Param("prompt", ParameterType.String,
                     "Text prompt describing the image to generate."), true),
 
@@ -281,9 +401,14 @@ namespace ShimmerChatBuiltin.ImageGeneration
                         : $": {settings.NegativePrompt}")), false),
 
                 (Param("model", ParameterType.String,
-                    string.IsNullOrWhiteSpace(settings.Model)
-                        ? "Checkpoint name (ckpt_name) to load. Required: no default model is configured."
-                        : $"Checkpoint name (ckpt_name) to load. Defaults to '{settings.Model}'."), false),
+                    descriptor.Kind == ImageApiProvider.ComfyUi
+                        ? (string.IsNullOrWhiteSpace(settings.Model)
+                            ? "Checkpoint name (ckpt_name) to load. Required: no default model is configured."
+                            : $"Checkpoint name (ckpt_name) to load. Defaults to '{settings.Model}'.")
+                        : (string.IsNullOrWhiteSpace(settings.Model)
+                            ? "Checkpoint name to load (sd_model_checkpoint). Defaults to the server's current model."
+                            : $"Checkpoint name to load (sd_model_checkpoint). Defaults to '{settings.Model}'.")),
+                    false),
 
                 (Param("width", ParameterType.Number,
                     $"Image width in pixels (multiple of 8, {ImageGenerationConfigManager.MinDimension}-" +
@@ -305,16 +430,21 @@ namespace ShimmerChatBuiltin.ImageGeneration
                 (Param("sampler", ParameterType.String,
                     $"Sampler name, e.g. euler / dpmpp_2m. Defaults to '{settings.Sampler}'."), false),
 
-                (Param("scheduler", ParameterType.String,
-                    $"Scheduler name, e.g. normal / karras. Defaults to '{settings.Scheduler}'."), false),
-
                 (Param("seed", ParameterType.Number,
                     "Random seed. Omit it to pick a random seed for each call."), false),
 
                 (Param("batch_size", ParameterType.Number,
                     $"Number of images to generate in one batch ({ImageGenerationConfigManager.MinBatchSize}-" +
                     $"{ImageGenerationConfigManager.MaxBatchSize}). Defaults to {settings.BatchSize}."), false)
-            ];
+            };
+
+            if (descriptor.SupportsScheduler)
+            {
+                parameters.Insert(7, (Param("scheduler", ParameterType.String,
+                    $"Scheduler name, e.g. normal / karras. Defaults to '{settings.Scheduler}'."), false));
+            }
+
+            return parameters;
         }
 
         private static List<(ToolParameter Parameter, bool Required)> BuildCustomParameters(
@@ -366,11 +496,15 @@ namespace ShimmerChatBuiltin.ImageGeneration
         private static string AppendSentence(string text, string sentence) =>
             string.IsNullOrWhiteSpace(text) ? sentence : $"{text} {sentence}";
 
-        private static (DefaultArguments? Request, string? Error) ResolveDefaultArguments(
-            JObject arguments, ImageGenerationConfig config)
+        private static (StandardArguments? Request, string? Error) ResolveStandardArguments(
+            JObject arguments, ImageGenerationProfile profile, ImageApiProviderDescriptor descriptor)
         {
+            var supportedNames = descriptor.SupportsScheduler
+                ? ComfyArgumentNames
+                : A1111ArgumentNames;
+
             var unknown = arguments.Properties()
-                .Where(p => !DefaultArgumentNames.Contains(p.Name))
+                .Where(p => !supportedNames.Contains(p.Name))
                 .Select(p => p.Name)
                 .ToList();
 
@@ -378,8 +512,10 @@ namespace ShimmerChatBuiltin.ImageGeneration
             {
                 return (null,
                     $"Unknown parameter(s): {string.Join(", ", unknown)}. " +
-                    $"Supported parameters: {string.Join(", ", DefaultArgumentNames)}.");
+                    $"Supported parameters: {string.Join(", ", supportedNames)}.");
             }
+
+            var settings = profile.DefaultWorkflow;
 
             var prompt = ReadString(arguments, "prompt", out var error);
             if (error != null) return (null, error);
@@ -388,45 +524,50 @@ namespace ShimmerChatBuiltin.ImageGeneration
 
             var negativePrompt = ReadString(arguments, "negative_prompt", out error);
             if (error != null) return (null, error);
-            negativePrompt ??= config.DefaultWorkflow.NegativePrompt;
+            negativePrompt ??= settings.NegativePrompt;
 
             var model = ReadString(arguments, "model", out error);
             if (error != null) return (null, error);
             if (string.IsNullOrWhiteSpace(model))
-                model = config.DefaultWorkflow.Model;
+                model = settings.Model;
 
-            if (string.IsNullOrWhiteSpace(model))
+            if (descriptor.Kind == ImageApiProvider.ComfyUi && string.IsNullOrWhiteSpace(model))
             {
                 return (null,
-                    "No checkpoint model is configured for the default image workflow. " +
+                    "No checkpoint model is configured for this ComfyUI image configuration. " +
                     "Ask the user to select one in Settings → Image Generation.");
             }
 
             var width = ReadInt(arguments, "width", out error);
             if (error != null) return (null, error);
-            width ??= config.DefaultWorkflow.Width;
+            width ??= settings.Width;
 
             var height = ReadInt(arguments, "height", out error);
             if (error != null) return (null, error);
-            height ??= config.DefaultWorkflow.Height;
+            height ??= settings.Height;
 
             var steps = ReadInt(arguments, "steps", out error);
             if (error != null) return (null, error);
-            steps ??= config.DefaultWorkflow.Steps;
+            steps ??= settings.Steps;
 
             var cfg = ReadDouble(arguments, "cfg", out error);
             if (error != null) return (null, error);
-            cfg ??= config.DefaultWorkflow.CfgScale;
+            cfg ??= settings.CfgScale;
 
             var sampler = ReadString(arguments, "sampler", out error);
             if (error != null) return (null, error);
             if (string.IsNullOrWhiteSpace(sampler))
-                sampler = config.DefaultWorkflow.Sampler;
+                sampler = settings.Sampler;
 
-            var scheduler = ReadString(arguments, "scheduler", out error);
-            if (error != null) return (null, error);
-            if (string.IsNullOrWhiteSpace(scheduler))
-                scheduler = config.DefaultWorkflow.Scheduler;
+            var scheduler = "";
+            if (descriptor.SupportsScheduler)
+            {
+                var schedulerArgument = ReadString(arguments, "scheduler", out error);
+                if (error != null) return (null, error);
+                scheduler = string.IsNullOrWhiteSpace(schedulerArgument)
+                    ? settings.Scheduler
+                    : schedulerArgument;
+            }
 
             var seed = ReadLong(arguments, "seed", out error);
             if (error != null) return (null, error);
@@ -434,7 +575,7 @@ namespace ShimmerChatBuiltin.ImageGeneration
 
             var batchSize = ReadInt(arguments, "batch_size", out error);
             if (error != null) return (null, error);
-            batchSize ??= config.DefaultWorkflow.BatchSize;
+            batchSize ??= settings.BatchSize;
 
             if (width is < ImageGenerationConfigManager.MinDimension or > ImageGenerationConfigManager.MaxDimension)
             {
@@ -481,7 +622,7 @@ namespace ShimmerChatBuiltin.ImageGeneration
             if (seed.Value < 0)
                 return (null, $"'seed' must be 0 or greater; got {seed}.");
 
-            return (new DefaultArguments(
+            return (new StandardArguments(
                 prompt!,
                 negativePrompt!,
                 model!,
@@ -490,7 +631,7 @@ namespace ShimmerChatBuiltin.ImageGeneration
                 steps.Value,
                 cfg.Value,
                 sampler!,
-                scheduler!,
+                scheduler,
                 seed.Value,
                 batchSize.Value), null);
         }
@@ -650,11 +791,11 @@ namespace ShimmerChatBuiltin.ImageGeneration
             }
         }
 
-        private static string FormatResult(IReadOnlyList<string> urls, string workflowLabel, long? seed)
+        private static string FormatResult(IReadOnlyList<string> urls, string configurationLabel, long? seed)
         {
             var builder = new StringBuilder();
-            builder.Append("Generated ").Append(urls.Count).Append(" image(s) with ComfyUI (")
-                .Append(workflowLabel).AppendLine(").");
+            builder.Append("Generated ").Append(urls.Count).Append(" image(s) (")
+                .Append(configurationLabel).AppendLine(").");
 
             if (seed.HasValue)
                 builder.Append("Seed: ").AppendLine(seed.Value.ToString(CultureInfo.InvariantCulture));
@@ -674,18 +815,29 @@ namespace ShimmerChatBuiltin.ImageGeneration
             return builder.ToString().TrimEnd();
         }
 
-        private static IComfyUiClient CreateClient(ImageGenerationConfig config)
+        private static IComfyUiClient CreateComfyClient(ImageGenerationProfile profile)
         {
             var options = new ComfyUiClientOptions(
-                config.ComfyUiBaseUrl.Trim(),
-                TimeSpan.FromSeconds(config.TimeoutSeconds),
-                TimeSpan.FromSeconds(config.MaxWaitSeconds),
-                TimeSpan.FromMilliseconds(config.PollIntervalMilliseconds));
+                profile.BaseUrl.Trim(),
+                TimeSpan.FromSeconds(profile.TimeoutSeconds),
+                TimeSpan.FromSeconds(profile.MaxWaitSeconds),
+                TimeSpan.FromMilliseconds(profile.PollIntervalMilliseconds),
+                profile.ApiKey);
 
             return new ComfyUiClient(ImageGenerationHttp.Client, options);
         }
 
-        private sealed record DefaultArguments(
+        private static IA1111Client CreateA1111Client(ImageGenerationProfile profile)
+        {
+            var options = new A1111ClientOptions(
+                profile.BaseUrl.Trim(),
+                profile.ApiKey,
+                TimeSpan.FromSeconds(profile.MaxWaitSeconds));
+
+            return new A1111Client(ImageGenerationHttp.Client, options);
+        }
+
+        private sealed record StandardArguments(
             string Prompt,
             string NegativePrompt,
             string Model,
@@ -697,5 +849,7 @@ namespace ShimmerChatBuiltin.ImageGeneration
             string Scheduler,
             long Seed,
             int BatchSize);
+
+        private sealed record GeneratedImage(string FileName, string ContentType, byte[] Content);
     }
 }
