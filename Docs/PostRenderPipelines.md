@@ -210,8 +210,25 @@ public class RenderNodeException : Exception
 | `MarkdownRenderNode` | Markdown → HTML 渲染（基于 Markdig，可配置 PipeTables 与数学公式） |
 | `CodeHighlightNode` | 给围栏代码块加语法高亮，**必须排在 Markdown 渲染之后**；可配置跳过着色的语言（默认 `svg,mermaid`）与最大块长度 |
 | `CodeBlockActionsNode` | 给代码块加语言标签与复制 / 下载按钮（行为在 `wwwroot/js/code-block-actions.js`，事件委托）；与高亮节点先后顺序无关 |
+| `SvgRenderNode` | 把代码块中的 SVG（含根节点为 `<svg>` 的 XML）替换为渲染后的图片卡片，可选复制 / 下载；**必须排在 Markdown 之后、代码高亮 / 代码块工具条之前** |
 | `RegexReplaceNode` | 正则表达式替换（IgnoreCase/Multiline/Singleline） |
 | `RenderCallNode` | 引用 `RenderModifierPreset`，通过 `context.Env.Serializer` + `KVData` 加载 |
+
+### SVG 直出（SvgRenderNode）
+
+`SvgRenderNode` 扫描 Markdown 渲染后的 `<pre><code>` 块，**按内容而不是按语言**识别 SVG：
+
+- 代码块内容必须是合法 XML，且根节点为 `<svg>`；没有 `xmlns` 的裸 `<svg>` 会被补上 SVG 默认命名空间。
+- 根节点是其他元素、命中其他命名空间、XML 非法或带 DTD / 外部实体的内容都保持原代码块不变。
+- 命中后整个 `<pre>` 被替换为 `<figure class="svg-render">`，只保留渲染结果与源码模板。
+
+安全模型：SVG 以 `data:image/svg+xml;base64,...` 交给 `<img>`，不内联进 HTML。浏览器在 image 模式下不执行 SVG 脚本，
+模型输出因此不会成为 XSS 载体。复制读取 `template.svg-render-source` 里的原始源码；下载从 data URL 解码规范化后的
+SVG（补齐 `xmlns`、编码声明为 UTF-8），保证文件可独立打开。两个按钮可分别关闭，`MaxSvgChars`（默认 200000，0 = 不限制）
+用于跳过超大代码块。按钮行为由 `wwwroot/js/svg-render.js` 事件委托处理。
+
+排序要求：必须在 `MarkdownRenderNode` 之后，否则没有 `<pre><code>`；必须在 `CodeHighlightNode` /
+`CodeBlockActionsNode` 之前，否则高亮 span 或工具条会破坏待解析的 XML 文本。
 
 ### 数学公式（KStyleMath）
 

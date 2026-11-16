@@ -1,0 +1,86 @@
+/*
+ * SVG 渲染卡片（SvgRenderNode 产出的结构）。
+ * 结构：.svg-render > .svg-render-stage > img + .svg-render-bar? + template
+ */
+
+.svg-render {
+	display: flex;
+	flex-direction: column;
+	margin: var(--su-space-3) 0;
+	border: var(--su-border-size) solid var(--su-border-0);
+	border-radius: var(--su-radius-md);
+	overflow: hidden;
+	background: var(--su-surface-3);
+}
+
+.svg-render-stage {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 120px;
+	padding: var(--su-space-4);
+	overflow: auto;
+}
+
+.svg-render-image {
+	display: block;
+	max-width: 100%;
+	max-height: 70vh;
+	width: auto;
+	height: auto;
+}
+
+.svg-render-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--su-space-2);
+	min-height: 26px;
+	padding: 0 var(--su-space-2) 0 var(--su-space-3);
+	background: var(--su-surface-2);
+	border-top: var(--su-border-size) solid var(--su-border-0);
+	font-size: var(--su-font-xs);
+	color: var(--su-text-2);
+	user-select: none;
+}
+
+.svg-render-label {
+	font-family: var(--su-font-mono);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.svg-render-tools {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.svg-render-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	border: none;
+	background: none;
+	cursor: pointer;
+	color: var(--su-text-2);
+	font-size: var(--su-font-xs);
+	padding: 2px 6px;
+	border-radius: var(--su-radius-sm);
+	transition: color var(--su-transition), background var(--su-transition);
+}
+
+.svg-render-btn:hover {
+	color: var(--su-accent);
+	background: var(--su-surface-3);
+}
+
+.svg-render-btn.is-copied {
+	color: var(--su-success);
+}
+
+.svg-render-btn i {
+	font-size: 0.9em;
+}
