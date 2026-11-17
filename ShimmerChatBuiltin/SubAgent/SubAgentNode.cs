@@ -10,8 +10,6 @@ namespace ShimmerChatBuiltin.SubAgent
     [NodeInfo("node.sub_agent", Icon = "🤖", Color = "var(--node-subagent)", CategoryKeys = ["category.flow", "category.sub_agent"])]
     public class SubAgentNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "SubAgent";
 
         [NodeProperty("editor_subagent.label", HintKey = "editor_subagent.select_hint", Order = -1,
             OptionsKey = "subagent_configs", ShowOptionDescription = true,
@@ -40,13 +38,12 @@ namespace ShimmerChatBuiltin.SubAgent
             var config = LoadConfig(kvData, ConfigGuid);
             if (config == null)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_config_not_found", ConfigGuid), nodeId: Id, nodeName: Name);
+                    loc.Format("node_err.subagent_config_not_found", ConfigGuid));
 
             var rootNode = ResolveTree(config, kvData, context.Env.Persistent.Serializer);
             if (rootNode == null)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_no_tree", config.Name),
-                    nodeId: Id, nodeName: Name);
+                    loc.Format("node_err.subagent_no_tree", config.Name));
 
             // 1. 创建隔离的 PreGenerationEnv，将父级 Fragments 转为临时对话写入虚拟 Chat
             var persistent = new PersistentEnv
@@ -84,18 +81,18 @@ namespace ShimmerChatBuiltin.SubAgent
                 var result = await rootNode.ExecuteAsync(ctx);
                 if (!result.Success)
                     return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                        loc.Format("node_err.subagent_tree_failed", result.Message), nodeId: Id, nodeName: Name);
+                        loc.Format("node_err.subagent_tree_failed", result.Message));
             }
             catch (Exception ex)
             {
                 return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                    loc.Format("node_err.subagent_tree_failed", ex.Message), nodeId: Id, nodeName: Name);
+                    loc.Format("node_err.subagent_tree_failed", ex.Message));
             }
 
             // 3. API：由修饰器树中的 APISelectNode 设置
             if (subEnv.Transient.API == null)
                 return NodeResult.Failure(NodeErrorCodes.ApiUnavailable,
-                    loc["node_err.subagent_no_api"], nodeId: Id, nodeName: Name);
+                    loc["node_err.subagent_no_api"]);
 
             // 4. 轮次循环（隔离 env 内独立运行），每轮 assistant 响应经由 Post-Generation 管线
             var tools = subEnv.Transient.Tools;
@@ -178,7 +175,7 @@ namespace ShimmerChatBuiltin.SubAgent
             catch (Exception ex)
             {
                 return NodeResult.Failure(NodeErrorCodes.ServiceError,
-                    $"[SubAgent Error: {ex.Message}]", nodeId: Id, nodeName: Name);
+                    $"[SubAgent Error: {ex.Message}]");
             }
             finally
             {
@@ -226,7 +223,7 @@ namespace ShimmerChatBuiltin.SubAgent
             }
         }
 
-        private static IPreGenerationNode? ResolveTree(SubAgentConfig config, IKVDataService kvData, IPreGenerationNodeSerializer serializer)
+        private static PreGenerationNodeWrapper? ResolveTree(SubAgentConfig config, IKVDataService kvData, IPreGenerationNodeSerializer serializer)
         {
             if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
                 return serializer.Deserialize(config.ModifierTreeJson);

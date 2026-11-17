@@ -6,7 +6,8 @@ namespace ShimmerChatLib.Components;
 
 /// <summary>
 /// Non-generic bridge that instantiates <see cref="GenericNodeEditor{TNode}"/>
-/// from an <see cref="ITreeNode"/> parameter.
+/// from an <see cref="ITreeNode"/> wrapper parameter. The generated form edits the
+/// wrapper's <see cref="ITreeNode.Payload"/>; the wrapper itself is not a node type.
 /// Custom editor resolution is handled by <see cref="TreeEditor"/>.
 /// </summary>
 public class NodeBodyRenderer : ComponentBase
@@ -18,10 +19,13 @@ public class NodeBodyRenderer : ComponentBase
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
-        var componentType = typeof(GenericNodeEditor<>).MakeGenericType(Node.GetType());
+        if (Node.Payload is not { } payload)
+            return;
+
+        var componentType = typeof(GenericNodeEditor<>).MakeGenericType(payload.GetType());
 
         builder.OpenComponent(0, componentType);
-        builder.AddAttribute(1, "Node", Node);
+        builder.AddAttribute(1, "Node", payload);
         builder.AddAttribute(2, "Depth", Depth);
         builder.AddAttribute(3, "RemoveMe", RemoveMe);
         builder.AddAttribute(4, "CopyMe", CopyMe);

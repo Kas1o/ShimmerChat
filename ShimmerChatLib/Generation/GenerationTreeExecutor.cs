@@ -17,7 +17,7 @@ namespace ShimmerChatLib.Generation
         /// <returns>执行后的生成环境</returns>
         /// <exception cref="InvalidOperationException">节点执行失败时抛出，异常信息包含失败节点和错误详情</exception>
         public async Task<PreGenerationEnv> ExecuteAsync(
-            IPreGenerationNode rootNode,
+            PreGenerationNodeWrapper rootNode,
             PersistentEnv env,
             CancellationToken ct = default)
         {

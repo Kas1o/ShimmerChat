@@ -17,7 +17,7 @@ public record NodeTypeMetadata(
 );
 
 /// <summary>
-/// 扫描所有 ITreeNode 实现类型，提供统一的节点类型目录。
+/// 扫描所有业务节点实现类型（三个管线接口），提供统一的节点类型目录。
 /// 支持按管线接口类型（IPreGenerationNode / IPostGenerationNode / IRenderModifierNode）过滤。
 /// 扫描委托给 <see cref="IPluginLoaderService"/>，确保插件加载的节点也能被发现。
 /// </summary>
@@ -50,10 +50,13 @@ public class NodeTypeCatalog : INodeTypeCatalog
 
     private static List<NodeTypeMetadata> ScanAll(IPluginLoaderService pluginLoader, ILogger<NodeTypeCatalog> logger)
     {
-        var types = pluginLoader.GetImplementingTypes(typeof(ITreeNode));
-        var result = new List<NodeTypeMetadata>(types.Count);
+        var discovered = new HashSet<Type>();
+        foreach (var nodeInterface in NodeWrapperTypes.Interfaces)
+            discovered.UnionWith(pluginLoader.GetImplementingTypes(nodeInterface));
 
-        foreach (var type in types)
+        var result = new List<NodeTypeMetadata>(discovered.Count);
+
+        foreach (var type in discovered)
         {
             try
             {

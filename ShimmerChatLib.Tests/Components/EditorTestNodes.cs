@@ -4,55 +4,50 @@ using ShimmerChatLib.Interface;
 
 namespace ShimmerChatLib.Tests.Components;
 
+/// <summary>编辑器测试用包装器：与真实管线包装器同构，只是负载类型为 object。</summary>
+public class TestNodeWrapper : NodeWrapper<object>
+{
+    public TestNodeWrapper() { }
+
+    public TestNodeWrapper(object node, string? name = null) : base(node, name) { }
+}
+
 /// <summary>
 /// 带单节点槽位（Then）的测试节点，结构对应 IfNode / AdvancedIfNode 的 Then/Else 槽位。
 /// </summary>
 [NodeInfo("test.slot_node", Icon = "S", Color = "#000000", CategoryKeys = ["category.test"])]
-public class TestSlotNode : ITreeNode
+public class TestSlotNode
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "Slot";
-
     [NodeProperty("test.slot_node.then", Order = 1)]
-    public ITreeNode? Then { get; set; }
+    public TestNodeWrapper? Then { get; set; }
 }
 
 /// <summary>
 /// 带子节点列表的测试节点，结构对应 SequenceNode 等列表型节点。
 /// </summary>
 [NodeInfo("test.list_node", Icon = "L", Color = "#000000", CategoryKeys = ["category.test"])]
-public class TestListNode : ITreeNode
+public class TestListNode
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "List";
-
     [NodeProperty("test.list_node.children", Order = 1)]
-    public List<TestLeafNode> Children { get; set; } = new();
+    public List<TestNodeWrapper> Children { get; set; } = new();
 }
 
 /// <summary>可作为槽位/列表子节点的叶子节点。</summary>
 [NodeInfo("test.leaf_node", Icon = "F", Color = "#000000", CategoryKeys = ["category.test"])]
-public class TestLeafNode : ITreeNode
+public class TestLeafNode
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "Leaf";
 }
 
-/// <summary>通用递归树节点（自引用子列表），用于 TreeDragContext 拖拽逻辑测试。</summary>
-public class TestTree : ITreeNode
+/// <summary>通用递归树业务节点（自引用子列表），用于 TreeDragContext 拖拽逻辑测试。</summary>
+public class TestTree
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "Node";
-    public List<TestTree> Children { get; set; } = new();
+    public List<TestNodeWrapper> Children { get; set; } = new();
 }
 
 /// <summary>带动态选项属性的测试节点（对应 OptionsKey 迁移后的节点形态）。</summary>
 [NodeInfo("test.options_node", Icon = "O", Color = "#000000", CategoryKeys = ["category.test"])]
-public class TestOptionsNode : ITreeNode
+public class TestOptionsNode
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "Options";
-
     [NodeProperty("test.options_node.choice", Order = 1, OptionsKey = TestOptionsProvider.KeyName,
         ShowOptionDescription = true, OptionsDefaultLabelKey = "test.options_node.none")]
     public string Choice { get; set; } = "";
@@ -82,11 +77,8 @@ public sealed class EmptyOptionsProvider : INodePropertyOptionsProvider
 
 /// <summary>带图像列表属性的测试节点（Editor = ImageList 的自动表单接线）。</summary>
 [NodeInfo("test.image_node", Icon = "I", Color = "#000000", CategoryKeys = ["category.test"])]
-public class TestImageNode : ITreeNode
+public class TestImageNode
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "Images";
-
     [NodeProperty("test.image_node.images", Order = 1, Editor = NodePropertyEditor.ImageList)]
     public string ImagesJson { get; set; } = "";
 }
@@ -103,7 +95,8 @@ public static class EditorTestHelpers
             {
                 new("test.leaf_node", typeof(TestLeafNode), "F", "#000000", null, "category.test"),
             });
-        return new TreeEditorContext(Mock.Of<ITreeNodeSerializer>(), catalog.Object, typeof(ITreeNode));
+        return new TreeEditorContext(Mock.Of<ITreeNodeSerializer>(), catalog.Object,
+            typeof(ITreeNode), typeof(TestNodeWrapper));
     }
 
     /// <summary>返回 key 本身的 ILocService：组件渲染时直接显示本地化 key。</summary>

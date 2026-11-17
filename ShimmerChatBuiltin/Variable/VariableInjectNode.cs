@@ -5,9 +5,7 @@ namespace ShimmerChatBuiltin.Variable;
 [NodeInfo("node.variableinject", Icon = "💉", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.variableinject.desc")]
 public class VariableInjectNode : IPreGenerationNode
 {
-    public string Id {get;set;} = Guid.NewGuid().ToString();
 
-    public string Name {get; set;}
 
     [NodeProperty("node.variableinject.template", MultiLine =true)]
     public string template {get;set;} = "<inject_variables>{0}</inject_variables>";

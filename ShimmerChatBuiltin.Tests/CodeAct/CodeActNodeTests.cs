@@ -29,7 +29,7 @@ public class CodeActNodeTests : NodeTestBase
         var context = CreateContext();
         (await new CodeActNode().ExecuteAsync(context)).Success.Should().BeTrue();
 
-        var second = new CodeActNode();
+        var second = new PreGenerationNodeWrapper(new CodeActNode());
         var result = await second.ExecuteAsync(context);
 
         result.Success.Should().BeFalse();

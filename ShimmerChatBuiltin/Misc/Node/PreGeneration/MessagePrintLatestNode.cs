@@ -5,8 +5,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
     [NodeInfo("node.message_print_latest", Icon = "📄", Color = "var(--node-debug)", CategoryKeys = ["category.debug"], DescriptionKey = "node.message_print_latest.desc")]
     public class MessagePrintLatestNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Message Print Latest";
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {

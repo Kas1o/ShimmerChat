@@ -80,5 +80,8 @@ namespace ShimmerChatLib.Generation
 
         /// <summary> 通常错误 </summary>
         public const string CommonError = "COMMON_ERROR";
+
+        /// <summary> 包装器缺少业务节点负载（反序列化失败或数据损坏） </summary>
+        public const string PayloadMissing = "NODE_PAYLOAD_MISSING";
     }
 }

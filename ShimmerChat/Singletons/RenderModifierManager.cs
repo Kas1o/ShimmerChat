@@ -15,7 +15,7 @@ namespace ShimmerChat.Singletons
         private readonly ILocService _loc;
         private readonly ILogger<RenderModifierManager> _logger;
 
-        private IRenderModifierNode? _globalRoot;
+        private RenderModifierNodeWrapper? _globalRoot;
         private readonly object _globalLock = new();
 
         public RenderModifierManager(RenderModifierNodeSerializer serializer, IKVDataService kvData,
@@ -41,7 +41,7 @@ namespace ShimmerChat.Singletons
             if (string.IsNullOrEmpty(content))
                 return (content, new List<RenderChangeRecord>());
 
-            IRenderModifierNode? root = ResolveRoot(agent, chat)
+            RenderModifierNodeWrapper root = ResolveRoot(agent, chat)
                 ?? CreateFallbackRoot();
 
             var env = new RenderEnv(content, _serializer, _kvData, chat, agent, _loc);
@@ -67,22 +67,34 @@ namespace ShimmerChat.Singletons
         {
             lock (_globalLock)
             {
-                _globalRoot = string.IsNullOrEmpty(json)
-                    ? null
-                    : _serializer.Deserialize(json) as IRenderModifierNode;
+                _globalRoot = string.IsNullOrEmpty(json) ? null : DeserializeRoot(json, "global");
             }
         }
 
-        private IRenderModifierNode? ResolveRoot(Agent? agent, Chat? chat = null)
+        private RenderModifierNodeWrapper? DeserializeRoot(string json, string source)
+        {
+            var result = _serializer.DeserializeTree(json);
+            if (result.Root is RenderModifierNodeWrapper wrapper)
+                return wrapper;
+
+            if (!result.Success)
+            {
+                // 回退必须可见：留下日志，调用方会使用默认渲染树。
+                _logger.LogError("[RenderModifier] {Source} 渲染节点树反序列化失败，已回退: {Error}",
+                    source, result.Error);
+            }
+
+            return null;
+        }
+
+        private RenderModifierNodeWrapper? ResolveRoot(Agent? agent, Chat? chat = null)
         {
             // 生成提供器渲染树覆盖：优先使用触发时盖印在 Chat 上的覆盖树
             if (!string.IsNullOrEmpty(chat?.SourceRenderModifierTreeJson))
-            {
-                return _serializer.Deserialize(chat.SourceRenderModifierTreeJson) as IRenderModifierNode;
-            }
+                return DeserializeRoot(chat.SourceRenderModifierTreeJson, "chat override");
 
             if (agent != null && !string.IsNullOrEmpty(agent.RenderModifierTreeJson))
-                return _serializer.Deserialize(agent.RenderModifierTreeJson) as IRenderModifierNode;
+                return DeserializeRoot(agent.RenderModifierTreeJson, "agent");
 
             lock (_globalLock) return _globalRoot;
         }
@@ -100,27 +112,25 @@ namespace ShimmerChat.Singletons
             {
                 Id = "__default__",
                 Name = "Default",
-                RootNodeJson = _serializer.Serialize
-                (
-                    new RenderSequenceNode
+                RootNodeJson = _serializer.Serialize(
+                    new RenderModifierNodeWrapper(new RenderSequenceNode
                     {
-                        Children = 
+                        Children =
                         [
-                            new MarkdownRenderNode { Name = "Markdown Render" }
+                            new RenderModifierNodeWrapper(new MarkdownRenderNode(), "Markdown Render")
                         ]
-                    }
-                )
+                    }, "Default"))
             });
 
             _kvData.Write("RenderModifierManager", "render_modifier_presets",
                 JsonConvert.SerializeObject(presets, Formatting.Indented));
         }
 
-        private static IRenderModifierNode CreateFallbackRoot()
+        private static RenderModifierNodeWrapper CreateFallbackRoot()
         {
-            var root = new RenderSequenceNode { Name = "Default" };
-            root.Children.Add(new RenderCallNode { PresetId = "__default__" });
-            return root;
+            var payload = new RenderSequenceNode();
+            payload.Children.Add(new RenderModifierNodeWrapper(new RenderCallNode { PresetId = "__default__" }));
+            return new RenderModifierNodeWrapper(payload, "Default");
         }
     }
 }

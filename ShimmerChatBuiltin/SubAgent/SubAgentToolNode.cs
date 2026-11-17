@@ -11,8 +11,6 @@ namespace ShimmerChatBuiltin.SubAgent
     [NodeInfo("node.sub_agent_tool", Icon = "🔧", Color = "var(--node-subagent)", CategoryKeys = ["category.tool", "category.sub_agent"])]
     public class SubAgentToolNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "SubAgent Tool";
 
         [NodeProperty("editor_subagent.label", HintKey = "editor_subagent.select_hint", Order = -1,
             OptionsKey = "subagent_configs", ShowOptionDescription = true,
@@ -46,8 +44,7 @@ namespace ShimmerChatBuiltin.SubAgent
             if (config == null)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.subagent_tool_config_not_found", ConfigGuid),
-                    nodeId: Id, nodeName: Name));
+                    loc.Format("node_err.subagent_tool_config_not_found", ConfigGuid)));
 
             // 查找或创建 SubAgentToolV2 单例
             var tool = context.Env.Transient.Tools.OfType<SubAgentToolV2>().FirstOrDefault();

@@ -5,13 +5,19 @@ namespace ShimmerChatLib.Tests.Components;
 /// <summary>TreeDragContext 拖拽提交/移除的纯逻辑测试（不涉及渲染）。</summary>
 public class TreeDragContextTests
 {
+    private static TestNodeWrapper NewNode(string? name = null)
+        => new(new TestTree(), name);
+
+    private static List<TestNodeWrapper> ChildrenOf(TestNodeWrapper node)
+        => ((TestTree)node.Node!).Children;
+
     [Fact]
     public async Task CommitDrop_MovesNodeBetweenLists()
     {
-        var a = new TestTree { Name = "A" };
-        var b = new TestTree { Name = "B" };
-        var source = new List<TestTree> { a, b };
-        var target = new List<TestTree>();
+        var a = NewNode("A");
+        var b = NewNode("B");
+        var source = new List<TestNodeWrapper> { a, b };
+        var target = new List<TestNodeWrapper>();
         var drag = new TreeDragContext();
         var notified = false;
 
@@ -28,10 +34,10 @@ public class TreeDragContextTests
     [Fact]
     public async Task CommitDrop_ReordersWithinSameList()
     {
-        var a = new TestTree { Name = "A" };
-        var b = new TestTree { Name = "B" };
-        var c = new TestTree { Name = "C" };
-        var list = new List<TestTree> { a, b, c };
+        var a = NewNode("A");
+        var b = NewNode("B");
+        var c = NewNode("C");
+        var list = new List<TestNodeWrapper> { a, b, c };
         var drag = new TreeDragContext();
 
         // 把 a 拖到 c 之前（插入索引 2）
@@ -58,9 +64,9 @@ public class TreeDragContextTests
     [Fact]
     public async Task CommitDrop_NoopWhenDroppingAtSamePosition()
     {
-        var a = new TestTree { Name = "A" };
-        var b = new TestTree { Name = "B" };
-        var list = new List<TestTree> { a, b };
+        var a = NewNode("A");
+        var b = NewNode("B");
+        var list = new List<TestNodeWrapper> { a, b };
         var drag = new TreeDragContext();
 
         drag.BeginDrag(a, list, () => Task.CompletedTask);
@@ -74,26 +80,26 @@ public class TreeDragContextTests
     [Fact]
     public async Task CommitDrop_PreventsDroppingIntoOwnDescendant()
     {
-        var root = new TestTree();
-        var child = new TestTree();
-        root.Children.Add(child);
-        var source = new List<TestTree> { root };
+        var root = NewNode();
+        var child = NewNode();
+        ChildrenOf(root).Add(child);
+        var source = new List<TestNodeWrapper> { root };
         var drag = new TreeDragContext();
 
         drag.BeginDrag(root, source, () => Task.CompletedTask);
-        var ok = await drag.CommitDrop(child.Children, 0);
+        var ok = await drag.CommitDrop(ChildrenOf(child), 0);
 
         ok.Should().BeFalse();
-        child.Children.Should().BeEmpty();
+        ChildrenOf(child).Should().BeEmpty();
         source.Should().Equal(root); // 未提交，源列表不变
     }
 
     [Fact]
     public async Task CommitDrop_FromSlotSource_InvokesRemoveAction()
     {
-        var node = new TestTree();
+        var node = NewNode();
         var cleared = false;
-        var target = new List<TestTree>();
+        var target = new List<TestNodeWrapper>();
         var drag = new TreeDragContext();
 
         drag.BeginDrag(node, () => { cleared = true; return Task.CompletedTask; }, () => Task.CompletedTask);
@@ -107,9 +113,9 @@ public class TreeDragContextTests
     [Fact]
     public async Task RemoveFromSource_RemovesFromList_AndNotifies()
     {
-        var a = new TestTree { Name = "A" };
-        var b = new TestTree { Name = "B" };
-        var list = new List<TestTree> { a, b };
+        var a = NewNode("A");
+        var b = NewNode("B");
+        var list = new List<TestNodeWrapper> { a, b };
         var drag = new TreeDragContext();
         var notified = false;
 
@@ -124,11 +130,11 @@ public class TreeDragContextTests
     [Fact]
     public void IsAncestorOf_DetectsDescendants()
     {
-        var root = new TestTree();
-        var child = new TestTree();
-        var leaf = new TestTree();
-        root.Children.Add(child);
-        child.Children.Add(leaf);
+        var root = NewNode();
+        var child = NewNode();
+        var leaf = NewNode();
+        ChildrenOf(root).Add(child);
+        ChildrenOf(child).Add(leaf);
 
         TreeDragContext.IsAncestorOf(root, leaf).Should().BeTrue();
         TreeDragContext.IsAncestorOf(root, child).Should().BeTrue();

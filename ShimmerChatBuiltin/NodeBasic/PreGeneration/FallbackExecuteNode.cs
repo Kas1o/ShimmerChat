@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using ShimmerChatLib.Generation;
 using System;
 using System.Collections.Generic;
@@ -14,12 +14,10 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
 	[NodeInfo("node.fallback_execute")]
 	public class FallbackExecuteNode : IPreGenerationNode
 	{
-		public string Id { get; } = Guid.NewGuid().ToString();
 
-		public string Name { get; set; } = nameof(FallbackExecuteNode);
 
 		[NodeProperty("node.fallback_execute.fallback_list")]
-		public List<IPreGenerationNode>? FallbackList { get; set; } = new();
+		public List<PreGenerationNodeWrapper>? FallbackList { get; set; } = new();
 
 		public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
 		{

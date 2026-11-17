@@ -30,8 +30,6 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
     [NodeEditor(typeof(SetValueNodeEditor))]
     public class SetValueNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Set Value";
 
         [NodeProperty("prop.set_value.target", HintKey = "prop.set_value.target.hint", Order = 1)]
         public SetValueTarget Target { get; set; } = SetValueTarget.SharedState;
@@ -53,15 +51,14 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
             if (string.IsNullOrWhiteSpace(Key))
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
-                    "SetValueNode: Key is empty.",
-                    nodeId: Id, nodeName: Name));
+                    "SetValueNode: Key is empty."));
 
             switch (Target)
             {
                 case SetValueTarget.SharedState:
                     if (!TryConvertValue(Value, ValueType, out var converted, out var error))
                         return Task.FromResult(NodeResult.Failure(
-                            NodeErrorCodes.ParseError, error, nodeId: Id, nodeName: Name));
+                            NodeErrorCodes.ParseError, error));
 
                     context.Env.Transient.SharedState[Key] = converted;
                     break;
@@ -70,8 +67,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                     if (string.IsNullOrWhiteSpace(KVCollection))
                         return Task.FromResult(NodeResult.Failure(
                             NodeErrorCodes.DataMissing,
-                            "SetValueNode: KVCollection is empty.",
-                            nodeId: Id, nodeName: Name));
+                            "SetValueNode: KVCollection is empty."));
 
                     context.Env.Persistent.KVData.Write(KVCollection, Key, Value ?? "");
                     break;
@@ -79,8 +75,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                 default:
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ParseError,
-                        $"SetValueNode: Unknown target '{Target}'.",
-                        nodeId: Id, nodeName: Name));
+                        $"SetValueNode: Unknown target '{Target}'."));
             }
 
             return Task.FromResult(NodeResult.SuccessResult());

@@ -22,9 +22,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
         DescriptionKey = "node.code_block_actions.desc")]
     public class CodeBlockActionsNode : IRenderModifierNode
     {
-        public string Id { get; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Code Block Actions";
 
         [NodeProperty("prop.code_actions.show_language",
             HintKey = "prop.code_actions.show_language.hint", Order = 10)]
@@ -49,7 +47,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
             if (result is null)
                 return;
 
-            context.Env.UpdateContent(result, Name, GetType().Name);
+            context.Env.UpdateContent(result, context.CurrentNodeName ?? GetType().Name, GetType().Name);
         }
 
         private string? AddToolbars(string html, ILocService? loc)

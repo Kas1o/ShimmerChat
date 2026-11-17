@@ -21,8 +21,8 @@ public class IfNodeTests : NodeTestBase
             SharedStateKey = "status",
             Operator = ConditionOperator.Is,
             Value = "active",
-            Then = thenNode.Object,
-            Else = elseNode.Object
+            Then = new PreGenerationNodeWrapper(thenNode.Object),
+            Else = new PreGenerationNodeWrapper(elseNode.Object)
         };
 
         var result = await node.ExecuteAsync(CreateContext(env));
@@ -49,8 +49,8 @@ public class IfNodeTests : NodeTestBase
             SharedStateKey = "status",
             Operator = ConditionOperator.Is,
             Value = "active",
-            Then = thenNode.Object,
-            Else = elseNode.Object
+            Then = new PreGenerationNodeWrapper(thenNode.Object),
+            Else = new PreGenerationNodeWrapper(elseNode.Object)
         };
 
         var result = await node.ExecuteAsync(CreateContext(env));
@@ -97,7 +97,7 @@ public class IfNodeTests : NodeTestBase
             SharedStateKey = "x",
             Operator = ConditionOperator.Is,
             Value = "1",
-            Then = thenNode.Object
+            Then = new PreGenerationNodeWrapper(thenNode.Object)
         };
 
         var result = await node.ExecuteAsync(CreateContext(env));

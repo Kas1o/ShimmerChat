@@ -5,7 +5,7 @@ public class SequenceNodeTests : NodeTestBase
     [Fact]
     public async Task Execute_EmptyChildren_ReturnsSuccess()
     {
-        var node = new SequenceNode { Nodes = new List<IPreGenerationNode>() };
+        var node = new SequenceNode { Nodes = new List<PreGenerationNodeWrapper>() };
         var result = await node.ExecuteAsync(CreateContext());
         result.Success.Should().BeTrue();
     }
@@ -17,7 +17,7 @@ public class SequenceNodeTests : NodeTestBase
         child.Setup(c => c.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()))
             .ReturnsAsync(NodeResult.SuccessResult());
 
-        var node = new SequenceNode { Nodes = new List<IPreGenerationNode> { child.Object } };
+        var node = new SequenceNode { Nodes = new List<PreGenerationNodeWrapper> { new PreGenerationNodeWrapper(child.Object) } };
 
         var result = await node.ExecuteAsync(CreateContext());
 
@@ -40,7 +40,7 @@ public class SequenceNodeTests : NodeTestBase
 
         var node = new SequenceNode
         {
-            Nodes = new List<IPreGenerationNode> { child1.Object, child2.Object }
+            Nodes = new List<PreGenerationNodeWrapper> { new PreGenerationNodeWrapper(child1.Object), new PreGenerationNodeWrapper(child2.Object) }
         };
 
         var result = await node.ExecuteAsync(CreateContext());
@@ -59,7 +59,7 @@ public class SequenceNodeTests : NodeTestBase
 
         var node = new SequenceNode
         {
-            Nodes = new List<IPreGenerationNode> { child1.Object, child2.Object }
+            Nodes = new List<PreGenerationNodeWrapper> { new PreGenerationNodeWrapper(child1.Object), new PreGenerationNodeWrapper(child2.Object) }
         };
 
         var result = await node.ExecuteAsync(CreateContext());
@@ -81,7 +81,7 @@ public class SequenceNodeTests : NodeTestBase
         var node = new SequenceNode
         {
             Repeat = 2,
-            Nodes = new List<IPreGenerationNode> { child.Object }
+            Nodes = new List<PreGenerationNodeWrapper> { new PreGenerationNodeWrapper(child.Object) }
         };
 
         var result = await node.ExecuteAsync(CreateContext());

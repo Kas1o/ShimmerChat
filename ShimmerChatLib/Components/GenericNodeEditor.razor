@@ -3,7 +3,7 @@
 @using Microsoft.Extensions.Logging
 @using ShimmerChatLib.Generation
 @using ShimmerChatLib.Interface
-@typeparam TNode where TNode : ITreeNode
+@typeparam TNode where TNode : class
 @inject ILocService Loc
 @inject IPluginLoaderService PluginLoader
 @inject IServiceProvider Services
@@ -50,6 +50,7 @@
     private List<PropInfo> _singleNodeProps = new();
     private PropInfo? _childNodesProp;
     private IList _childNodes = new List<ITreeNode>();
+    private object? _lastNode;
     private List<INodePropertyOptionsProvider>? _optionProviders;
 
     private IReadOnlyList<NodePropertyOption> GetOptions(string key)
@@ -76,7 +77,12 @@
 
     protected override void OnParametersSet()
     {
-        BuildPropertyList();
+        // 属性列表按类型缓存；但子列表引用属于具体实例，Node 实例变化时必须重新取。
+        if (!ReferenceEquals(_lastNode, Node))
+        {
+            _lastNode = Node;
+            BuildPropertyList();
+        }
     }
 
     private void BuildPropertyList()

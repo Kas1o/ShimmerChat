@@ -11,9 +11,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PostGeneration
         DescriptionKey = "node.post_debug_output.desc")]
     public class PostDebugOutputNode : IPostGenerationNode
     {
-        public string Id { get; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Debug Output";
 
         [NodeProperty("prop.debug_output.source", Order = 10,
             HintKey = "prop.debug_output.source_hint")]

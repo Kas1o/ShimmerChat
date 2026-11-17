@@ -35,7 +35,7 @@ public class WebSearchAutoNodeTests : NodeTestBase
 
     private WebSearchAutoNode CreateNode(WebSearchProviderResolution? resolution = null)
     {
-        var node = new WebSearchAutoNode { Name = "AutoSearch" };
+        var node = new WebSearchAutoNode();
         node.ProviderResolver = (_, _) => resolution
             ?? new WebSearchProviderResolution { Provider = _provider, ResolvedKind = WebSearchProviderKind.Tavily };
         return node;
@@ -141,7 +141,7 @@ public class WebSearchAutoNodeTests : NodeTestBase
     {
         // 真实工厂解析：配置里没有 Key 时必须明确失败，而不是静默跳过搜索
         SetupConfig(WebSearchTestData.ConfigJson(WebSearchProviderKind.Tavily));
-        var node = new WebSearchAutoNode { Name = "AutoSearch" };
+        var node = new PreGenerationNodeWrapper(new WebSearchAutoNode());
         var context = CreateContextWith(WebSearchTestData.CreateChatWithUserMessage("q"));
 
         var result = await node.ExecuteAsync(context);

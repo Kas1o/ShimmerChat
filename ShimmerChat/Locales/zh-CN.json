@@ -143,6 +143,8 @@
   "tree_editor.name_placeholder": "名称",
   "tree_editor.collapse": "折叠",
   "tree_editor.expand": "展开",
+  "tree_editor.payload_missing": "节点数据缺失",
+  "tree_editor.payload_missing.hint": "该节点的数据无法加载（未知类型或 JSON 损坏）。编辑器保留错误提示，而不是把它隐藏起来。",
 
   "popup.default_title": "提示",
   "popup.default_confirm": "确定",
@@ -648,5 +650,8 @@
   "generation_config.name_required": "预设名称不能为空。",
   "generation_config.saved": "预设已保存",
   "generation_config.load_failed": "预设加载失败：{0}",
+  "generation_config.tree_load_failed": "节点树加载失败：{0}。编辑器已回退到空白树；保存会覆盖损坏的树。",
+  "generation_config.tree_empty_fallback": "节点树类型异常，编辑器已回退到空白树。",
+  "generation_config.tree_migrated": "旧格式节点树已迁移到新的包装器格式，保存后写回。",
   "generation_config.tree_bytes": "{0} 字符"
 }

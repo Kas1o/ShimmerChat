@@ -42,9 +42,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
         DescriptionKey = "node.post_tool_call.desc")]
     public class PostToolCallNode : IPostGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Tool Calls";
 
         [NodeProperty("prop.post_tool_call.continue_on_error",
             HintKey = "prop.post_tool_call.continue_on_error.hint", Order = 10)]
@@ -213,8 +211,6 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
         private PostNodeResult Fail(string code, string message)
         {
             var result = PostNodeResult.Failure(code, message);
-            result.NodeId = Id;
-            result.NodeName = Name;
             return result;
         }
     }

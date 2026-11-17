@@ -17,8 +17,6 @@ namespace ShimmerChatBuiltin.ImageGeneration
         DescriptionKey = "node.image_generation_tool_set.desc")]
     public class ImageGenerationToolSetNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Image Generation Tools";
 
         /// <summary>
         /// 指定只暴露某一份配置；留空表示暴露所有已启用的配置。
@@ -42,15 +40,14 @@ namespace ShimmerChatBuiltin.ImageGeneration
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
                     loc["node_err.image_generation_config_invalid"],
-                    details: configError, nodeId: Id, nodeName: Name));
+                    details: configError));
             }
 
             if (attachments == null)
             {
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ConfigNotFound,
-                    loc["node_err.image_generation_attachments_unavailable"],
-                    nodeId: Id, nodeName: Name));
+                    loc["node_err.image_generation_attachments_unavailable"]));
             }
 
             List<ImageGenerationProfile> selected;
@@ -61,7 +58,7 @@ namespace ShimmerChatBuiltin.ImageGeneration
                 if (selected.Count == 0)
                 {
                     WriteLog(context,
-                        $"[{Name}] no enabled image generation configuration was found; nothing was added.");
+                        $"[{context.CurrentNodeName}] no enabled image generation configuration was found; nothing was added.");
                     return Task.FromResult(NodeResult.SuccessResult());
                 }
             }
@@ -72,16 +69,14 @@ namespace ShimmerChatBuiltin.ImageGeneration
                 {
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ConfigNotFound,
-                        loc.Format("node_err.image_generation_config_not_found", ConfigurationId),
-                        nodeId: Id, nodeName: Name));
+                        loc.Format("node_err.image_generation_config_not_found", ConfigurationId)));
                 }
 
                 if (!profile.Enabled)
                 {
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ConfigNotFound,
-                        loc.Format("node_err.image_generation_config_disabled", profile.Name, profile.Id),
-                        nodeId: Id, nodeName: Name));
+                        loc.Format("node_err.image_generation_config_disabled", profile.Name, profile.Id)));
                 }
 
                 selected = [profile];
@@ -97,8 +92,7 @@ namespace ShimmerChatBuiltin.ImageGeneration
                 {
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ConfigNotFound,
-                        loc.Format("node_err.image_generation_model_missing", profile.Name),
-                        nodeId: Id, nodeName: Name));
+                        loc.Format("node_err.image_generation_model_missing", profile.Name)));
                 }
 
                 var tool = new ImageGenerationToolV2(kvData, attachments, profile.Id);
@@ -116,8 +110,7 @@ namespace ShimmerChatBuiltin.ImageGeneration
         private NodeResult DuplicateToolFailure(ILocService loc, string toolName) =>
             NodeResult.Failure(
                 NodeErrorCodes.ConfigNotFound,
-                loc.Format("node_err.image_generation_duplicate_tool", toolName),
-                nodeId: Id, nodeName: Name);
+                loc.Format("node_err.image_generation_duplicate_tool", toolName));
 
         private void WriteLog(PreNodeExecutionContext context, string message) =>
             context.Env.Persistent.DebugOutput.Write("ImageGenerationToolSetNode", "ImageGeneration", message);

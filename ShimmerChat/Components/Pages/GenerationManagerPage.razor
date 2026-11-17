@@ -83,6 +83,20 @@
                     </div>
                 </div>
                 <div class="cfg-tree-editor">
+                    @if (_treeLoadError != null)
+                    {
+                        <div class="cfg-note is-danger">
+                            <i class="bi bi-exclamation-octagon-fill"></i>
+                            <span>@_treeLoadError</span>
+                        </div>
+                    }
+                    else if (_treeMigrated)
+                    {
+                        <div class="cfg-note is-warning">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span>@Loc["generation_config.tree_migrated"]</span>
+                        </div>
+                    }
                     <CascadingValue Value="_dragContext">
                         <CascadingValue Value="_editorContext">
                             <TreeEditor Node="@_editingRoot" />
@@ -170,6 +184,20 @@ else
                     </div>
 
                     <div class="cfg-tree-editor @(preset.Id == DefaultPresetId ? "is-readonly" : "")">
+                        @if (_treeLoadError != null)
+                        {
+                            <div class="cfg-note is-danger">
+                                <i class="bi bi-exclamation-octagon-fill"></i>
+                                <span>@_treeLoadError</span>
+                            </div>
+                        }
+                        else if (_treeMigrated)
+                        {
+                            <div class="cfg-note is-warning">
+                                <i class="bi bi-arrow-repeat"></i>
+                                <span>@Loc["generation_config.tree_migrated"]</span>
+                            </div>
+                        }
                         <CascadingValue Value="_dragContext">
                             <CascadingValue Value="_editorContext">
                                 <TreeEditor Node="@_editingRoot" />
@@ -210,9 +238,11 @@ else
     private string _statusText = string.Empty;
     private string _statusKind = "info";
 
-    private ITreeNode _editingRoot = new SequenceNode { Name = "Root" };
+    private PreGenerationNodeWrapper _editingRoot = CreateRoot("Root");
     private TreeDragContext _dragContext = new();
     private TreeEditorContext _editorContext = default!;
+    private string? _treeLoadError;
+    private bool _treeMigrated;
 
     private bool _isAgentMode;
     private string _agentName = "";
@@ -259,10 +289,7 @@ else
             var treeJson = _eventProviderInstance != null
                 ? ProviderConfigHelper.GetTreeJson(_eventProviderInstance, prop!) ?? ag.PreGenerationTreeJson
                 : ag.PreGenerationTreeJson;
-            _editingRoot = string.IsNullOrEmpty(treeJson)
-                ? new SequenceNode { Name = "Root" }
-                : Serializer.Deserialize(treeJson)
-                    ?? new SequenceNode { Name = "Root" };
+            LoadTree(treeJson, "Root");
             _savedTreeJson = Serializer.Serialize(_editingRoot);
             return;
         }
@@ -285,7 +312,7 @@ else
                 {
                     Id = DefaultPresetId,
                     Name = "Default",
-                    RootNodeJson = Serializer.Serialize(new SequenceNode { Name = "Root" })
+                    RootNodeJson = Serializer.Serialize(CreateRoot("Root"))
                 });
             }
 
@@ -343,10 +370,53 @@ else
 
     private void LoadEditingTree()
     {
-        _editingRoot = Current is { } preset
-            ? Serializer.Deserialize(preset.RootNodeJson) ?? new SequenceNode { Name = "Root" }
-            : new SequenceNode { Name = "Root" };
+        LoadTree(Current?.RootNodeJson, "Root");
     }
+
+    /// <summary>
+    /// 读取节点树；反序列化失败时回退到空白根节点，并把错误显示给用户
+    /// （不能静默当成空树，否则用户会以为配置丢了）。
+    /// </summary>
+    private void LoadTree(string? json, string fallbackName)
+    {
+        _treeLoadError = null;
+        _treeMigrated = false;
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            _editingRoot = CreateRoot(fallbackName);
+            return;
+        }
+
+        var result = Serializer.DeserializeTree(json);
+        if (!result.Success)
+        {
+            _treeLoadError = Loc.Format("generation_config.tree_load_failed", result.Error ?? "");
+            Logger.LogError("前生成节点树反序列化失败，已回退到空白根节点: {Error}", result.Error);
+            _editingRoot = CreateRoot(fallbackName);
+            return;
+        }
+
+        if (result.IsEmpty)
+        {
+            _editingRoot = CreateRoot(fallbackName);
+            return;
+        }
+
+        if (result.Root is PreGenerationNodeWrapper root)
+        {
+            _editingRoot = root;
+            _treeMigrated = result.Migrated;
+            return;
+        }
+
+        _treeLoadError = Loc["generation_config.tree_empty_fallback"];
+        Logger.LogError("前生成节点树反序列化结果不是预生成管线包装器，已回退到空白根节点。");
+        _editingRoot = CreateRoot(fallbackName);
+    }
+
+    private static PreGenerationNodeWrapper CreateRoot(string name)
+        => new(new SequenceNode(), name);
 
     private void CommitEditingTree()
     {
@@ -426,7 +496,7 @@ else
         var preset = new PreGenerationPreset
         {
             Name = NextName(Loc["gen_manager.new_preset"]),
-            RootNodeJson = Serializer.Serialize(new SequenceNode { Name = "Root" })
+            RootNodeJson = Serializer.Serialize(CreateRoot("Root"))
         };
 
         _presets.Add(preset);

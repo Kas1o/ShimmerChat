@@ -13,8 +13,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
     [NodeInfo("node.api_select", Icon = "⚡", Color = "var(--node-config)", CategoryKeys = ["category.config"], DescriptionKey = "node.api_select.desc")]
     public class APISelectNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Select API";
 
         /// <summary>
         /// API 配置 Guid。null（或空串）表示全局选中。
@@ -34,8 +32,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
             if (settings.Count == 0)
                 return NodeResult.Failure(
                     NodeErrorCodes.ApiUnavailable,
-                    loc["node_err.api_no_settings"],
-                    nodeId: Id, nodeName: Name);
+                    loc["node_err.api_no_settings"]);
 
             ApiConfig? selectedConfig = null;
             if (!string.IsNullOrEmpty(APIGuid))
@@ -73,8 +70,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
                 {
                     return NodeResult.Failure(
                         NodeErrorCodes.ApiUnavailable,
-                        loc.Format("node_err.api_no_continuation", selectedConfig.Type),
-                        nodeId: Id, nodeName: Name);
+                        loc.Format("node_err.api_no_continuation", selectedConfig.Type));
                 }
             }
 

@@ -30,11 +30,11 @@ public class GenerationTreeExecutorTests
     public async Task ExecuteAsync_NodeReturnsSuccess_ReturnsEnv()
     {
         var node = new Mock<IPreGenerationNode>();
-        node.Setup(n => n.Id).Returns("test-node");
         node.Setup(n => n.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()))
             .ReturnsAsync(NodeResult.SuccessResult());
+        var root = new PreGenerationNodeWrapper(node.Object, "test-node");
 
-        var result = await _executor.ExecuteAsync(node.Object, CreatePersistentEnv());
+        var result = await _executor.ExecuteAsync(root, CreatePersistentEnv());
 
         result.Should().NotBeNull();
         result.Persistent.Should().NotBeNull();
@@ -45,29 +45,29 @@ public class GenerationTreeExecutorTests
     public async Task ExecuteAsync_NodeReturnsFailure_ThrowsInvalidOperationException()
     {
         var node = new Mock<IPreGenerationNode>();
-        node.Setup(n => n.Id).Returns("fail-node");
-        node.Setup(n => n.Name).Returns("Failure Node");
         node.Setup(n => n.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()))
             .ReturnsAsync(NodeResult.Failure("TEST_ERROR", "Something went wrong"));
+        var root = new PreGenerationNodeWrapper(node.Object, "Failure Node") { Id = "fail-node" };
 
-        var act = async () => await _executor.ExecuteAsync(node.Object, CreatePersistentEnv());
+        var act = async () => await _executor.ExecuteAsync(root, CreatePersistentEnv());
 
         var ex = await act.Should().ThrowAsync<InvalidOperationException>();
-        // NodeResult doesn't carry NodeName/NodeId (they're null), so "?" fallback is used
+        // 包装器负责补全 NodeId / NodeName，业务节点不再需要自己维护。
         ex.Which.Message.Should().Contain("TEST_ERROR");
         ex.Which.Message.Should().Contain("Something went wrong");
+        ex.Which.Message.Should().Contain("Failure Node");
+        ex.Which.Message.Should().Contain("fail-node");
     }
 
     [Fact]
     public async Task ExecuteAsync_NodeReturnsFailure_WithDetails_IncludesDetails()
     {
         var node = new Mock<IPreGenerationNode>();
-        node.Setup(n => n.Id).Returns("detail-node");
-        node.Setup(n => n.Name).Returns("Detail Node");
         node.Setup(n => n.ExecuteAsync(It.IsAny<PreNodeExecutionContext>()))
             .ReturnsAsync(NodeResult.Failure("ERR", "msg", details: "stack trace here"));
+        var root = new PreGenerationNodeWrapper(node.Object, "Detail Node");
 
-        var act = async () => await _executor.ExecuteAsync(node.Object, CreatePersistentEnv());
+        var act = async () => await _executor.ExecuteAsync(root, CreatePersistentEnv());
 
         var ex = await act.Should().ThrowAsync<InvalidOperationException>();
         ex.Which.Message.Should().Contain("stack trace here");
@@ -86,8 +86,9 @@ public class GenerationTreeExecutorTests
                 ctx.CancellationToken.ThrowIfCancellationRequested();
                 return Task.FromResult(NodeResult.SuccessResult());
             });
+        var root = new PreGenerationNodeWrapper(node.Object, "Cancelled Node");
 
-        var act = async () => await _executor.ExecuteAsync(node.Object, CreatePersistentEnv(), cts.Token);
+        var act = async () => await _executor.ExecuteAsync(root, CreatePersistentEnv(), cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
     }

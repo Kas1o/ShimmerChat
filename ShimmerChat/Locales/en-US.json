@@ -143,6 +143,8 @@
   "tree_editor.name_placeholder": "Name",
   "tree_editor.collapse": "Collapse",
   "tree_editor.expand": "Expand",
+  "tree_editor.payload_missing": "Node data missing",
+  "tree_editor.payload_missing.hint": "This node's payload could not be loaded (unknown type or corrupted JSON). The tree fell back instead of hiding the error.",
 
   "popup.default_title": "Info",
   "popup.default_confirm": "OK",
@@ -648,5 +650,8 @@
   "generation_config.name_required": "Preset name cannot be empty.",
   "generation_config.saved": "Preset saved",
   "generation_config.load_failed": "Presets could not be loaded: {0}",
+  "generation_config.tree_load_failed": "Node tree could not be loaded: {0}. The editor fell back to an empty tree; saving will overwrite the broken tree.",
+  "generation_config.tree_empty_fallback": "Node tree has an unexpected type. The editor fell back to an empty tree.",
+  "generation_config.tree_migrated": "Legacy node tree was migrated to the new wrapper format. Save to persist it.",
   "generation_config.tree_bytes": "{0} chars"
 }

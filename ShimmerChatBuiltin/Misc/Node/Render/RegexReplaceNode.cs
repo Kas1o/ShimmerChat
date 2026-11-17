@@ -15,9 +15,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
         DescriptionKey = "node.regex_replace.desc")]
     public class RegexReplaceNode : IRenderModifierNode
     {
-        public string Id { get; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Regex Replace";
 
         [NodeProperty("prop.regex.pattern", Order = 10)]
         public string Pattern { get; set; } = "";
@@ -47,7 +45,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
                 if (Singleline) options |= RegexOptions.Singleline;
 
                 var result = Regex.Replace(context.Env.GetContent(), Pattern, Replacement ?? "", options);
-                context.Env.UpdateContent(result, Name, GetType().Name);
+                context.Env.UpdateContent(result, context.CurrentNodeName ?? GetType().Name, GetType().Name);
             }
             catch (RegexParseException)
             {

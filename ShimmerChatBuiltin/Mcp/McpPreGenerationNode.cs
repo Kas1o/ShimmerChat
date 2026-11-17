@@ -48,9 +48,7 @@ namespace ShimmerChatBuiltin.Mcp
         DescriptionKey = "node.mcp_toolset.desc")]
     public class McpPreGenerationNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "MCP Toolset";
 
         /// <summary>目标端点 Id（对应 MCP 工具集设置页中的标识）。</summary>
         [NodeProperty("prop.mcp_toolset.endpoint", HintKey = "prop.mcp_toolset.endpoint.hint",
@@ -90,7 +88,7 @@ namespace ShimmerChatBuiltin.Mcp
 
             if (string.IsNullOrWhiteSpace(EndpointId))
                 return NodeResult.Failure(NodeErrorCodes.ParameterError,
-                    loc["node_err.mcp_endpoint_empty"], nodeId: Id, nodeName: Name);
+                    loc["node_err.mcp_endpoint_empty"]);
 
             List<McpEndpointConfig> endpoints;
             try
@@ -101,21 +99,21 @@ namespace ShimmerChatBuiltin.Mcp
             {
                 WriteDebug(env, $"endpoint catalog load failed: {ex.Message}");
                 return NodeResult.Failure(NodeErrorCodes.DataMissing,
-                    loc.Format("node_err.mcp_catalog_invalid", ex.Message), ex.ToString(), Id, Name);
+                    loc.Format("node_err.mcp_catalog_invalid", ex.Message), ex.ToString());
             }
 
             if (endpoints.Count == 0)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    loc["node_err.mcp_no_endpoints"], nodeId: Id, nodeName: Name);
+                    loc["node_err.mcp_no_endpoints"]);
 
             var endpoint = McpEndpointCatalog.Find(endpoints, EndpointId);
             if (endpoint == null)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.mcp_endpoint_not_found", EndpointId), nodeId: Id, nodeName: Name);
+                    loc.Format("node_err.mcp_endpoint_not_found", EndpointId));
 
             if (!endpoint.Enabled)
                 return NodeResult.Failure(NodeErrorCodes.ConfigNotFound,
-                    loc.Format("node_err.mcp_endpoint_disabled", endpoint.Name, endpoint.Id), nodeId: Id, nodeName: Name);
+                    loc.Format("node_err.mcp_endpoint_disabled", endpoint.Name, endpoint.Id));
 
             var loggerFactory = env.Persistent.Services?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
 
@@ -126,11 +124,11 @@ namespace ShimmerChatBuiltin.Mcp
             }
             catch (McpConfigException ex)
             {
-                return NodeResult.Failure(NodeErrorCodes.ConfigNotFound, ex.Message, ex.ToString(), Id, Name);
+                return NodeResult.Failure(NodeErrorCodes.ConfigNotFound, ex.Message, ex.ToString());
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                return NodeResult.Failure(NodeErrorCodes.Cancelled, loc["node_err.mcp_cancelled"], nodeId: Id, nodeName: Name);
+                return NodeResult.Failure(NodeErrorCodes.Cancelled, loc["node_err.mcp_cancelled"]);
             }
             catch (Exception ex)
             {
@@ -177,7 +175,7 @@ namespace ShimmerChatBuiltin.Mcp
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    return NodeResult.Failure(NodeErrorCodes.Cancelled, loc["node_err.mcp_cancelled"], nodeId: Id, nodeName: Name);
+                    return NodeResult.Failure(NodeErrorCodes.Cancelled, loc["node_err.mcp_cancelled"]);
                 }
                 catch (Exception ex)
                 {
@@ -197,7 +195,7 @@ namespace ShimmerChatBuiltin.Mcp
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    return NodeResult.Failure(NodeErrorCodes.Cancelled, loc["node_err.mcp_cancelled"], nodeId: Id, nodeName: Name);
+                    return NodeResult.Failure(NodeErrorCodes.Cancelled, loc["node_err.mcp_cancelled"]);
                 }
                 catch (Exception ex)
                 {
@@ -245,7 +243,7 @@ namespace ShimmerChatBuiltin.Mcp
                 return NodeResult.SuccessResult();
             }
 
-            return NodeResult.Failure(errorCode, userMessage, details, Id, Name);
+            return NodeResult.Failure(errorCode, userMessage, details);
         }
 
         private static int AddTools(PreGenerationEnv env, McpEndpointSession session,

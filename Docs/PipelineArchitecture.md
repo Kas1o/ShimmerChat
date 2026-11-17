@@ -44,24 +44,35 @@ Render Modifier Tree ──→ GetContent/UpdateContent 链式处理 ──→ �
 
 ---
 
-## ITreeNode — 最小节点接口
+## ITreeNode — 树包装器
 
-所有管线节点共享基础接口：
+树中的节点是包装器，持有树结构状态；业务节点只实现管线接口：
 
 ```csharp
 public interface ITreeNode
 {
-    string Id { get; }          // 唯一标识 (GUID)
-    string Name { get; set; }   // 用户可编辑名称
+    string Id { get; set; }          // 唯一标识 (GUID)
+    string Name { get; set; }        // 用户可编辑名称
+    bool IsExpanded { get; set; }    // 展开状态，随树持久化
+    object? Payload { get; }         // 业务节点实例（可能为 null，表示数据缺失）
+    Type PayloadType { get; }
 }
 ```
 
 ```csharp
-// 三个管线接口
-IPreGenerationNode  : ITreeNode   // + ExecuteAsync(PreNodeExecutionContext)
-IPostGenerationNode : ITreeNode   // + ExecuteAsync(PostNodeExecutionContext)
-IRenderModifierNode : ITreeNode   // + Execute(RenderNodeExecutionContext)
+public class PreGenerationNodeWrapper : NodeWrapper<IPreGenerationNode> { … }
+public class PostGenerationNodeWrapper : NodeWrapper<IPostGenerationNode> { … }
+public class RenderModifierNodeWrapper : NodeWrapper<IRenderModifierNode> { … }
 ```
+
+```csharp
+// 三个管线接口（不再继承 ITreeNode）
+IPreGenerationNode   // ExecuteAsync(PreNodeExecutionContext)
+IPostGenerationNode  // ExecuteAsync(PostNodeExecutionContext)
+IRenderModifierNode  // Execute(RenderNodeExecutionContext)
+```
+
+包装器负责补齐执行错误的 `NodeId`/`NodeName`、维护展开状态，并在反序列化失败时把缺失负载暴露为可见错误。
 
 ---
 
@@ -75,6 +86,7 @@ public class TreeEditorContext
     ITreeNodeSerializer Serializer;    // 当前管线的序列化器
     INodeTypeCatalog TypeCatalog;      // 节点类型目录（按接口过滤）
     Type NodeInterfaceType;            // typeof(IPreGenerationNode) 等
+    Type WrapperType;                  // typeof(PreGenerationNodeWrapper) 等
 }
 ```
 
@@ -100,7 +112,7 @@ public class Agent
 
 ## 节点类型目录
 
-`INodeTypeCatalog` 扫描所有 `ITreeNode` 实现，通过 `GetNodeTypes(Type)` 按管线接口过滤。标记了 `[NodeInfo]` 的节点自动出现在对应管线的添加菜单中。
+`INodeTypeCatalog` 扫描实现三个管线接口的业务节点类型，通过 `GetNodeTypes(Type)` 按管线接口过滤。标记了 `[NodeInfo]` 的节点自动出现在对应管线的添加菜单中。
 
 ---
 

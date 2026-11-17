@@ -9,8 +9,6 @@ namespace ShimmerChatBuiltin.ToolManage
     [NodeInfo("node.instantiate_tool", Icon = "⚙", Color = "var(--node-tool)", CategoryKeys = ["category.tool"])]
     public class ToolInstantiateNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Instantiate Tool";
 
         /// <summary>
         /// IAutoCreateToolV2 实现的完整类型名
@@ -27,8 +25,7 @@ namespace ShimmerChatBuiltin.ToolManage
             if (string.IsNullOrWhiteSpace(ToolTypeName))
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ToolNotFound,
-                    loc["node_err.tool_instantiate_empty"],
-                    nodeId: Id, nodeName: Name));
+                    loc["node_err.tool_instantiate_empty"]));
 
             try
             {
@@ -36,8 +33,7 @@ namespace ShimmerChatBuiltin.ToolManage
                 if (tool == null)
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ToolNotFound,
-                        loc.Format("node_err.tool_instantiate_type_not_found", ToolTypeName),
-                        nodeId: Id, nodeName: Name));
+                        loc.Format("node_err.tool_instantiate_type_not_found", ToolTypeName)));
 
                 context.Env.Transient.Tools.Add(tool);
                 return Task.FromResult(NodeResult.SuccessResult());
@@ -47,8 +43,7 @@ namespace ShimmerChatBuiltin.ToolManage
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ToolNotFound,
                     loc.Format("node_err.tool_instantiate_create_failed", ToolTypeName),
-                    details: ex.ToString(),
-                    nodeId: Id, nodeName: Name));
+                    details: ex.ToString()));
             }
         }
     }

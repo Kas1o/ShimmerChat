@@ -25,9 +25,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
 
         private static readonly ConcurrentDictionary<CacheKey, string> Cache = new();
 
-        public string Id { get; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Code Highlight";
 
         /// <summary>
         /// 不参与着色的语言（逗号 / 分号 / 空白分隔，大小写不敏感）。
@@ -65,7 +63,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
             if (result is null)
                 return;
 
-            context.Env.UpdateContent(result, Name, GetType().Name);
+            context.Env.UpdateContent(result, context.CurrentNodeName ?? GetType().Name, GetType().Name);
         }
 
         /// <summary>遍历所有代码块并替换其中的代码文本；没有任何块被修改时返回 null。</summary>

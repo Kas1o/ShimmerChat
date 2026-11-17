@@ -14,8 +14,6 @@ namespace ShimmerChatBuiltin.Fragments
     [NodeInfo("node.merge_fragments", Icon = "🔗", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.merge_fragments.desc")]
     public class MergeFragmentsNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Merge Fragments";
 
         [NodeProperty("prop.merge_fragments.target_role", HintKey = "prop.merge_fragments.target_role.hint")]
         public MergeTargetRole TargetRole { get; set; } = MergeTargetRole.System;

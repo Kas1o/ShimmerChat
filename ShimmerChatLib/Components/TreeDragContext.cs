@@ -6,7 +6,7 @@ namespace ShimmerChatLib.Components;
 /// <summary>
 /// Holds the transient state of an ongoing drag-and-drop operation within the tree editor.
 /// Passed via CascadingValue so every TreeEditor and GenericNodeEditor in the tree shares the same instance.
-/// Uses non-generic <see cref="IList"/> to work with any ITreeNode list (List&lt;IPreGenerationNode&gt; etc.).
+/// Uses non-generic <see cref="IList"/> to work with any ITreeNode wrapper list.
 /// </summary>
 public class TreeDragContext
 {
@@ -137,31 +137,30 @@ public class TreeDragContext
 
     private static bool ContainsTargetList(ITreeNode node, IList target, HashSet<string> visited)
     {
-        if (!visited.Add(node.Id))
+        if (!visited.Add(node.Id) || node.Payload is not { } payload)
             return false;
 
-        foreach (var prop in node.GetType().GetProperties())
+        foreach (var prop in payload.GetType().GetProperties())
         {
             if (!prop.CanRead) continue;
 
             if (TreeNodeReflection.IsListOfTreeNode(prop))
             {
-                var list = prop.GetValue(node) as IList;
+                if (prop.GetValue(payload) is not IList list)
+                    continue;
+
                 if (ReferenceEquals(list, target))
                     return true;
-                if (list != null)
+
+                foreach (var child in list)
                 {
-                    foreach (var child in list)
-                    {
-                        if (child is ITreeNode treeChild && ContainsTargetList(treeChild, target, visited))
-                            return true;
-                    }
+                    if (child is ITreeNode treeChild && ContainsTargetList(treeChild, target, visited))
+                        return true;
                 }
             }
             else if (TreeNodeReflection.IsSingleTreeNode(prop))
             {
-                var child = prop.GetValue(node) as ITreeNode;
-                if (child != null && ContainsTargetList(child, target, visited))
+                if (prop.GetValue(payload) is ITreeNode child && ContainsTargetList(child, target, visited))
                     return true;
             }
         }
@@ -179,38 +178,15 @@ public class TreeDragContext
 
     private static bool ContainsNode(ITreeNode container, ITreeNode target, HashSet<string> visited)
     {
-        if (!visited.Add(container.Id))
+        if (!visited.Add(container.Id) || container.Payload is not { } payload)
             return false;
 
-        foreach (var prop in container.GetType().GetProperties())
+        foreach (var child in TreeNodeReflection.GetChildNodes(payload))
         {
-            if (!prop.CanRead) continue;
-
-            if (TreeNodeReflection.IsListOfTreeNode(prop))
-            {
-                var list = prop.GetValue(container) as IList;
-                if (list != null)
-                {
-                    foreach (var child in list)
-                    {
-                        if (ReferenceEquals(child, target))
-                            return true;
-                        if (child is ITreeNode treeChild && ContainsNode(treeChild, target, visited))
-                            return true;
-                    }
-                }
-            }
-            else if (TreeNodeReflection.IsSingleTreeNode(prop))
-            {
-                var child = prop.GetValue(container) as ITreeNode;
-                if (child != null)
-                {
-                    if (ReferenceEquals(child, target))
-                        return true;
-                    if (ContainsNode(child, target, visited))
-                        return true;
-                }
-            }
+            if (ReferenceEquals(child, target))
+                return true;
+            if (ContainsNode(child, target, visited))
+                return true;
         }
 
         return false;

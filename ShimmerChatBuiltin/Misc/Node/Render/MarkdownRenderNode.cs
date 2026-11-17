@@ -18,9 +18,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
     {
         private static readonly ConcurrentDictionary<PipelineKey, MarkdownPipeline> Pipelines = new();
 
-        public string Id { get; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Markdown Render";
 
         [NodeProperty("prop.markdown.pipe_tables", HintKey = "prop.markdown.pipe_tables.hint", Order = 10)]
         public bool EnablePipeTables { get; set; } = true;
@@ -38,7 +36,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
                 return;
 
             var html = Markdown.ToHtml(content, GetPipeline());
-            context.Env.UpdateContent(html, Name, GetType().Name);
+            context.Env.UpdateContent(html, context.CurrentNodeName ?? GetType().Name, GetType().Name);
         }
 
         private MarkdownPipeline GetPipeline()

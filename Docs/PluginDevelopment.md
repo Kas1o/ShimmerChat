@@ -389,9 +389,6 @@ using SharperLLM.Util;
     CategoryKeys = ["category.content"])]
 public class MyFragmentNode : IPreGenerationNode
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "My Fragment";
-
     [NodeProperty("prop.my_fragment.text", HintKey = "prop.my_fragment.text.hint", Order = 0)]
     public string Text { get; set; } = "";
 
@@ -409,14 +406,18 @@ public class MyFragmentNode : IPreGenerationNode
 
 ### 核心概念速览
 
+> **迁移提示（节点包装器）**：业务节点不再声明 `Id` / `Name`；容器节点的子节点属性改为
+> `PreGenerationNodeWrapper` / `PostGenerationNodeWrapper` / `RenderModifierNodeWrapper`。
+> 旧格式树 JSON 在读取时自动迁移，插件不需要手动改数据；但插件源码必须按新接口重新编译。
+> 详细格式见 [节点编辑器系统 § 包装器与序列化](NodeEditorSystem.md#7-序列化)。
+
 | 概念 | 说明 |
 |------|------|
-| `IPreGenerationNode` | 节点接口：`Id`、`Name`、`ExecuteAsync` |
-| `[NodeInfo]` | 类级元数据：标签 Key、图标、颜色、分类 |
+| `IPreGenerationNode` | 业务节点接口：`ExecuteAsync`（Id/名称/展开状态由包装器持有） || `[NodeInfo]` | 类级元数据：标签 Key、图标、颜色、分类 |
 | `[NodeProperty]` | 属性级元数据：标签 Key、提示、排序。支持 string/int/float/bool/enum |
 | `[NodeEditor(typeof(...))]` | 指定自定义 Blazor 编辑器组件 |
-| `List<IPreGenerationNode>` | 标记 `[NodeProperty]` 后生成子节点列表 UI，支持拖拽排序 |
-| `IPreGenerationNode` (单个) | 标记 `[NodeProperty]` 后生成单节点槽 UI |
+| `List<PreGenerationNodeWrapper>` | 标记 `[NodeProperty]` 后生成子节点列表 UI，支持拖拽排序 |
+| `PreGenerationNodeWrapper` (单个) | 标记 `[NodeProperty]` 后生成单节点槽 UI |
 | `DropStrip` | 可复用放置条组件，自定义编辑器用它来支持拖放 |
 | `TreeDragContext` | 级联共享的拖拽状态，自动流入所有子组件 |
 

@@ -12,8 +12,6 @@ namespace ShimmerChatBuiltin.DynPrompt
     [NodeInfo("node.dyn_prompt", Icon = "📝", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.dyn_prompt.desc")]
     public class DynPromptNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "DynPrompt";
 
         /// <summary>
         /// 指定要使用的 DynPromptSet 名称。留空则使用所有集合。
@@ -48,8 +46,7 @@ namespace ShimmerChatBuiltin.DynPrompt
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ParseError,
                     loc["node_err.dynprompt_parse_failed"],
-                    details: ex.ToString(),
-                    nodeId: Id, nodeName: Name));
+                    details: ex.ToString()));
             }
 
             if (allSets == null || allSets.Count == 0)
@@ -87,8 +84,7 @@ namespace ShimmerChatBuiltin.DynPrompt
                         return Task.FromResult(NodeResult.Failure(
                             NodeErrorCodes.ParseError,
                             loc.Format("node_err.dynprompt_trigger_eval_failed", term.Name),
-                            details: ex.ToString(),
-                            nodeId: Id, nodeName: Name));
+                            details: ex.ToString()));
                     }
                 }
             }

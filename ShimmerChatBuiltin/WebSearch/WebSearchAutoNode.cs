@@ -30,8 +30,6 @@ namespace ShimmerChatBuiltin.WebSearch
             "The following are live web search results. Answer the user's latest message using them " +
             "and cite the source URLs. If the results do not contain the answer, say so instead of guessing.";
 
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Auto Web Search";
 
         /// <summary>
         /// 提供方解析入口。默认走真实工厂，测试可替换为桩，避免节点测试发起网络请求。
@@ -138,7 +136,7 @@ namespace ShimmerChatBuiltin.WebSearch
             if (response.Results.Count == 0)
             {
                 // 搜索正常但无结果：不注入空片段，记录后可继续生成
-                WriteLog(context, $"[{Name}] search for \"{query}\" returned no results; nothing injected.");
+                WriteLog(context, $"[{context.CurrentNodeName}] search for \"{query}\" returned no results; nothing injected.");
                 return NodeResult.SuccessResult();
             }
 
@@ -270,12 +268,12 @@ namespace ShimmerChatBuiltin.WebSearch
         {
             if (OnFailure == WebSearchFailureBehavior.SkipAndLog)
             {
-                WriteLog(context, $"[{Name}] skipped ({code}): {message}"
+                WriteLog(context, $"[{context.CurrentNodeName}] skipped ({code}): {message}"
                     + (string.IsNullOrWhiteSpace(details) ? "" : $" | {details}"));
                 return NodeResult.SuccessResult();
             }
 
-            return NodeResult.Failure(code, message, details, Id, Name);
+            return NodeResult.Failure(code, message, details);
         }
 
         private void WriteLog(PreNodeExecutionContext context, string message) =>

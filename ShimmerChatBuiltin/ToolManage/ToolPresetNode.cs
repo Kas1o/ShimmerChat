@@ -9,8 +9,6 @@ namespace ShimmerChatBuiltin.ToolManage
     [NodeInfo("node.tool_preset", Icon = "📦", Color = "var(--node-link)", CategoryKeys = ["category.tool", "category.preset"], DescriptionKey = "node.tool_preset.desc")]
     public class ToolPresetNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Tool Preset";
 
         [NodeProperty("prop.tool_preset.preset_id", HintKey = "prop.tool_preset.preset_id.hint",
             OptionsKey = "tool_presets", OptionsSearchable = true, ShowOptionDescription = true,
@@ -25,15 +23,13 @@ namespace ShimmerChatBuiltin.ToolManage
             if (string.IsNullOrEmpty(json))
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    loc["node_err.tool_preset_none"],
-                    nodeId: Id, nodeName: Name));
+                    loc["node_err.tool_preset_none"]));
 
             var presets = JsonConvert.DeserializeObject<List<ToolPreset>>(json);
             if (presets == null || presets.Count == 0)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    loc["node_err.tool_preset_empty"],
-                    nodeId: Id, nodeName: Name));
+                    loc["node_err.tool_preset_empty"]));
 
             ToolPreset? preset;
             if (string.IsNullOrWhiteSpace(PresetId))
@@ -44,8 +40,7 @@ namespace ShimmerChatBuiltin.ToolManage
             if (preset == null)
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.PresetNotFound,
-                    loc.Format("node_err.tool_preset_not_found", string.IsNullOrWhiteSpace(PresetId) ? "(default)" : PresetId),
-                    nodeId: Id, nodeName: Name));
+                    loc.Format("node_err.tool_preset_not_found", string.IsNullOrWhiteSpace(PresetId) ? "(default)" : PresetId)));
 
             foreach (var typeName in preset.EnabledToolTypeNames)
             {

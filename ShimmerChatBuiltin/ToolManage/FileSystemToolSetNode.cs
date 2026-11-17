@@ -26,8 +26,6 @@ namespace ShimmerChatBuiltin.ToolManage
         DescriptionKey = "node.file_system_tool_set.desc")]
     public class FileSystemToolSetNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "FileSystem Tools";
 
         // -- 工具勾选 --
 

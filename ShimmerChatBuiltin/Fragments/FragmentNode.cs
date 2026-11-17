@@ -9,8 +9,6 @@ namespace ShimmerChatBuiltin.Fragments
     [NodeInfo("node.fragment", Icon = "▤", Color = "var(--node-fragment)", CategoryKeys = ["category.content", "category.fragment"])]
     public class FragmentNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Fragment";
 
         /// <summary>
         /// 片段内容

@@ -37,12 +37,27 @@ namespace ShimmerChat.Singletons
             CancellationToken ct = default,
             PipelineTreeOverrides? overrides = null)
         {
-            IPostGenerationNode? root;
+            PostGenerationNodeWrapper? root;
             var postTreeJson = overrides?.PostGenerationTreeJson ?? agent.PostGenerationTreeJson;
             if (!string.IsNullOrEmpty(postTreeJson))
             {
-                root = _serializer.Deserialize(postTreeJson) as IPostGenerationNode
-                    ?? CreateFallbackRoot();
+                var loaded = _serializer.DeserializeTree(postTreeJson);
+                if (loaded.Root is PostGenerationNodeWrapper wrapper)
+                {
+                    root = wrapper;
+                }
+                else if (loaded.Success)
+                {
+                    // 空树（"{}"）不是损坏数据，按未配置处理。
+                    root = CreateFallbackRoot();
+                }
+                else
+                {
+                    // 回退必须可见：日志记录失败原因，不悄悄换成默认树。
+                    _logger.LogError("[PostGeneration] 后生成节点树反序列化失败，已回退到默认树: {Error}",
+                        loaded.Error);
+                    root = CreateFallbackRoot();
+                }
             }
             else
             {
@@ -112,27 +127,26 @@ namespace ShimmerChat.Singletons
             {
                 Id = "__default__",
                 Name = "Default",
-                RootNodeJson = _serializer.Serialize(new PostSequenceNode
+                RootNodeJson = _serializer.Serialize(new PostGenerationNodeWrapper(new PostSequenceNode
                 {
-                    Name = "Default",
-                    Children = new List<IPostGenerationNode>
-                    {
-                        new PostDebugOutputNode { Name = "Debug Output" },
-                        new AutoChatNameNode { Name = "Auto Chat Name" },
-                        new PostToolCallNode { Name = "Tool Calls" }
-                    }
-                })
+                    Children =
+                    [
+                        new PostGenerationNodeWrapper(new PostDebugOutputNode(), "Debug Output"),
+                        new PostGenerationNodeWrapper(new AutoChatNameNode(), "Auto Chat Name"),
+                        new PostGenerationNodeWrapper(new PostToolCallNode(), "Tool Calls")
+                    ]
+                }, "Default"))
             });
 
             _kvData.Write("PostGenerationManager", "post_generation_presets",
                 JsonConvert.SerializeObject(presets, Formatting.Indented));
         }
 
-        private static IPostGenerationNode CreateFallbackRoot()
+        private static PostGenerationNodeWrapper CreateFallbackRoot()
         {
-            var root = new PostSequenceNode { Name = "Default" };
-            root.Children.Add(new PostCallNode { PresetId = "__default__" });
-            return root;
+            var payload = new PostSequenceNode();
+            payload.Children.Add(new PostGenerationNodeWrapper(new PostCallNode { PresetId = "__default__" }));
+            return new PostGenerationNodeWrapper(payload, "Default");
         }
     }
 }

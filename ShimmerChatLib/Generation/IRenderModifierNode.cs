@@ -3,10 +3,11 @@ using ShimmerChatLib.Interface;
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
-    /// 渲染修改节点接口。节点通过 <see cref="RenderEnv.UpdateContent"/> 修改内容，
-    /// 失败时抛出 <see cref="RenderNodeException"/>。
+    /// 渲染修改业务节点接口。节点通过 <see cref="RenderEnv.UpdateContent"/> 修改内容，
+    /// 失败时抛出 <see cref="RenderNodeException"/>。树结构状态由
+    /// <see cref="RenderModifierNodeWrapper"/> 持有。
     /// </summary>
-    public interface IRenderModifierNode : ITreeNode
+    public interface IRenderModifierNode
     {
         void Execute(RenderNodeExecutionContext context);
     }
@@ -35,6 +36,12 @@ namespace ShimmerChatLib.Generation
     public class RenderNodeExecutionContext
     {
         public RenderEnv Env { get; }
+
+        /// <summary>当前执行节点（包装器）的 Id，由包装器在执行期间设置。</summary>
+        public string? CurrentNodeId { get; internal set; }
+
+        /// <summary>当前执行节点（包装器）的显示名，由包装器在执行期间设置。</summary>
+        public string? CurrentNodeName { get; internal set; }
 
         public RenderNodeExecutionContext(RenderEnv env) => Env = env;
     }

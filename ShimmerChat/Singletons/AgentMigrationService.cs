@@ -58,10 +58,9 @@ namespace ShimmerChat.Singletons
             if (!string.IsNullOrEmpty(agent.PreGenerationTreeJson))
                 return false;
 
-            var root = new SequenceNode
+            var payload = new SequenceNode
             {
-                Name = agent.Name,
-                Nodes = new List<IPreGenerationNode>()
+                Nodes = new List<PreGenerationNodeWrapper>()
             };
 
 
@@ -70,20 +69,21 @@ namespace ShimmerChat.Singletons
 
             if (!string.IsNullOrWhiteSpace(agent.Description))
             {
-                root.Nodes.Add(new FragmentNode
+                payload.Nodes.Add(new PreGenerationNodeWrapper(new FragmentNode
                 {
-                    Name = "System Prompt",
                     Content = agent.Description,
                     From = SharperLLM.Util.PromptBuilder.From.system
-                });
+                }, "System Prompt"));
             }
 #pragma warning restore CS0618 // 类型或成员已过时
 
 
-            root.Nodes.Add(new CallNode
+            payload.Nodes.Add(new PreGenerationNodeWrapper(new CallNode
             {
                 PresetId = "__default__"
-            });
+            }));
+
+            var root = new PreGenerationNodeWrapper(payload, agent.Name);
 
             // ShimmerChat 2.0: CustomToolNames has been removed. Tools are now configured
             // via ToolManager presets and loaded by ToolPresetNode in the tree.

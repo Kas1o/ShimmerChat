@@ -12,8 +12,6 @@ namespace ShimmerChatBuiltin.WebSearch
         DescriptionKey = "node.web_search_tool_set.desc")]
     public class WebSearchToolSetNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Web Search Tools";
 
         /// <summary>使用的提供方</summary>
         [NodeProperty("prop.web_search.provider", HintKey = "prop.web_search.provider.hint", Order = 1)]
@@ -37,7 +35,7 @@ namespace ShimmerChatBuiltin.WebSearch
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
                     loc["node_err.web_search_config_invalid"],
-                    details: configError, nodeId: Id, nodeName: Name));
+                    details: configError));
 
             var resolution = WebSearchProviderFactory.Resolve(config, Provider);
             if (resolution.Provider == null)
@@ -50,7 +48,7 @@ namespace ShimmerChatBuiltin.WebSearch
                     : loc.Format("node_err.web_search_unknown_provider", name);
 
                 return Task.FromResult(NodeResult.Failure(
-                    NodeErrorCodes.ConfigNotFound, message, nodeId: Id, nodeName: Name));
+                    NodeErrorCodes.ConfigNotFound, message));
             }
 
             var descriptor = WebSearchProviderCatalog.Get(resolution.ResolvedKind);
@@ -64,7 +62,7 @@ namespace ShimmerChatBuiltin.WebSearch
                     context.Env.Transient.Tools.Add(new WebFetchToolV2(kvData, Provider));
                 else
                     context.Env.Persistent.DebugOutput.Write("WebSearchToolSetNode", "WebSearch",
-                        $"[{Name}] {descriptor.DisplayName} has no fetch API; web_fetch was not added.");
+                        $"[{context.CurrentNodeName}] {descriptor.DisplayName} has no fetch API; web_fetch was not added.");
             }
 
             return Task.FromResult(NodeResult.SuccessResult());

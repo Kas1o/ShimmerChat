@@ -61,11 +61,11 @@ public class PostGenerationManagerServiceTests
     public async Task ResponseText_BecomesResponseMessageContent()
     {
         var chat = new Chat { Name = "c" };
-        var tree = _serializer.Serialize(new PostMessageNode
+        var tree = _serializer.Serialize(new PostGenerationNodeWrapper(new PostMessageNode
         {
             Mode = PostMessageMode.ReplaceResponse,
             Content = "rewritten"
-        });
+        }, "Replace"));
         var (agent, persistent) = CreateRound(tree, chat);
 
         var result = await CreateService().ExecuteAsync(
@@ -81,13 +81,13 @@ public class PostGenerationManagerServiceTests
     public async Task LoopDirective_IsPropagated()
     {
         var chat = new Chat { Name = "c" };
-        var tree = _serializer.Serialize(new PostSequenceNode
+        var tree = _serializer.Serialize(new PostGenerationNodeWrapper(new PostSequenceNode
         {
             Children =
             {
-                new PostLoopDirectiveNode { Directive = PostLoopDirective.Continue }
+                new PostGenerationNodeWrapper(new PostLoopDirectiveNode { Directive = PostLoopDirective.Continue }, "Loop")
             }
-        });
+        }, "Sequence"));
         var (agent, persistent) = CreateRound(tree, chat);
 
         var result = await CreateService().ExecuteAsync(
@@ -101,12 +101,12 @@ public class PostGenerationManagerServiceTests
     public async Task NodesWriteDirectlyToChatAndStore()
     {
         var chat = new Chat { Name = "c" };
-        var tree = _serializer.Serialize(new PostMessageNode
+        var tree = _serializer.Serialize(new PostGenerationNodeWrapper(new PostMessageNode
         {
             Mode = PostMessageMode.Append,
             Sender = PostMessageSender.User,
             Content = "injected"
-        });
+        }, "Append"));
         var (agent, persistent) = CreateRound(tree, chat);
 
         var result = await CreateService().ExecuteAsync(
@@ -123,7 +123,7 @@ public class PostGenerationManagerServiceTests
     public async Task ToolCallNode_RunsToolsAndRequestsNextRound()
     {
         var chat = new Chat { Name = "c" };
-        var tree = _serializer.Serialize(new PostToolCallNode());
+        var tree = _serializer.Serialize(new PostGenerationNodeWrapper(new PostToolCallNode(), "Tools"));
         var (agent, persistent) = CreateRound(tree, chat);
 
         var response = new ChatMessage

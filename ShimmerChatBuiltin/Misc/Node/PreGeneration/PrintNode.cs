@@ -5,8 +5,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
     [NodeInfo("node.print", Icon = "🖨️", Color = "var(--node-debug)", CategoryKeys = ["category.debug"], DescriptionKey = "node.print.desc")]
     public class PrintNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Print";
 
         [NodeProperty("prop.print.template", HintKey = "prop.print.template.hint")]
         public string Template { get; set; } = "";

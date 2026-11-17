@@ -7,11 +7,14 @@ Pre-Generation 管线在 LLM 调用之前执行，负责构建 `GenerationEnv`�
 ## IPreGenerationNode
 
 ```csharp
-public interface IPreGenerationNode : ITreeNode
+public interface IPreGenerationNode
 {
     Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context);
 }
 ```
+
+> 树中的 Id、显示名与展开状态由 `PreGenerationNodeWrapper` 持有；业务节点不再声明 `Id`/`Name`。
+> 执行失败时包装器会自动补齐 `NodeResult.NodeId` / `NodeName`。
 
 ### 最小实现
 
@@ -20,10 +23,6 @@ public interface IPreGenerationNode : ITreeNode
     CategoryKeys = ["category.content"])]
 public class MyFragmentNode : IPreGenerationNode
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();  // 需 { get; set; } 以支持序列化
-
-    public string Name { get; set; } = "My Fragment";
-
     [NodeProperty("prop.my_fragment.text", Order = 0)]
     public string Text { get; set; } = "";
 
@@ -38,6 +37,8 @@ public class MyFragmentNode : IPreGenerationNode
     }
 }
 ```
+
+新节点由编辑器用 `new PreGenerationNodeWrapper(new MyFragmentNode(), "显示名")` 包装；默认显示名取 `[NodeInfo]` 的 `LabelKey`。
 
 ### 自动发现
 
@@ -222,4 +223,5 @@ public static class NodeErrorCodes
 }
 ```
 
-使用：`NodeResult.Failure(NodeErrorCodes.PresetNotFound, "预设未找到", $"ID: {id}", nodeId, nodeName)`
+使用：`NodeResult.Failure(NodeErrorCodes.PresetNotFound, "预设未找到", $"ID: {id}")`。
+`NodeId` / `NodeName` 由执行它的 `PreGenerationNodeWrapper` 自动补齐，业务节点不需要再传。

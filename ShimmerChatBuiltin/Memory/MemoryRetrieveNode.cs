@@ -12,8 +12,6 @@ namespace ShimmerChatBuiltin.Memory
     [NodeInfo("node.memory_retrieve", Icon = "🔍", Color = "var(--node-memory)", CategoryKeys = ["category.content", "category.memory_node"])]
     public class MemoryRetrieveNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Memory Retrieve";
 
         /// <summary>指定使用的嵌入配置；留空表示使用当前激活配置。</summary>
         [NodeProperty("prop.memory_retrieve.profile", HintKey = "prop.memory_retrieve.profile.hint", Order = -1,
@@ -48,8 +46,7 @@ namespace ShimmerChatBuiltin.Memory
             {
                 return NodeResult.Failure(
                     NodeErrorCodes.ServiceError,
-                    loc["node_err.memory_no_vector_store"],
-                    nodeId: Id, nodeName: Name);
+                    loc["node_err.memory_no_vector_store"]);
             }
 
             var (config, configError) = MemoryModelConfig.Load(kvData, EmbeddingProfileId);
@@ -57,8 +54,7 @@ namespace ShimmerChatBuiltin.Memory
             {
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
-                    configError ?? loc["node_err.memory_no_model"],
-                    nodeId: Id, nodeName: Name);
+                    configError ?? loc["node_err.memory_no_model"]);
             }
 
             var recentMessages = context.Env.Transient.Fragments
@@ -127,16 +123,14 @@ namespace ShimmerChatBuiltin.Memory
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
                     loc.Format("node_err.memory_not_ready", ex.Status),
-                    details: ex.Message,
-                    nodeId: Id, nodeName: Name);
+                    details: ex.Message);
             }
             catch (Exception ex)
             {
                 return NodeResult.Failure(
                     NodeErrorCodes.ServiceError,
                     loc["node_err.memory_retrieve_failed"],
-                    details: ex.ToString(),
-                    nodeId: Id, nodeName: Name);
+                    details: ex.ToString());
             }
         }
     }

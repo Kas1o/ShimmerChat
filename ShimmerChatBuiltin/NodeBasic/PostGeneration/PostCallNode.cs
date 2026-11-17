@@ -8,10 +8,6 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
         DescriptionKey = "node.post_call_preset.desc")]
     public class PostCallNode : IPostGenerationNode
     {
-        public string Id { get; } = Guid.NewGuid().ToString();
-
-        public string Name { get; set; } = "Call Preset";
-
         [NodeProperty("prop.call_node.preset_id", HintKey = "prop.call_node.preset_id.hint",
             OptionsKey = "post_generation_presets",
             OptionsDefaultLabelKey = "node_editor.option_none")]
@@ -35,25 +31,14 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
             if (string.IsNullOrWhiteSpace(preset.RootNodeJson))
                 return Fail(NodeErrorCodes.DataMissing, $"Post-generation preset has empty tree: {PresetId}");
 
-            var node = context.Env.Serializer.Deserialize(preset.RootNodeJson);
-            if (node is not IPostGenerationNode childNode)
+            var node = context.Env.Serializer.Deserialize(preset.RootNodeJson) as PostGenerationNodeWrapper;
+            if (node == null)
                 return Fail(NodeErrorCodes.DataMissing, $"Failed to deserialize post-generation preset: {PresetId}");
 
-            var childResult = await childNode.ExecuteAsync(context);
-            if (!childResult.Success)
-            {
-                childResult.NodeId ??= Id;
-                childResult.NodeName ??= Name;
-            }
-            return childResult;
+            return await node.ExecuteAsync(context);
         }
 
         private PostNodeResult Fail(string code, string message)
-        {
-            var r = PostNodeResult.Failure(code, message);
-            r.NodeId = Id;
-            r.NodeName = Name;
-            return r;
-        }
+            => PostNodeResult.Failure(code, message);
     }
 }

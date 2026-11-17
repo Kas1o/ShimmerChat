@@ -12,8 +12,6 @@ namespace ShimmerChatBuiltin.Fragments
     [NodeInfo("node.fragment_trim", Icon = "✂", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.filter"])]
     public class FragmentTrimNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Fragment Trim";
 
         /// <summary>
         /// Token 预算，超过则从头部裁剪
@@ -106,9 +104,7 @@ namespace ShimmerChatBuiltin.Fragments
             {
                 return NodeResult.Failure(
                     NodeErrorCodes.ConfigNotFound,
-                    "FragmentTrim: Tokenizer 路径未配置，请在 Tokenizer 配置面板中设置 Model 路径。",
-                    nodeId: Id,
-                    nodeName: Name);
+                    "FragmentTrim: Tokenizer 路径未配置，请在 Tokenizer 配置面板中设置 Model 路径。");
             }
 
             string resolvedPath;
@@ -126,9 +122,7 @@ namespace ShimmerChatBuiltin.Fragments
             {
                 return NodeResult.Failure(
                     NodeErrorCodes.ConfigNotFound,
-                    $"FragmentTrim: Tokenizer 文件不存在: {resolvedPath}",
-                    nodeId: Id,
-                    nodeName: Name);
+                    $"FragmentTrim: Tokenizer 文件不存在: {resolvedPath}");
             }
 
             var tokenizer = TokenizerCache.GetOrAdd(resolvedPath, path =>

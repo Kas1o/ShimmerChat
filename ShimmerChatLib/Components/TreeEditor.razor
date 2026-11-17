@@ -3,14 +3,44 @@
 @using ShimmerChatLib.Generation
 @inject ILocService Loc
 
-@if (_info == null)
+@if (Node.Payload == null)
+{
+    <div class="tree-node-card" style="border-left-color: var(--node-error, #d9534f);">
+        <div class="tn-header @(_isDraggingSelf ? "tn-dragging" : "")"
+             draggable="@(_isDraggable ? "true" : null)"
+             @ondragstart="OnDragStart" @ondragend="OnDragEnd">
+            <span class="tn-icon">⚠</span>
+            <span class="tn-label">@Loc["tree_editor.payload_missing"]</span>
+            <span class="tn-name" title="@Loc["tree_editor.payload_missing.hint"]">@Node.Name</span>
+            <div class="tn-actions">
+                @if (CopyMe != null)
+                {
+                    <button class="tn-btn tn-btn-copy" @onclick="() => CopyMe?.Invoke(Node)"
+                            @onclick:stopPropagation="true" title="@Loc["tree_editor.copy"]">📋</button>
+                }
+                @if (RemoveMe != null && Depth > 0)
+                {
+                    <button class="tn-btn tn-btn-del" @onclick="() => RemoveMe?.Invoke(Node)"
+                            @onclick:stopPropagation="true" title="@Loc["tree_editor.remove"]">✕</button>
+                }
+            </div>
+        </div>
+        <div class="tn-body">
+            <div class="tn-custom-editor-error">
+                <span class="tn-error-icon">⚠</span>
+                <span class="tn-error-msg">@Loc["tree_editor.payload_missing.hint"]</span>
+            </div>
+        </div>
+    </div>
+}
+else if (_info == null)
 {
     <div class="tree-node-card" style="border-left-color: var(--node-debug);">
         <div class="tn-header @(_isDraggingSelf ? "tn-dragging" : "")"
              draggable="@(_isDraggable ? "true" : null)"
              @ondragstart="OnDragStart" @ondragend="OnDragEnd">
             <span class="tn-icon">●</span>
-            <span class="tn-label">@Node.GetType().Name</span>
+            <span class="tn-label">@Node.PayloadType.Name</span>
             <span class="tn-name">@Node.Name</span>
             <div class="tn-actions">
                 @if (CopyMe != null)
@@ -52,7 +82,7 @@ else
             </div>
         </div>
 
-        @if (_expanded)
+        @if (Node.IsExpanded)
         {
             <div class="tn-body">
                 @* Custom editor via [NodeEditor] *@
@@ -109,24 +139,23 @@ else
     private NodeInfoAttribute? _info;
     private Type? _customEditorType;
     private Dictionary<string, object> _editorParams = new();
-    private bool _expanded = true;
     private bool _isDraggingSelf => DragContext?.DraggedNode == Node;
     private bool _isDraggable => (ParentList != null && Depth > 0) || OnDragRemove != null;
 
     protected override void OnParametersSet()
     {
-        var type = Node.GetType();
-        _info = type.GetCustomAttribute<NodeInfoAttribute>();
-        _customEditorType = type.GetCustomAttribute<NodeEditorAttribute>()?.EditorType;
+        var payloadType = Node.Payload?.GetType();
+        _info = payloadType?.GetCustomAttribute<NodeInfoAttribute>();
+        _customEditorType = payloadType?.GetCustomAttribute<NodeEditorAttribute>()?.EditorType;
         _editorParams = new Dictionary<string, object>
         {
-            ["Node"] = Node,
+            ["Node"] = Node.Payload!,
             ["Depth"] = Depth,
             ["CopyMe"] = CopyMe!
         };
     }
 
-    private void ToggleExpand() => _expanded = !_expanded;
+    private void ToggleExpand() => Node.IsExpanded = !Node.IsExpanded;
 
     private Task OnNameKeyDown(KeyboardEventArgs e)
     {

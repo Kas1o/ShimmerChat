@@ -64,7 +64,7 @@ public class CallNodeTests : NodeTestBase
         var childJson = "{\"$type\":\"MockNode\"}";
         KvMock.Setup(k => k.Read("GenerationManager", "generation_presets"))
             .Returns(CreatePresetsJson("valid", childJson));
-        SerializerMock.Setup(s => s.Deserialize(childJson)).Returns(childNode.Object);
+        SerializerMock.Setup(s => s.Deserialize(childJson)).Returns(new PreGenerationNodeWrapper(childNode.Object));
         var node = new CallNode { PresetId = "valid" };
         var ctx = CreateContext();
 

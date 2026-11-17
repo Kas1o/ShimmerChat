@@ -8,10 +8,8 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
     [NodeInfo("node.sequence", Icon = "▦", Color = "var(--node-flow)", CategoryKeys = ["category.flow"])]
     public class SequenceNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Sequence";
         [NodeProperty("prop.sequence.nodes")]
-        public List<IPreGenerationNode> Nodes { get; set; } = new();
+        public List<PreGenerationNodeWrapper> Nodes { get; set; } = new();
         [NodeProperty("prop.sequence.repeat", HintKey = "prop.sequence.repeat.hint")]
         public int Repeat { get; set; } = 1;
 
@@ -24,11 +22,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                     context.CancellationToken.ThrowIfCancellationRequested();
                     var result = await node.ExecuteAsync(context);
                     if (!result.Success)
-                    {
-                        result.NodeId ??= Id;
-                        result.NodeName ??= Name;
                         return result;
-                    }
                 }
             }
             return NodeResult.SuccessResult();

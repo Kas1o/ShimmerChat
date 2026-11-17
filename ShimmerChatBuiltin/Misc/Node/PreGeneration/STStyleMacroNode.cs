@@ -6,8 +6,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
     [NodeInfo("node.st_style_macro", Icon = "🔤", Color = "var(--node-prompt)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.st_style_macro.desc")]
     public class STStyleMacroNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "ST Style Macro";
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {

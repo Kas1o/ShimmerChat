@@ -70,22 +70,20 @@ namespace ShimmerChat.Singletons
             {
                 Id = "__default__",
                 Name = "Default",
-                RootNodeJson = _serializer.Serialize(new SequenceNode
+                RootNodeJson = _serializer.Serialize(new PreGenerationNodeWrapper(new SequenceNode
                 {
-                    Name = "Default",
-                    Nodes = new List<IPreGenerationNode>
-                    {
-                        new FragmentNode
+                    Nodes =
+                    [
+                        new PreGenerationNodeWrapper(new FragmentNode
                         {
-                            Name = "System Prompt",
                             Content = "You are a helpful AI assistant.",
                             From = PromptBuilder.From.system
-                        },
-                        new AppendChatMessagesNode { Name = "Append Chat Messages" },
-                        new APISelectNode { Name = "Select API" },
-                        new ToolPresetNode { Name = "Load Tools", PresetId = "" }
-                    }
-                })
+                        }, "System Prompt"),
+                        new PreGenerationNodeWrapper(new AppendChatMessagesNode(), "Append Chat Messages"),
+                        new PreGenerationNodeWrapper(new APISelectNode(), "Select API"),
+                        new PreGenerationNodeWrapper(new ToolPresetNode { PresetId = "" }, "Load Tools")
+                    ]
+                }, "Default"))
             });
 
             _kvData.Write("GenerationManager", "generation_presets",
@@ -203,12 +201,29 @@ namespace ShimmerChat.Singletons
                 Services = _services
             };
 
-            IPreGenerationNode rootNode;
+            PreGenerationNodeWrapper rootNode;
             var preTreeJson = overrides?.PreGenerationTreeJson ?? agent.PreGenerationTreeJson;
             if (!string.IsNullOrEmpty(preTreeJson))
             {
-                rootNode = _serializer.Deserialize(preTreeJson)
-                    ?? CreateFallbackRoot(agent);
+                var loaded = _serializer.DeserializeTree(preTreeJson);
+                if (loaded.Root is PreGenerationNodeWrapper wrapper)
+                {
+                    rootNode = wrapper;
+                }
+                else if (loaded.Success)
+                {
+                    // 空树（"{}"）不是损坏数据，按未配置处理。
+                    rootNode = CreateFallbackRoot(agent);
+                }
+                else
+                {
+                    // 回退必须可见：日志 + 调试面板，而不是悄悄换成一棵默认树。
+                    _logger.LogError("[GenerationManagerV2] 前生成节点树反序列化失败，已回退到默认树: {Error}",
+                        loaded.Error);
+                    _debugOutput.Write("GenerationManagerV2", "PreGeneration",
+                        $"Pre-generation tree deserialization failed; using fallback tree. {loaded.Error}");
+                    rootNode = CreateFallbackRoot(agent);
+                }
             }
             else
             {
@@ -439,13 +454,11 @@ namespace ShimmerChat.Singletons
                 => _chat.Messages.LastOrDefault(m => m.IsGenerating);
         }
 
-        private static IPreGenerationNode CreateFallbackRoot(Agent agent)
+        private static PreGenerationNodeWrapper CreateFallbackRoot(Agent agent)
         {
-            var root = new SequenceNode { Name = agent.Name };
-
-            root.Nodes.Add(new CallNode { PresetId = "__default__" });
-
-            return root;
+            var payload = new SequenceNode();
+            payload.Nodes.Add(new PreGenerationNodeWrapper(new CallNode { PresetId = "__default__" }));
+            return new PreGenerationNodeWrapper(payload, agent.Name);
         }
     }
 }

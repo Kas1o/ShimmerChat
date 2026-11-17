@@ -29,8 +29,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PostGeneration
     public partial class AutoChatNameNode : IPostGenerationNode
     {
         [Newtonsoft.Json.JsonIgnore]
-        public string Id { get; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Auto Chat Name";
 
         [NodeProperty("prop.auto_chat_name.strategy", Order = 10,
             HintKey = "prop.auto_chat_name.strategy.hint")]
@@ -240,8 +238,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PostGeneration
         private PostNodeResult Fail(string code, string message)
         {
             var r = PostNodeResult.Failure(code, message);
-            r.NodeId = Id;
-            r.NodeName = Name;
             return r;
         }
     }

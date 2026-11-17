@@ -1453,20 +1453,16 @@
     private void CreatePrivateTree()
     {
         if (agent == null) return;
-        var root = new SequenceNode
-        {
-            Name = "Agent Private Tree",
-            Nodes = new List<IPreGenerationNode>()
-        };
+        var payload = new SequenceNode();
+        var root = new PreGenerationNodeWrapper(payload, "Agent Private Tree");
 
         if (!string.IsNullOrEmpty(_selectedPresetId))
         {
             var preset = _availablePresets.FirstOrDefault(p => p.Id == _selectedPresetId);
-            root.Nodes.Add(new CallNode
+            payload.Nodes.Add(new PreGenerationNodeWrapper(new CallNode
             {
-                Name = preset?.Name ?? "Preset",
                 PresetId = _selectedPresetId
-            });
+            }, preset?.Name ?? "Preset"));
         }
 
         agent.PreGenerationTreeJson = Serializer.Serialize(root);
@@ -1476,16 +1472,16 @@
     private void CreatePostPrivateTree()
     {
         if (agent == null) return;
-        var root = new PostSequenceNode { Name = "Agent Post Tree", Children = new() };
+        var payload = new PostSequenceNode();
+        var root = new PostGenerationNodeWrapper(payload, "Agent Post Tree");
 
         if (!string.IsNullOrEmpty(_postSelectedPresetId))
         {
             var preset = _postPresets.FirstOrDefault(p => p.Id == _postSelectedPresetId);
-            root.Children.Add(new PostCallNode
+            payload.Children.Add(new PostGenerationNodeWrapper(new PostCallNode
             {
-                Name = preset?.Name ?? "Preset",
                 PresetId = _postSelectedPresetId
-            });
+            }, preset?.Name ?? "Preset"));
         }
 
         agent.PostGenerationTreeJson = PostSerializer.Serialize(root);
@@ -1495,16 +1491,16 @@
     private void CreateRenderPrivateTree()
     {
         if (agent == null) return;
-        var root = new RenderSequenceNode { Name = "Agent Render Tree", Children = new() };
+        var payload = new RenderSequenceNode();
+        var root = new RenderModifierNodeWrapper(payload, "Agent Render Tree");
 
         if (!string.IsNullOrEmpty(_renderSelectedPresetId))
         {
             var preset = _renderPresets.FirstOrDefault(p => p.Id == _renderSelectedPresetId);
-            root.Children.Add(new RenderCallNode
+            payload.Children.Add(new RenderModifierNodeWrapper(new RenderCallNode
             {
-                Name = preset?.Name ?? "Preset",
                 PresetId = _renderSelectedPresetId
-            });
+            }, preset?.Name ?? "Preset"));
         }
 
         agent.RenderModifierTreeJson = RenderSerializer.Serialize(root);

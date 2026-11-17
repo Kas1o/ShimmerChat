@@ -223,7 +223,7 @@ namespace ShimmerChatBuiltin.SubAgent
             }
         }
 
-        private async Task<string> RunAsync(SubAgentSessionRunScope scope, SubAgentEntry entry, IPreGenerationNode rootNode)
+        private async Task<string> RunAsync(SubAgentSessionRunScope scope, SubAgentEntry entry, PreGenerationNodeWrapper rootNode)
         {
             var config = entry.Config;
             var session = scope.Session;
@@ -467,7 +467,7 @@ namespace ShimmerChatBuiltin.SubAgent
 
         #endregion
 
-        private IPreGenerationNode? ResolveTree(SubAgentConfig config, IKVDataService kvData)
+        private PreGenerationNodeWrapper? ResolveTree(SubAgentConfig config, IKVDataService kvData)
         {
             if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
                 return _serializer.Deserialize(config.ModifierTreeJson);

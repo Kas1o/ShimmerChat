@@ -9,8 +9,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
     [NodeInfo("node.transient_probe", Icon = "◉", Color = "var(--node-branch)", CategoryKeys = ["category.debug"])]
     public class TransientProbeNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Transient Probe";
 
         [NodeProperty("prop.transient_probe.print_fragments", HintKey = "prop.transient_probe.print_fragments.hint")]
         public bool PrintFragments { get; set; } = true;

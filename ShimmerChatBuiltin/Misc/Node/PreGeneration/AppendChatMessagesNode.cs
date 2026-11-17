@@ -35,8 +35,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
     [NodeInfo("node.append_chat_messages", Icon = "💬", Color = "var(--node-fragment)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.append_chat_messages.desc")]
     public class AppendChatMessagesNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Append Chat Messages";
 
         [NodeProperty("prop.append_chat_messages.dangling_tool_calls",
             HintKey = "prop.append_chat_messages.dangling_tool_calls.hint", Order = 10)]
@@ -67,8 +65,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
                 return NodeResult.Failure(
                     NodeErrorCodes.ParseError,
                     string.Format(template, unanswered.Count, list),
-                    details: "AppendChatMessagesNode.DanglingToolCalls = FailFast.",
-                    nodeId: Id, nodeName: Name);
+                    details: "AppendChatMessagesNode.DanglingToolCalls = FailFast.");
             }
 
             int injected = 0;
@@ -196,8 +193,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
                 return (null, NodeResult.Failure(
                     NodeErrorCodes.ServiceError,
                     "AppendChatMessages: 图像附件服务不可用，无法把消息中的图像解析为请求内容。",
-                    details: "PersistentEnv.ImageAttachments is null.",
-                    nodeId: Id, nodeName: Name));
+                    details: "PersistentEnv.ImageAttachments is null."));
             }
 
             var resolved = new List<ChatImage>(images.Count);
@@ -212,8 +208,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
                     return (null, NodeResult.Failure(
                         NodeErrorCodes.DataMissing,
                         $"AppendChatMessages: 无法加载消息中的图像（{image.FileName ?? image.MimeType}）：{ex.Message}",
-                        details: ex.ToString(),
-                        nodeId: Id, nodeName: Name));
+                        details: ex.ToString()));
                 }
             }
 

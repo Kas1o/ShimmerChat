@@ -22,9 +22,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
         DescriptionKey = "node.svg_render.desc")]
     public class SvgRenderNode : IRenderModifierNode
     {
-        public string Id { get; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "SVG Render";
 
         [NodeProperty("prop.svg_render.show_copy",
             HintKey = "prop.svg_render.show_copy.hint", Order = 10)]
@@ -50,7 +48,7 @@ namespace ShimmerChatBuiltin.Misc.Node.Render
             if (result is null)
                 return;
 
-            context.Env.UpdateContent(result, Name, GetType().Name);
+            context.Env.UpdateContent(result, context.CurrentNodeName ?? GetType().Name, GetType().Name);
         }
 
         private string? ReplaceBlocks(string html, ILocService? loc)

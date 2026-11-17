@@ -23,9 +23,6 @@ public class SubAgentToolV2Tests
     /// <summary>探针树：记录子代理树实际看到的作用域身份。</summary>
     private sealed class GuidProbeNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Probe";
-
         public Guid? ChatGuid { get; private set; }
         public Guid? AgentGuid { get; private set; }
         public int ChatMessageCount { get; private set; }
@@ -45,7 +42,7 @@ public class SubAgentToolV2Tests
         bool sharedAgentGuid = true, bool sharedChatGuid = true, string name = "probe")
     {
         var probe = new GuidProbeNode();
-        _serializer.Setup(s => s.Deserialize(It.IsAny<string>())).Returns(probe);
+        _serializer.Setup(s => s.Deserialize(It.IsAny<string>())).Returns(new PreGenerationNodeWrapper(probe));
 
         var config = new SubAgentConfig { Name = name, UseSharedPreset = false, ModifierTreeJson = "probe" };
         var tool = new SubAgentToolV2(_kv, _toolRegistry.Object, _parentChat, _parentAgent,

@@ -1,19 +1,24 @@
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
-    /// 节点树中的最小节点接口。所有管线节点（Pre/Post/Render）均实现此接口，
-    /// 使节点编辑器 UI 组件可以统一操作不同类型的节点树。
+    /// 节点树中的树节点（包装器）。树结构相关状态（Id、显示名、展开状态）由包装器持有，
+    /// 业务节点只实现管线接口（<see cref="IPreGenerationNode"/> 等），不再重复声明这些字段。
     /// </summary>
     public interface ITreeNode
     {
-        /// <summary>
-        /// 节点唯一标识（GUID）
-        /// </summary>
-        string Id { get; }
+        /// <summary>节点唯一标识（GUID），用于 Blazor @key、拖拽环路检测与错误定位。</summary>
+        string Id { get; set; }
 
-        /// <summary>
-        /// 节点显示名称，用户可编辑
-        /// </summary>
+        /// <summary>节点显示名称，用户可编辑。</summary>
         string Name { get; set; }
+
+        /// <summary>节点在编辑器中的展开状态，随节点树一起持久化。</summary>
+        bool IsExpanded { get; set; }
+
+        /// <summary>业务节点实例。反序列化失败时可能为 null。</summary>
+        object? Payload { get; }
+
+        /// <summary>业务节点的实际类型。</summary>
+        Type PayloadType { get; }
     }
 }

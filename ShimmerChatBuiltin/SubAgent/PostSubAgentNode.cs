@@ -10,8 +10,6 @@ namespace ShimmerChatBuiltin.SubAgent
     [NodeInfo("node.post_sub_agent", Icon = "🤖", Color = "var(--node-subagent)", CategoryKeys = ["category.flow", "category.sub_agent", "category.post"])]
     public class PostSubAgentNode : IPostGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Post SubAgent";
 
         [NodeProperty("editor_subagent.label", HintKey = "editor_subagent.select_hint", Order = -1,
             OptionsKey = "subagent_configs", ShowOptionDescription = true,
@@ -237,7 +235,7 @@ namespace ShimmerChatBuiltin.SubAgent
             return PostNodeResult.SuccessResult();
         }
 
-        private static IPreGenerationNode? ResolveTree(SubAgentConfig config, IKVDataService kvData, IPreGenerationNodeSerializer serializer)
+        private static PreGenerationNodeWrapper? ResolveTree(SubAgentConfig config, IKVDataService kvData, IPreGenerationNodeSerializer serializer)
         {
             if (!config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
                 return serializer.Deserialize(config.ModifierTreeJson);
@@ -264,8 +262,6 @@ namespace ShimmerChatBuiltin.SubAgent
         private PostNodeResult Fail(string code, string message)
         {
             var r = PostNodeResult.Failure(code, message);
-            r.NodeId = Id;
-            r.NodeName = Name;
             return r;
         }
 

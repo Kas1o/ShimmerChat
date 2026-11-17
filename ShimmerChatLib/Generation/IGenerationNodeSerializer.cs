@@ -6,10 +6,10 @@ namespace ShimmerChatLib.Generation
     public interface IPreGenerationNodeSerializer : ITreeNodeSerializer
     {
         /// <summary>类型安全的序列化重载</summary>
-        string Serialize(IPreGenerationNode root);
+        string Serialize(PreGenerationNodeWrapper root);
 
         /// <summary>类型安全的反序列化重载</summary>
-        new IPreGenerationNode? Deserialize(string json);
+        new PreGenerationNodeWrapper? Deserialize(string json);
     }
 
     /// <summary>
@@ -18,9 +18,9 @@ namespace ShimmerChatLib.Generation
     public interface IPostGenerationNodeSerializerService : ITreeNodeSerializer
     {
         /// <summary>类型安全的序列化重载</summary>
-        string Serialize(IPostGenerationNode root);
+        string Serialize(PostGenerationNodeWrapper root);
 
         /// <summary>类型安全的反序列化重载</summary>
-        new IPostGenerationNode? Deserialize(string json);
+        new PostGenerationNodeWrapper? Deserialize(string json);
     }
 }

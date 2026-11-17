@@ -93,13 +93,13 @@
     <SlotEditor Label="@LocService["prop.if_node.then"]"
                 SlotNode="Node.Then"
                 Depth="Depth"
-                OnSet="v => Node.Then = (IPreGenerationNode?)v"
+                OnSet="v => Node.Then = (PreGenerationNodeWrapper?)v"
                 OnClear="() => Node.Then = null" />
 
     <SlotEditor Label="@LocService["prop.if_node.else"]"
                 SlotNode="Node.Else"
                 Depth="Depth"
-                OnSet="v => Node.Else = (IPreGenerationNode?)v"
+                OnSet="v => Node.Else = (PreGenerationNodeWrapper?)v"
                 OnClear="() => Node.Else = null" />
 </div>
 

@@ -12,11 +12,13 @@ ShimmerChat 2.0 新增两个后处理管线，分别在 LLM 响应后和消息�
 ### IPostGenerationNode
 
 ```csharp
-public interface IPostGenerationNode : ITreeNode
+public interface IPostGenerationNode
 {
     Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context);
 }
 ```
+
+> 树结构状态由 `PostGenerationNodeWrapper` 持有；执行失败时包装器补齐 `NodeId`/`NodeName`。
 
 ### PostNodeExecutionContext
 
@@ -152,7 +154,7 @@ PostChat.Remove(env, target);
 ### IRenderModifierNode
 
 ```csharp
-public interface IRenderModifierNode : ITreeNode
+public interface IRenderModifierNode
 {
     void Execute(RenderNodeExecutionContext context);
 }
@@ -264,17 +266,18 @@ SVG（补齐 `xmlns`、编码声明为 UTF-8），保证文件可独立打开。
     CategoryKeys = ["category.render"])]
 public class MyRenderNode : IRenderModifierNode
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "My Render";
-
     public void Execute(RenderNodeExecutionContext context)
     {
         var content = context.Env.GetContent();
         var result = DoSomething(content);
-        context.Env.UpdateContent(result, Name, GetType().Name);
+        context.Env.UpdateContent(result,
+            context.CurrentNodeName ?? GetType().Name, GetType().Name);
     }
 }
 ```
+
+> `IRenderModifierNode` 不再继承 `ITreeNode`。显示名从执行上下文的 `CurrentNodeName` 读取
+> （由 `RenderModifierNodeWrapper` 在执行期间设置），不要写死在节点类里。
 
 ### 集成点
 

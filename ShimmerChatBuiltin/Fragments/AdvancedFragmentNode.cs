@@ -20,8 +20,6 @@ namespace ShimmerChatBuiltin.Fragments
     [NodeInfo("node.advanced_fragment", Icon = "▣", Color = "var(--node-fragment)", CategoryKeys = ["category.content", "category.fragment"], DescriptionKey = "node.advanced_fragment.desc")]
     public class AdvancedFragmentNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Advanced Fragment";
 
         /// <summary>片段角色，包含 tool_result 等复杂角色。</summary>
         [NodeProperty("prop.advanced_fragment.role", HintKey = "prop.advanced_fragment.role.hint", Order = 0)]
@@ -106,7 +104,7 @@ namespace ShimmerChatBuiltin.Fragments
         }
 
         private NodeResult Fail(string code, string message, string? details)
-            => NodeResult.Failure(code, message, details, Id, Name);
+            => NodeResult.Failure(code, message, details);
 
         /// <summary>
         /// 解析图像列表，并把文件引用解析为请求可用的 Base64 内容块。

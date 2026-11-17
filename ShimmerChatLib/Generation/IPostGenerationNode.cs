@@ -1,11 +1,11 @@
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
-    /// 后生成节点接口。在 LLM 生成响应后执行，可修改本轮响应、直接增删改对话消息，
+    /// 后生成业务节点接口。在 LLM 生成响应后执行，可修改本轮响应、直接增删改对话消息，
     /// 并决定是否继续下一轮（<see cref="PostGenerationEnv.LoopDirective"/>）。
-    /// 继承 <see cref="ITreeNode"/>，可复用节点编辑器基础设施。
+    /// 树结构状态由 <see cref="PostGenerationNodeWrapper"/> 持有。
     /// </summary>
-    public interface IPostGenerationNode : ITreeNode
+    public interface IPostGenerationNode
     {
         /// <summary>
         /// 执行后处理逻辑。可修改 <see cref="PostGenerationEnv.ResponseText"/>、

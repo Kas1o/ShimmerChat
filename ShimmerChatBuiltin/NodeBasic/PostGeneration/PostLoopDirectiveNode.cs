@@ -13,9 +13,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
         DescriptionKey = "node.post_loop_directive.desc")]
     public class PostLoopDirectiveNode : IPostGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Loop Control";
 
         [NodeProperty("prop.post_loop_directive.directive",
             HintKey = "prop.post_loop_directive.directive.hint")]

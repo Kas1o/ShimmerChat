@@ -32,8 +32,6 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
     [NodeEditor(typeof(IfNodeEditor))]
     public class IfNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "If";
 
         [NodeProperty("prop.if_node.source", HintKey = "prop.if_node.source.hint", Order = 1)]
         public ConditionSource Source { get; set; } = ConditionSource.KVData;
@@ -57,10 +55,10 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
         public OnConvertFailBehavior OnConvertFail { get; set; } = OnConvertFailBehavior.AsFalse;
 
         [NodeProperty("prop.if_node.then", Order = 8)]
-        public IPreGenerationNode? Then { get; set; }
+        public PreGenerationNodeWrapper? Then { get; set; }
 
         [NodeProperty("prop.if_node.else", Order = 9)]
-        public IPreGenerationNode? Else { get; set; }
+        public PreGenerationNodeWrapper? Else { get; set; }
 
         public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
@@ -71,8 +69,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                 if (OnConvertFail == OnConvertFailBehavior.Failure)
                     return NodeResult.Failure(
                         NodeErrorCodes.DataMissing,
-                        $"IfNode: source '{Source}' returned null or empty.",
-                        nodeId: Id, nodeName: Name);
+                        $"IfNode: source '{Source}' returned null or empty.");
 
                 return Else != null
                     ? await ExecuteChild(Else, context)
@@ -143,15 +140,9 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
             };
         }
 
-        private async Task<NodeResult> ExecuteChild(IPreGenerationNode child, PreNodeExecutionContext context)
+        private async Task<NodeResult> ExecuteChild(PreGenerationNodeWrapper child, PreNodeExecutionContext context)
         {
-            var result = await child.ExecuteAsync(context);
-            if (!result.Success)
-            {
-                result.NodeId ??= Id;
-                result.NodeName ??= Name;
-            }
-            return result;
+            return await child.ExecuteAsync(context);
         }
     }
 }

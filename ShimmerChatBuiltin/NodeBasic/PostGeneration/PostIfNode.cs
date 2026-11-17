@@ -27,9 +27,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
         DescriptionKey = "node.post_condition.desc")]
     public class PostIfNode : IPostGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Post If";
 
         [NodeProperty("prop.post_condition.source", HintKey = "prop.post_condition.source.hint", Order = 1)]
         public PostConditionSource Source { get; set; } = PostConditionSource.ResponseText;
@@ -55,10 +53,10 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
         public string Value { get; set; } = "";
 
         [NodeProperty("prop.post_condition.then", Order = 7)]
-        public IPostGenerationNode? Then { get; set; }
+        public PostGenerationNodeWrapper? Then { get; set; }
 
         [NodeProperty("prop.post_condition.else", Order = 8)]
-        public IPostGenerationNode? Else { get; set; }
+        public PostGenerationNodeWrapper? Else { get; set; }
 
         public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
         {
@@ -131,15 +129,9 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
             };
         }
 
-        private async Task<PostNodeResult> ExecuteChild(IPostGenerationNode child, PostNodeExecutionContext context)
+        private async Task<PostNodeResult> ExecuteChild(PostGenerationNodeWrapper child, PostNodeExecutionContext context)
         {
-            var result = await child.ExecuteAsync(context);
-            if (!result.Success)
-            {
-                result.NodeId ??= Id;
-                result.NodeName ??= Name;
-            }
-            return result;
+            return await child.ExecuteAsync(context);
         }
     }
 

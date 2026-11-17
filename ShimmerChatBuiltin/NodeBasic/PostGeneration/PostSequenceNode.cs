@@ -9,15 +9,13 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
         DescriptionKey = "node.post_sequence.desc")]
     public class PostSequenceNode : IPostGenerationNode
     {
-        public string Id { get; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "";
 
         [NodeProperty("prop.sequence.repeat", HintKey = "prop.sequence.repeat_hint", Order = 50)]
         public int Repeat { get; set; } = 1;
 
         [NodeProperty("prop.sequence.children", Order = 100)]
-        public List<IPostGenerationNode> Children { get; set; } = new();
+        public List<PostGenerationNodeWrapper> Children { get; set; } = new();
 
         public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
         {

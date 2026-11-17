@@ -40,7 +40,7 @@ public class ChildListEditorTests
     public void RemovingChild_ImmediatelyRemovesChild()
     {
         using var ctx = new BunitContext();
-        var listNode = new TestListNode { Children = { new TestLeafNode() } };
+        var listNode = new TestListNode { Children = { new TestNodeWrapper(new TestLeafNode()) } };
         var cut = RenderEditor(ctx, listNode);
 
         cut.FindAll(".tree-node-card").Count.Should().Be(1);
@@ -60,8 +60,8 @@ public class ChildListEditorTests
         var cut = RenderEditor(ctx, listNode, drag);
 
         // 模拟从一个外部列表拖入：BeginDrag 建立拖拽状态后直接在落点条上触发 drop
-        var leaf = new TestLeafNode();
-        drag.BeginDrag(leaf, new List<TestLeafNode> { leaf }, () => Task.CompletedTask);
+        var leaf = new TestNodeWrapper(new TestLeafNode());
+        drag.BeginDrag(leaf, new List<TestNodeWrapper> { leaf }, () => Task.CompletedTask);
 
         cut.Find(".tn-drop-strip").TriggerEvent("ondrop", new DragEventArgs());
 

@@ -94,7 +94,7 @@ public class WebSearchToolSetNodeTests : NodeTestBase
     public async Task MissingApiKey_Fails()
     {
         SetupConfig(WebSearchTestData.ConfigJson(WebSearchProviderKind.Tavily));
-        var node = new WebSearchToolSetNode();
+        var node = new PreGenerationNodeWrapper(new WebSearchToolSetNode());
 
         var result = await node.ExecuteAsync(CreateContext());
 

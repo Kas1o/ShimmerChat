@@ -19,6 +19,9 @@ public class TreeEditorContext
     /// <summary>当前管线的节点接口类型（typeof(IPreGenerationNode) 等）</summary>
     public Type NodeInterfaceType { get; }
 
+    /// <summary>当前管线的包装器类型</summary>
+    public Type WrapperType { get; }
+
     /// <summary>剪贴板 JSON 缓存</summary>
     private string? _clipboardJson;
 
@@ -27,23 +30,40 @@ public class TreeEditorContext
     /// <summary>剪贴板内容变化时触发，供各层 ChildListEditor / SlotEditor 刷新粘贴按钮可见性</summary>
     public event Action? ClipboardChanged;
 
-    public TreeEditorContext(ITreeNodeSerializer serializer, INodeTypeCatalog typeCatalog, Type nodeInterfaceType)
+    public TreeEditorContext(ITreeNodeSerializer serializer, INodeTypeCatalog typeCatalog, Type nodeInterfaceType, Type? wrapperType = null)
     {
         Serializer = serializer;
         TypeCatalog = typeCatalog;
         NodeInterfaceType = nodeInterfaceType;
+        WrapperType = wrapperType ?? NodeWrapperTypes.Get(nodeInterfaceType);
     }
 
     /// <summary>获取当前管线可用的所有节点类型</summary>
     public IReadOnlyList<NodeTypeMetadata> GetAvailableNodeTypes()
         => TypeCatalog.GetNodeTypes(NodeInterfaceType);
 
-    /// <summary>通过 Activator 创建节点实例并设置默认名称</summary>
+    /// <summary>创建包装器 + 业务节点实例，显示名取 NodeInfo 标签 Key。</summary>
     public ITreeNode CreateNode(Type type)
     {
-        var instance = (ITreeNode)Activator.CreateInstance(type)!;
-        instance.Name = type.GetCustomAttribute<NodeInfoAttribute>()?.LabelKey ?? type.Name;
-        return instance;
+        var payload = Activator.CreateInstance(type)
+            ?? throw new InvalidOperationException($"Failed to create node instance of '{type.FullName}'.");
+
+        return CreateWrapper(payload, NodeNaming.GetDefaultName(type));
+    }
+
+    /// <summary>用当前管线对应的包装器类型包装业务节点。</summary>
+    public ITreeNode CreateWrapper(object payload, string? name = null)
+    {
+        var wrapper = Activator.CreateInstance(WrapperType)
+            ?? throw new InvalidOperationException($"Failed to create node wrapper '{WrapperType.FullName}'.");
+
+        var nodeProperty = WrapperType.GetProperty(nameof(NodeWrapper<object>.Node), BindingFlags.Public | BindingFlags.Instance)
+            ?? throw new InvalidOperationException($"Wrapper type '{WrapperType.FullName}' has no Node property.");
+
+        nodeProperty.SetValue(wrapper, payload);
+        var treeNode = (ITreeNode)wrapper;
+        treeNode.Name = name ?? NodeNaming.GetDefaultName(payload.GetType());
+        return treeNode;
     }
 
     /// <summary>复制节点到剪贴板</summary>

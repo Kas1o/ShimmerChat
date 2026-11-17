@@ -261,7 +261,7 @@ public class PostIfNodeTests : PostNodeTestBase
             Source = PostConditionSource.ResponseText,
             Operator = PostConditionOperator.Contains,
             Value = "[[done]]",
-            Then = new PostLoopDirectiveNode { Directive = PostLoopDirective.Stop }
+            Then = new PostGenerationNodeWrapper(new PostLoopDirectiveNode { Directive = PostLoopDirective.Stop })
         };
         ctx.Env.LoopDirective = PostLoopDirective.Continue;
 
@@ -279,7 +279,7 @@ public class PostIfNodeTests : PostNodeTestBase
             Source = PostConditionSource.FirstToolName,
             Operator = PostConditionOperator.Is,
             Value = "finish",
-            Then = new PostLoopDirectiveNode { Directive = PostLoopDirective.Stop }
+            Then = new PostGenerationNodeWrapper(new PostLoopDirectiveNode { Directive = PostLoopDirective.Stop })
         };
         ctx.Env.LoopDirective = PostLoopDirective.Continue;
 
@@ -297,8 +297,8 @@ public class PostIfNodeTests : PostNodeTestBase
             Source = PostConditionSource.HasToolCall,
             Operator = PostConditionOperator.Is,
             Value = "true",
-            Then = new PostLoopDirectiveNode { Directive = PostLoopDirective.Stop },
-            Else = new PostLoopDirectiveNode { Directive = PostLoopDirective.Continue }
+            Then = new PostGenerationNodeWrapper(new PostLoopDirectiveNode { Directive = PostLoopDirective.Stop }),
+            Else = new PostGenerationNodeWrapper(new PostLoopDirectiveNode { Directive = PostLoopDirective.Continue })
         };
         ctx.Env.LoopDirective = PostLoopDirective.Stop;
 
@@ -318,7 +318,7 @@ public class PostIfNodeTests : PostNodeTestBase
             SharedStateKey = "rounds",
             Operator = PostConditionOperator.Is,
             Value = "3",
-            Then = new PostLoopDirectiveNode { Directive = PostLoopDirective.Stop }
+            Then = new PostGenerationNodeWrapper(new PostLoopDirectiveNode { Directive = PostLoopDirective.Stop })
         };
         ctx.Env.LoopDirective = PostLoopDirective.Continue;
 

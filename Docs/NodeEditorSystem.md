@@ -1,11 +1,51 @@
 # 节点编辑器系统
 
-三个管线共用同一套节点编辑器 UI 组件。所有组件通过 `ITreeNode` 接口操作节点，通过 `TreeEditorContext` 获取管线特化的序列化器和类型目录。
+三个管线共用同一套节点编辑器 UI 组件。业务节点只实现管线接口；树结构状态（Id、显示名、展开状态）由 `NodeWrapper<TNode>` 持有。所有组件通过 `ITreeNode`（包装器）操作树，通过 `TreeEditorContext` 获取管线特化的序列化器和类型目录。
+
+> **为什么需要包装器**：名称、Id、展开状态不是节点业务逻辑，而是「树中的位置」的元数据。
+> 把它们放在包装器里，业务节点类不再被迫声明 `Id`/`Name`，序列化也不会把展示字段混进节点负载；
+> 同时展开状态可以随节点树一起持久化。
+
+## 包装器类型（概览）
+
+```csharp
+public interface ITreeNode
+{
+    string Id { get; set; }
+    string Name { get; set; }
+    bool IsExpanded { get; set; }
+    object? Payload { get; }
+    Type PayloadType { get; }
+}
+
+public class NodeWrapper<TNode> : ITreeNode where TNode : class
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Name { get; set; } = "";
+    public bool IsExpanded { get; set; } = true;
+    public TNode? Node { get; set; }            // 业务节点负载
+}
+
+public sealed class PreGenerationNodeWrapper : NodeWrapper<IPreGenerationNode> { … }
+public sealed class PostGenerationNodeWrapper : NodeWrapper<IPostGenerationNode> { … }
+public sealed class RenderModifierNodeWrapper : NodeWrapper<IRenderModifierNode> { … }
+```
+
+业务节点接口不再继承 `ITreeNode`。容器节点的子节点属性使用包装器类型：
+
+```csharp
+[NodeProperty("prop.sequence.children")]
+public List<PreGenerationNodeWrapper> Children { get; set; } = new();
+```
+
+包装器的 `ExecuteAsync`/`Execute` 会转发到负载，并在失败时补齐 `NodeId`/`NodeName`；
+渲染节点用 `context.CurrentNodeName` 读取当前显示名。
 
 ---
 
 ## 目录
 
+0. [包装器类型（概览）](#包装器类型概览)
 1. [三个 Attribute](#1-三个-attribute)
 2. [属性编辑器](#2-属性编辑器)
 3. [自定义编辑器](#3-自定义编辑器)
@@ -78,8 +118,8 @@ public class NodePropertyAttribute : Attribute
 | `float` | `<input type="number" step="0.1">` |
 | `bool` | `<input type="checkbox">` |
 | `enum` | `<select>`（枚举名即显示文本，标签本地化尚未覆盖） |
-| `List<T>` (T : ITreeNode) | ChildListEditor |
-| `T` (T : ITreeNode) | SlotEditor |
+| `List<T>` (T : ITreeNode 包装器) | ChildListEditor |
+| `T` (T : ITreeNode 包装器) | SlotEditor |
 
 > 需要「选项」语义的属性必须是 `string`；把枚举改成 string 只为了用 OptionsKey 是不必要的 ——
 > 枚举已经渲染成下拉框，缺的只是标签本地化。
@@ -277,10 +317,10 @@ public class ConfigNode : IPreGenerationNode { ... }
 
 ```csharp
 [NodeProperty("prop.sequence.children")]
-public List<IPreGenerationNode> Children { get; set; } = new();
+public List<PreGenerationNodeWrapper> Children { get; set; } = new();
 ```
 
-`GenericNodeEditor` 通过 `TreeNodeReflection.IsListOfTreeNode()` 自动检测子列表属性（支持 `List<T>` 和 `IList<T>`，其中 `T : ITreeNode`）。`ChildListEditor` 自动提供：
+`GenericNodeEditor` 通过 `TreeNodeReflection.IsListOfTreeNode()` 自动检测子列表属性（支持 `List<T>` 和 `IList<T>`，其中 `T : ITreeNode` 包装器）。`ChildListEditor` 自动提供：
 
 - 添加按钮 → NodePickerMenu
 - 粘贴按钮 → 剪贴板粘贴
@@ -292,7 +332,7 @@ public List<IPreGenerationNode> Children { get; set; } = new();
 
 ```csharp
 [NodeProperty("prop.if_node.then")]
-public IPreGenerationNode? Then { get; set; }
+public PreGenerationNodeWrapper? Then { get; set; }
 ```
 
 `SlotEditor` 渲染为单槽：有节点时显示 `TreeEditor`，空时显示添加按钮。支持拖放和粘贴。
@@ -323,7 +363,7 @@ CascadingValue<TreeDragContext>       ← 全局级联
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `ParentList` | `IList?` | 节点所属列表（非泛型，兼容所有 ITreeNode 列表） |
+| `ParentList` | `IList?` | 节点所属列表（非泛型，兼容所有 ITreeNode 包装器列表） |
 | `OnDragRemove` | `Func<Task>?` | 单槽拖动回调 |
 | `OnDragSourceChanged` | `EventCallback` | 拖拽后通知源重渲染 |
 
@@ -361,6 +401,7 @@ public class TreeEditorContext
     public ITreeNodeSerializer Serializer { get; }      // 序列化器
     public INodeTypeCatalog TypeCatalog { get; }         // 类型目录
     public Type NodeInterfaceType { get; }               // 管线接口类型
+    public Type WrapperType { get; }                     // 包装器类型
 
     public IReadOnlyList<NodeTypeMetadata> GetAvailableNodeTypes();
     public ITreeNode CreateNode(Type type);
@@ -390,21 +431,64 @@ _editorContext = new TreeEditorContext(serializer, nodeTypeCatalog, typeof(IRend
 
 节点树通过 Newtonsoft.Json + `TypeNameHandling.Objects` 序列化。每个管线的 Serializer 实现 `ITreeNodeSerializer`，通过 `SerializationBinder` 白名单机制安全反序列化。
 
+### 7.1 包装器 JSON 形态
+
+树中的每个节点是一个包装器，业务节点位于 `Node` 属性下：
+
+```json
+{
+  "Id": "…",
+  "Name": "System Prompt",
+  "IsExpanded": false,
+  "Node": {
+    "$type": "ShimmerChatBuiltin.Fragments.FragmentNode",
+    "Content": "You are a helpful AI assistant."
+  }
+}
+```
+
+- `Id` / `Name` / `IsExpanded` 属于包装器，由编辑器维护；业务节点类不再声明它们。
+- `Node` 的 `$type` 仍走白名单（`SerializationBinder`）。包装器类型本身也被加入白名单，因为 `TypeNameHandling.Objects` 可能给根包装器写出 `$type`。
+- 展开状态随树保存：折叠/展开会改变 `IsExpanded`，下一次保存预设/Agent 树时一起写回。
+
+### 7.2 反序列化结果
+
 ```csharp
 public interface ITreeNodeSerializer
 {
     string Serialize(ITreeNode root);
-    ITreeNode? Deserialize(string json);
+    ITreeNode? Deserialize(string json);                  // 兼容旧调用；失败返回 null
+    NodeDeserializationResult DeserializeTree(string json); // UI 应使用这个重载
     IReadOnlyDictionary<string, Type> GetKnownTypes();
 }
 ```
 
-三个序列化器分别扫描各自的节点接口构建类型白名单：
-- `PreGenerationNodeSerializer` → `IPreGenerationNode` 实现
-- `PostGenerationNodeSerializerService` → `IPostGenerationNode` 实现
-- `RenderModifierNodeSerializer` → `IRenderModifierNode` 实现
+`DeserializeTree` 返回显式结果：
 
-**注意**：`Id` 属性用于 Blazor `@key` 和环路检测，由系统管理，不要加 `[NodeProperty]`。
+```csharp
+public sealed class NodeDeserializationResult
+{
+    public ITreeNode? Root { get; init; }
+    public string? Error { get; init; }
+    public bool Migrated { get; init; }
+    public bool IsEmpty { get; init; }
+    public bool Success => Error == null;
+}
+```
+
+失败时**不返回空树**：序列化器输出 `LogError`，页面显示 `generation_config.tree_load_failed`（附错误原因）并回退到空白根节点。
+节点负载缺失（`Node == null`）时编辑器卡片显示 `tree_editor.payload_missing`，执行时返回 `NODE_PAYLOAD_MISSING`，不会被当成空节点静默跳过。
+
+### 7.3 旧格式懒迁移
+
+旧数据（节点对象直接作为树节点，`Id`/`Name` 写在业务节点上）在读取时自动迁移：
+
+- 包装器取走 `Id` / `Name`（缺失时生成新 Id、名称留空），`IsExpanded` 默认 `true`；
+- 业务节点负载保留 `$type` 与其他属性；
+- 递归处理包装器列表/单槽属性（通过新业务节点类型的属性反射确定子包装器类型）。
+
+迁移是幂等的：新格式 JSON 中根节点带 `Node` 属性，不会再次包装。迁移只发生在读取阶段，下次保存时写回新格式；页面会显示 `generation_config.tree_migrated` 提示。
+未知节点类型、损坏 JSON、根不是对象等都会变成显式失败，而不是被默认树掩盖。
 
 ---
 

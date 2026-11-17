@@ -45,7 +45,7 @@ public class SlotEditorRefreshTests
     public void RemovingNodeFromSlot_ImmediatelyEmptiesSlot()
     {
         using var ctx = new BunitContext();
-        var slotNode = new TestSlotNode { Then = new TestLeafNode() };
+        var slotNode = new TestSlotNode { Then = new TestNodeWrapper(new TestLeafNode()) };
         var cut = RenderEditor(ctx, slotNode);
 
         cut.FindAll(".tree-node-card").Count.Should().Be(1);

@@ -18,9 +18,7 @@ namespace ShimmerChatBuiltin.CodeAct
         DescriptionKey = "node.codeact.desc")]
     public class CodeActNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "CodeAct C#";
 
         /// <summary>
         /// 是否允许脚本输出图像。关闭后：被调用工具返回的图像不会随结果回传，
@@ -37,9 +35,7 @@ namespace ShimmerChatBuiltin.CodeAct
                 var loc = context.Env.Persistent.LocService;
                 return Task.FromResult(NodeResult.Failure(
                     NodeErrorCodes.ParameterError,
-                    loc["node_err.codeact_duplicate"],
-                    nodeId: Id,
-                    nodeName: Name));
+                    loc["node_err.codeact_duplicate"]));
             }
 
             // 传入的是活列表引用，不是快照：执行脚本时才枚举工具，

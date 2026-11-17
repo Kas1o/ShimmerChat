@@ -8,8 +8,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
     [NodeInfo("node.comment", Icon = "✏️", Color = "var(--node-debug)", CategoryKeys = ["category.other"], DescriptionKey = "node.comment.desc")]
     public class CommentNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Comment";
 
         [NodeProperty("prop.comment.text", HintKey = "prop.comment.text.hint", MultiLine = true)]
         public string Text { get; set; } = "";

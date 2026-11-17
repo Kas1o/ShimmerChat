@@ -31,9 +31,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
         DescriptionKey = "node.post_message.desc")]
     public class PostMessageNode : IPostGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Append Message";
 
         [NodeProperty("prop.post_message.mode", HintKey = "prop.post_message.mode.hint", Order = 10)]
         public PostMessageMode Mode { get; set; } = PostMessageMode.Append;
@@ -62,8 +60,6 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
                 default:
                     var fail = PostNodeResult.Failure(NodeErrorCodes.ParameterError,
                         $"PostMessageNode: unsupported mode '{Mode}'.");
-                    fail.NodeId = Id;
-                    fail.NodeName = Name;
                     return Task.FromResult(fail);
             }
 

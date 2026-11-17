@@ -9,12 +9,10 @@ namespace ShimmerChatBuiltin.NodeBasic.Render
         DescriptionKey = "node.render_sequence.desc")]
     public class RenderSequenceNode : IRenderModifierNode
     {
-        public string Id { get; } = Guid.NewGuid().ToString();
 
-        public string Name { get; set; } = "Sequence";
 
         [NodeProperty("prop.sequence.children", Order = 100)]
-        public List<IRenderModifierNode> Children { get; set; } = new();
+        public List<RenderModifierNodeWrapper> Children { get; set; } = new();
 
         public void Execute(RenderNodeExecutionContext context)
         {

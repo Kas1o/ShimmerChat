@@ -22,8 +22,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
         private const string SeparatorColor = "\x1b[90m";
         private const string WarningColor = "\x1b[1;31m";
 
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Message Print V2";
 
         [NodeProperty("prop.message_print_v2.colorize", HintKey = "prop.message_print_v2.colorize.hint")]
         public bool Colorize { get; set; } = true;

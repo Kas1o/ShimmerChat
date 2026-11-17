@@ -12,8 +12,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
             Converters = { new StringEnumConverter() }
         };
 
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Message Print";
 
         public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {

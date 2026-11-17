@@ -27,8 +27,6 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
     [NodeEditor(typeof(ConfigNodeEditor))]
     public class ConfigNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Config";
 
         /// <summary>
         /// 配置项列表的 JSON 序列化。以字符串存储以兼容节点序列化白名单：
@@ -57,8 +55,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ParseError,
                         loc["node_err.config_parse_failed"],
-                        ex.ToString(),
-                        Id, Name));
+                        ex.ToString()));
                 }
             }
 
@@ -69,8 +66,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                 if (string.IsNullOrWhiteSpace(item.Key))
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.DataMissing,
-                        loc.Format("node_err.config_empty_key", label),
-                        nodeId: Id, nodeName: Name));
+                        loc.Format("node_err.config_empty_key", label)));
 
                 var raw = string.IsNullOrEmpty(item.Value) ? item.DefaultValue : item.Value;
                 object converted;
@@ -84,8 +80,7 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                     return Task.FromResult(NodeResult.Failure(
                         NodeErrorCodes.ParseError,
                         loc.Format("node_err.config_invalid_value", raw, LocTypeName(loc, item.ValueType), label),
-                        error,
-                        Id, Name));
+                        error));
                 }
 
                 context.Env.Transient.SharedState[item.Key] = converted;

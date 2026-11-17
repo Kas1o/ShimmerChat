@@ -138,6 +138,13 @@
                             </button>
                         }
                     </div>
+                    @if (_preTreeError != null)
+                    {
+                        <div class="cfg-note is-danger">
+                            <i class="bi bi-exclamation-octagon-fill"></i>
+                            <span>@_preTreeError</span>
+                        </div>
+                    }
                     @if (_editingTree != null)
                     {
                         <div class="tree-editor-container">
@@ -180,6 +187,13 @@
                     }
                 </div>
 
+                @if (_postTreeError != null)
+                {
+                    <div class="cfg-note is-danger">
+                        <i class="bi bi-exclamation-octagon-fill"></i>
+                        <span>@_postTreeError</span>
+                    </div>
+                }
                 @if (_editingPostTree != null)
                 {
                     <div class="tree-editor-container">
@@ -230,8 +244,10 @@
     private string _statusText = string.Empty;
     private string _statusKind = "info";
 
-    private IPreGenerationNode? _editingTree;
-    private IPostGenerationNode? _editingPostTree;
+    private PreGenerationNodeWrapper? _editingTree;
+    private PostGenerationNodeWrapper? _editingPostTree;
+    private string? _preTreeError;
+    private string? _postTreeError;
     private TreeDragContext _dragContext = new();
     private TreeDragContext _postDragContext = new();
     private TreeEditorContext _preEditorContext = default!;
@@ -315,10 +331,26 @@
 
     private void LoadEditingTree()
     {
+        _preTreeError = null;
+        _postTreeError = null;
+
         if (Current is { } config && !config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
         {
-            _editingTree = Serializer.Deserialize(config.ModifierTreeJson)
-                ?? new SequenceNode { Name = config.Name };
+            var result = Serializer.DeserializeTree(config.ModifierTreeJson);
+            if (result.IsEmpty)
+            {
+                _editingTree = new PreGenerationNodeWrapper(new SequenceNode(), config.Name);
+            }
+            else if (result.Root is PreGenerationNodeWrapper root)
+            {
+                _editingTree = root;
+            }
+            else
+            {
+                _editingTree = new PreGenerationNodeWrapper(new SequenceNode(), config.Name);
+                _preTreeError = Loc.Format("generation_config.tree_load_failed", result.Error ?? "");
+                Logger.LogError("子智能体前生成树反序列化失败，已回退到空白树: {Error}", result.Error);
+            }
         }
         else
         {
@@ -327,8 +359,21 @@
 
         if (Current is { } postConfig && !string.IsNullOrEmpty(postConfig.PostGenerationTreeJson))
         {
-            _editingPostTree = PostSerializer.Deserialize(postConfig.PostGenerationTreeJson)
-                as IPostGenerationNode;
+            var result = PostSerializer.DeserializeTree(postConfig.PostGenerationTreeJson);
+            if (result.IsEmpty)
+            {
+                _editingPostTree = new PostGenerationNodeWrapper(new PostSequenceNode(), Current?.Name ?? "Post Tree");
+            }
+            else if (result.Root is PostGenerationNodeWrapper postRoot)
+            {
+                _editingPostTree = postRoot;
+            }
+            else
+            {
+                _editingPostTree = new PostGenerationNodeWrapper(new PostSequenceNode(), Current?.Name ?? "Post Tree");
+                _postTreeError = Loc.Format("generation_config.tree_load_failed", result.Error ?? "");
+                Logger.LogError("子智能体后生成树反序列化失败，已回退到空白树: {Error}", result.Error);
+            }
         }
         else
         {
@@ -434,20 +479,16 @@
     {
         if (Current is not { } config) return;
 
-        var root = new SequenceNode
-        {
-            Name = $"{config.Name} Private Tree",
-            Nodes = new List<IPreGenerationNode>()
-        };
+        var payload = new SequenceNode();
+        var root = new PreGenerationNodeWrapper(payload, $"{config.Name} Private Tree");
 
         if (!string.IsNullOrEmpty(config.ModifierPresetId))
         {
             var preset = GetPresets().FirstOrDefault(p => p.Id == config.ModifierPresetId);
-            root.Nodes.Add(new CallNode
+            payload.Nodes.Add(new PreGenerationNodeWrapper(new CallNode
             {
-                Name = preset?.Name ?? "Preset",
                 PresetId = config.ModifierPresetId
-            });
+            }, preset?.Name ?? "Preset"));
         }
 
         config.ModifierTreeJson = Serializer.Serialize(root);
@@ -474,11 +515,7 @@
     {
         if (Current is not { } config) return;
 
-        var root = new PostSequenceNode
-        {
-            Name = $"{config.Name} Post Tree",
-            Children = new List<IPostGenerationNode>()
-        };
+        var root = new PostGenerationNodeWrapper(new PostSequenceNode(), $"{config.Name} Post Tree");
         config.PostGenerationTreeJson = PostSerializer.Serialize(root);
         _editingPostTree = root;
     }

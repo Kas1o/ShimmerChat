@@ -12,8 +12,6 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
     [NodeInfo("node.advanced_condition", Icon = "◆", Color = "var(--node-branch)", CategoryKeys = ["category.flow", "category.branching"])]
     public class AdvancedIfNode : IPreGenerationNode
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Advanced If";
 
         [NodeProperty("prop.adv_if.condition", HintKey = "prop.adv_if.condition.hint", MultiLine = true, Order = 1)]
         public string Condition { get; set; } = "";
@@ -22,10 +20,10 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
         public string Usings { get; set; } = "";
 
         [NodeProperty("prop.adv_if.then", Order = 3)]
-        public IPreGenerationNode? Then { get; set; }
+        public PreGenerationNodeWrapper? Then { get; set; }
 
         [NodeProperty("prop.adv_if.else", Order = 4)]
-        public IPreGenerationNode? Else { get; set; }
+        public PreGenerationNodeWrapper? Else { get; set; }
 
         private static readonly ScriptOptions DefaultScriptOptions = ScriptOptions.Default
             .WithImports("System.Linq", "SharperLLM.Util", "System.Collections.Generic")
@@ -57,14 +55,14 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                 return NodeResult.Failure(
                     NodeErrorCodes.ParseError,
                     $"AdvancedIfNode: compilation error — {string.Join("; ", ex.Diagnostics)}",
-                    ex.ToString(), Id, Name);
+                    ex.ToString());
             }
             catch (Exception ex)
             {
                 return NodeResult.Failure(
                     NodeErrorCodes.ParseError,
                     $"AdvancedIfNode: runtime error — {ex.Message}",
-                    ex.ToString(), Id, Name);
+                    ex.ToString());
             }
 
             if (result && Then != null)
@@ -75,15 +73,9 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
             return NodeResult.SuccessResult();
         }
 
-        private async Task<NodeResult> ExecuteChild(IPreGenerationNode child, PreNodeExecutionContext context)
+        private async Task<NodeResult> ExecuteChild(PreGenerationNodeWrapper child, PreNodeExecutionContext context)
         {
-            var result = await child.ExecuteAsync(context);
-            if (!result.Success)
-            {
-                result.NodeId ??= Id;
-                result.NodeName ??= Name;
-            }
-            return result;
+            return await child.ExecuteAsync(context);
         }
     }
 

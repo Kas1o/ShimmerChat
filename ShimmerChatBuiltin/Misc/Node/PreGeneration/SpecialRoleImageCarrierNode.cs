@@ -32,8 +32,6 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
         /// <summary>伪 user 消息上的标记，值为 "synthetic"。</summary>
         public const string CarrierMetadataKey = "image_carrier";
 
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Name { get; set; } = "Special Role Image Carrier";
 
         [NodeProperty("prop.special_role_image_carrier.system", HintKey = "prop.special_role_image_carrier.system.hint", Order = 0)]
         public bool CarrySystemImages { get; set; } = true;
@@ -165,9 +163,7 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
                             NodeErrorCodes.DataMissing,
                             $"SpecialRoleImageCarrier: cannot relocate image content from a {segment.From} message: image data is missing.",
                             $"Fragment #{i}, image #{imageIndex}, role {segment.From}, " +
-                            $"message id '{segment.Message.id ?? "(null)"}', mime '{image?.MimeType ?? "(null)"}'.",
-                            Id,
-                            Name);
+                            $"message id '{segment.Message.id ?? "(null)"}', mime '{image?.MimeType ?? "(null)"}'.");
                     }
                 }
             }

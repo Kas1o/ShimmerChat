@@ -7,32 +7,37 @@ namespace ShimmerChatLib.Tests.Components;
 public class TreeEditorContextTests
 {
     [Fact]
-    public void CreateNode_CreatesInstance_WithNodeInfoLabelAsName()
+    public void CreateNode_CreatesWrapperWithNodeInfoLabelAsName()
     {
         var context = EditorTestHelpers.CreateEditorContext();
 
         var node = context.CreateNode(typeof(TestLeafNode));
 
-        node.Should().BeOfType<TestLeafNode>();
+        node.Should().BeOfType<TestNodeWrapper>();
+        node.Payload.Should().BeOfType<TestLeafNode>();
         node.Name.Should().Be("test.leaf_node");
+        node.IsExpanded.Should().BeTrue();
     }
 
     [Fact]
     public void CopyThenPaste_RegeneratesAllIds()
     {
-        var original = new TestSlotNode { Then = new TestLeafNode() };
+        var originalLeaf = new TestNodeWrapper(new TestLeafNode(), "Leaf");
+        var original = new TestNodeWrapper(new TestSlotNode { Then = originalLeaf }, "Slot");
         // 模拟序列化器返回的"反序列化副本"：Id 与原节点相同，粘贴时应全部重新生成
-        var clone = new TestSlotNode
+        var clone = new TestNodeWrapper(new TestSlotNode
         {
-            Id = original.Id,
-            Name = original.Name,
-            Then = new TestLeafNode { Id = original.Then.Id }
+            Then = new TestNodeWrapper(new TestLeafNode(), "Leaf") { Id = originalLeaf.Id }
+        }, "Slot")
+        {
+            Id = original.Id
         };
         var serializer = new Mock<ITreeNodeSerializer>();
         serializer.Setup(s => s.Serialize(It.IsAny<ITreeNode>())).Returns("json");
         serializer.Setup(s => s.Deserialize("json")).Returns(clone);
 
-        var context = new TreeEditorContext(serializer.Object, Mock.Of<INodeTypeCatalog>(), typeof(ITreeNode));
+        var context = new TreeEditorContext(serializer.Object, Mock.Of<INodeTypeCatalog>(),
+            typeof(ITreeNode), typeof(TestNodeWrapper));
 
         context.HasClipboardContent.Should().BeFalse();
         context.Copy(original);
@@ -42,13 +47,16 @@ public class TreeEditorContextTests
 
         pasted.Should().BeSameAs(clone);
         pasted!.Id.Should().NotBe(original.Id);
-        ((TestSlotNode)pasted).Then!.Id.Should().NotBe(original.Then!.Id);
+        var pastedChild = ((TestSlotNode)((TestNodeWrapper)pasted!).Node!).Then!;
+        var originalChild = ((TestSlotNode)original.Node!).Then!;
+        pastedChild.Id.Should().NotBe(originalChild.Id);
     }
 
     [Fact]
     public void Paste_WithoutCopy_ReturnsNull()
     {
-        var context = new TreeEditorContext(Mock.Of<ITreeNodeSerializer>(), Mock.Of<INodeTypeCatalog>(), typeof(ITreeNode));
+        var context = new TreeEditorContext(Mock.Of<ITreeNodeSerializer>(), Mock.Of<INodeTypeCatalog>(),
+            typeof(ITreeNode), typeof(TestNodeWrapper));
 
         context.Paste().Should().BeNull();
         context.HasClipboardContent.Should().BeFalse();
@@ -61,7 +69,7 @@ public class TreeEditorContextTests
         var fired = 0;
         context.ClipboardChanged += () => fired++;
 
-        context.Copy(new TestLeafNode());
+        context.Copy(new TestNodeWrapper(new TestLeafNode()));
 
         fired.Should().Be(1);
     }
