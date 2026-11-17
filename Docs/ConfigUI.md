@@ -209,7 +209,7 @@
 | DynPrompt | `DynPrompt/DynPromptSets` | `DynPromptSet.Pinned` | 旧集合缺失 `Id` 时在读取阶段生成并记录警告 |
 | 子智能体 | `SubAgent/configs` | `SubAgentConfig.Pinned` | 保留 `Guid` 作为稳定标识 |
 | 工具管理 | `ToolPresets/__presets__` | `ToolPreset.Pinned` | 保留旧格式迁移逻辑 |
-| MCP | `Mcp/servers` | `McpEndpointConfig.Pinned` | 端点 `Id` 仍由名称派生，重命名不改 ID |
+| MCP | `Mcp/servers` | `McpEndpointConfig.Pinned` | 端点 `Id` 可在设置页修改；节点引用改用稳定 `Key`，旧数据读取时把原 `Id` 固化为 `Key` |
 | 节点树预设 | `GenerationManager/generation_presets`、`PostGenerationManager/post_generation_presets`、`RenderModifierManager/render_modifier_presets` | `*Preset.Pinned` | 仅新增字段 |
 
 新增字段全部有默认值，读取旧 JSON 不需要迁移动作；`Pinned` 只参与视图排序，持久化列表顺序保持不变。

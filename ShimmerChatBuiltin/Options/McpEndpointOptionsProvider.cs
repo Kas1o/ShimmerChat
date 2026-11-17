@@ -6,7 +6,8 @@ namespace ShimmerChatBuiltin.Options
 {
     /// <summary>
     /// MCP 端点目录 → 节点属性下拉选项。
-    /// 与设置页共用 <see cref="McpEndpointCatalog"/>，`Id` 是写回节点的唯一引用键。
+    /// 与设置页共用 <see cref="McpEndpointCatalog"/>：写回节点的是稳定的 <c>Key</c>，
+    /// 所以修改端点 Id 不会让已有节点变成悬空引用；显示与检索仍使用可读的 Id / 名称。
     /// 目录损坏 / 服务缺失时返回空集合并写日志，由编辑器显示「暂无可选项」。
     /// </summary>
     public sealed class McpEndpointOptionsProvider : INodePropertyOptionsProvider
@@ -54,12 +55,13 @@ namespace ShimmerChatBuiltin.Options
                     : string.IsNullOrWhiteSpace(target) ? disabled : $"{disabled} · {target}";
 
                 return new NodePropertyOption(
-                    endpoint.Id,
+                    endpoint.Key,
                     label,
                     endpoint.Transport.ToString(),
                     description,
                     [
                         endpoint.Id,
+                        endpoint.Key,
                         endpoint.Name,
                         endpoint.Command,
                         endpoint.Url,

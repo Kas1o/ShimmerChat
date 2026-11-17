@@ -227,14 +227,14 @@ public class OptionsProviderTests
     }
 
     [Fact]
-    public void McpEndpoints_UseIdAsValueAndShowTransportAndTarget()
+    public void McpEndpoints_UseStableKeyAsValueAndShowTransportAndTarget()
     {
         var kv = new FakeKVDataService();
         McpEndpointCatalog.Save(kv,
         [
             new McpEndpointConfig
             {
-                Id = "filesystem", Name = "Filesystem", Enabled = true,
+                Id = "renamed-fs", Key = "filesystem_1a2b3c4d", Name = "Filesystem", Enabled = true,
                 Transport = McpTransportType.Stdio, Command = "npx", Arguments = ["-y", "server-filesystem"]
             },
             new McpEndpointConfig
@@ -248,11 +248,13 @@ public class OptionsProviderTests
 
         options.Should().HaveCount(2);
 
-        var local = options.Single(o => o.Value == "filesystem");
+        // 节点写回稳定 Key；修改 Id 后引用仍然有效。
+        var local = options.Single(o => o.Value == "filesystem_1a2b3c4d");
         local.Label.Should().Be("Filesystem");
         local.Group.Should().Be("Stdio");
         local.Description.Should().Be("npx -y server-filesystem");
         local.SearchTerms.Should().Contain("server-filesystem");
+        local.SearchTerms.Should().Contain("renamed-fs");
 
         var remote = options.Single(o => o.Value == "remote");
         remote.Group.Should().Be("Http");

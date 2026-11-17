@@ -85,30 +85,31 @@ namespace ShimmerChatBuiltin.Mcp
             if (loggerFactory != null && _logger == null)
                 _logger = loggerFactory.CreateLogger("ShimmerChat.Mcp.Registry");
 
-            var endpointId = config.Key;
-            ThrowIfRecentlyFailed(endpointId);
+            // 连接缓存按稳定 Key 归属：修改 Id 只影响工具名前缀，不应重建连接。
+            var endpointKey = config.Key;
+            ThrowIfRecentlyFailed(endpointKey);
 
-            var gate = GetGate(endpointId);
+            var gate = GetGate(endpointKey);
             await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
                 var fingerprint = ComputeFingerprint(config);
-                var stale = DetachStaleSession(endpointId, fingerprint);
+                var stale = DetachStaleSession(endpointKey, fingerprint);
                 if (stale != null)
                 {
                     _logger?.LogInformation(
-                        "[MCP:{Endpoint}] connection configuration changed; reconnecting.", endpointId);
+                        "[MCP:{Endpoint}] connection configuration changed; reconnecting.", config.Id);
                     await stale.DisposeAsync().ConfigureAwait(false);
                 }
 
-                if (!TryGetSession(endpointId, out var session))
+                if (!TryGetSession(endpointKey, out var session))
                 {
-                    session = await ConnectAsync(config, loggerFactory, endpointId, fingerprint, ct).ConfigureAwait(false);
+                    session = await ConnectAsync(config, loggerFactory, endpointKey, fingerprint, ct).ConfigureAwait(false);
                 }
 
                 lock (_sync)
                 {
-                    var entry = _entries[endpointId];
+                    var entry = _entries[endpointKey];
                     entry.RefCount++;
                     CancelIdleTimer(entry);
 

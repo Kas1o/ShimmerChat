@@ -99,8 +99,24 @@ namespace ShimmerChatBuiltin.Mcp
     /// </summary>
     public class McpEndpointConfig
     {
-        /// <summary>稳定标识，用于工具名前缀与配置引用。由名称派生，创建后不建议修改。</summary>
+        /// <summary>
+        /// 用户可见标识，同时用作工具名前缀（<c>mcp_{Id}_{tool}</c>）。
+        /// 可以随时修改；节点引用使用 <see cref="Key"/>，不会因为改名而失效。
+        /// </summary>
         public string Id { get; set; } = "";
+
+        /// <summary>
+        /// 稳定引用键，创建后不再改变。节点通过它引用端点，因此修改 <see cref="Id"/>
+        /// 不会让已保存的节点配置失去目标。旧数据没有该字段时由 <see cref="Id"/> 补齐。
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Key")]
+        public string Key
+        {
+            get => string.IsNullOrWhiteSpace(_key) ? Id : _key;
+            set => _key = value ?? "";
+        }
+
+        private string _key = "";
 
         /// <summary>显示名称。</summary>
         public string Name { get; set; } = "";
@@ -180,12 +196,23 @@ namespace ShimmerChatBuiltin.Mcp
         public McpLogLevel LogLevel { get; set; } = McpLogLevel.Info;
 
         /// <summary>
-        /// 生成工具名/资源名使用的短标识。Id 已被约束为小写字母数字与 '_'。
+        /// 生成工具名/资源名使用的短标识。Id 已被约束为字母、数字与 '_'。
+        /// 注意：这里有意使用可编辑的 <see cref="Id"/>，而节点引用使用稳定的 <see cref="Key"/>。
         /// </summary>
-        public string Key => string.IsNullOrWhiteSpace(Id) ? "mcp" : Id;
+        public string ToolPrefix => string.IsNullOrWhiteSpace(Id) ? "mcp" : Id;
 
         /// <summary>该端点是否应输出指定级别的日志（Off &lt; Error &lt; Info &lt; Debug）。</summary>
         public bool LogsAt(McpLogLevel level) => LogLevel >= level;
+
+        /// <summary>
+        /// 旧数据没有持久化 Key：在读取时把当前 Id 固化为稳定引用键。
+        /// 之后修改 Id 不再影响 Key。
+        /// </summary>
+        internal void EnsureStableKey()
+        {
+            if (string.IsNullOrWhiteSpace(_key))
+                _key = Id;
+        }
 
         /// <summary>
         /// 计算该端点应暴露给 LLM 的工具名列表：
@@ -314,6 +341,7 @@ namespace ShimmerChatBuiltin.Mcp
         /// </summary>
         private static void Normalize(McpEndpointConfig endpoint)
         {
+            endpoint.EnsureStableKey();
             endpoint.Arguments ??= [];
             endpoint.Environment ??= [];
             endpoint.Headers ??= [];
@@ -327,17 +355,21 @@ namespace ShimmerChatBuiltin.Mcp
             kvData.Write(SpaceId, Key, json);
         }
 
-        /// <summary>按 Id 精确查找端点（大小写不敏感）。</summary>
-        public static McpEndpointConfig? Find(IEnumerable<McpEndpointConfig> endpoints, string id) =>
-            endpoints.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase));
+        /// <summary>
+        /// 按稳定引用键 <see cref="McpEndpointConfig.Key"/> 查找端点（大小写不敏感）。
+        /// 旧数据的 Key 在读取时已由当时的 Id 固化，因此旧节点引用仍可命中。
+        /// </summary>
+        public static McpEndpointConfig? Find(IEnumerable<McpEndpointConfig> endpoints, string reference) =>
+            endpoints.FirstOrDefault(e => string.Equals(e.Key, reference, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
         /// 从显示名称派生唯一 Id（小写字母数字与下划线）。名称重复时追加 _2、_3 等后缀。
+        /// 同时避开所有端点的引用键，避免新 Id 与某个旧引用键重名后造成解析歧义。
         /// </summary>
         public static string CreateUniqueId(string displayName, IEnumerable<McpEndpointConfig> existing)
         {
             var baseId = NormalizeId(displayName);
-            var taken = new HashSet<string>(existing.Select(e => e.Id), StringComparer.OrdinalIgnoreCase);
+            var taken = CollectReferenceTokens(existing);
 
             if (!taken.Contains(baseId)) return baseId;
 
@@ -348,6 +380,67 @@ namespace ShimmerChatBuiltin.Mcp
             }
 
             throw new McpConfigException($"Unable to allocate a unique MCP endpoint id for '{displayName}'.");
+        }
+
+        /// <summary>
+        /// 为新端点生成稳定引用键。键由名称前缀 + 随机后缀组成：既保持可读，
+        /// 又保证删除后重建同名端点不会复用旧键、让陈旧节点引用指向错误的端点。
+        /// </summary>
+        public static string CreateReferenceKey(string displayName, IEnumerable<McpEndpointConfig> existing)
+        {
+            var baseId = NormalizeId(displayName);
+            var taken = CollectReferenceTokens(existing);
+
+            for (int i = 0; i < 1000; i++)
+            {
+                var candidate = $"{baseId}_{Guid.NewGuid().ToString("N")[..8]}";
+                if (!taken.Contains(candidate)) return candidate;
+            }
+
+            throw new McpConfigException($"Unable to allocate a unique MCP endpoint reference key for '{displayName}'.");
+        }
+
+        /// <summary>
+        /// 找出被多个端点共用的引用标识（Id 或 Key）。返回空列表表示无冲突。
+        /// 同一端点的 Id 与 Key 相同不算冲突。
+        /// </summary>
+        public static List<string> FindReferenceCollisions(IEnumerable<McpEndpointConfig> endpoints)
+        {
+            var owner = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var collisions = new List<string>();
+
+            foreach (var (endpoint, index) in endpoints.Select((e, i) => (e, i)))
+            {
+                foreach (var token in new[] { endpoint.Id, endpoint.Key })
+                {
+                    if (string.IsNullOrWhiteSpace(token)) continue;
+
+                    if (owner.TryGetValue(token, out var existing) && existing != index)
+                    {
+                        if (!collisions.Contains(token, StringComparer.OrdinalIgnoreCase))
+                            collisions.Add(token);
+                    }
+                    else
+                    {
+                        owner[token] = index;
+                    }
+                }
+            }
+
+            return collisions;
+        }
+
+        /// <summary>收集所有端点的 Id 与 Key，用于分配新标识时避免重名。</summary>
+        private static HashSet<string> CollectReferenceTokens(IEnumerable<McpEndpointConfig> endpoints)
+        {
+            var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var endpoint in endpoints)
+            {
+                if (!string.IsNullOrWhiteSpace(endpoint.Id)) taken.Add(endpoint.Id);
+                if (!string.IsNullOrWhiteSpace(endpoint.Key)) taken.Add(endpoint.Key);
+            }
+
+            return taken;
         }
 
         /// <summary>把任意显示名映射为标识符安全的字符串。</summary>
@@ -454,12 +547,17 @@ namespace ShimmerChatBuiltin.Mcp
             Newtonsoft.Json.JsonConvert.DeserializeObject<McpEndpointConfig>(
                 Newtonsoft.Json.JsonConvert.SerializeObject(source))!;
 
-        /// <summary>创建带默认值的新端点。</summary>
-        public static McpEndpointConfig CreateNew(string displayName, IEnumerable<McpEndpointConfig> existing) => new()
+        /// <summary>创建带默认值的新端点。Id 可读，Key 从创建起固化。</summary>
+        public static McpEndpointConfig CreateNew(string displayName, IEnumerable<McpEndpointConfig> existing)
         {
-            Id = CreateUniqueId(displayName, existing),
-            Name = displayName
-        };
+            var snapshot = existing.ToList();
+            return new McpEndpointConfig
+            {
+                Id = CreateUniqueId(displayName, snapshot),
+                Key = CreateReferenceKey(displayName, snapshot),
+                Name = displayName
+            };
+        }
     }
 
     /// <summary>MCP 配置层的可报告错误。调用方负责转换为 NodeResult 或面板提示。</summary>

@@ -37,10 +37,10 @@
             OnRetry="Reload">
     <ToolbarExtras>
         <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
-                disabled="@(Current == null || _probingEndpointId != null)"
+                disabled="@(Current == null || _probingEndpointKey != null)"
                 @onclick="ProbeCurrentAsync"
                 title="@Loc["panel_mcp.probe"]" aria-label="@Loc["panel_mcp.probe"]">
-            <i class="bi @(_probingEndpointId != null ? "bi-hourglass-split" : "bi-plug")"></i>
+            <i class="bi @(_probingEndpointKey != null ? "bi-hourglass-split" : "bi-plug")"></i>
             <span class="cfg-btn-label">@Loc["panel_mcp.probe"]</span>
         </button>
         <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn"
@@ -52,9 +52,9 @@
     <Body>
         @if (Current is { } endpoint)
         {
-            var probing = _probingEndpointId == endpoint.Id;
+            var probing = _probingEndpointKey == endpoint.RefKey;
 
-            if (_probeResults.TryGetValue(endpoint.Id, out var probe))
+            if (_probeResults.TryGetValue(endpoint.RefKey, out var probe))
             {
                 <div class="cfg-note @(probe.Success ? "is-success" : "is-danger")">
                     <i class="bi @(probe.Success ? "bi-check-circle-fill" : "bi-exclamation-octagon-fill")"></i>
@@ -106,10 +106,41 @@
                     </div>
                     <div class="cfg-field cfg-span-3">
                         <label class="su-label">@Loc["mcp_config.id"]</label>
-                        <div class="cfg-readonly-row">
-                            <code title="@endpoint.Id">@endpoint.Id</code>
-                        </div>
-                        <p class="cfg-field-hint">@Loc["mcp_config.id_hint"]</p>
+                        @if (_editingIdKey == endpoint.RefKey)
+                        {
+                            <div class="cfg-readonly-row">
+                                <input class="su-input" @bind="_idDraft" @bind:event="oninput"
+                                       @onkeydown="OnIdDraftKeyDown" autofocus
+                                       aria-label="@Loc["mcp_config.id"]" />
+                                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn"
+                                        @onclick="ApplyIdEdit"
+                                        title="@Loc["config_ui.dialog_confirm"]" aria-label="@Loc["config_ui.dialog_confirm"]">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn"
+                                        @onclick="CancelIdEdit"
+                                        title="@Loc["config_ui.dialog_cancel"]" aria-label="@Loc["config_ui.dialog_cancel"]">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                            <p class="cfg-field-hint">@Loc["mcp_config.id_edit_hint"]</p>
+                        }
+                        else
+                        {
+                            <div class="cfg-readonly-row">
+                                <code title="@endpoint.Id">@endpoint.Id</code>
+                                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn"
+                                        @onclick="() => BeginIdEdit(endpoint)"
+                                        title="@Loc["mcp_config.edit_id"]" aria-label="@Loc["mcp_config.edit_id"]">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </div>
+                            <p class="cfg-field-hint">@Loc["mcp_config.id_hint"]</p>
+                            @if (!string.Equals(endpoint.RefKey, endpoint.Id, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <p class="cfg-field-hint">@Loc.Format("mcp_config.ref_key", endpoint.RefKey)</p>
+                            }
+                        }
                     </div>
                     <div class="cfg-field cfg-span-4">
                         <label class="su-label">@Loc["panel_mcp.transport"]</label>
@@ -253,7 +284,7 @@
                     </div>
                 </div>
 
-                @if (_inventories.TryGetValue(endpoint.Id, out var inventory))
+                @if (_inventories.TryGetValue(endpoint.RefKey, out var inventory))
                 {
                     <div class="cfg-action-row">
                         <button type="button" class="su-btn su-btn-secondary su-btn-sm"
@@ -385,10 +416,13 @@
     private string _statusText = string.Empty;
     private string _statusKind = "info";
 
+    // 测试结果与能力清单按稳定 Key 缓存：修改端点 Id 后仍能复用，不需要重新探测。
     private readonly Dictionary<string, ProbeResult> _probeResults = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Inventory> _inventories = new(StringComparer.OrdinalIgnoreCase);
 
-    private string? _probingEndpointId;
+    private string? _probingEndpointKey;
+    private string? _editingIdKey;
+    private string _idDraft = "";
 
     private static readonly JsonSerializerOptions _snapshotOptions = new() { WriteIndented = false };
 
@@ -401,6 +435,7 @@
 
     private void Reload()
     {
+        CancelIdEdit();
         try
         {
             _endpoints = McpEndpointCatalog.Load(KVData).Select(EditorModel.From).ToList();
@@ -446,9 +481,13 @@
     {
         if (Current is not { } source) return;
 
+        var existing = _endpoints.Select(e => e.ToConfig()).ToList();
+
         var copy = McpEndpointCatalog.Clone(source.ToConfig());
         copy.Name = NextName($"{DisplayName(source)} {Loc["config_ui.copy_suffix"]}");
-        copy.Id = McpEndpointCatalog.CreateUniqueId(copy.Name, _endpoints.Select(e => e.ToConfig()));
+        copy.Id = McpEndpointCatalog.CreateUniqueId(copy.Name, existing);
+        // 克隆必须换一个新的稳定引用键：否则两个端点会争抢同一批节点引用。
+        copy.Key = McpEndpointCatalog.CreateReferenceKey(copy.Name, existing);
 
         var index = _endpoints.IndexOf(source);
         _endpoints.Insert(index + 1, EditorModel.From(copy));
@@ -465,14 +504,80 @@
         await Task.CompletedTask;
     }
 
+    private void BeginIdEdit(EditorModel endpoint)
+    {
+        _editingIdKey = endpoint.RefKey;
+        _idDraft = endpoint.Id;
+    }
+
+    private void CancelIdEdit()
+    {
+        _editingIdKey = null;
+        _idDraft = string.Empty;
+    }
+
+    private void OnIdDraftKeyDown(KeyboardEventArgs e)
+    {
+        if (string.Equals(e.Key, "Enter", StringComparison.Ordinal))
+            ApplyIdEdit();
+        else if (string.Equals(e.Key, "Escape", StringComparison.Ordinal))
+            CancelIdEdit();
+    }
+
+    /// <summary>
+    /// 修改用户可见 ID。只校验本地可判定项；节点引用走稳定 Key，因此这里不会改动任何节点数据。
+    /// </summary>
+    private void ApplyIdEdit()
+    {
+        if (Current is not { } endpoint || _editingIdKey != endpoint.RefKey) return;
+
+        var newId = _idDraft.Trim();
+
+        if (string.IsNullOrWhiteSpace(newId))
+        {
+            SetStatus(Loc["mcp_err.id_required"], "error");
+            return;
+        }
+
+        if (newId.Any(c => !(char.IsLetterOrDigit(c) || c == '_')))
+        {
+            SetStatus(Loc["mcp_err.id_charset"], "error");
+            return;
+        }
+
+        if (string.Equals(newId, endpoint.Id, StringComparison.Ordinal))
+        {
+            CancelIdEdit();
+            return;
+        }
+
+        // Id 与所有端点的 Key 共享命名空间：改名后仍要保证 Find 只有一个解析结果。
+        var conflict = _endpoints.FirstOrDefault(e =>
+            e.RefKey != endpoint.RefKey &&
+            (string.Equals(e.Id, newId, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(e.RefKey, newId, StringComparison.OrdinalIgnoreCase)));
+
+        if (conflict != null)
+        {
+            SetStatus(Loc.Format("mcp_err.ref_duplicate", newId), "error");
+            return;
+        }
+
+        var oldId = endpoint.Id;
+        endpoint.Id = newId;
+        _selectedId = newId;   // 列表选择按 Id 跟踪，改名后同步，避免编辑区消失。
+        CancelIdEdit();
+        SetStatus(Loc.Format("mcp_config.id_changed", oldId, newId), "info");
+    }
+
     private async Task RemoveEndpoint()
     {
         if (Current is not { } endpoint) return;
 
         var index = _endpoints.IndexOf(endpoint);
         _endpoints.Remove(endpoint);
-        _probeResults.Remove(endpoint.Id);
-        _inventories.Remove(endpoint.Id);
+        _probeResults.Remove(endpoint.RefKey);
+        _inventories.Remove(endpoint.RefKey);
         _selectedId = _endpoints.Count == 0 ? null : _endpoints[Math.Min(index, _endpoints.Count - 1)].Id;
         SetStatus(Loc.Format("config_ui.deleted_pending", DisplayName(endpoint)), "info");
         await Task.CompletedTask;
@@ -488,6 +593,7 @@
     private async Task SelectEndpoint(string id)
     {
         _selectedId = id;
+        CancelIdEdit();
         await Task.CompletedTask;
     }
 
@@ -495,17 +601,23 @@
     {
         if (_loadError != null) return;
 
+        // 保存时先落定正在编辑的 ID；若草稿非法则停在编辑态并报告，不保存半成品。
+        if (_editingIdKey != null)
+        {
+            ApplyIdEdit();
+            if (_editingIdKey != null) return;
+        }
+
         var configs = _endpoints.Select(e => e.ToConfig()).ToList();
         var errors = new List<string>();
 
         foreach (var config in configs)
             errors.AddRange(McpEndpointCatalog.Validate(config, Loc).Select(msg => $"[{config.Name}] {msg}"));
 
-        var duplicates = configs.GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToList();
-        errors.AddRange(duplicates.Select(id => Loc.Format("mcp_err.id_duplicate", id)));
+        // Id 用于工具名前缀，Key 用于节点引用；两者共享同一命名空间，
+        // 任一重名都会让 Find 产生歧义，因此一起检查。
+        var duplicates = McpEndpointCatalog.FindReferenceCollisions(configs);
+        errors.AddRange(duplicates.Select(id => Loc.Format("mcp_err.ref_duplicate", id)));
 
         if (errors.Count > 0)
         {
@@ -537,17 +649,17 @@
 
     private async Task ProbeAsync(EditorModel endpoint)
     {
-        _probingEndpointId = endpoint.Id;
-        _probeResults.Remove(endpoint.Id);
-        _inventories.Remove(endpoint.Id);
+        _probingEndpointKey = endpoint.RefKey;
+        _probeResults.Remove(endpoint.RefKey);
+        _inventories.Remove(endpoint.RefKey);
         StateHasChanged();
 
         var config = endpoint.ToConfig();
         var errors = McpEndpointCatalog.Validate(config, Loc);
         if (errors.Count > 0)
         {
-            _probeResults[endpoint.Id] = new ProbeResult(false, null, null, 0, 0, 0, false, null, string.Join(" | ", errors));
-            _probingEndpointId = null;
+            _probeResults[endpoint.RefKey] = new ProbeResult(false, null, null, 0, 0, 0, false, null, string.Join(" | ", errors));
+            _probingEndpointKey = null;
             SetStatus(string.Join(" | ", errors), "error");
             return;
         }
@@ -562,8 +674,8 @@
             var resources = McpDescriptorFactory.Resources(await session.GetResourcesAsync(cts.Token));
             var prompts = McpDescriptorFactory.Prompts(await session.GetPromptsAsync(cts.Token));
 
-            _inventories[endpoint.Id] = new Inventory(tools, resources, prompts);
-            _probeResults[endpoint.Id] = new ProbeResult(
+            _inventories[endpoint.RefKey] = new Inventory(tools, resources, prompts);
+            _probeResults[endpoint.RefKey] = new ProbeResult(
                 true,
                 session.ServerInfo?.Name,
                 session.Client.NegotiatedProtocolVersion?.ToString(),
@@ -585,7 +697,7 @@
         catch (Exception ex)
         {
             LoggerFactory.CreateLogger<McpToolsetPage>().LogError(ex, "探测 MCP 端点 {EndpointId} 失败", config.Id);
-            _probeResults[endpoint.Id] = new ProbeResult(false, null, null, 0, 0, 0, false, null, ex.Message);
+            _probeResults[endpoint.RefKey] = new ProbeResult(false, null, null, 0, 0, 0, false, null, ex.Message);
             SetStatus(Loc.Format("panel_mcp.probe_error", config.Name, ex.Message), "error");
         }
         finally
@@ -603,7 +715,7 @@
                 }
             }
 
-            _probingEndpointId = null;
+            _probingEndpointKey = null;
             StateHasChanged();
         }
     }
@@ -619,8 +731,8 @@
 
         try
         {
-            await JS.InvokeVoidAsync("copyTextToClipboard", endpoint.Id);
-            SetStatus(Loc.Format("panel_mcp.node_hint", endpoint.Id), "success");
+            await JS.InvokeVoidAsync("copyTextToClipboard", endpoint.RefKey);
+            SetStatus(Loc.Format("panel_mcp.node_hint", endpoint.RefKey), "success");
         }
         catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or InvalidOperationException)
         {
@@ -685,7 +797,8 @@
     {
         public required McpEndpointConfig Config { get; init; }
 
-        public string Id => Config.Id;
+        public string Id { get => Config.Id; set => Config.Id = value; }
+        public string RefKey => Config.Key;
         public string Name { get => Config.Name; set => Config.Name = value; }
         public bool Enabled { get => Config.Enabled; set => Config.Enabled = value; }
         public bool Pinned { get => Config.Pinned; set => Config.Pinned = value; }

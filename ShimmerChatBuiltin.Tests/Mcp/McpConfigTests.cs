@@ -73,6 +73,7 @@ public class McpEndpointCatalogTests
 
         var actual = Assert.Single(loaded);
         Assert.Equal("filesystem", actual.Id);
+        Assert.Equal("filesystem", actual.Key); // 旧数据没有 Key 时由 Id 懒迁移
         Assert.Equal("npx", actual.Command);
         Assert.Equal(3, actual.Arguments.Count);
         Assert.False(actual.InheritEnvironment);
@@ -206,6 +207,93 @@ public class McpEndpointCatalogTests
         var endpoints = new List<McpEndpointConfig> { new() { Id = "Filesystem" } };
         Assert.NotNull(McpEndpointCatalog.Find(endpoints, "filesystem"));
         Assert.Null(McpEndpointCatalog.Find(endpoints, "other"));
+    }
+
+    [Fact]
+    public void Find_ResolvesStableKey_AfterIdRename()
+    {
+        var endpoint = new McpEndpointConfig { Id = "filesystem", Key = "filesystem_1a2b3c4d" };
+
+        endpoint.Id = "fs-renamed"; // 模拟用户修改 Id
+
+        var endpoints = new List<McpEndpointConfig> { endpoint };
+        Assert.Same(endpoint, McpEndpointCatalog.Find(endpoints, "filesystem_1a2b3c4d"));
+        Assert.Null(McpEndpointCatalog.Find(endpoints, "fs-renamed")); // Id 不再作为引用键
+        Assert.Null(McpEndpointCatalog.Find(endpoints, "filesystem")); // 旧 Id 已释放
+    }
+
+    [Fact]
+    public void Load_PreservesStableKey_WhenIdDiffers()
+    {
+        var kv = new InMemoryKvData();
+        kv.Write(McpEndpointCatalog.SpaceId, McpEndpointCatalog.Key,
+            """[{"Id":"renamed","Key":"original_1a2b3c4d","Name":"A","Command":"npx"}]""");
+
+        var actual = Assert.Single(McpEndpointCatalog.Load(kv));
+
+        Assert.Equal("renamed", actual.Id);
+        Assert.Equal("original_1a2b3c4d", actual.Key);
+    }
+
+    [Fact]
+    public void CreateNew_AllocatesDistinctIdAndStableKey()
+    {
+        var endpoint = McpEndpointCatalog.CreateNew("My Server", []);
+
+        Assert.Equal("my_server", endpoint.Id);
+        Assert.StartsWith("my_server_", endpoint.Key, StringComparison.Ordinal);
+        Assert.NotEqual(endpoint.Id, endpoint.Key);
+    }
+
+    [Fact]
+    public void CreateUniqueId_AvoidsExistingReferenceKeys()
+    {
+        var existing = new List<McpEndpointConfig>
+        {
+            new() { Id = "renamed", Key = "filesystem_1a2b3c4d" }
+        };
+
+        var id = McpEndpointCatalog.CreateUniqueId("filesystem", existing);
+
+        Assert.Equal("filesystem", id); // Key 带后缀，不占用裸名称
+        Assert.NotEqual("filesystem_1a2b3c4d", id);
+    }
+
+    [Fact]
+    public void CreateReferenceKey_AvoidsExistingTokens()
+    {
+        var existing = new List<McpEndpointConfig> { new() { Id = "filesystem", Key = "filesystem_1a2b3c4d" } };
+
+        var key = McpEndpointCatalog.CreateReferenceKey("filesystem", existing);
+
+        Assert.StartsWith("filesystem_", key, StringComparison.Ordinal);
+        Assert.NotEqual("filesystem_1a2b3c4d", key);
+    }
+
+    [Fact]
+    public void FindReferenceCollisions_ReportsIdsAndKeysSharedAcrossEndpoints()
+    {
+        var endpoints = new List<McpEndpointConfig>
+        {
+            new() { Id = "a", Key = "a" },
+            new() { Id = "b", Key = "a" },      // 与上一个端点的 Key 冲突
+            new() { Id = "c", Key = "c" },
+            new() { Id = "c", Key = "c_2" }     // Id 冲突
+        };
+
+        var collisions = McpEndpointCatalog.FindReferenceCollisions(endpoints);
+
+        Assert.Contains("a", collisions);
+        Assert.Contains("c", collisions);
+        Assert.DoesNotContain("b", collisions);
+    }
+
+    [Fact]
+    public void FindReferenceCollisions_AllowsSameIdAndKeyOnOneEndpoint()
+    {
+        var endpoints = new List<McpEndpointConfig> { new() { Id = "a", Key = "a" } };
+
+        Assert.Empty(McpEndpointCatalog.FindReferenceCollisions(endpoints));
     }
 
     [Fact]

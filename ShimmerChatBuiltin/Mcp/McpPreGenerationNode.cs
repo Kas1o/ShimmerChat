@@ -50,7 +50,10 @@ namespace ShimmerChatBuiltin.Mcp
     {
 
 
-        /// <summary>目标端点 Id（对应 MCP 工具集设置页中的标识）。</summary>
+        /// <summary>
+        /// 目标端点的稳定引用键（<see cref="McpEndpointConfig.Key"/>）。
+        /// 设置页修改可读 Id 不会改变它；手写旧数据时填当前 Id 也能解析。
+        /// </summary>
         [NodeProperty("prop.mcp_toolset.endpoint", HintKey = "prop.mcp_toolset.endpoint.hint",
             OptionsKey = "mcp_endpoints", OptionsSearchable = true, ShowOptionDescription = true,
             OptionsDefaultLabelKey = "prop.mcp_toolset.endpoint.default")]
@@ -273,11 +276,11 @@ namespace ShimmerChatBuiltin.Mcp
             {
                 if (!enabledSet.Contains(descriptor.Name)) continue;
 
-                var exposedName = McpToolBridge.BuildExposedName(session.Config.Key, descriptor.Name);
+                var exposedName = McpToolBridge.BuildExposedName(session.Config.ToolPrefix, descriptor.Name);
                 if (existingNames.Contains(exposedName))
                 {
                     // sanitize 可能把不同工具名映射到同一暴露名；改名为唯一形式而不是静默丢弃。
-                    exposedName = McpToolBridge.BuildUniqueExposedName(session.Config.Key, descriptor.Name, existingNames);
+                    exposedName = McpToolBridge.BuildUniqueExposedName(session.Config.ToolPrefix, descriptor.Name, existingNames);
                     WriteLog(env, endpoint, McpLogLevel.Info, $"tool '{descriptor.Name}' exposed name collides; using '{exposedName}'.");
                 }
 

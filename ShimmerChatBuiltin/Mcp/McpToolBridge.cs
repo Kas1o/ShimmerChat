@@ -208,7 +208,7 @@ namespace ShimmerChatBuiltin.Mcp
         {
             _session = session;
             _descriptor = descriptor;
-            _exposedName = exposedName ?? BuildExposedName(session.Config.Key, descriptor.Name);
+            _exposedName = exposedName ?? BuildExposedName(session.Config.ToolPrefix, descriptor.Name);
             _imageAttachments = imageAttachments;
         }
 
@@ -340,7 +340,7 @@ namespace ShimmerChatBuiltin.Mcp
         public McpResourceReadToolBridge(McpEndpointSession session, IImageAttachmentService? imageAttachments = null)
         {
             _session = session;
-            _exposedName = McpToolBridge.BuildExposedName(session.Config.Key, "read_mcp_resource");
+            _exposedName = McpToolBridge.BuildExposedName(session.Config.ToolPrefix, "read_mcp_resource");
             _imageAttachments = imageAttachments;
         }
 
