@@ -140,6 +140,8 @@ main {
     .shimmer-content {
         flex: 1;
         padding: 24px;
+        /* 供配置页固定操作栏抵消滚动容器内边距；padding 变化时必须同步。 */
+        --cfg-content-gutter: 24px;
         overflow-y: auto;
         overflow-x: hidden;
     }
@@ -232,4 +234,5 @@ main {
     /* 竖屏内容区域调整 */
     .shimmer-layout.portrait .shimmer-content {
         padding: 16px;
+        --cfg-content-gutter: 16px;
     }

@@ -60,6 +60,9 @@
 
 - 使用 `position: sticky; top: 0`，`z-index: 30`。
 - 面板必须铺满父级 `panel-content` 的内边距（负外边距 + 内边距补偿），滚动时不能露出缝隙。
+- 滚动容器 `.shimmer-content` 自带内边距，sticky 的 `top` 必须同步抵消同一段距离（`--cfg-content-gutter`，由
+  `MainLayout` 在 padding 变化时同步维护），否则滚动后操作栏会停在视口下方，顶部露出一条内边距高度的空隙。
+  铺满整页的操作栏顶部不再保留圆角，避免圆角处透出底色。
 - 面板背景半透明并使用 `backdrop-filter: blur()`；不透明度不低于 94%，避免正文文字透出干扰阅读。
 - 宽屏一行到两行；窄屏（≤900px）自动换行，隐藏按钮文字但保留 `title` / `aria-label`。
 - 面板本身不参与正文滚动；正文滚动容器仍是 `.shimmer-content`，不要另起 `overflow` 容器。

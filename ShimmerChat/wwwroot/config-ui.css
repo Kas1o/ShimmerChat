@@ -29,19 +29,17 @@
     backdrop-filter: blur(14px) saturate(1.15);
 }
 
-/* 主项目页面：.shimmer-content 自带 24px 内边距，需要更大的负外边距。 */
+/* 主项目页面：.shimmer-content 自带内边距，操作栏用负外边距铺满。
+   sticky 的 top 必须同步抵消这段内边距，否则滚动时操作栏会停在视口下方，
+   顶部露出一条内边距高度的空隙。--cfg-content-gutter 由 MainLayout 定义。 */
 .cfg-page-main .cfg-topbar {
-    margin: -24px -24px 0;
-    padding-left: 24px;
-    padding-right: 24px;
-}
-
-@media (max-width: 900px) {
-    .cfg-page-main .cfg-topbar {
-        margin: -16px -16px 0;
-        padding-left: 16px;
-        padding-right: 16px;
-    }
+    margin: calc(-1 * var(--cfg-content-gutter, 24px)) calc(-1 * var(--cfg-content-gutter, 24px)) 0;
+    padding-left: var(--cfg-content-gutter, 24px);
+    padding-right: var(--cfg-content-gutter, 24px);
+    top: calc(-1 * var(--cfg-content-gutter, 24px));
+    /* 操作栏已经贴住滚动容器顶边，顶部圆角只会露出底色。 */
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
 }
 
 .cfg-topbar-main {
