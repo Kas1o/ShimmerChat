@@ -7,7 +7,7 @@
 @using ShimmerChatLib.Components
 @using ShimmerChatLib.Generation
 @using ShimmerChatLib.Interface
-
+@using System.Text.Json
 @inject IKVDataService pluginData
 @inject IPreGenerationNodeSerializer Serializer
 @inject IPostGenerationNodeSerializerService PostSerializer
@@ -15,405 +15,319 @@
 @inject INodeTypeCatalog NodeTypeCatalog
 @inject IMessageStoreService MessageStore
 @inject IPanelDraftStore PanelDrafts
+@inject NavigationManager Navigation
+@inject ILogger<SubAgentConfigurationPanel> Logger
 
-<div class="subagent-panel shimmer-content">
-    <div class="subagent-header">
-        <div class="subagent-header-title">
-            <h2>@Loc["panel_subagent.title"]</h2>
-            <p class="su-text-2">@Loc["panel_subagent.desc"]</p>
-            <p class="su-text-sm su-text-2">@Loc["panel_subagent.sessions_hint"]</p>
-        </div>
-        <button class="su-btn su-btn-primary" @onclick="OpenCreateModal" title="@Loc["panel_subagent.create"]">
-            <i class="bi bi-plus-lg"></i> @Loc["panel_subagent.create"]
+<ConfigShell T="SubAgentConfig"
+            Items="_configs"
+            SelectedId="@_selectedId"
+            IdSelector="@(c => c.Guid.ToString("D"))"
+            NameSelector="@(c => c.Name)"
+            TypeSelector="@(c => GetPresetName(c))"
+            MetaSelector="@(c => GetOutputModeLabel(c.OutputMode))"
+            SearchSelector="@(c => $"{c.ModifierPresetId} {c.OutputMode} {c.Guid}")"
+            PinSelector="@(c => c.Pinned)"
+            Title="@Loc["panel_subagent.title"]"
+            Description="@Loc["panel_subagent.desc"]"
+            Icon="bi-robot"
+            IsDirty="IsDirty"
+            LoadError="@_loadError"
+            StatusMessage="@_statusText"
+            StatusKind="@_statusKind"
+            OnCreate="CreateConfig"
+            OnSave="SaveAll"
+            OnSelect="SelectConfig"
+            OnClone="CloneConfig"
+            OnRename="RenameConfig"
+            OnDelete="DeleteConfig"
+            OnTogglePin="TogglePin"
+            OnRetry="Reload">
+    <ToolbarExtras>
+        <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                @onclick="OpenSessions"
+                title="@Loc["panel_subagent.sessions"]" aria-label="@Loc["panel_subagent.sessions"]">
+            <i class="bi bi-clock-history"></i>
+            <span class="cfg-btn-label">@Loc["panel_subagent.sessions"]</span>
         </button>
-    </div>
-
-    <div class="subagent-layout @(selectedConfig != null ? "show-editor" : "")">
-        <!-- 侧栏 / 一级页：子智能体列表 -->
-        <aside class="subagent-list-pane su-group">
-            <div class="subagent-list-header">
-                <span class="subagent-list-title"><i class="bi bi-robot"></i> @Loc["panel_subagent.existing"]</span>
-                <span class="su-badge su-badge-accent">@configs.Count</span>
-            </div>
-
-            @if (configs.Count == 0)
-            {
-                <div class="subagent-empty">
-                    <i class="bi bi-robot"></i>
-                    <p>@Loc["panel_subagent.no_subagents"]</p>
-                    <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="OpenCreateModal">
-                        <i class="bi bi-plus-lg"></i> @Loc["panel_subagent.create"]
-                    </button>
-                </div>
-            }
-            else
-            {
-                <div class="subagent-list">
-                    @foreach (var cfg in configs)
-                    {
-                        var isActive = selectedConfig == cfg;
-                        <div class="subagent-list-item @(isActive ? "active" : "")" @onclick="() => SelectConfig(cfg)">
-                            <div class="subagent-list-item-main">
-                                <div class="subagent-list-item-name">
-                                    <span class="subagent-list-item-avatar" style="background-color: @GetAvatarColor(cfg.Name)">@GetInitial(cfg.Name)</span>
-                                    <span class="su-truncate">@cfg.Name</span>
-                                </div>
-                                <div class="subagent-list-item-meta">
-                                    <span class="su-badge su-badge-accent subagent-preset-badge">@GetPresetName(cfg)</span>
-                                    <span class="su-badge @GetOutputModeBadgeClass(cfg.OutputMode)">@GetOutputModeLabel(cfg.OutputMode)</span>
-                                </div>
-                            </div>
-                            <button class="subagent-delete-btn" title="@Loc["panel_subagent.delete"]"
-                                    @onclick:stopPropagation @onclick="() => ShowDeleteConfirmation(cfg)">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    }
-                </div>
-            }
-        </aside>
-
-        <!-- 编辑区 / 二级页：选中子智能体的配置 -->
-        <section class="subagent-editor-pane su-group">
-            @if (selectedConfig != null)
-            {
-                <div class="subagent-editor-header">
-                    <button class="su-btn su-btn-ghost subagent-back-btn" @onclick="BackToList" title="@Loc["panel_subagent.back"]">
-                        <i class="bi bi-arrow-left"></i>
-                    </button>
-                    <h3><i class="bi bi-sliders"></i> @Loc.Format("panel_subagent.edit_title", selectedConfig.Name)</h3>
-                    <button class="su-btn su-btn-outline-danger su-btn-sm subagent-editor-delete"
-                            @onclick="() => ShowDeleteConfirmation(selectedConfig)" title="@Loc["panel_subagent.delete"]">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
-
-                <div class="subagent-editor-body">
-                    <div class="subagent-editor-section">
-                        <div class="settings-field">
-                            <label>@Loc["panel_subagent.label_name"]</label>
-                            <input type="text" class="shimmer-input" @bind="selectedConfig.Name" />
-                        </div>
-
-                        <div class="settings-field">
-                            <label>@Loc["panel_subagent.label_output_mode"]</label>
-                            <select class="su-select" @bind="selectedConfig.OutputMode">
-                                <option value="LastMessage">@Loc["panel_subagent.output_last_msg"]</option>
-                                <option value="FullJson">@Loc["panel_subagent.output_full_json"]</option>
-                                <option value="None">@Loc["panel_subagent.output_none"]</option>
-                            </select>
-                            <p class="su-text-sm su-text-2 su-mt-1">
-                                <em>@Loc["panel_subagent.output_help"]</em>
-                            </p>
-                        </div>
+    </ToolbarExtras>
+    <Body>
+        @if (Current is { } config)
+        {
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-info-circle"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["subagent_config.basic"]</h3>
+                        <p>@Loc["subagent_config.basic_desc"]</p>
                     </div>
+                </div>
 
-                    <div class="subagent-editor-section">
-                        <h5><i class="bi bi-diagram-3"></i> @Loc["panel_subagent.modifier_tree"]</h5>
+                <div class="cfg-grid">
+                    <div class="cfg-field cfg-span-5">
+                        <label class="su-label">@Loc["panel_subagent.label_name"]</label>
+                        <input class="su-input" @bind="config.Name" />
+                        <p class="cfg-field-hint">@Loc["subagent_config.name_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-4">
+                        <label class="su-label">@Loc["panel_subagent.label_output_mode"]</label>
+                        <select class="su-select" @bind="config.OutputMode">
+                            <option value="LastMessage">@Loc["panel_subagent.output_last_msg"]</option>
+                            <option value="FullJson">@Loc["panel_subagent.output_full_json"]</option>
+                            <option value="None">@Loc["panel_subagent.output_none"]</option>
+                        </select>
+                        <p class="cfg-field-hint">@Loc["panel_subagent.output_help"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["subagent_config.id"]</label>
+                        <div class="cfg-readonly-row">
+                            <code title="@config.Guid.ToString("D")">@config.Guid.ToString("D")</code>
+                        </div>
+                        <p class="cfg-field-hint">@Loc["subagent_config.id_hint"]</p>
+                    </div>
+                </div>
+            </section>
 
-                        @if (selectedConfig.UseSharedPreset)
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-diagram-3"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["panel_subagent.modifier_tree"]</h3>
+                        <p>@Loc["subagent_config.pre_tree_desc"]</p>
+                    </div>
+                </div>
+
+                @if (config.UseSharedPreset)
+                {
+                    <div class="cfg-status is-info" role="status">
+                        <i class="bi bi-collection"></i>
+                        @Loc["panel_subagent.using_preset"] — @Loc["panel_subagent.select_preset_hint"]
+                    </div>
+                    <div class="cfg-inline">
+                        <select class="su-select" @bind="config.ModifierPresetId">
+                            <option value="">@Loc["panel_subagent.none_option"]</option>
+                            @foreach (var preset in GetPresets())
+                            {
+                                <option value="@preset.Id">@preset.Name</option>
+                            }
+                        </select>
+                        <button type="button" class="su-btn su-btn-secondary su-btn-sm" @onclick="CreatePrivateTree">
+                            <i class="bi bi-pencil"></i> @Loc["panel_subagent.create_private_tree"]
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="cfg-inline">
+                        @if (!string.IsNullOrEmpty(config.ModifierTreeJson))
                         {
-                            <div class="gen-config-status mb-2">
-                                <span class="gen-config-badge preset">@Loc["panel_subagent.using_preset"]</span>
-                                <span class="gen-config-hint">@Loc["panel_subagent.select_preset_hint"]</span>
-                            </div>
-                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                                <select class="su-select" style="max-width:300px; flex:1; min-width:180px;" @bind="selectedConfig.ModifierPresetId">
-                                    <option value="">@Loc["panel_subagent.none_option"]</option>
-                                    @foreach (var preset in GetPresets())
-                                    {
-                                        <option value="@preset.Id">@preset.Name</option>
-                                    }
-                                </select>
-                                <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePrivateTree">
-                                    <i class="bi bi-pencil"></i> @Loc["panel_subagent.create_private_tree"]
-                                </button>
-                            </div>
+                            <span class="su-badge su-badge-secondary">@Loc["panel_subagent.private_tree"]</span>
+                            <button type="button" class="su-btn su-btn-secondary su-btn-sm" @onclick="RevertToPreset">
+                                <i class="bi bi-arrow-counterclockwise"></i> @Loc["panel_subagent.revert_to_preset"]
+                            </button>
+                            <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn is-danger"
+                                    @onclick="ClearPrivateTree" title="@Loc["panel_subagent.clear_private_tree"]">
+                                <i class="bi bi-trash3"></i>
+                            </button>
                         }
                         else
                         {
-                            @if (!string.IsNullOrEmpty(selectedConfig.ModifierTreeJson))
-                            {
-                                <div class="gen-config-status mb-2">
-                                    <span class="gen-config-badge private">@Loc["panel_subagent.private_tree"]</span>
-                                    <span class="gen-config-hint">@Loc["panel_subagent.private_tree_hint"]</span>
-                                </div>
-                                <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
-                                    <button class="su-btn su-btn-outline su-btn-sm" @onclick="RevertToPreset">
-                                        <i class="bi bi-arrow-counterclockwise"></i> @Loc["panel_subagent.revert_to_preset"]
-                                    </button>
-                                    <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="ClearPrivateTree">
-                                        @Loc["panel_subagent.clear_private_tree"]
-                                    </button>
-                                </div>
-                                @if (_editingTree != null)
-                                {
-                                    <div class="tree-editor-container">
-                                        <CascadingValue Value="_dragContext">
-                                            <CascadingValue Value="_preEditorContext">
-                                                <TreeEditor Node="@_editingTree" />
-                                            </CascadingValue>
-                                        </CascadingValue>
-                                    </div>
-                                }
-                            }
-                            else
-                            {
-                                <div class="gen-config-status mb-2">
-                                    <span class="gen-config-badge private">@Loc["panel_subagent.minimal"]</span>
-                                    <span class="gen-config-hint">@Loc["panel_subagent.minimal_hint"]</span>
-                                </div>
-                                <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePrivateTree">
-                                    <i class="bi bi-pencil"></i> @Loc["panel_subagent.create_private_tree"]
-                                </button>
-                            }
+                            <span class="su-badge su-badge-secondary">@Loc["panel_subagent.minimal"]</span>
+                            <span class="cfg-field-hint">@Loc["panel_subagent.minimal_hint"]</span>
+                            <button type="button" class="su-btn su-btn-secondary su-btn-sm" @onclick="CreatePrivateTree">
+                                <i class="bi bi-pencil"></i> @Loc["panel_subagent.create_private_tree"]
+                            </button>
                         }
                     </div>
-
-                    <div class="subagent-editor-section">
-                        <h5><i class="bi bi-arrow-repeat"></i> @Loc["panel_subagent.post_tree"]</h5>
-                        <p class="su-text-sm su-text-2 su-mt-1">
-                            <em>@Loc["panel_subagent.post_tree_hint"]</em>
-                        </p>
-
-                        @if (_editingPostTree != null)
-                        {
-                            <div class="gen-config-status mb-2">
-                                <span class="gen-config-badge private">@Loc["panel_subagent.private_tree"]</span>
-                                <span class="gen-config-hint">@Loc["panel_subagent.post_tree_private_hint"]</span>
-                            </div>
-                            <div style="display:flex; gap:8px; margin-bottom:12px;">
-                                <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="ClearPrivatePostTree">
-                                    @Loc["panel_subagent.clear_private_tree"]
-                                </button>
-                            </div>
-                            <div class="tree-editor-container">
-                                <CascadingValue Value="_postDragContext">
-                                    <CascadingValue Value="_postEditorContext">
-                                        <TreeEditor Node="@_editingPostTree" />
-                                    </CascadingValue>
+                    @if (_editingTree != null)
+                    {
+                        <div class="tree-editor-container">
+                            <CascadingValue Value="_dragContext">
+                                <CascadingValue Value="_preEditorContext">
+                                    <TreeEditor Node="@_editingTree" />
                                 </CascadingValue>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="gen-config-status mb-2">
-                                <span class="gen-config-badge private">@Loc["panel_subagent.minimal"]</span>
-                                <span class="gen-config-hint">@Loc["panel_subagent.post_tree_minimal_hint"]</span>
-                            </div>
-                            <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="CreatePrivatePostTree">
-                                <i class="bi bi-pencil"></i> @Loc["panel_subagent.create_private_post_tree"]
-                            </button>
-                        }
-                    </div>
+                            </CascadingValue>
+                        </div>
+                    }
+                }
+            </section>
 
-                    <div class="subagent-editor-section">
-                        <h5><i class="bi bi-puzzle"></i> @Loc["panel_subagent.plugins"]</h5>
-                        <PluginPanelContainer
-                            PanelDisplayPlace="PanelDisplayPlace.Agent"
-                            Parameters="SubAgentPluginParameters" />
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-arrow-repeat"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["panel_subagent.post_tree"]</h3>
+                        <p>@Loc["panel_subagent.post_tree_hint"]</p>
                     </div>
                 </div>
 
-                <div class="subagent-editor-footer">
-                    <button class="su-btn su-btn-primary" @onclick="SaveAll" disabled="@isLoading">
-                        <i class="bi bi-check-lg"></i> @(isLoading ? Loc["panel_subagent.saving"] : Loc["panel_subagent.save_all"])
-                    </button>
-                    @if (!string.IsNullOrEmpty(statusMessage))
+                <div class="cfg-inline">
+                    @if (_editingPostTree != null)
                     {
-                        <span class="@(statusType == "success" ? "su-text-success" : "su-text-danger")">@statusMessage</span>
+                        <span class="su-badge su-badge-secondary">@Loc["panel_subagent.private_tree"]</span>
+                        <span class="cfg-field-hint">@Loc["panel_subagent.post_tree_private_hint"]</span>
+                        <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn is-danger"
+                                @onclick="ClearPrivatePostTree" title="@Loc["panel_subagent.clear_private_tree"]">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="su-badge su-badge-secondary">@Loc["panel_subagent.minimal"]</span>
+                        <span class="cfg-field-hint">@Loc["panel_subagent.post_tree_minimal_hint"]</span>
+                        <button type="button" class="su-btn su-btn-secondary su-btn-sm" @onclick="CreatePrivatePostTree">
+                            <i class="bi bi-pencil"></i> @Loc["panel_subagent.create_private_post_tree"]
+                        </button>
                     }
                 </div>
-            }
-            else
-            {
-                <div class="subagent-editor-placeholder">
-                    <i class="bi bi-robot"></i>
-                    <p>@Loc["panel_subagent.select_hint"]</p>
-                    <button class="su-btn su-btn-primary su-btn-sm" @onclick="OpenCreateModal">
-                        <i class="bi bi-plus-lg"></i> @Loc["panel_subagent.create"]
-                    </button>
+
+                @if (_editingPostTree != null)
+                {
+                    <div class="tree-editor-container">
+                        <CascadingValue Value="_postDragContext">
+                            <CascadingValue Value="_postEditorContext">
+                                <TreeEditor Node="@_editingPostTree" />
+                            </CascadingValue>
+                        </CascadingValue>
+                    </div>
+                }
+            </section>
+
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-puzzle"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["panel_subagent.plugins"]</h3>
+                        <p>@Loc["subagent_config.plugins_desc"]</p>
+                    </div>
                 </div>
-            }
-        </section>
-    </div>
-</div>
+                <PluginPanelContainer
+                    PanelDisplayPlace="PanelDisplayPlace.Agent"
+                    Parameters="SubAgentPluginParameters" />
+            </section>
+        }
+    </Body>
 
-@if (CreatePopupVisible)
-{
-    <div class="su-modal-mask" @onclick="() => CreatePopupVisible = false">
-        <div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
-            <h5>@Loc["panel_subagent.create_title"]</h5>
-            <div class="su-form-group su-mt-3">
-                <label class="su-label">@Loc["panel_subagent.label_name"]</label>
-                <input class="su-input" @bind="newConfigName" @bind:event="oninput"
-                       @onkeydown="OnCreateKeyDown"
-                       placeholder="@Loc["panel_subagent.name_placeholder"]" />
-            </div>
-            <div class="su-modal-footer">
-                <button class="su-btn su-btn-secondary" @onclick="() => CreatePopupVisible = false">@Loc["panel_subagent.cancel"]</button>
-                <button class="su-btn su-btn-primary" @onclick="CreateNewConfig" disabled="@string.IsNullOrWhiteSpace(newConfigName)">
-                    @Loc["panel_subagent.create"]
-                </button>
-            </div>
+    <EmptyState>
+        <div class="cfg-empty">
+            <span class="cfg-empty-icon"><i class="bi bi-robot"></i></span>
+            <h2>@Loc["subagent_config.empty_title"]</h2>
+            <p>@Loc["subagent_config.empty_desc"]</p>
+            <button type="button" class="su-btn su-btn-primary" @onclick="CreateConfig">
+                <i class="bi bi-plus-lg"></i> @Loc["panel_subagent.create"]
+            </button>
         </div>
-    </div>
-}
-
-@if (DeletePopupVisible)
-{
-    <div class="su-modal-mask" @onclick="() => DeletePopupVisible = false">
-        <div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
-            <h5>@Loc["panel_subagent.delete_title"]</h5>
-            <p class="su-mt-2">@Loc.Format("panel_subagent.delete_msg", ConfigToDelete?.Name ?? "")</p>
-            <div class="su-modal-footer">
-                <button class="su-btn su-btn-secondary" @onclick="() => DeletePopupVisible = false">@Loc["panel_subagent.cancel"]</button>
-                <button class="su-btn su-btn-danger" @onclick="DeleteConfigConfirmed">@Loc["panel_subagent.delete"]</button>
-            </div>
-        </div>
-    </div>
-}
+    </EmptyState>
+</ConfigShell>
 
 @code {
-    List<SubAgentConfig> configs = [];
-    SubAgentConfig? selectedConfig;
-    string newConfigName = "";
-    bool isLoading;
-    string statusMessage = "";
-    string statusType = "success";
-    IPreGenerationNode? _editingTree;
-    IPostGenerationNode? _editingPostTree;
-    TreeDragContext _dragContext = new();
-    TreeDragContext _postDragContext = new();
-    TreeEditorContext _preEditorContext = default!;
-    TreeEditorContext _postEditorContext = default!;
+    private const string Space = "SubAgent";
+    private const string Key = "configs";
 
-    bool CreatePopupVisible { get; set; } = false;
-    bool DeletePopupVisible { get; set; } = false;
-    SubAgentConfig? ConfigToDelete { get; set; } = null;
+    private List<SubAgentConfig> _configs = [];
+    private string? _selectedId;
+    private string? _loadError;
+    private string? _savedSnapshot;
+    private string _statusText = string.Empty;
+    private string _statusKind = "info";
+
+    private IPreGenerationNode? _editingTree;
+    private IPostGenerationNode? _editingPostTree;
+    private TreeDragContext _dragContext = new();
+    private TreeDragContext _postDragContext = new();
+    private TreeEditorContext _preEditorContext = default!;
+    private TreeEditorContext _postEditorContext = default!;
+
+    private static readonly JsonSerializerSettings _configSerializerSettings = new()
+    {
+        TypeNameHandling = TypeNameHandling.Auto
+    };
+
+    private static readonly JsonSerializerOptions _snapshotOptions = new() { WriteIndented = false };
+
+    private SubAgentConfig? Current =>
+        _configs.FirstOrDefault(c => string.Equals(c.Guid.ToString("D"), _selectedId, StringComparison.Ordinal));
+
+    private bool IsDirty
+    {
+        get
+        {
+            if (_loadError != null) return false;
+            CommitEditingTrees();
+            return Snapshot() != _savedSnapshot;
+        }
+    }
 
     protected override void OnInitialized()
     {
         _preEditorContext = new TreeEditorContext(Serializer, NodeTypeCatalog, typeof(IPreGenerationNode));
         _postEditorContext = new TreeEditorContext(PostSerializer, NodeTypeCatalog, typeof(IPostGenerationNode));
-        LoadConfigs();
+        Reload();
     }
 
-    static readonly JsonSerializerSettings _configSerializerSettings = new()
+    private void Reload()
     {
-        TypeNameHandling = TypeNameHandling.Auto
-    };
+        var json = pluginData.Read(Space, Key);
 
-    void LoadConfigs()
-    {
-        var json = pluginData.Read("SubAgent", "configs");
         try
         {
-            configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]", _configSerializerSettings) ?? [];
+            _configs = string.IsNullOrEmpty(json)
+                ? []
+                : JsonConvert.DeserializeObject<List<SubAgentConfig>>(json, _configSerializerSettings) ?? [];
+            _loadError = null;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Deserialization with TypeNameHandling failed, trying legacy format: {ex.Message}");
+            Logger.LogWarning(ex, "子智能体配置包含无法识别的类型信息，尝试按旧格式读取");
             try
             {
-                configs = JsonConvert.DeserializeObject<List<SubAgentConfig>>(json ?? "[]") ?? [];
+                _configs = string.IsNullOrEmpty(json)
+                    ? []
+                    : JsonConvert.DeserializeObject<List<SubAgentConfig>>(json) ?? [];
+                _loadError = null;
             }
-            catch (Exception ex2)
+            catch (Exception legacyEx)
             {
-                Console.WriteLine($"Legacy deserialization also failed: {ex2.Message}");
-                configs = [];
+                Logger.LogError(legacyEx, "加载子智能体配置失败");
+                _loadError = Loc.Format("subagent_config.load_failed", legacyEx.Message);
+                _configs = [];
             }
         }
-    }
 
-    string GetPresetName(SubAgentConfig cfg)
-    {
-        if (!cfg.UseSharedPreset)
-            return !string.IsNullOrEmpty(cfg.ModifierTreeJson) ? Loc["panel_subagent.private_tree"] : Loc["panel_subagent.minimal"];
-        if (string.IsNullOrEmpty(cfg.ModifierPresetId))
-            return Loc["panel_subagent.none_option_fallback"];
-        var preset = GetPresets().FirstOrDefault(p => p.Id == cfg.ModifierPresetId);
-        return preset?.Name ?? Loc["panel_subagent.none_option_fallback"];
-    }
-
-    #region 创建（按钮 + 弹窗）
-
-    void OpenCreateModal()
-    {
-        newConfigName = "";
-        CreatePopupVisible = true;
-    }
-
-    void OnCreateKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-            CreateNewConfig();
-    }
-
-    void CreateNewConfig()
-    {
-        if (string.IsNullOrWhiteSpace(newConfigName))
-            return;
-
-        var config = new SubAgentConfig { Name = newConfigName.Trim() };
-        configs.Add(config);
-        SelectConfig(config);
-        newConfigName = "";
-        CreatePopupVisible = false;
-    }
-
-    #endregion
-
-    #region 删除（确认弹窗）
-
-    void ShowDeleteConfirmation(SubAgentConfig config)
-    {
-        ConfigToDelete = config;
-        DeletePopupVisible = true;
-    }
-
-    async Task DeleteConfigConfirmed()
-    {
-        if (ConfigToDelete == null)
-            return;
-
-        configs.Remove(ConfigToDelete);
-        if (selectedConfig == ConfigToDelete)
-            selectedConfig = null;
-        ConfigToDelete = null;
-        DeletePopupVisible = false;
-        await SaveConfigsAsync();
-    }
-
-    #endregion
-
-    void SelectConfig(SubAgentConfig config)
-    {
-        selectedConfig = config;
+        _selectedId = _configs.FirstOrDefault()?.Guid.ToString("D");
         LoadEditingTree();
+        CommitEditingTrees();
+        _savedSnapshot = _loadError == null ? Snapshot() : null;
     }
 
-    void BackToList()
+    private string Snapshot() =>
+        JsonConvert.SerializeObject(_configs, Formatting.None, _configSerializerSettings);
+
+    private void CommitEditingTrees()
     {
-        selectedConfig = null;
+        if (Current is not { } config) return;
+
+        if (_editingTree != null)
+            config.ModifierTreeJson = Serializer.Serialize(_editingTree);
+
+        if (_editingPostTree != null)
+            config.PostGenerationTreeJson = PostSerializer.Serialize(_editingPostTree);
     }
 
-    void LoadEditingTree()
+    private void LoadEditingTree()
     {
-        if (selectedConfig != null && !selectedConfig.UseSharedPreset
-            && !string.IsNullOrEmpty(selectedConfig.ModifierTreeJson))
+        if (Current is { } config && !config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierTreeJson))
         {
-            _editingTree = Serializer.Deserialize(selectedConfig.ModifierTreeJson)
-                ?? new SequenceNode { Name = selectedConfig.Name };
+            _editingTree = Serializer.Deserialize(config.ModifierTreeJson)
+                ?? new SequenceNode { Name = config.Name };
         }
         else
         {
             _editingTree = null;
         }
 
-        if (selectedConfig != null && !string.IsNullOrEmpty(selectedConfig.PostGenerationTreeJson))
+        if (Current is { } postConfig && !string.IsNullOrEmpty(postConfig.PostGenerationTreeJson))
         {
-            _editingPostTree = PostSerializer.Deserialize(selectedConfig.PostGenerationTreeJson)
+            _editingPostTree = PostSerializer.Deserialize(postConfig.PostGenerationTreeJson)
                 as IPostGenerationNode;
         }
         else
@@ -422,81 +336,202 @@
         }
     }
 
-    async Task SaveConfigsAsync()
+    private async Task SaveAll()
     {
+        if (_loadError != null) return;
+
+        if (_configs.Any(c => string.IsNullOrWhiteSpace(c.Name)))
+        {
+            SetStatus(Loc["subagent_config.name_required"], "error");
+            return;
+        }
+
         try
         {
-            var json = JsonConvert.SerializeObject(configs, Formatting.Indented, _configSerializerSettings);
-            pluginData.Write("SubAgent", "configs", json);
+            CommitEditingTrees();
+            var json = JsonConvert.SerializeObject(_configs, Formatting.Indented, _configSerializerSettings);
+            pluginData.Write(Space, Key, json);
+            _savedSnapshot = Snapshot();
+            SetStatus(Loc["panel_subagent.msg_saved"], "success");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Save configs failed: {ex.Message}");
+            Logger.LogError(ex, "保存子智能体配置失败");
+            SetStatus(Loc.Format("panel_subagent.msg_save_failed", ex.Message), "error");
         }
+
+        await Task.CompletedTask;
     }
 
-    async void SaveAll()
+    private async Task CreateConfig()
     {
-        try
-        {
-            isLoading = true;
-            if (_editingTree != null && selectedConfig != null)
-            {
-                selectedConfig.ModifierTreeJson = Serializer.Serialize(_editingTree);
-            }
-            if (_editingPostTree != null && selectedConfig != null)
-            {
-                selectedConfig.PostGenerationTreeJson = PostSerializer.Serialize(_editingPostTree);
-            }
-            await SaveConfigsAsync();
-            ShowStatus(Loc["panel_subagent.msg_saved"], "success");
-        }
-        catch (Exception ex)
-        {
-            ShowStatus(Loc.Format("panel_subagent.msg_save_failed", ex.Message), "error");
-        }
-        finally
-        {
-            isLoading = false;
-        }
+        var config = new SubAgentConfig { Name = NextName(Loc["panel_subagent.create"]) };
+        _configs.Add(config);
+        SelectConfig(config.Guid.ToString("D"));
+        SetStatus(Loc.Format("config_ui.created", config.Name), "info");
+        await Task.CompletedTask;
     }
 
-    async void ShowStatus(string message, string type)
+    private async Task CloneConfig()
     {
-        statusMessage = message;
-        statusType = type;
-        StateHasChanged();
-        await Task.Delay(3000);
-        statusMessage = "";
-        StateHasChanged();
+        if (Current is not { } source) return;
+
+        var copy = source.Clone();
+        copy.Guid = Guid.NewGuid();
+        copy.Name = NextName($"{DisplayName(source)} {Loc["config_ui.copy_suffix"]}");
+
+        var index = _configs.IndexOf(source);
+        _configs.Insert(index + 1, copy);
+        SelectConfig(copy.Guid.ToString("D"));
+        SetStatus(Loc.Format("config_ui.cloned", copy.Name), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task RenameConfig(string name)
+    {
+        if (Current is not { } config) return;
+
+        config.Name = name;
+        SetStatus(Loc.Format("config_ui.renamed", config.Name), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task DeleteConfig()
+    {
+        if (Current is not { } config) return;
+
+        var index = _configs.IndexOf(config);
+        _configs.Remove(config);
+        _selectedId = _configs.Count == 0
+            ? null
+            : _configs[Math.Min(index, _configs.Count - 1)].Guid.ToString("D");
+        LoadEditingTree();
+        SetStatus(Loc.Format("config_ui.deleted_pending", DisplayName(config)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task TogglePin(SubAgentConfig config)
+    {
+        config.Pinned = !config.Pinned;
+        SetStatus(Loc.Format(config.Pinned ? "config_ui.pinned" : "config_ui.unpinned", DisplayName(config)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task SelectConfig(string id)
+    {
+        CommitEditingTrees();
+        _selectedId = id;
+        LoadEditingTree();
+        await Task.CompletedTask;
+    }
+
+    private void OpenSessions()
+    {
+        Navigation.NavigateTo("/pluginpanel/panel.sub_agent_sessions");
+    }
+
+    private void CreatePrivateTree()
+    {
+        if (Current is not { } config) return;
+
+        var root = new SequenceNode
+        {
+            Name = $"{config.Name} Private Tree",
+            Nodes = new List<IPreGenerationNode>()
+        };
+
+        if (!string.IsNullOrEmpty(config.ModifierPresetId))
+        {
+            var preset = GetPresets().FirstOrDefault(p => p.Id == config.ModifierPresetId);
+            root.Nodes.Add(new CallNode
+            {
+                Name = preset?.Name ?? "Preset",
+                PresetId = config.ModifierPresetId
+            });
+        }
+
+        config.ModifierTreeJson = Serializer.Serialize(root);
+        config.UseSharedPreset = false;
+        _editingTree = root;
+    }
+
+    private void RevertToPreset()
+    {
+        if (Current is not { } config) return;
+        config.UseSharedPreset = true;
+        config.ModifierTreeJson = null;
+        _editingTree = null;
+    }
+
+    private void ClearPrivateTree()
+    {
+        if (Current is not { } config) return;
+        config.ModifierTreeJson = null;
+        _editingTree = null;
+    }
+
+    private void CreatePrivatePostTree()
+    {
+        if (Current is not { } config) return;
+
+        var root = new PostSequenceNode
+        {
+            Name = $"{config.Name} Post Tree",
+            Children = new List<IPostGenerationNode>()
+        };
+        config.PostGenerationTreeJson = PostSerializer.Serialize(root);
+        _editingPostTree = root;
+    }
+
+    private void ClearPrivatePostTree()
+    {
+        if (Current is not { } config) return;
+        config.PostGenerationTreeJson = null;
+        _editingPostTree = null;
+    }
+
+    private List<PreGenerationPreset> GetPresets()
+    {
+        var json = pluginData.Read("GenerationManager", "generation_presets");
+        return string.IsNullOrEmpty(json)
+            ? []
+            : JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? [];
+    }
+
+    private string GetPresetName(SubAgentConfig cfg)
+    {
+        if (!cfg.UseSharedPreset)
+            return !string.IsNullOrEmpty(cfg.ModifierTreeJson)
+                ? Loc["panel_subagent.private_tree"]
+                : Loc["panel_subagent.minimal"];
+
+        if (string.IsNullOrEmpty(cfg.ModifierPresetId))
+            return Loc["panel_subagent.none_option_fallback"];
+
+        var preset = GetPresets().FirstOrDefault(p => p.Id == cfg.ModifierPresetId);
+        return preset?.Name ?? Loc["panel_subagent.none_option_fallback"];
     }
 
     private Dictionary<string, object> SubAgentPluginParameters => new()
     {
-        ["AgentGuid"] = selectedConfig?.Guid ?? Guid.Empty,
+        ["AgentGuid"] = Current?.Guid ?? Guid.Empty,
         ["EventHandlerReg"] = (Action<IChatPanelEventHandler>)(handler => { }),
-        // 本宿主只有子代理配置记录、没有活的 Agent 实例，因此提供
-        // SubAgentPanelContext：它在类型层面就不含 Agent 属性，
-        // 避免用 null 当哨兵值，也避免把不适用的面板拉进来。
         ["PanelContext"] = SubAgentPanelContext!
     };
 
-    /// <summary>
-    /// 交给 Agent 作用域面板的宿主契约（子代理配置编辑器变体）。
-    /// </summary>
     private SubAgentPanelContext? SubAgentPanelContext
     {
         get
         {
-            if (selectedConfig == null) return null;
+            if (Current is not { } config) return null;
 
-            if (_subAgentPanelContext != null && _subAgentPanelContext.Config.Guid == selectedConfig.Guid)
+            if (_subAgentPanelContext != null && _subAgentPanelContext.Config.Guid == config.Guid)
                 return _subAgentPanelContext;
 
             _subAgentPanelContext = new SubAgentPanelContext
             {
-                TargetGuid = selectedConfig.Guid,
-                Config = selectedConfig,
+                TargetGuid = config.Guid,
+                Config = config,
                 MessageStore = MessageStore,
                 DraftStore = PanelDrafts,
                 RequestRefreshAsync = () => InvokeAsync(StateHasChanged),
@@ -509,116 +544,31 @@
 
     private SubAgentPanelContext? _subAgentPanelContext;
 
-    void CreatePrivateTree()
-    {
-        if (selectedConfig == null) return;
-        var root = new SequenceNode
-        {
-            Name = $"{selectedConfig.Name} Private Tree",
-            Nodes = new List<IPreGenerationNode>()
-        };
-
-        if (!string.IsNullOrEmpty(selectedConfig.ModifierPresetId))
-        {
-            var presets = GetPresets();
-            var preset = presets.FirstOrDefault(p => p.Id == selectedConfig.ModifierPresetId);
-            root.Nodes.Add(new CallNode
-            {
-                Name = preset?.Name ?? "Preset",
-                PresetId = selectedConfig.ModifierPresetId
-            });
-        }
-
-        selectedConfig.ModifierTreeJson = Serializer.Serialize(root);
-        selectedConfig.UseSharedPreset = false;
-        _editingTree = root;
-    }
-
-    void RevertToPreset()
-    {
-        if (selectedConfig == null) return;
-        selectedConfig.UseSharedPreset = true;
-        selectedConfig.ModifierTreeJson = null;
-        _editingTree = null;
-    }
-
-    void ClearPrivateTree()
-    {
-        if (selectedConfig == null) return;
-        selectedConfig.ModifierTreeJson = null;
-        _editingTree = null;
-    }
-
-    private List<PreGenerationPreset> GetPresets()
-    {
-        var json = pluginData.Read("GenerationManager", "generation_presets");
-        return string.IsNullOrEmpty(json)
-            ? new()
-            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? new();
-    }
-
-    void CreatePrivatePostTree()
-    {
-        if (selectedConfig == null) return;
-        var root = new PostSequenceNode
-        {
-            Name = $"{selectedConfig.Name} Post Tree",
-            Children = new List<IPostGenerationNode>()
-        };
-        selectedConfig.PostGenerationTreeJson = PostSerializer.Serialize(root);
-        _editingPostTree = root;
-    }
-
-    void ClearPrivatePostTree()
-    {
-        if (selectedConfig == null) return;
-        selectedConfig.PostGenerationTreeJson = null;
-        _editingPostTree = null;
-    }
-
-    private List<PostGenerationPreset> GetPostPresets()
-    {
-        var json = pluginData.Read("PostGenerationManager", "post_generation_presets");
-        return string.IsNullOrEmpty(json)
-            ? new()
-            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PostGenerationPreset>>(json) ?? new();
-    }
-
-    #region 列表展示辅助
-
-    static readonly string[] _avatarColors = new[]
-    {
-        "#5e6ad2", "#e74c3c", "#2ecc71", "#f39c12", "#1abc9c",
-        "#3498db", "#9b59b6", "#e67e22", "#27ae60", "#c0392b",
-    };
-
-    static string GetAvatarColor(string name)
-    {
-        var hash = 0;
-        foreach (var c in name ?? "?")
-            hash = ((hash << 5) + hash) ^ c;
-        return _avatarColors[Math.Abs(hash) % _avatarColors.Length];
-    }
-
-    static string GetInitial(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name)) return "?";
-        return char.ToUpper(name.TrimStart()[0]).ToString();
-    }
-
-    string GetOutputModeLabel(string mode) => mode switch
+    private string GetOutputModeLabel(string mode) => mode switch
     {
         "FullJson" => Loc["panel_subagent.output_short_full"],
         "None" => Loc["panel_subagent.output_short_none"],
         _ => Loc["panel_subagent.output_short_last"]
     };
 
-    string GetOutputModeBadgeClass(string mode) => mode switch
+    private void SetStatus(string message, string kind)
     {
-        "FullJson" => "su-badge-success",
-        "None" => "",
-        _ => "su-badge-accent"
-    };
+        _statusText = message;
+        _statusKind = kind;
+    }
 
-    #endregion
+    private string DisplayName(SubAgentConfig config) =>
+        string.IsNullOrWhiteSpace(config.Name) ? Loc["config_ui.untitled"] : config.Name;
+
+    private string NextName(string baseName)
+    {
+        var name = string.IsNullOrWhiteSpace(baseName) ? Loc["config_ui.new"] : baseName.Trim();
+        var candidate = name;
+        var suffix = 2;
+
+        while (_configs.Any(c => string.Equals(c.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+            candidate = $"{name} ({suffix++})";
+
+        return candidate;
+    }
 }

@@ -34,6 +34,18 @@ public class ImageGenerationConfigTests
     }
 
     [Fact]
+    public void PinnedProfile_SurvivesRoundTripAndSave()
+    {
+        var config = ImageGenerationConfig.CreateDefault();
+        config.Profiles[0].Pinned = true;
+
+        var json = JsonConvert.SerializeObject(config);
+        var restored = JsonConvert.DeserializeObject<ImageGenerationConfig>(json)!;
+
+        restored.Profiles[0].Pinned.Should().BeTrue();
+    }
+
+    [Fact]
     public void BrokenJson_ReturnsError()
     {
         Setup("{ oops");

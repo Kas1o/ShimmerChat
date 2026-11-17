@@ -2,139 +2,196 @@
 @using ShimmerChatBuiltin.NodeBasic.PostGeneration
 @using ShimmerChatLib.Components
 @using ShimmerChatLib.Generation
+@using System.Text.Json
 @inject NavigationManager Navigation
 @inject IKVDataService KVData
 @inject PostGenerationNodeSerializerService Serializer
-@inject IPostGenerationManagerService PostManager
 @inject INodeTypeCatalog NodeTypeCatalog
 @inject IGenerationEventStore EventStore
 @inject IGenerationProviderRegistry ProviderRegistry
 @inject GenerationProviderHostService ProviderHost
 @inject IJSRuntime JS
 @inject ILocService Loc
-
-<h3>@Loc["post_gen.title"]</h3>
+@inject ILogger<PostGenerationPage> Logger
 
 @if (_isAgentMode)
 {
-    <div class="su-alert su-alert-warning" style="margin-top:16px;">
-        <strong>@(_targetEvent != null
-            ? Loc.Format("post_gen.editing_event_tree", _agentName, _targetEvent.Name)
-            : Loc.Format("post_gen.editing_private_tree", _agentName))</strong>
-        <button class="su-btn su-btn-sm su-btn-outline" style="margin-left:12px;" @onclick="BackToAgent">@Loc["post_gen.back_to_agent"]</button>
-    </div>
-    @if (_eventConfigError != null)
-    {
-        <div class="su-alert su-alert-danger" style="margin-top:8px;">@_eventConfigError</div>
-    }
-    @if (_targetEvent != null && _eventConfigError == null)
-    {
-        <div class="su-alert su-alert-info" style="margin-top:8px;">@Loc["editor.event_tree_template_hint"]</div>
-    }
-}
-
-@if (!_isAgentMode)
-{
-    <div class="su-group" style="margin-top:16px;">
-        <h5>@Loc["post_gen.preset_management"]</h5>
-        <select @bind="_selectedPresetId" class="su-select" style="max-width: 400px;">
-            @foreach (var preset in _presets)
+    <div class="cfg-page cfg-page-main">
+        <header class="cfg-topbar">
+            <div class="cfg-topbar-main">
+                <div class="cfg-identity">
+                    <span class="cfg-identity-icon"><i class="bi bi-diagram-3"></i></span>
+                    <div class="cfg-identity-text">
+                        <div class="cfg-identity-title">
+                            <span>@Loc["post_gen.title"]</span>
+                            <span class="cfg-dirty @(IsAgentDirty ? "is-dirty" : "is-clean")">
+                                @(IsAgentDirty ? Loc["config_ui.unsaved"] : Loc["config_ui.saved"])
+                            </span>
+                        </div>
+                        <div class="cfg-identity-sub">
+                            @(_targetEvent != null
+                                ? Loc.Format("post_gen.editing_event_tree", _agentName, _targetEvent.Name)
+                                : Loc.Format("post_gen.editing_private_tree", _agentName))
+                        </div>
+                    </div>
+                </div>
+                <div class="cfg-topbar-actions">
+                    <button type="button" class="su-btn su-btn-secondary su-btn-sm" @onclick="BackToAgent">
+                        <i class="bi bi-arrow-left"></i> @Loc["post_gen.back_to_agent"]
+                    </button>
+                    <button type="button" class="su-btn su-btn-primary su-btn-sm cfg-btn"
+                            disabled="@(_eventConfigError != null)" @onclick="SaveAll">
+                        <i class="bi bi-check-lg"></i>
+                        <span class="cfg-btn-label">@Loc["config_ui.save"]</span>
+                        <kbd>@Loc["config_ui.shortcut_save"]</kbd>
+                    </button>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(_statusText))
             {
-                <option value="@preset.Id">@preset.Name @(preset.Id == DefaultPresetId ? Loc["post_gen.default_badge"] : "")</option>
+                <div class="cfg-topbar-sub">
+                    <span class="cfg-status is-@_statusKind" role="status">
+                        <i class="bi @(_statusKind == "error" ? "bi-exclamation-octagon-fill" : "bi-check-circle-fill")"></i>
+                        @_statusText
+                    </span>
+                </div>
             }
-        </select>
-        @if (_activePreset != null)
+        </header>
+
+        @if (_eventConfigError != null)
         {
-            <div class="preset-id-row" style="margin-top: 6px; display: flex; align-items: center; gap: 6px; max-width: 400px;">
-                <span style="font-size: 0.72em; color: #777; white-space: nowrap;">@Loc["post_gen.label_id"]</span>
-                <code style="font-size: 0.72em; color: #999; font-family: monospace; overflow: hidden; text-overflow: ellipsis; flex: 1; cursor: pointer; user-select: all; padding: 2px 4px; background: rgba(255,255,255,0.03); border-radius: 3px;">
-                    @_activePreset.Id
-                </code>
-                <button class="su-btn su-btn-sm su-btn-outline" style="font-size: 0.65em; padding: 1px 6px;" @onclick="CopyPresetId">@Loc["post_gen.copy_id"]</button>
+            <div class="cfg-note is-danger">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+                <span>@_eventConfigError</span>
             </div>
         }
-        <div style="margin-top: 8px;">
-            <button class="su-btn su-btn-primary su-btn-sm" @onclick="CreateNewPreset">@Loc["post_gen.new_preset"]</button>
-            <button class="su-btn su-btn-secondary su-btn-sm" style="margin-left: 5px;" @onclick="StartRename"
-                    disabled="@(_activePreset?.Id == DefaultPresetId)">@Loc["post_gen.rename"]</button>
-            <button class="su-btn su-btn-secondary su-btn-sm" style="margin-left: 5px;" @onclick="CloneCurrentPreset">@Loc["post_gen.clone"]</button>
-            <button class="su-btn su-btn-danger su-btn-sm" style="margin-left: 5px;" @onclick="DeleteCurrentPreset"
-                    disabled="@(_presets.Count <= 1 || _activePreset?.Id == DefaultPresetId)">@Loc["Delete"]</button>
-        </div>
-    </div>
-}
+        else if (_targetEvent != null)
+        {
+            <div class="cfg-note">
+                <i class="bi bi-info-circle-fill"></i>
+                <span>@Loc["editor.event_tree_template_hint"]</span>
+            </div>
+        }
 
-@if (_showNameDialog)
-{
-    <div class="su-modal-mask" @onclick="() => _showNameDialog = false">
-        <div class="su-modal su-modal-sm" @onclick:stopPropagation="true">
-            <div class="su-modal-header">
-                @_nameDialogTitle
-                <button class="su-btn-close" @onclick="() => _showNameDialog = false">&times;</button>
-            </div>
-            <div class="su-modal-body">
-                <input type="text" class="su-input" @bind="_nameInput" @bind:event="oninput"
-                       placeholder="@Loc["post_gen.preset_name_placeholder"]" />
-            </div>
-            <div class="su-modal-footer">
-                <button class="su-btn su-btn-secondary" @onclick="() => _showNameDialog = false">@Loc["Cancel"]</button>
-                <button class="su-btn su-btn-primary" @onclick="ConfirmName"
-                        disabled="@string.IsNullOrWhiteSpace(_nameInput)">@Loc["post_gen.confirm"]</button>
-            </div>
-        </div>
-    </div>
-}
-
-<div style="margin-top:16px;">
-    <h4>@Loc["post_gen.modifier_tree"]</h4>
-    @if (_isAgentMode)
-    {
-        <div class="su-card">
-            <div class="su-card-body">
-                <CascadingValue Value="_dragContext">
-                <CascadingValue Value="_editorContext">
-                    <TreeEditor Node="@_editingRoot" />
-                </CascadingValue>
-                </CascadingValue>
-            </div>
-        </div>
-    }
-    else if (_activePreset != null)
-    {
-        <div class="su-card">
-            <div class="su-card-body">
-                @if (_activePreset.Id == DefaultPresetId)
-                {
-                    <div class="su-alert su-alert-warning" style="margin-bottom: 12px;">
-                        <strong>@Loc["post_gen.default_readonly"]</strong> @Loc["post_gen.default_readonly_hint"]
+        <div class="cfg-body">
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-diagram-3"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["post_gen.modifier_tree"]</h3>
+                        <p>@Loc["generation_config.node_tree_desc"]</p>
                     </div>
-                    <div style="pointer-events: none; opacity: 0.7;">
-                        <TreeEditor Node="@_editingRoot" />
-                    </div>
-                }
-                else
-                {
+                </div>
+                <div class="cfg-tree-editor">
                     <CascadingValue Value="_dragContext">
-                    <CascadingValue Value="_editorContext">
-                        <TreeEditor Node="@_editingRoot" />
+                        <CascadingValue Value="_editorContext">
+                            <TreeEditor Node="@_editingRoot" />
+                        </CascadingValue>
                     </CascadingValue>
-                    </CascadingValue>
-                }
-            </div>
+                </div>
+            </section>
         </div>
-    }
-    else
-    {
-        <p>@Loc["post_gen.select_preset_first"]</p>
-    }
-</div>
+    </div>
+}
+else
+{
+    <ConfigShell T="PostGenerationPreset"
+                Items="_presets"
+                SelectedId="@_selectedId"
+                IdSelector="@(p => p.Id)"
+                NameSelector="@(p => p.Name)"
+                TypeSelector="@(p => p.Id == DefaultPresetId ? Loc["post_gen.default_badge"] : null)"
+                SearchSelector="@(p => p.RootNodeJson)"
+                PinSelector="@(p => p.Pinned)"
+                Title="@Loc["post_gen.title"]"
+                Description="@Loc["generation_config.post_desc"]"
+                Icon="bi-diagram-3"
+                Flush="true"
+                IsDirty="IsDirty"
+                LoadError="@_loadError"
+                StatusMessage="@_statusText"
+                StatusKind="@_statusKind"
+                CanSave="@(Current is { } c && c.Id != DefaultPresetId)"
+                CanClone="@(Current != null)"
+                CanRename="@(Current is { } r && r.Id != DefaultPresetId)"
+                CanDelete="@(Current is { } d && d.Id != DefaultPresetId && _presets.Count > 1)"
+                OnCreate="CreateNewPreset"
+                OnSave="SaveAll"
+                OnSelect="SelectPreset"
+                OnClone="CloneCurrentPreset"
+                OnRename="RenamePreset"
+                OnDelete="DeleteCurrentPreset"
+                OnTogglePin="TogglePin"
+                OnRetry="Reload">
+        <Body>
+            @if (Current is { } preset)
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-info-circle"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["generation_config.basic"]</h3>
+                            <p>@Loc["generation_config.basic_desc"]</p>
+                        </div>
+                    </div>
 
-<button class="su-btn su-btn-primary" style="margin:16px 5px;" @onclick="SaveAll"
-        disabled="@((_isAgentMode && _eventConfigError != null) || (!_isAgentMode && _activePreset?.Id == DefaultPresetId))">@Loc["Save"]</button>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["post_gen.preset_name_placeholder"]</label>
+                            <input class="su-input" @bind="preset.Name"
+                                   disabled="@(preset.Id == DefaultPresetId)" />
+                            <p class="cfg-field-hint">@Loc["generation_config.name_hint"]</p>
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["post_gen.label_id"]</label>
+                            <div class="cfg-readonly-row">
+                                <code title="@preset.Id">@preset.Id</code>
+                            </div>
+                            <p class="cfg-field-hint">@Loc["generation_config.id_hint"]</p>
+                        </div>
+                    </div>
 
-<!-- 浮动保存按钮：节点树较长时无需滚动到底部 -->
-<button class="ne-floating-save su-btn su-btn-primary" @onclick="SaveAll"
-        disabled="@((_isAgentMode && _eventConfigError != null) || (!_isAgentMode && _activePreset?.Id == DefaultPresetId))">@Loc["Save"]</button>
+                    @if (preset.Id == DefaultPresetId)
+                    {
+                        <div class="cfg-note is-warning">
+                            <i class="bi bi-lock-fill"></i>
+                            <span><strong>@Loc["post_gen.default_readonly"]</strong> @Loc["post_gen.default_readonly_hint"]</span>
+                        </div>
+                    }
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-diagram-3"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["post_gen.modifier_tree"]</h3>
+                            <p>@Loc["generation_config.node_tree_desc"]</p>
+                        </div>
+                    </div>
+
+                    <div class="cfg-tree-editor @(preset.Id == DefaultPresetId ? "is-readonly" : "")">
+                        <CascadingValue Value="_dragContext">
+                            <CascadingValue Value="_editorContext">
+                                <TreeEditor Node="@_editingRoot" />
+                            </CascadingValue>
+                        </CascadingValue>
+                    </div>
+                </section>
+            }
+        </Body>
+
+        <EmptyState>
+            <div class="cfg-empty">
+                <span class="cfg-empty-icon"><i class="bi bi-diagram-3"></i></span>
+                <h2>@Loc["generation_config.empty_title"]</h2>
+                <p>@Loc["generation_config.empty_desc"]</p>
+                <button type="button" class="su-btn su-btn-primary" @onclick="CreateNewPreset">
+                    <i class="bi bi-plus-lg"></i> @Loc["post_gen.new_preset"]
+                </button>
+            </div>
+        </EmptyState>
+    </ConfigShell>
+}
 
 @code {
     [Parameter] [SupplyParameterFromQuery] public string? agent { get; set; }
@@ -146,8 +203,13 @@
     private const string PresetStorageKey = "post_generation_presets";
     private const string DefaultPresetId = "__default__";
 
-    private List<PostGenerationPreset> _presets = new();
-    private PostGenerationPreset? _activePreset;
+    private List<PostGenerationPreset> _presets = [];
+    private string? _selectedId;
+    private string? _loadError;
+    private string? _savedSnapshot;
+    private string _statusText = string.Empty;
+    private string _statusKind = "info";
+
     private ITreeNode _editingRoot = new PostSequenceNode { Name = "Root" };
     private TreeDragContext _dragContext = new();
     private TreeEditorContext _editorContext = default!;
@@ -158,26 +220,25 @@
     private GenerationEvent? _targetEvent;
     private object? _eventProviderInstance;
     private string? _eventConfigError;
+    private string? _savedTreeJson;
 
-    private bool _showNameDialog;
-    private string _nameDialogTitle = "";
-    private string _nameInput = "";
-    private string? _renameTargetId;
+    private static readonly JsonSerializerOptions _snapshotOptions = new() { WriteIndented = false };
 
-    private string _selectedPresetId
+    private PostGenerationPreset? Current =>
+        _presets.FirstOrDefault(p => string.Equals(p.Id, _selectedId, StringComparison.Ordinal));
+
+    private bool IsDirty
     {
-        get => _activePreset?.Id ?? "";
-        set
+        get
         {
-            var preset = _presets.FirstOrDefault(p => p.Id == value);
-            if (preset != null)
-            {
-                _activePreset = preset;
-                _editingRoot = Serializer.Deserialize(preset.RootNodeJson)
-                    ?? new PostSequenceNode { Name = "Root" };
-            }
+            if (_loadError != null) return false;
+            CommitEditingTree();
+            return Snapshot() != _savedSnapshot;
         }
     }
+
+    private bool IsAgentDirty =>
+        _eventConfigError == null && Serializer.Serialize(_editingRoot) != _savedTreeJson;
 
     protected override void OnInitialized()
     {
@@ -189,7 +250,6 @@
             var ag = Agent.Load(_agentGuid, KVData);
             _agentName = ag.Name;
 
-            // 事件模式：编辑提供器配置的指定管线树参数；无覆盖时以 Agent 树为模板
             if (!string.IsNullOrEmpty(evt))
             {
                 _targetEvent = EventStore.GetEvent(_agentGuid, evt);
@@ -197,26 +257,54 @@
             }
 
             var treeJson = _eventProviderInstance != null
-                // 未设置覆盖时回退 Agent 树作为模板（否则首次编辑会得到空树）
                 ? ProviderConfigHelper.GetTreeJson(_eventProviderInstance, prop!) ?? ag.PostGenerationTreeJson
                 : ag.PostGenerationTreeJson;
             _editingRoot = string.IsNullOrEmpty(treeJson)
                 ? new PostSequenceNode { Name = "Root" }
                 : Serializer.Deserialize(treeJson)
                     ?? new PostSequenceNode { Name = "Root" };
+            _savedTreeJson = Serializer.Serialize(_editingRoot);
             return;
         }
 
-        LoadPresets();
-        _activePreset = _presets.FirstOrDefault(p => p.Id == DefaultPresetId) ?? _presets[0];
-        _editingRoot = Serializer.Deserialize(_activePreset.RootNodeJson)
-            ?? new PostSequenceNode { Name = "Root" };
+        Reload();
     }
 
-    /// <summary>
-    /// 事件模式：实例化并填充事件对应的提供器配置，校验 prop 参数。
-    /// 失败时记录 _eventConfigError（页面显示错误并禁用保存）。
-    /// </summary>
+    private void Reload()
+    {
+        try
+        {
+            var json = KVData.Read("PostGenerationManager", PresetStorageKey);
+            _presets = string.IsNullOrEmpty(json)
+                ? []
+                : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PostGenerationPreset>>(json) ?? [];
+
+            if (_presets.Count == 0)
+            {
+                _presets.Add(new PostGenerationPreset
+                {
+                    Id = DefaultPresetId,
+                    Name = "Default",
+                    RootNodeJson = Serializer.Serialize(new PostSequenceNode { Name = "Root" })
+                });
+            }
+
+            _loadError = null;
+            _selectedId = _presets.FirstOrDefault(p => p.Id == DefaultPresetId)?.Id ?? _presets[0].Id;
+            LoadEditingTree();
+            CommitEditingTree();
+            _savedSnapshot = Snapshot();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "加载前生成预设失败");
+            _presets = [];
+            _selectedId = null;
+            _savedSnapshot = null;
+            _loadError = Loc.Format("generation_config.load_failed", ex.Message);
+        }
+    }
+
     private void InitEventProviderInstance(Agent ag)
     {
         if (_targetEvent == null) return;
@@ -244,7 +332,6 @@
         try
         {
             ProviderConfigHelper.Populate(_eventProviderInstance, _targetEvent.ConfigJson);
-            // 校验 prop 指向合法的管线树属性（非法时抛出 ArgumentException）
             ProviderConfigHelper.GetTreeJson(_eventProviderInstance, prop);
         }
         catch (Exception ex)
@@ -254,92 +341,60 @@
         }
     }
 
-    private void LoadPresets()
+    private void LoadEditingTree()
     {
-        var json = KVData.Read("PostGenerationManager", PresetStorageKey);
-        _presets = string.IsNullOrEmpty(json)
-            ? new()
-            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PostGenerationPreset>>(json) ?? new();
+        _editingRoot = Current is { } preset
+            ? Serializer.Deserialize(preset.RootNodeJson) ?? new PostSequenceNode { Name = "Root" }
+            : new PostSequenceNode { Name = "Root" };
     }
 
-    private void SavePresets()
+    private void CommitEditingTree()
     {
-        KVData.Write("PostGenerationManager", PresetStorageKey,
-            Newtonsoft.Json.JsonConvert.SerializeObject(_presets));
+        if (Current is { } preset)
+            preset.RootNodeJson = Serializer.Serialize(_editingRoot);
     }
 
-    private void CreateNewPreset()
-    {
-        _renameTargetId = null;
-        _nameInput = "";
-        _nameDialogTitle = Loc["post_gen.dialog_new_preset"];
-        _showNameDialog = true;
-    }
-
-    private void StartRename()
-    {
-        if (_activePreset == null || _activePreset.Id == DefaultPresetId) return;
-        _renameTargetId = _activePreset.Id;
-        _nameInput = _activePreset.Name;
-        _nameDialogTitle = Loc["post_gen.dialog_rename_preset"];
-        _showNameDialog = true;
-    }
-
-    private void CloneCurrentPreset()
-    {
-        if (_activePreset == null) return;
-        var newName = _activePreset.Name + " (Copy)";
-        var counter = 2;
-        while (_presets.Any(p => p.Name == newName))
-        {
-            newName = $"{_activePreset.Name} (Copy {counter})";
-            counter++;
-        }
-        var clone = new PostGenerationPreset { Name = newName, RootNodeJson = _activePreset.RootNodeJson };
-        _presets.Add(clone);
-        _activePreset = clone;
-        _editingRoot = Serializer.Deserialize(clone.RootNodeJson)
-            ?? new PostSequenceNode { Name = "Root" };
-    }
-
-    private void DeleteCurrentPreset()
-    {
-        if (_presets.Count <= 1 || _activePreset == null || _activePreset.Id == DefaultPresetId)
-            return;
-        _presets.Remove(_activePreset);
-        _activePreset = _presets[0];
-        _editingRoot = Serializer.Deserialize(_activePreset.RootNodeJson)
-            ?? new PostSequenceNode { Name = "Root" };
-        SavePresets();
-    }
-
-    private void ConfirmName()
-    {
-        if (string.IsNullOrWhiteSpace(_nameInput)) return;
-
-        if (_renameTargetId != null)
-        {
-            var target = _presets.FirstOrDefault(p => p.Id == _renameTargetId);
-            if (target != null) target.Name = _nameInput.Trim();
-        }
-        else
-        {
-            var newPreset = new PostGenerationPreset { Name = _nameInput.Trim() };
-            _presets.Add(newPreset);
-            _activePreset = newPreset;
-            _editingRoot = new PostSequenceNode { Name = "Root" };
-        }
-
-        _showNameDialog = false;
-        _renameTargetId = null;
-        SavePresets();
-    }
+    private string Snapshot() => JsonSerializer.Serialize(_presets, _snapshotOptions);
 
     private async Task SaveAll()
     {
+        if (_isAgentMode)
+        {
+            await SaveAgentTree();
+            return;
+        }
+
+        if (_loadError != null) return;
+        if (Current is not { } preset || preset.Id == DefaultPresetId) return;
+
+        if (string.IsNullOrWhiteSpace(preset.Name))
+        {
+            SetStatus(Loc["generation_config.name_required"], "error");
+            return;
+        }
+
+        try
+        {
+            CommitEditingTree();
+            KVData.Write("PostGenerationManager", PresetStorageKey,
+                Newtonsoft.Json.JsonConvert.SerializeObject(_presets));
+            _savedSnapshot = Snapshot();
+            SetStatus(Loc["generation_config.saved"], "success");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "保存前生成预设失败");
+            SetStatus(Loc.Format("config_ui.save_failed", ex.Message), "error");
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task SaveAgentTree()
+    {
         if (_editingRoot == null) return;
 
-        if (_isAgentMode)
+        try
         {
             if (_targetEvent != null)
             {
@@ -347,34 +402,116 @@
                 ProviderConfigHelper.SetTreeJson(_eventProviderInstance, prop, Serializer.Serialize(_editingRoot));
                 _targetEvent.ConfigJson = ProviderConfigHelper.Serialize(_eventProviderInstance);
                 EventStore.UpdateEvent(_agentGuid, _targetEvent);
-                // 重载运行中的提供器实例，使新树覆盖立即生效
-                // （否则运行中的实例仍持有旧配置，触发时继续使用旧树）
                 await ProviderHost.ReloadEventAsync(_agentGuid, _targetEvent.Id);
-                return;
+            }
+            else
+            {
+                Agent.Update(_agentGuid, KVData, ag => ag.PostGenerationTreeJson = Serializer.Serialize(_editingRoot));
             }
 
-            // 仅更新后生成树字段，避免整对象 Save 覆盖其它连接对 Agent 的并发修改。
-            Agent.Update(_agentGuid, KVData, ag => ag.PostGenerationTreeJson = Serializer.Serialize(_editingRoot));
-            return;
+            _savedTreeJson = Serializer.Serialize(_editingRoot);
+            SetStatus(Loc["generation_config.saved"], "success");
         }
-
-        if (_activePreset != null && _activePreset.Id != DefaultPresetId)
+        catch (Exception ex)
         {
-            _activePreset.RootNodeJson = Serializer.Serialize(_editingRoot);
-            SavePresets();
+            Logger.LogError(ex, "保存智能体前生成树失败");
+            SetStatus(Loc.Format("config_ui.save_failed", ex.Message), "error");
         }
     }
 
-    private void BackToAgent()
+    private async Task CreateNewPreset()
     {
-        Navigation.NavigateTo($"/agent/{_agentGuid}");
+        CommitEditingTree();
+
+        var preset = new PostGenerationPreset
+        {
+            Name = NextName(Loc["post_gen.new_preset"]),
+            RootNodeJson = Serializer.Serialize(new PostSequenceNode { Name = "Root" })
+        };
+
+        _presets.Add(preset);
+        _selectedId = preset.Id;
+        LoadEditingTree();
+        SetStatus(Loc.Format("config_ui.created", preset.Name), "info");
+        await Task.CompletedTask;
     }
 
-    private async Task CopyPresetId()
+    private async Task CloneCurrentPreset()
     {
-        if (_activePreset != null)
+        if (Current is not { } source) return;
+
+        CommitEditingTree();
+
+        var clone = new PostGenerationPreset
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _activePreset.Id);
-        }
+            Name = NextName($"{DisplayName(source)} {Loc["config_ui.copy_suffix"]}"),
+            RootNodeJson = source.RootNodeJson,
+            Pinned = source.Pinned
+        };
+
+        var index = _presets.IndexOf(source);
+        _presets.Insert(index + 1, clone);
+        _selectedId = clone.Id;
+        LoadEditingTree();
+        SetStatus(Loc.Format("config_ui.cloned", clone.Name), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task RenamePreset(string name)
+    {
+        if (Current is not { } preset) return;
+        preset.Name = name;
+        SetStatus(Loc.Format("config_ui.renamed", preset.Name), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task DeleteCurrentPreset()
+    {
+        if (Current is not { } preset || preset.Id == DefaultPresetId) return;
+
+        var index = _presets.IndexOf(preset);
+        _presets.Remove(preset);
+        _selectedId = _presets[Math.Min(index, _presets.Count - 1)].Id;
+        LoadEditingTree();
+        SetStatus(Loc.Format("config_ui.deleted_pending", DisplayName(preset)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task TogglePin(PostGenerationPreset preset)
+    {
+        preset.Pinned = !preset.Pinned;
+        SetStatus(Loc.Format(preset.Pinned ? "config_ui.pinned" : "config_ui.unpinned", DisplayName(preset)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task SelectPreset(string id)
+    {
+        CommitEditingTree();
+        _selectedId = id;
+        LoadEditingTree();
+        await Task.CompletedTask;
+    }
+
+    private void BackToAgent() => Navigation.NavigateTo($"/agent/{_agentGuid}");
+
+    private void SetStatus(string message, string kind)
+    {
+        _statusText = message;
+        _statusKind = kind;
+    }
+
+    private string DisplayName(PostGenerationPreset preset) =>
+        string.IsNullOrWhiteSpace(preset.Name) ? Loc["config_ui.untitled"] : preset.Name;
+
+    private string NextName(string baseName)
+    {
+        var name = string.IsNullOrWhiteSpace(baseName) ? Loc["post_gen.new_preset"] : baseName.Trim();
+        var candidate = name;
+        var suffix = 2;
+
+        while (_presets.Any(p => string.Equals(p.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+            candidate = $"{name} ({suffix++})";
+
+        return candidate;
     }
 }

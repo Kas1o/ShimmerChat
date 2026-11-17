@@ -1,525 +1,1648 @@
-@using ShimmerChatLib;
-@using SharperLLM.API;
+@using ShimmerChatLib
+@using SharperLLM.API
 @using ShimmerChatLib.Panel
 @attribute [PluginPanelAttribute("panel.api_settings", "panel.api_settings.desc", PanelDisplayPlace.Settings, Order = 1)]
-@inject NavigationManager Navigation
+@inject IKVDataService KVData
 @inject ILocService Loc
+@inject IJSRuntime JS
+@inject ILogger<ApiSettingsPage> Logger
+@implements IAsyncDisposable
 
-<h3>@Loc["Api Settings"]</h3>
-<h4>@Loc["ApiConfigs Profile:"]</h4>
-<select @bind="_selectedGuid" class="su-select">
-    @for (int i = 0; i < apiSettings.Count; i++)
+<div class="cfg-page" @onkeydown="OnPageKeyDown">
+    <!-- 固定操作面板：页面滚动时保持可见 -->
+    <header class="cfg-topbar">
+        <div class="cfg-topbar-main">
+            <div class="cfg-identity">
+                <span class="cfg-identity-icon"><i class="bi bi-hdd-network"></i></span>
+                <div class="cfg-identity-text">
+                    <div class="cfg-identity-title">
+                        <span>@Loc["panel.api_settings"]</span>
+                        <span class="su-badge su-badge-secondary">@Loc.Format("config_ui.count", apiSettings.Count)</span>
+                        <span class="cfg-dirty @(IsDirty ? "is-dirty" : "is-clean")">
+                            @(IsDirty ? Loc["config_ui.unsaved"] : Loc["config_ui.saved"])
+                        </span>
+                    </div>
+                    <div class="cfg-identity-sub">@Loc["panel.api_settings.desc"]</div>
+                </div>
+            </div>
+
+            <div class="cfg-topbar-actions">
+                <button type="button" class="su-btn su-btn-primary su-btn-sm"
+                        disabled="@(_loadError != null)"
+                        aria-label="@Loc["config_ui.new"]"
+                        title="@Loc["config_ui.new"]"
+                        @onclick="CreateNewConfig">
+                    <i class="bi bi-plus-lg"></i>
+                    <span class="cfg-btn-label">@Loc["config_ui.new"]</span>
+                </button>
+                <button type="button" class="su-btn su-btn-primary su-btn-sm cfg-btn"
+                        disabled="@(_loadError != null)"
+                        aria-label="@Loc["config_ui.save"]"
+                        title="@Loc["config_ui.save"]"
+                        @onclick="SaveAll">
+                    <i class="bi bi-check-lg"></i>
+                    <span class="cfg-btn-label">@Loc["config_ui.save"]</span>
+                    <kbd>@Loc["config_ui.shortcut_save"]</kbd>
+                </button>
+            </div>
+        </div>
+
+        <div class="cfg-topbar-sub">
+            <label class="cfg-switcher" title="@Loc["config_ui.switch"]">
+                <i class="bi bi-collection"></i>
+                <select @key="SwitchSignature" class="su-select su-select-sm"
+                        @bind="_selectedGuid" @bind:after="OnSelectionChanged"
+                        aria-label="@Loc["config_ui.switch"]"
+                        disabled="@(apiSettings.Count == 0)">
+                    @foreach (var item in OrderedConfigs)
+                    {
+                        <option value="@item.Id">@(item.Pinned ? "★ " : "")@DisplayName(item) · @TypeLabel(item.Type)</option>
+                    }
+                </select>
+            </label>
+
+            <div class="cfg-topbar-divider"></div>
+
+            <div class="cfg-topbar-tools">
+                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                        disabled="@(Current == null)" @onclick="CloneCurrentConfig"
+                        aria-label="@Loc["config_ui.clone"]"
+                        title="@Loc["config_ui.clone"]">
+                    <i class="bi bi-files"></i>
+                    <span class="cfg-btn-label">@Loc["config_ui.clone"]</span>
+                </button>
+                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                        disabled="@(Current == null)" @onclick="OpenRenameDialog"
+                        aria-label="@Loc["config_ui.rename"]"
+                        title="@Loc["config_ui.rename"]">
+                    <i class="bi bi-pencil"></i>
+                    <span class="cfg-btn-label">@Loc["config_ui.rename"]</span>
+                </button>
+                <button type="button"
+                        class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn @(Current?.Pinned == true ? "is-active" : "")"
+                        disabled="@(Current == null)" @onclick="TogglePinned"
+                        aria-label="@(Current?.Pinned == true ? Loc["config_ui.unfavorite"] : Loc["config_ui.favorite"])"
+                        title="@(Current?.Pinned == true ? Loc["config_ui.unfavorite"] : Loc["config_ui.favorite"])">
+                    <i class="bi @(Current?.Pinned == true ? "bi-star-fill" : "bi-star")"></i>
+                </button>
+                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn is-danger"
+                        disabled="@(Current == null)" @onclick="OpenDeleteDialog"
+                        aria-label="@Loc["config_ui.delete"]"
+                        title="@Loc["config_ui.delete"]">
+                    <i class="bi bi-trash3"></i>
+                </button>
+                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                        disabled="@(Current == null)" @onclick="CopyCurrentIdAsync"
+                        aria-label="@Loc["config_ui.copy_id"]"
+                        title="@Loc["config_ui.copy_id"]">
+                    <i class="bi bi-clipboard"></i>
+                    <span class="cfg-btn-label">@Loc["config_ui.copy_id"]</span>
+                </button>
+                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                        disabled="@(apiSettings.Count == 0)" @onclick="OpenSearchDialog"
+                        aria-label="@Loc["config_ui.search"]"
+                        title="@Loc["config_ui.search"]">
+                    <i class="bi bi-search"></i>
+                    <span class="cfg-btn-label">@Loc["config_ui.search"]</span>
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_statusText))
+            {
+                <span class="cfg-status is-@StatusClass(_statusKind)" role="status">
+                    <i class="bi @StatusIcon(_statusKind)"></i>
+                    @_statusText
+                </span>
+            }
+        </div>
+    </header>
+
+    @if (_loadError != null)
     {
-        <option value="@apiSettings[i].Id.ToString()">@apiSettings[i].Name</option>
+        <div class="cfg-note is-danger">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+            <span>@_loadError</span>
+            <button type="button" class="su-btn su-btn-sm su-btn-secondary" @onclick="Reload">
+                <i class="bi bi-arrow-clockwise"></i> @Loc["config_ui.retry"]
+            </button>
+        </div>
     }
-</select>
-<button class="su-btn su-btn-primary" style="margin:5px" @onclick="CreateNewApiConfig">@Loc["Create New Api Setting Profile"]</button>
-<button class="su-btn su-btn-secondary" style="margin:5px" @onclick="CloneCurrentApiConfig">@Loc["Clone Current Api Setting Profile"]</button>
-<button class="su-btn su-btn-danger" style="margin:5px" @onclick="DeleteCurrentApiConfig">@Loc["Delete Current Api Setting Profile"]</button>
+    else if (apiSettings.Count == 0)
+    {
+        <div class="cfg-empty">
+            <span class="cfg-empty-icon"><i class="bi bi-hdd-network"></i></span>
+            <h2>@Loc["config_ui.empty_title"]</h2>
+            <p>@Loc["config_ui.empty_desc"]</p>
+            <button type="button" class="su-btn su-btn-primary" @onclick="CreateNewConfig">
+                <i class="bi bi-plus-lg"></i> @Loc["config_ui.empty_create"]
+            </button>
+        </div>
+    }
+    else if (Current is { } config)
+    {
+        <div class="cfg-body">
+            <!-- 基本信息 -->
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-info-circle"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["api_settings.basic"]</h3>
+                        <p>@Loc["api_settings.basic_desc"]</p>
+                    </div>
+                </div>
 
-@if (topAPISetting != null)
+                <div class="cfg-grid">
+                    <div class="cfg-field cfg-span-6">
+                        <label class="su-label">@Loc["api_settings.name"]</label>
+                        <input class="su-input" @bind="config.Name"
+                               placeholder="@Loc["api_settings.name_placeholder"]" />
+                        <p class="cfg-field-hint">@Loc["api_settings.name_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["api_settings.type"]</label>
+                        <select class="su-select" @bind="config.Type">
+                            @foreach (var type in Enum.GetValues<ApiConfigType>())
+                            {
+                                <option value="@type">@TypeLabel(type)</option>
+                            }
+                        </select>
+                        <p class="cfg-field-hint">@Loc["api_settings.type_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["api_settings.id"]</label>
+                        <div class="cfg-readonly-row">
+                            <code title="@config.Id">@config.Id</code>
+                            <button type="button" class="su-btn su-btn-ghost su-btn-sm"
+                                    title="@Loc["config_ui.copy_id"]" @onclick="CopyCurrentIdAsync">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                        <p class="cfg-field-hint">@Loc["api_settings.id_hint"]</p>
+                    </div>
+                </div>
+            </section>
+
+            @if (config.Type == ApiConfigType.Pseudo)
+            {
+                <div class="cfg-note">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span><strong>@Loc["PseudoAPI Info Title"]</strong><br />@Loc["PseudoAPI Info Description"]</span>
+                </div>
+            }
+
+            @if (config.Type == ApiConfigType.OpenAIText)
+            {
+                <div class="cfg-note is-warning">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span><strong>@Loc["OpenAIText Warning Title"]</strong><br />@Loc["OpenAIText Warning Description"]</span>
+                </div>
+            }
+
+            @if (config.Type == ApiConfigType.OpenCodeGo)
+            {
+                <div class="cfg-note">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span><strong>@Loc["OpenCodeGo Info Title"]</strong><br />@Loc["OpenCodeGo Info Description"]</span>
+                </div>
+            }
+
+            <!-- 连接 -->
+            @if (config.Type == ApiConfigType.Kobold)
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-plug"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.connection"]</h3>
+                            <p>@Loc["api_settings.connection_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-8">
+                            <label class="su-label">@Loc["API URL"]</label>
+                            <input class="su-input" @bind="config.KoboldUrl" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["Temperature"]</label>
+                            <input type="number" step="0.01" min="0" max="2" class="su-input"
+                                   @bind="config.KoboldConf!.temperature" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-arrows-expand"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["Context & Length"]</h3>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["Max Context Length"]</label>
+                            <input type="number" class="su-input" @bind="config.KoboldConf!.max_context_length" />
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["Max Length"]</label>
+                            <input type="number" class="su-input" @bind="config.KoboldConf!.max_length" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-sliders2"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["Sampling Settings"]</h3>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["Top K"]</label>
+                            <input type="number" class="su-input" @bind="config.KoboldConf!.top_k" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["Top P"]</label>
+                            <input type="number" step="0.01" min="0" max="1" class="su-input"
+                                   @bind="config.KoboldConf!.top_p" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["Top A"]</label>
+                            <input type="number" step="0.01" min="0" max="1" class="su-input"
+                                   @bind="config.KoboldConf!.top_a" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["Min P"]</label>
+                            <input type="number" step="0.01" min="0" max="1" class="su-input"
+                                   @bind="config.KoboldConf!.min_p" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["Typical"]</label>
+                            <input type="number" step="0.01" min="0" max="1" class="su-input"
+                                   @bind="config.KoboldConf!.typical" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["TFS (Tail Free Sampling)"]</label>
+                            <input type="number" step="0.01" min="0" max="1" class="su-input"
+                                   @bind="config.KoboldConf!.tfs" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["Sampler Seed"]</label>
+                            <input type="number" class="su-input" @bind="config.KoboldConf!.sampler_seed" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["Repetition Penalty"]</label>
+                            <input type="number" step="0.01" min="1" max="2" class="su-input"
+                                   @bind="config.KoboldConf!.rep_pen" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["Repetition Penalty Range"]</label>
+                            <input type="number" class="su-input" @bind="config.KoboldConf!.rep_pen_range" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-thermometer-half"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["Dynamic Temperature"]</h3>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["Dynatemp Range"]</label>
+                            <input type="number" step="0.01" min="0" max="1" class="su-input"
+                                   @bind="config.KoboldConf!.dynatemp_range" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["Dynatemp Exponent"]</label>
+                            <input type="number" step="0.01" min="0" max="2" class="su-input"
+                                   @bind="config.KoboldConf!.dynatemp_exponent" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["Smoothing Factor"]</label>
+                            <input type="number" step="0.01" min="0" max="1" class="su-input"
+                                   @bind="config.KoboldConf!.smoothing_factor" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-activity"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["Mirostat"]</h3>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["Mirostat (0=disabled, 1=v1, 2=v2)"]</label>
+                            <input type="number" min="0" max="2" class="su-input"
+                                   @bind="config.KoboldConf!.mirostat" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["Mirostat Tau"]</label>
+                            <input type="number" class="su-input" @bind="config.KoboldConf!.mirostat_tau" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["Mirostat Eta"]</label>
+                            <input type="number" step="0.01" min="0" max="1" class="su-input"
+                                   @bind="config.KoboldConf!.mirostat_eta" />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-gear"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["Advanced"]</h3>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["Stop Sequence (comma separated)"]</label>
+                            <input class="su-input"
+                                   @bind:get="string.Join(',', config.KoboldConf!.stop_sequence ?? Array.Empty<string>())"
+                                   @bind:set="value => config.KoboldConf!.stop_sequence = SplitCsv(value)" />
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["Banned Tokens (comma separated)"]</label>
+                            <input class="su-input"
+                                   @bind:get="string.Join(',', config.KoboldConf!.banned_tokens ?? Array.Empty<string>())"
+                                   @bind:set="value => config.KoboldConf!.banned_tokens = SplitCsv(value)" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["Genkey"]</label>
+                            <input class="su-input" @bind="config.KoboldConf!.genkey" />
+                        </div>
+                        <div class="cfg-field cfg-span-8">
+                            <label class="su-label">@Loc["Grammar"]</label>
+                            <textarea class="su-textarea cfg-code" rows="3" @bind="config.KoboldConf!.grammar"></textarea>
+                        </div>
+                        <div class="cfg-field cfg-span-12">
+                            <div class="cfg-toggle-row">
+                                <label class="cfg-toggle">
+                                    <input type="checkbox" @bind="config.KoboldConf!.trim_stop" />
+                                    <span>@Loc["Trim Stop"]</span>
+                                </label>
+                                <label class="cfg-toggle">
+                                    <input type="checkbox" @bind="config.KoboldConf!.bypass_eos" />
+                                    <span>@Loc["Bypass EOS"]</span>
+                                </label>
+                            </div>
+                            <p class="cfg-field-hint">@Loc["Note: Logit bias settings are available in the API but not configurable through this interface."]</p>
+                        </div>
+                    </div>
+                </section>
+            }
+            else if (config.Type == ApiConfigType.OpenAI)
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-plug"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.connection"]</h3>
+                            <p>@Loc["api_settings.connection_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-8">
+                            <label class="su-label">@Loc["API URL"]</label>
+                            <input class="su-input" @bind="config.OpenAIUrl" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["API KEY"]</label>
+                            <input type="password" autocomplete="off" class="su-input" @bind="config.OpenAIApiKey" />
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["API MODEL"]</label>
+                            <div class="cfg-input-row">
+                                <input class="su-input" list="api-model-options" @bind="config.OpenAIModel"
+                                       placeholder="@Loc["api_settings.model_placeholder"]" />
+                                <button type="button" class="su-btn su-btn-outline su-btn-sm"
+                                        disabled="@_fetchingModels" @onclick="FetchModelsAsync">
+                                    <i class="bi @(_fetchingModels ? "bi-hourglass-split" : "bi-arrow-repeat")"></i>
+                                    @(_fetchingModels ? Loc["api_settings.fetching_models"] : Loc["api_settings.fetch_models"])
+                                </button>
+                            </div>
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["API GENERATION LENGTH"]</label>
+                            <input type="number" class="su-input" @bind="config.OpenAICtx" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["API REASONING ECHO"]</label>
+                            <select class="su-select" @bind="config.OpenAIReasoningEchoMode">
+                                <option value="@ReasoningEchoMode.Full">@Loc["API REASONING ECHO FULL"]</option>
+                                <option value="@ReasoningEchoMode.AfterLastUser">@Loc["API REASONING ECHO AFTER LAST USER"]</option>
+                                <option value="@ReasoningEchoMode.None">@Loc["API REASONING ECHO NONE"]</option>
+                            </select>
+                        </div>
+                        @if (_modelFetchError != null)
+                        {
+                            <p class="cfg-field-error cfg-span-12">@_modelFetchError</p>
+                        }
+                        else if (_availableModels.Count > 0)
+                        {
+                            <p class="cfg-field-hint cfg-span-12">@Loc.Format("api_settings.models_loaded", _availableModels.Count)</p>
+                        }
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-toggles"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.generation"]</h3>
+                            <p>@Loc["api_settings.generation_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-toggle-row">
+                        <label class="cfg-toggle">
+                            <input type="checkbox" @bind="config.OpenAIStream" />
+                            <span>@Loc["API ENABLE STREAM"]</span>
+                        </label>
+                        <label class="cfg-toggle">
+                            <input type="checkbox" @bind="config.OpenAIAsIs" />
+                            <span>@Loc["API ASIS"]</span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-braces"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.advanced"]</h3>
+                            <p>@Loc["api_settings.advanced_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-12">
+                            <label class="su-label">@Loc["API CUSTOM REQUEST BODY"]</label>
+                            <textarea class="su-textarea cfg-code" rows="6"
+                                      @bind="config.OpenAICustomRequestBody"
+                                      placeholder="@Loc["API CUSTOM REQUEST BODY PLACEHOLDER"]"></textarea>
+                        </div>
+                    </div>
+                </section>
+            }
+            else if (config.Type == ApiConfigType.DeepSeek)
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-plug"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.connection"]</h3>
+                            <p>@Loc["api_settings.connection_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-8">
+                            <label class="su-label">@Loc["API URL"]</label>
+                            <input class="su-input" @bind="config.DeepSeekUrl" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["API KEY"]</label>
+                            <input type="password" autocomplete="off" class="su-input" @bind="config.DeepSeekApiKey" />
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["API MODEL"]</label>
+                            <div class="cfg-input-row">
+                                <input class="su-input" list="api-model-options" @bind="config.DeepSeekModel"
+                                       placeholder="@Loc["api_settings.model_placeholder"]" />
+                                <button type="button" class="su-btn su-btn-outline su-btn-sm"
+                                        disabled="@_fetchingModels" @onclick="FetchModelsAsync">
+                                    <i class="bi @(_fetchingModels ? "bi-hourglass-split" : "bi-arrow-repeat")"></i>
+                                    @(_fetchingModels ? Loc["api_settings.fetching_models"] : Loc["api_settings.fetch_models"])
+                                </button>
+                            </div>
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["API GENERATION LENGTH"]</label>
+                            <input type="number" class="su-input" @bind="config.DeepSeekCtx" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["API REASONING EFFORT"]</label>
+                            <select class="su-select" @bind="config.DeepSeekReasoningEffort">
+                                <option value="">@Loc["API REASONING EFFORT OFF"]</option>
+                                <option value="low">Low</option>
+                                <option value="high">High</option>
+                                <option value="max">Max</option>
+                            </select>
+                        </div>
+                        @if (_modelFetchError != null)
+                        {
+                            <p class="cfg-field-error cfg-span-12">@_modelFetchError</p>
+                        }
+                        else if (_availableModels.Count > 0)
+                        {
+                            <p class="cfg-field-hint cfg-span-12">@Loc.Format("api_settings.models_loaded", _availableModels.Count)</p>
+                        }
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-toggles"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.generation"]</h3>
+                            <p>@Loc["API REASONING ECHO DEEPSEEK FIXED"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-toggle-row">
+                        <label class="cfg-toggle">
+                            <input type="checkbox" @bind="config.DeepSeekStream" />
+                            <span>@Loc["API ENABLE STREAM"]</span>
+                        </label>
+                        <label class="cfg-toggle">
+                            <input type="checkbox" @bind="config.DeepSeekAsIs" />
+                            <span>@Loc["API ASIS"]</span>
+                        </label>
+                    </div>
+                </section>
+            }
+            else if (config.Type == ApiConfigType.OpenCodeGo)
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-plug"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.connection"]</h3>
+                            <p>@Loc["api_settings.connection_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["API URL"]</label>
+                            <input class="su-input" @bind="config.OpenCodeGoUrl" />
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["API MODELS URL"]</label>
+                            <input class="su-input" @bind="config.OpenCodeGoModelsUrl" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["API KEY"]</label>
+                            <input type="password" autocomplete="off" class="su-input" @bind="config.OpenCodeGoApiKey" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["API MODEL"]</label>
+                            <div class="cfg-input-row">
+                                <input class="su-input" list="api-model-options" @bind="config.OpenCodeGoModel"
+                                       placeholder="@Loc["api_settings.model_placeholder"]" />
+                                <button type="button" class="su-btn su-btn-outline su-btn-sm"
+                                        disabled="@_fetchingModels" @onclick="FetchModelsAsync">
+                                    <i class="bi @(_fetchingModels ? "bi-hourglass-split" : "bi-arrow-repeat")"></i>
+                                    @(_fetchingModels ? Loc["api_settings.fetching_models"] : Loc["api_settings.fetch_models"])
+                                </button>
+                            </div>
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["API GENERATION LENGTH"]</label>
+                            <input type="number" class="su-input" @bind="config.OpenCodeGoCtx" />
+                        </div>
+                        @if (_modelFetchError != null)
+                        {
+                            <p class="cfg-field-error cfg-span-12">@_modelFetchError</p>
+                        }
+                        else if (_availableModels.Count > 0)
+                        {
+                            <p class="cfg-field-hint cfg-span-12">@Loc.Format("api_settings.models_loaded", _availableModels.Count)</p>
+                        }
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-toggles"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.generation"]</h3>
+                            <p>@Loc["api_settings.generation_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-toggle-row">
+                        <label class="cfg-toggle">
+                            <input type="checkbox" @bind="config.OpenCodeGoStream" />
+                            <span>@Loc["API ENABLE STREAM"]</span>
+                        </label>
+                        <label class="cfg-toggle">
+                            <input type="checkbox" @bind="config.OpenCodeGoAsIs" />
+                            <span>@Loc["API ASIS"]</span>
+                        </label>
+                    </div>
+                </section>
+            }
+            else if (config.Type == ApiConfigType.OpenAIText)
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-plug"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.connection"]</h3>
+                            <p>@Loc["api_settings.connection_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-8">
+                            <label class="su-label">@Loc["API URL"]</label>
+                            <input class="su-input" @bind="config.OpenAITextUrl" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["API KEY"]</label>
+                            <input type="password" autocomplete="off" class="su-input" @bind="config.OpenAITextApiKey" />
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["API MODEL"]</label>
+                            <input class="su-input" @bind="config.OpenAITextModel" />
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["API GENERATION LENGTH"]</label>
+                            <input type="number" class="su-input" @bind="config.OpenAITextCtx" />
+                        </div>
+                    </div>
+                </section>
+            }
+            else if (config.Type == ApiConfigType.Ollama)
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-plug"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.connection"]</h3>
+                            <p>@Loc["api_settings.connection_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-8">
+                            <label class="su-label">@Loc["API URL"]</label>
+                            <input class="su-input" @bind="config.OllamaUrl" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["API MODEL"]</label>
+                            <input class="su-input" @bind="config.OllamaModel" />
+                        </div>
+                    </div>
+                </section>
+            }
+
+            <!-- 文本补全模板 -->
+            @if (SupportsTextCompletion(config.Type))
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-braces-asterisk"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.text_completion"]</h3>
+                            <p>@Loc["api_settings.text_completion_desc"]</p>
+                        </div>
+                    </div>
+
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-8">
+                            <label class="su-label">@Loc["api_settings.template"]</label>
+                            <select class="su-select" @bind="config.SelectedTextCompletionSettingIndex">
+                                @for (var i = 0; i < config.TextCompletionSettings!.Count; i++)
+                                {
+                                    <option value="@i">@(config.TextCompletionSettings[i].name ?? Loc["config_ui.untitled"])</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">&nbsp;</label>
+                            <button type="button" class="su-btn su-btn-outline-primary su-btn-sm"
+                                    @onclick="CreateTextCompletionSetting">
+                                <i class="bi bi-plus-lg"></i> @Loc["api_settings.new_template"]
+                            </button>
+                        </div>
+
+                        @if (CurrentTemplate is { } template)
+                        {
+                            <div class="cfg-field cfg-span-6">
+                                <label class="su-label">@Loc["NAME:"]</label>
+                                <input class="su-input" @bind="template.name" />
+                            </div>
+                            <div class="cfg-field cfg-span-12">
+                                <label class="su-label">@Loc["SYSTEM_MESSAGE_TEMPLATE"]</label>
+                                <textarea class="su-textarea" rows="2"
+                                          placeholder="@Loc["TEMPLATE_PLACEHOLDER"]"
+                                          @bind="template.SystemMessageTemplate"></textarea>
+                            </div>
+                            <div class="cfg-field cfg-span-12">
+                                <label class="su-label">@Loc["USER_MESSAGE_TEMPLATE"]</label>
+                                <textarea class="su-textarea" rows="2"
+                                          placeholder="@Loc["TEMPLATE_PLACEHOLDER"]"
+                                          @bind="template.UserMessageTemplate"></textarea>
+                            </div>
+                            <div class="cfg-field cfg-span-12">
+                                <label class="su-label">@Loc["AGENT_MESSAGE_TEMPLATE"]</label>
+                                <textarea class="su-textarea" rows="2"
+                                          placeholder="@Loc["TEMPLATE_PLACEHOLDER"]"
+                                          @bind="template.CharMessageTemplate"></textarea>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="cfg-field-hint cfg-span-12">@Loc["api_settings.no_template"]</p>
+                        }
+                    </div>
+                </section>
+            }
+        </div>
+    }
+
+    @if (apiSettings.Count > 0)
+    {
+        <datalist id="api-model-options">
+            @foreach (var model in _availableModels)
+            {
+                <option value="@model"></option>
+            }
+        </datalist>
+    }
+</div>
+
+<!-- 检索 / 高级选择 -->
+@if (_searchOpen)
 {
-    <h4>@Loc["Profile Settings:"]</h4>
-    <div class="su-group">
-        <h5>@Loc["Profile Name:"]</h5>
-        <input @bind="topAPISetting.Name" class="shimmer-input" />
-        <h5>@Loc["Api Type:"]</h5>
-        <select @bind="topAPISetting.Type" class="su-select">
-            <option value="@ApiConfigType.Kobold">kobold</option>
-            <option value="@ApiConfigType.OpenAI">openai</option>
-            <option value="@ApiConfigType.DeepSeek">deepseek</option>
-            <option value="@ApiConfigType.OpenCodeGo">opencode go</option>
-            <option value="@ApiConfigType.Ollama">ollama</option>
-            <option value="@ApiConfigType.OpenAIText">openai (text)</option>
-            <option value="@ApiConfigType.Pseudo">pseudo</option>
-        </select>
-        
-        @if (topAPISetting.Type == ApiConfigType.Pseudo)
-        {
-            <div class="su-alert su-alert-info" style="margin-top: 12px; padding: 12px; background-color: #e8f4fd; border: 1px solid #b6d4fe; border-radius: 4px;">
-                <strong>@Loc["PseudoAPI Info Title"]</strong><br/>
-                @Loc["PseudoAPI Info Description"]
+    <div class="su-modal-mask" @onclick="CloseSearchDialog">
+        <div class="cfg-dialog cfg-dialog-lg" role="dialog" aria-modal="true"
+             @onclick:stopPropagation="true" @onkeydown="OnSearchDialogKeyDown">
+            <div class="cfg-dialog-head">
+                <span class="cfg-dialog-icon"><i class="bi bi-search"></i></span>
+                <div class="cfg-dialog-heading">
+                    <h2>@Loc["config_ui.select_title"]</h2>
+                    <p>@Loc["config_ui.select_desc"]</p>
+                </div>
+                <button type="button" class="cfg-dialog-close" aria-label="@Loc["config_ui.dismiss"]"
+                        @onclick="CloseSearchDialog">
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </div>
-        }
-        
-        @if (topAPISetting.Type == ApiConfigType.OpenAIText)
-        {
-            <div class="su-alert su-alert-warning" style="margin-top: 12px; padding: 12px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
-                <strong>@Loc["OpenAIText Warning Title"]</strong><br/>
-                @Loc["OpenAIText Warning Description"]
+
+            <div class="cfg-dialog-body">
+                <div class="cfg-searchbox">
+                    <i class="bi bi-search"></i>
+                    <input @ref="_searchInput" @bind="_searchQuery" @bind:event="oninput"
+                           @onkeydown="OnSearchInputKeyDown"
+                           placeholder="@Loc["config_ui.search_placeholder"]" />
+                    <kbd class="cfg-search-kbd">Esc</kbd>
+                </div>
+
+                <div class="cfg-choice-list">
+                    @if (!FilteredConfigs.Any())
+                    {
+                        <div class="cfg-choice-empty">@Loc["config_ui.no_results"]</div>
+                    }
+                    else
+                    {
+                        @foreach (var item in FilteredConfigs)
+                        {
+                            <button type="button"
+                                    class="cfg-choice @(item.Id.ToString() == _selectedGuid ? "is-active" : "")"
+                                    @onclick="() => SelectFromSearch(item)">
+                                <span class="cfg-choice-main">
+                                    <span class="cfg-choice-title">
+                                        <strong>@DisplayName(item)</strong>
+                                        @if (item.Pinned)
+                                        {
+                                            <i class="bi bi-star-fill cfg-switch-star"></i>
+                                        }
+                                        <span class="su-badge su-badge-secondary">@TypeLabel(item.Type)</span>
+                                    </span>
+                                    <span class="cfg-choice-meta">@ChoiceMeta(item)</span>
+                                </span>
+                                <code class="cfg-choice-id">@item.Id</code>
+                                <span class="cfg-choice-check"><i class="bi bi-check-lg"></i></span>
+                            </button>
+                        }
+                    }
+                </div>
             </div>
-        }
 
-        <!-- Text Completion Settings (shown for text-based APIs) -->
-        @if (topAPISetting.Type == ApiConfigType.Kobold || topAPISetting.Type == ApiConfigType.Ollama || topAPISetting.Type == ApiConfigType.OpenAIText)
-        {
-            <h5>@Loc["Text Completion Settings:"]</h5>
-            <select @bind="topAPISetting.SelectedTextCompletionSettingIndex" class="su-select">
-                @for (int i = 0; i < (topAPISetting.TextCompletionSettings?.Count ?? 0); i++)
-                {
-                    <option value="@i">@(topAPISetting.TextCompletionSettings?[i]?.name ?? "Unnamed")</option>
-                }
-            </select>
-            <button class="su-btn su-btn-primary" style="margin:5px" @onclick="CreateNewTextCompletionSetting">@Loc["Create New Text Completion Setting Profile"]</button>
-            
-            @if (topAPISetting.TextCompletionSettings != null && topAPISetting.SelectedTextCompletionSettingIndex >= 0 && topAPISetting.SelectedTextCompletionSettingIndex < topAPISetting.TextCompletionSettings.Count)
-            {
-                var currentTextSetting = topAPISetting.TextCompletionSettings[topAPISetting.SelectedTextCompletionSettingIndex];
-                <div class="su-group" style="margin-top:16px;">
-                    <h5>@Loc["NAME:"]</h5>
-                    <textarea class="su-input" rows="2" @bind="currentTextSetting.name"></textarea>
-                    <h5>@Loc["SYSTEM_MESSAGE_TEMPLATE"]</h5>
-                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="su-input" rows="2" @bind="currentTextSetting.SystemMessageTemplate"></textarea>
-                    <h5>@Loc["USER_MESSAGE_TEMPLATE"]</h5>
-                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="su-input" rows="2" @bind="currentTextSetting.UserMessageTemplate"></textarea>
-                    <h5>@Loc["AGENT_MESSAGE_TEMPLATE"]</h5>
-                    <textarea placeholder="@Loc["TEMPLATE_PLACEHOLDER"]" class="su-input" rows="2" @bind="currentTextSetting.CharMessageTemplate"></textarea>
-                </div>
-            }
-        }
-        
-        <h5>@Loc["Configs:"]</h5>
-        <div class="su-group">
-            @if (topAPISetting.Type == ApiConfigType.Kobold)
-            {
-                <div class="su-group">
-                    <h5>@Loc["Basic Settings"]</h5>
-                    <label>@Loc["API URL"]</label>
-                    <input class="shimmer-input" @bind="topAPISetting.KoboldUrl" />
-                    <label>@Loc["Temperature"]</label>
-                    <input type="number" step="0.01" min="0" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.temperature" />
-                </div>
-
-                <div class="su-group">
-                    <h5>@Loc["Context & Length"]</h5>
-                    <label>@Loc["Max Context Length"]</label>
-                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.max_context_length" />
-                    <label>@Loc["Max Length"]</label>
-                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.max_length" />
-                </div>
-
-                <div class="su-group">
-                    <h5>@Loc["Repetition Penalty"]</h5>
-                    <label>@Loc["Repetition Penalty"]</label>
-                    <input type="number" step="0.01" min="1" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.rep_pen" />
-                    <label>@Loc["Repetition Penalty Range"]</label>
-                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.rep_pen_range" />
-                </div>
-
-                <div class="su-group">
-                    <h5>@Loc["Sampling Settings"]</h5>
-                    <label>@Loc["Sampler Seed"]</label>
-                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.sampler_seed" />
-                    <label>@Loc["Top K"]</label>
-                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.top_k" />
-                    <label>@Loc["Top P"]</label>
-                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.top_p" />
-                    <label>@Loc["Top A"]</label>
-                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.top_a" />
-                    <label>@Loc["Min P"]</label>
-                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.min_p" />
-                    <label>@Loc["Typical"]</label>
-                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.typical" />
-                    <label>@Loc["TFS (Tail Free Sampling)"]</label>
-                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.tfs" />
-                </div>
-
-                <div class="su-group">
-                    <h5>@Loc["Dynamic Temperature"]</h5>
-                    <label>@Loc["Dynatemp Range"]</label>
-                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.dynatemp_range" />
-                    <label>@Loc["Dynatemp Exponent"]</label>
-                    <input type="number" step="0.01" min="0" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.dynatemp_exponent" />
-                    <label>@Loc["Smoothing Factor"]</label>
-                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.smoothing_factor" />
-                </div>
-
-                <div class="su-group">
-                    <h5>@Loc["Mirostat"]</h5>
-                    <label>@Loc["Mirostat (0=disabled, 1=v1, 2=v2)"]</label>
-                    <input type="number" min="0" max="2" class="shimmer-input" @bind="topAPISetting.KoboldConf.mirostat" />
-                    <label>@Loc["Mirostat Tau"]</label>
-                    <input type="number" class="shimmer-input" @bind="topAPISetting.KoboldConf.mirostat_tau" />
-                    <label>@Loc["Mirostat Eta"]</label>
-                    <input type="number" step="0.01" min="0" max="1" class="shimmer-input" @bind="topAPISetting.KoboldConf.mirostat_eta" />
-                </div>
-
-                <div class="su-group">
-                    <h5>@Loc["Advanced"]</h5>
-                    <label>@Loc["Stop Sequence (comma separated)"]</label>
-                    <input class="shimmer-input" 
-                           @bind:get="string.Join(',', topAPISetting.KoboldConf.stop_sequence ?? new string[0])" 
-                           @bind:set="value => topAPISetting.KoboldConf.stop_sequence = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()" />
-                    <label>@Loc["Banned Tokens (comma separated)"]</label>
-                    <input class="shimmer-input" 
-                           @bind:get="string.Join(',', topAPISetting.KoboldConf.banned_tokens ?? new string[0])" 
-                           @bind:set="value => topAPISetting.KoboldConf.banned_tokens = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray()" />
-                    <label>@Loc["Genkey"]</label>
-                    <input class="shimmer-input" @bind="topAPISetting.KoboldConf.genkey" />
-                    <label>@Loc["Grammar"]</label>
-                    <textarea class="shimmer-input" rows="3" @bind="topAPISetting.KoboldConf.grammar"></textarea>
-                    <label>@Loc["Trim Stop"]</label>
-                    <input type="checkbox" @bind="topAPISetting.KoboldConf.trim_stop" />
-                    <label>@Loc["Bypass EOS"]</label>
-                    <input type="checkbox" @bind="topAPISetting.KoboldConf.bypass_eos" />
-                </div>
-                <div class="su-group">
-                    <p style="font-style: italic; color: #666;">@Loc["Note: Logit bias settings are available in the API but not configurable through this interface."]</p>
-                </div>
-            }
-
-            @if (topAPISetting.Type == ApiConfigType.OpenAI)
-            {
-                <label>@Loc["API URL"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.OpenAIUrl" />
-                <label>@Loc["API KEY"]</label>
-                <input type="password" class="shimmer-input" @bind="topAPISetting.OpenAIApiKey" />
-                <label>@Loc["API MODEL"]</label>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <input class="shimmer-input" style="flex: 1;" @bind="topAPISetting.OpenAIModel" />
-                    <button class="su-btn su-btn-secondary" style="white-space: nowrap;"
-                            disabled="@_isLoadingOpenAIModels" @onclick="FetchOpenAIModels">
-                        @(_isLoadingOpenAIModels ? Loc["Fetching..."] : Loc["Fetch Models"])
-                    </button>
-                </div>
-                @if (_openAIModels is { Count: > 0 })
-                {
-                    <select class="su-select" style="width: 100%; margin-top: 4px;"
-                            @bind:get="_selectedOpenAIModel"
-                            @bind:set="OnOpenAIModelSelected">
-                        <option value="">-- @Loc["Select or type model"] --</option>
-                        @foreach (var m in _openAIModels)
-                        {
-                            <option value="@m">@m</option>
-                        }
-                    </select>
-                }
-                @if (!string.IsNullOrEmpty(_openAIModelError))
-                {
-                    <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px;">@_openAIModelError</div>
-                }
-                <label>@Loc["API GENERATION LENGTH"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.OpenAICtx" />
-                <label>@Loc["API ENABLE STREAM"]</label>
-                <input type="checkbox" @bind="topAPISetting.OpenAIStream" />
-                <label>@Loc["API ASIS"]</label>
-                <input type="checkbox" @bind="topAPISetting.OpenAIAsIs" />
-                <div>
-                    <label>@Loc["API REASONING ECHO"]</label>
-                    <select class="shimmer-input" @bind="topAPISetting.OpenAIReasoningEchoMode">
-                        <option value="@ReasoningEchoMode.Full">@Loc["API REASONING ECHO FULL"]</option>
-                        <option value="@ReasoningEchoMode.AfterLastUser">@Loc["API REASONING ECHO AFTER LAST USER"]</option>
-                        <option value="@ReasoningEchoMode.None">@Loc["API REASONING ECHO NONE"]</option>
-                    </select>
-                </div>
-                <label>@Loc["API CUSTOM REQUEST BODY"]</label>
-                <textarea class="shimmer-input" rows="6" @bind="topAPISetting.OpenAICustomRequestBody"
-                    placeholder="@Loc["API CUSTOM REQUEST BODY PLACEHOLDER"]"></textarea>
-            }
-
-            @if (topAPISetting.Type == ApiConfigType.DeepSeek)
-            {
-                <label>@Loc["API URL"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.DeepSeekUrl" />
-                <label>@Loc["API KEY"]</label>
-                <input type="password" class="shimmer-input" @bind="topAPISetting.DeepSeekApiKey" />
-                <label>@Loc["API MODEL"]</label>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <input class="shimmer-input" style="flex: 1;" @bind="topAPISetting.DeepSeekModel" />
-                    <button class="su-btn su-btn-secondary" style="white-space: nowrap;"
-                            disabled="@_isLoadingDeepSeekModels" @onclick="FetchDeepSeekModels">
-                        @(_isLoadingDeepSeekModels ? Loc["Fetching..."] : Loc["Fetch Models"])
-                    </button>
-                </div>
-                @if (_deepSeekModels is { Count: > 0 })
-                {
-                    <select class="su-select" style="width: 100%; margin-top: 4px;"
-                            @bind:get="_selectedDeepSeekModel"
-                            @bind:set="OnDeepSeekModelSelected">
-                        <option value="">-- @Loc["Select or type model"] --</option>
-                        @foreach (var m in _deepSeekModels)
-                        {
-                            <option value="@m">@m</option>
-                        }
-                    </select>
-                }
-                @if (!string.IsNullOrEmpty(_deepSeekModelError))
-                {
-                    <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px;">@_deepSeekModelError</div>
-                }
-                <label>@Loc["API GENERATION LENGTH"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.DeepSeekCtx" />
-                <label>@Loc["API ENABLE STREAM"]</label>
-                <input type="checkbox" @bind="topAPISetting.DeepSeekStream" />
-                <label>@Loc["API ASIS"]</label>
-                <input type="checkbox" @bind="topAPISetting.DeepSeekAsIs" />
-                <div>
-                    <label>@Loc["API REASONING EFFORT"]</label>
-                    <select class="shimmer-input" @bind="topAPISetting.DeepSeekReasoningEffort">
-                        <option value="">@Loc["API REASONING EFFORT OFF"]</option>
-                        <option value="low">Low</option>
-                        <option value="high">High</option>
-                        <option value="max">Max</option>
-                    </select>
-                </div>
-                <label>@Loc["API REASONING ECHO"]</label>
-                <div style="font-style: italic; color: #666;">@Loc["API REASONING ECHO DEEPSEEK FIXED"]</div>
-            }
-
-            @if (topAPISetting.Type == ApiConfigType.OpenCodeGo)
-            {
-                <div class="su-alert su-alert-info" style="margin: 8px 0; padding: 12px; background-color: #e8f4fd; border: 1px solid #b6d4fe; border-radius: 4px;">
-                    <strong>@Loc["OpenCodeGo Info Title"]</strong><br />
-                    @Loc["OpenCodeGo Info Description"]
-                </div>
-                <label>@Loc["API URL"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.OpenCodeGoUrl" />
-                <label>@Loc["API MODELS URL"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.OpenCodeGoModelsUrl" />
-                <label>@Loc["API KEY"]</label>
-                <input type="password" class="shimmer-input" @bind="topAPISetting.OpenCodeGoApiKey" />
-                <label>@Loc["API MODEL"]</label>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <input class="shimmer-input" style="flex: 1;" @bind="topAPISetting.OpenCodeGoModel" />
-                    <button class="su-btn su-btn-secondary" style="white-space: nowrap;"
-                            disabled="@_isLoadingOpenCodeGoModels" @onclick="FetchOpenCodeGoModels">
-                        @(_isLoadingOpenCodeGoModels ? Loc["Fetching..."] : Loc["Fetch Models"])
-                    </button>
-                </div>
-                @if (_openCodeGoModels is { Count: > 0 })
-                {
-                    <select class="su-select" style="width: 100%; margin-top: 4px;"
-                            @bind:get="_selectedOpenCodeGoModel"
-                            @bind:set="OnOpenCodeGoModelSelected">
-                        <option value="">-- @Loc["Select or type model"] --</option>
-                        @foreach (var m in _openCodeGoModels)
-                        {
-                            <option value="@m">@m</option>
-                        }
-                    </select>
-                }
-                @if (!string.IsNullOrEmpty(_openCodeGoModelError))
-                {
-                    <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px;">@_openCodeGoModelError</div>
-                }
-                <label>@Loc["API GENERATION LENGTH"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.OpenCodeGoCtx" />
-                <label>@Loc["API ENABLE STREAM"]</label>
-                <input type="checkbox" @bind="topAPISetting.OpenCodeGoStream" />
-                <label>@Loc["API ASIS"]</label>
-                <input type="checkbox" @bind="topAPISetting.OpenCodeGoAsIs" />
-            }
-
-            @if (topAPISetting.Type == ApiConfigType.OpenAIText)
-            {
-                <label>@Loc["API URL"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.OpenAITextUrl" />
-                <label>@Loc["API KEY"]</label>
-                <input type="password" class="shimmer-input" @bind="topAPISetting.OpenAITextApiKey" />
-                <label>@Loc["API MODEL"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.OpenAITextModel" />
-                <label>@Loc["API GENERATION LENGTH"]</label>
-                <input class="shimmer-input" @bind="topAPISetting.OpenAITextCtx" />
-            }
+            <div class="cfg-dialog-footer cfg-dialog-footer-spread">
+                <span class="cfg-dialog-meta">@Loc.Format("config_ui.count", FilteredConfigs.Count())</span>
+                <button type="button" class="su-btn su-btn-secondary su-btn-sm" @onclick="CloseSearchDialog">
+                    @Loc["config_ui.dismiss"]
+                </button>
+            </div>
         </div>
     </div>
 }
-<br />
-<button class="su-btn su-btn-primary" style="margin:5px" @onclick="SaveAll">@Loc["Save"]</button>
+
+<!-- 重命名 -->
+@if (_renameOpen && Current is { } renameTarget)
+{
+    <div class="su-modal-mask" @onclick="CloseRenameDialog">
+        <div class="cfg-dialog cfg-dialog-sm" role="dialog" aria-modal="true"
+             @onclick:stopPropagation="true" @onkeydown="OnRenameDialogKeyDown">
+            <div class="cfg-dialog-head">
+                <span class="cfg-dialog-icon"><i class="bi bi-pencil"></i></span>
+                <div class="cfg-dialog-heading">
+                    <h2>@Loc["config_ui.rename_title"]</h2>
+                    <p>@Loc["config_ui.rename_desc"]</p>
+                </div>
+                <button type="button" class="cfg-dialog-close" aria-label="@Loc["config_ui.dismiss"]"
+                        @onclick="CloseRenameDialog">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="cfg-dialog-body">
+                <div class="cfg-field">
+                    <label class="su-label">@Loc["config_ui.rename_name"]</label>
+                    <input @ref="_renameInput" class="su-input" @bind="_renameValue" @bind:event="oninput"
+                           @onkeydown="OnRenameInputKeyDown"
+                           placeholder="@Loc["config_ui.rename_placeholder"]" />
+                    @if (_renameError != null)
+                    {
+                        <p class="cfg-field-error">@_renameError</p>
+                    }
+                </div>
+                <p class="cfg-dialog-meta">@Loc["api_settings.id"]: <code>@renameTarget.Id</code></p>
+            </div>
+            <div class="cfg-dialog-footer">
+                <button type="button" class="su-btn su-btn-secondary" @onclick="CloseRenameDialog">
+                    @Loc["config_ui.dialog_cancel"]
+                </button>
+                <button type="button" class="su-btn su-btn-primary" @onclick="ConfirmRename">
+                    @Loc["config_ui.dialog_confirm"]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- 删除确认 -->
+@if (_deleteOpen && _deleteTarget != null)
+{
+    <div class="su-modal-mask" @onclick="CloseDeleteDialog">
+        <div class="cfg-dialog cfg-dialog-sm" role="dialog" aria-modal="true"
+             @onclick:stopPropagation="true" @onkeydown="OnDeleteDialogKeyDown">
+            <div class="cfg-dialog-head">
+                <span class="cfg-dialog-icon is-danger"><i class="bi bi-trash3"></i></span>
+                <div class="cfg-dialog-heading">
+                    <h2>@Loc["config_ui.delete_title"]</h2>
+                    <p>@Loc["config_ui.delete_desc"]</p>
+                </div>
+                <button type="button" class="cfg-dialog-close" aria-label="@Loc["config_ui.dismiss"]"
+                        @onclick="CloseDeleteDialog">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="cfg-dialog-body">
+                <div class="cfg-note is-danger">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>@Loc.Format("config_ui.delete_warning", DisplayName(_deleteTarget))</span>
+                </div>
+                <p class="cfg-dialog-meta">@Loc["api_settings.id"]: <code>@_deleteTarget.Id</code></p>
+            </div>
+            <div class="cfg-dialog-footer">
+                <button @ref="_deleteCancelButton" type="button" class="su-btn su-btn-secondary"
+                        @onclick="CloseDeleteDialog">
+                    @Loc["config_ui.dialog_cancel"]
+                </button>
+                <button type="button" class="su-btn su-btn-danger" @onclick="ConfirmDelete">
+                    <i class="bi bi-trash3"></i> @Loc["config_ui.dialog_delete"]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_toastText != null)
+{
+    <div class="cfg-toast @(_toastError ? "is-error" : "")" role="status">
+        <i class="bi @(_toastError ? "bi-exclamation-circle-fill" : "bi-check-circle-fill")"></i>
+        <span>@_toastText</span>
+    </div>
+}
 
 @code {
-    [Inject]
-    public required IKVDataService KVData { get; set; }
+    private const string StoreSpace = "ApiSettings";
+    private const string StoreKey = "apiSetting";
+    private const string SelectedKey = "selectedAPIGuid";
 
-    List<ApiConfig> apiSettings { get; set; }
+    private List<ApiConfig> apiSettings = [];
+    private string? _selectedGuid;
+    private string? _savedGuid;
+    private string? _savedSnapshot;
+    private string? _loadError;
 
-    private string? _selectedGuid { get; set; }
-    ApiConfig topAPISetting => apiSettings.FirstOrDefault(s => s.Id.ToString() == _selectedGuid);
+    private List<string> _availableModels = [];
+    private bool _fetchingModels;
+    private string? _modelFetchError;
 
-    // OpenAI model fetching
-    private List<string>? _openAIModels;
-    private bool _isLoadingOpenAIModels;
-    private string? _openAIModelError;
-    private string _selectedOpenAIModel = "";
+    private string? _statusText;
+    private StatusKind _statusKind;
 
-    private void OnOpenAIModelSelected(string value)
+    private bool _searchOpen;
+    private string _searchQuery = "";
+
+    private bool _renameOpen;
+    private string _renameValue = "";
+    private string? _renameError;
+
+    private bool _deleteOpen;
+    private ApiConfig? _deleteTarget;
+
+    private string? _toastText;
+    private bool _toastError;
+    private CancellationTokenSource? _toastCts;
+
+    private ElementReference _searchInput;
+    private ElementReference _renameInput;
+    private ElementReference _deleteCancelButton;
+    private bool _focusSearch;
+    private bool _focusRename;
+    private bool _focusDeleteCancel;
+
+    private DotNetObjectReference<ApiSettingsPage>? _shortcutRef;
+
+    private ApiConfig? Current => apiSettings.FirstOrDefault(s => s.Id.ToString() == _selectedGuid);
+
+    private IEnumerable<ApiConfig> OrderedConfigs =>
+        apiSettings.OrderByDescending(config => config.Pinned);
+
+    /// <summary>
+    /// 收藏/克隆会改变下拉选项的顺序。原生 select 在选项重排后可能保留旧的
+    /// DOM 选中项，因此用签名强制重建元素，保证显示值与 _selectedGuid 一致。
+    /// </summary>
+    private string SwitchSignature =>
+        string.Join('|', OrderedConfigs.Select(config => $"{config.Id}:{config.Pinned}"));
+
+    private bool IsDirty =>
+        _savedSnapshot != null
+        && (!string.Equals(_savedSnapshot, SerializeConfigs(), StringComparison.Ordinal)
+            || !string.Equals(_savedGuid, _selectedGuid, StringComparison.Ordinal));
+
+    private TextCompletionSetting? CurrentTemplate
     {
-        _selectedOpenAIModel = value;
-        if (!string.IsNullOrEmpty(value) && topAPISetting != null)
+        get
         {
-            topAPISetting.OpenAIModel = value;
+            var config = Current;
+            var list = config?.TextCompletionSettings;
+            if (config == null || list == null)
+                return null;
+
+            var index = config.SelectedTextCompletionSettingIndex;
+            return index >= 0 && index < list.Count ? list[index] : null;
         }
     }
 
-    // DeepSeek model fetching
-    private List<string>? _deepSeekModels;
-    private bool _isLoadingDeepSeekModels;
-    private string? _deepSeekModelError;
-    private string _selectedDeepSeekModel = "";
-
-    private void OnDeepSeekModelSelected(string value)
+    private IEnumerable<ApiConfig> FilteredConfigs
     {
-        _selectedDeepSeekModel = value;
-        if (!string.IsNullOrEmpty(value) && topAPISetting != null)
+        get
         {
-            topAPISetting.DeepSeekModel = value;
-        }
-    }
+            var query = (_searchQuery ?? "").Trim();
+            if (query.Length == 0)
+                return OrderedConfigs;
 
-    private async Task FetchOpenAIModels()
-    {
-        if (topAPISetting == null) return;
-        _openAIModelError = null;
-        _isLoadingOpenAIModels = true;
-        try
-        {
-            var client = new SharperLLM.API.OpenAIChatCompletionClient(
-                _url: topAPISetting.OpenAIUrl ?? "https://api.openai.com/v1",
-                _apiKey: topAPISetting.OpenAIApiKey ?? "",
-                _model: topAPISetting.OpenAIModel ?? "gpt-4o"
-            );
-            _openAIModels = await client.GetModelNameList();
+            return OrderedConfigs.Where(config => Matches(config, query));
         }
-        catch (Exception ex)
-        {
-            _openAIModelError = ex.Message;
-            _openAIModels = null;
-        }
-        finally
-        {
-            _isLoadingOpenAIModels = false;
-        }
-    }
-
-    private async Task FetchDeepSeekModels()
-    {
-        if (topAPISetting == null) return;
-        _deepSeekModelError = null;
-        _isLoadingDeepSeekModels = true;
-        try
-        {
-            var client = new SharperLLM.API.OpenAIChatCompletionClient(
-                _url: topAPISetting.DeepSeekUrl ?? "https://api.deepseek.com/v1",
-                _apiKey: topAPISetting.DeepSeekApiKey ?? "",
-                _model: topAPISetting.DeepSeekModel ?? "deepseek-v4-flash"
-            );
-            _deepSeekModels = await client.GetModelNameList();
-        }
-        catch (Exception ex)
-        {
-            _deepSeekModelError = ex.Message;
-            _deepSeekModels = null;
-        }
-        finally
-        {
-            _isLoadingDeepSeekModels = false;
-        }
-    }
-
-    // OpenCode Go model fetching
-    private List<string>? _openCodeGoModels;
-    private bool _isLoadingOpenCodeGoModels;
-    private string? _openCodeGoModelError;
-    private string _selectedOpenCodeGoModel = "";
-
-    private void OnOpenCodeGoModelSelected(string value)
-    {
-        _selectedOpenCodeGoModel = value;
-        if (!string.IsNullOrEmpty(value) && topAPISetting != null)
-        {
-            topAPISetting.OpenCodeGoModel = value;
-        }
-    }
-
-    private async Task FetchOpenCodeGoModels()
-    {
-        if (topAPISetting == null) return;
-        _openCodeGoModelError = null;
-        _isLoadingOpenCodeGoModels = true;
-        try
-        {
-            var client = new SharperLLM.API.OpenAIChatCompletionClient(
-                _url: string.IsNullOrWhiteSpace(topAPISetting.OpenCodeGoUrl)
-                    ? ApiConfig.OpenCodeGoDefaultUrl
-                    : topAPISetting.OpenCodeGoUrl,
-                _apiKey: topAPISetting.OpenCodeGoApiKey ?? "",
-                _model: string.IsNullOrWhiteSpace(topAPISetting.OpenCodeGoModel)
-                    ? "glm-5.3-flash"
-                    : topAPISetting.OpenCodeGoModel
-            )
-            {
-                ModelsUrl = string.IsNullOrWhiteSpace(topAPISetting.OpenCodeGoModelsUrl)
-                    ? null
-                    : topAPISetting.OpenCodeGoModelsUrl
-            };
-            _openCodeGoModels = await client.GetModelNameList();
-        }
-        catch (Exception ex)
-        {
-            _openCodeGoModelError = ex.Message;
-            _openCodeGoModels = null;
-        }
-        finally
-        {
-            _isLoadingOpenCodeGoModels = false;
-        }
-    }
-
-    private void CreateNewApiConfig()
-    {
-        var newConfig = new ApiConfig { Name = "New API Setting" };
-        apiSettings.Add(newConfig);
-        _selectedGuid = newConfig.Id.ToString();
-    }
-
-    private void CloneCurrentApiConfig()
-    {
-        if (topAPISetting != null)
-        {
-            var clonedSetting = topAPISetting.Clone();
-            clonedSetting.Name = $"{clonedSetting.Name} - Copy";
-            apiSettings.Add(clonedSetting);
-            _selectedGuid = clonedSetting.Id.ToString();
-        }
-    }
-
-    private void DeleteCurrentApiConfig()
-    {
-        if (topAPISetting != null)
-        {
-            apiSettings.Remove(topAPISetting);
-            _selectedGuid = apiSettings.FirstOrDefault()?.Id.ToString();
-        }
-    }
-
-    private void CreateNewTextCompletionSetting()
-    {
-        if (topAPISetting != null)
-        {
-            if (topAPISetting.TextCompletionSettings == null)
-            {
-                topAPISetting.TextCompletionSettings = new List<TextCompletionSetting>();
-            }
-            topAPISetting.TextCompletionSettings.Add(new TextCompletionSetting { name = "New Text Completion Setting" });
-            topAPISetting.SelectedTextCompletionSettingIndex = topAPISetting.TextCompletionSettings.Count - 1;
-        }
-    }
-
-    private void SaveAll()
-    {
-        KVData.Write("ApiSettings", "apiSetting", Newtonsoft.Json.JsonConvert.SerializeObject(apiSettings));
-        KVData.Write("ApiSettings", "selectedAPIGuid", _selectedGuid ?? "");
-        Navigation.NavigateTo(Navigation.Uri, true);
     }
 
     protected override void OnInitialized()
     {
-        var apisettings = KVData.Read("ApiSettings", "apiSetting") ?? "[]";
-        apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiConfig>>(apisettings) ?? [];
-        _selectedGuid = KVData.Read("ApiSettings", "selectedAPIGuid");
-
-        if (string.IsNullOrEmpty(_selectedGuid))
-            _selectedGuid = apiSettings.FirstOrDefault()?.Id.ToString();
+        LoadFromStore();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _shortcutRef = DotNetObjectReference.Create(this);
+            try
+            {
+                await JS.InvokeVoidAsync("configPageShortcuts.register", _shortcutRef);
+            }
+            catch (JSDisconnectedException)
+            {
+                // 电路已断开时无法注册快捷键；页面其余功能不受影响。
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        if (_focusSearch)
+        {
+            _focusSearch = false;
+            try
+            {
+                await _searchInput.FocusAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+                // 弹窗在渲染完成前已被关闭，输入框引用尚未生成。
+            }
+        }
+
+        if (_focusRename)
+        {
+            _focusRename = false;
+            try
+            {
+                await _renameInput.FocusAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+                // 弹窗在渲染完成前已被关闭，输入框引用尚未生成。
+            }
+        }
+
+        if (_focusDeleteCancel)
+        {
+            _focusDeleteCancel = false;
+            try
+            {
+                await _deleteCancelButton.FocusAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+                // 弹窗在渲染完成前已被关闭，按钮引用尚未生成。
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_shortcutRef != null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("configPageShortcuts.unregister");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            _shortcutRef.Dispose();
+            _shortcutRef = null;
+        }
+
+        _toastCts?.Cancel();
+        _toastCts?.Dispose();
+        _toastCts = null;
+    }
+
+    private void LoadFromStore()
+    {
+        _loadError = null;
+
+        try
+        {
+            var raw = KVData.Read(StoreSpace, StoreKey) ?? "[]";
+            apiSettings = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ApiConfig>>(raw) ?? [];
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load API settings from KV storage.");
+            apiSettings = [];
+            _selectedGuid = null;
+            _savedSnapshot = null;
+            _loadError = Loc.Format("config_ui.load_failed", ex.Message);
+            return;
+        }
+
+        foreach (var config in apiSettings)
+            Normalize(config);
+
+        var storedSelection = KVData.Read(StoreSpace, SelectedKey);
+        if (!string.IsNullOrWhiteSpace(storedSelection)
+            && apiSettings.Any(config => config.Id.ToString() == storedSelection))
+        {
+            _selectedGuid = storedSelection;
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(storedSelection))
+            {
+                Logger.LogWarning(
+                    "Selected API config '{ConfigId}' no longer exists; falling back to the first config.",
+                    storedSelection);
+            }
+
+            _selectedGuid = OrderedConfigs.FirstOrDefault()?.Id.ToString() ?? "";
+        }
+
+        _savedSnapshot = SerializeConfigs();
+        _savedGuid = _selectedGuid;
+        _statusText = null;
+        _modelFetchError = null;
+        _availableModels = [];
+    }
+
+    private void Reload()
+    {
+        LoadFromStore();
+        StateHasChanged();
+    }
+
+    private void OnSelectionChanged()
+    {
+        _modelFetchError = null;
+        _availableModels = [];
+        _statusText = null;
+    }
+
+    private void CreateNewConfig()
+    {
+        var config = new ApiConfig
+        {
+            Name = NextName(Loc["config_ui.new"])
+        };
+        Normalize(config);
+
+        apiSettings.Add(config);
+        _selectedGuid = config.Id.ToString();
+        OnSelectionChanged();
+        ShowStatus(Loc.Format("config_ui.created", DisplayName(config)), StatusKind.Info);
+    }
+
+    private void CloneCurrentConfig()
+    {
+        if (Current is not { } source)
+            return;
+
+        var copy = source.Clone();
+        copy.Name = NextName($"{DisplayName(source)} {Loc["config_ui.copy_suffix"]}");
+        Normalize(copy);
+
+        var index = apiSettings.IndexOf(source);
+        apiSettings.Insert(index + 1, copy);
+        _selectedGuid = copy.Id.ToString();
+        OnSelectionChanged();
+        ShowStatus(Loc.Format("config_ui.cloned", DisplayName(copy)), StatusKind.Info);
+    }
+
+    private void OpenRenameDialog()
+    {
+        if (Current is not { } config)
+            return;
+
+        _renameValue = config.Name ?? "";
+        _renameError = null;
+        _renameOpen = true;
+        _focusRename = true;
+    }
+
+    private void CloseRenameDialog()
+    {
+        _renameOpen = false;
+        _renameError = null;
+    }
+
+    private void ConfirmRename()
+    {
+        if (Current is not { } config)
+        {
+            CloseRenameDialog();
+            return;
+        }
+
+        var name = (_renameValue ?? "").Trim();
+        if (name.Length == 0)
+        {
+            _renameError = Loc["config_ui.rename_required"];
+            return;
+        }
+
+        config.Name = name;
+        CloseRenameDialog();
+        ShowStatus(Loc.Format("config_ui.renamed", name), StatusKind.Info);
+    }
+
+    private void TogglePinned()
+    {
+        if (Current is not { } config)
+            return;
+
+        config.Pinned = !config.Pinned;
+        ShowStatus(
+            Loc.Format(config.Pinned ? "config_ui.pinned" : "config_ui.unpinned", DisplayName(config)),
+            StatusKind.Info);
+    }
+
+    private void OpenDeleteDialog()
+    {
+        if (Current is not { } config)
+            return;
+
+        _deleteTarget = config;
+        _deleteOpen = true;
+        _focusDeleteCancel = true;
+    }
+
+    private void CloseDeleteDialog()
+    {
+        _deleteOpen = false;
+        _deleteTarget = null;
+    }
+
+    private void ConfirmDelete()
+    {
+        if (_deleteTarget is not { } target)
+            return;
+
+        var index = apiSettings.IndexOf(target);
+        var name = DisplayName(target);
+        apiSettings.Remove(target);
+
+        _selectedGuid = apiSettings.Count == 0
+            ? ""
+            : apiSettings[Math.Clamp(index, 0, apiSettings.Count - 1)].Id.ToString();
+
+        CloseDeleteDialog();
+        OnSelectionChanged();
+        ShowStatus(Loc.Format("config_ui.deleted_pending", name), StatusKind.Info);
+    }
+
+    private async Task CopyCurrentIdAsync()
+    {
+        if (Current is not { } config)
+            return;
+
+        var id = config.Id.ToString();
+        try
+        {
+            await JS.InvokeVoidAsync("copyTextToClipboard", id);
+            ShowStatus(Loc["config_ui.toast_copied"], StatusKind.Success);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or ObjectDisposedException or JSException)
+        {
+            Logger.LogError(ex, "Failed to copy API config id '{ConfigId}' to the clipboard.", id);
+            ShowStatus(Loc.Format("config_ui.toast_copy_failed", ex.Message), StatusKind.Error);
+        }
+    }
+
+    private void OpenSearchDialog()
+    {
+        if (apiSettings.Count == 0)
+            return;
+
+        _searchQuery = "";
+        _searchOpen = true;
+        _focusSearch = true;
+    }
+
+    private void CloseSearchDialog()
+    {
+        _searchOpen = false;
+        _searchQuery = "";
+    }
+
+    private void SelectFromSearch(ApiConfig config)
+    {
+        _selectedGuid = config.Id.ToString();
+        CloseSearchDialog();
+        OnSelectionChanged();
+    }
+
+    private void OnPageKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Escape")
+            return;
+
+        if (_searchOpen)
+            CloseSearchDialog();
+        else if (_renameOpen)
+            CloseRenameDialog();
+        else if (_deleteOpen)
+            CloseDeleteDialog();
+    }
+
+    private void OnSearchDialogKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            CloseSearchDialog();
+    }
+
+    private void OnSearchInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && FilteredConfigs.FirstOrDefault() is { } first)
+            SelectFromSearch(first);
+    }
+
+    private void OnRenameDialogKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            CloseRenameDialog();
+    }
+
+    private void OnRenameInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            ConfirmRename();
+    }
+
+    private void OnDeleteDialogKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            CloseDeleteDialog();
+    }
+
+    private void SaveAll()
+    {
+        if (_loadError != null)
+        {
+            ShowStatus(_loadError, StatusKind.Error);
+            return;
+        }
+
+        try
+        {
+            var json = SerializeConfigs();
+            KVData.Write(StoreSpace, StoreKey, json);
+            KVData.Write(StoreSpace, SelectedKey, _selectedGuid ?? "");
+            _savedSnapshot = json;
+            _savedGuid = _selectedGuid;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save API settings to KV storage.");
+            var message = Loc.Format("config_ui.save_failed", ex.Message);
+            ShowStatus(message, StatusKind.Error);
+            ShowToast(message, error: true);
+            return;
+        }
+
+        ShowStatus(Loc["config_ui.toast_saved"], StatusKind.Success);
+        ShowToast(Loc["config_ui.toast_saved"], error: false);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void SaveFromShortcut()
+    {
+        SaveAll();
+    }
+
+    private void CreateTextCompletionSetting()
+    {
+        if (Current is not { } config)
+            return;
+
+        config.TextCompletionSettings ??= [];
+        config.TextCompletionSettings.Add(new TextCompletionSetting
+        {
+            name = Loc["api_settings.new_template_name"],
+            SystemMessageTemplate = "<|>",
+            UserMessageTemplate = "<|>",
+            CharMessageTemplate = "<|>"
+        });
+        config.SelectedTextCompletionSettingIndex = config.TextCompletionSettings.Count - 1;
+    }
+
+    private async Task FetchModelsAsync()
+    {
+        if (Current is not { } config)
+            return;
+
+        if (!SupportsModelFetch(config.Type))
+            return;
+
+        _fetchingModels = true;
+        _modelFetchError = null;
+        _availableModels = [];
+
+        try
+        {
+            var client = BuildModelListClient(config);
+            var models = await client.GetModelNameList();
+
+            // 请求期间可能已经切换到别的配置，旧结果不能覆盖当前配置的列表。
+            if (!ReferenceEquals(Current, config))
+                return;
+
+            _availableModels = (models ?? [])
+                .Where(model => !string.IsNullOrWhiteSpace(model))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(model => model, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (_availableModels.Count == 0)
+                _modelFetchError = Loc["api_settings.fetch_empty"];
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to fetch model list for API config '{ConfigId}'.", config.Id);
+            if (ReferenceEquals(Current, config))
+                _modelFetchError = Loc.Format("api_settings.fetch_failed", ex.Message);
+        }
+        finally
+        {
+            _fetchingModels = false;
+        }
+    }
+
+    private static OpenAIChatCompletionClient BuildModelListClient(ApiConfig config) => config.Type switch
+    {
+        ApiConfigType.OpenAI => new OpenAIChatCompletionClient(
+            _url: config.OpenAIUrl ?? "https://api.openai.com/v1",
+            _apiKey: config.OpenAIApiKey ?? "",
+            _model: config.OpenAIModel ?? "gpt-4o"),
+        ApiConfigType.DeepSeek => new OpenAIChatCompletionClient(
+            _url: config.DeepSeekUrl ?? "https://api.deepseek.com/v1",
+            _apiKey: config.DeepSeekApiKey ?? "",
+            _model: config.DeepSeekModel ?? "deepseek-v4-flash"),
+        ApiConfigType.OpenCodeGo => new OpenAIChatCompletionClient(
+            _url: string.IsNullOrWhiteSpace(config.OpenCodeGoUrl)
+                ? ApiConfig.OpenCodeGoDefaultUrl
+                : config.OpenCodeGoUrl,
+            _apiKey: config.OpenCodeGoApiKey ?? "",
+            _model: string.IsNullOrWhiteSpace(config.OpenCodeGoModel)
+                ? "glm-5.3-flash"
+                : config.OpenCodeGoModel)
+        {
+            ModelsUrl = string.IsNullOrWhiteSpace(config.OpenCodeGoModelsUrl)
+                ? null
+                : config.OpenCodeGoModelsUrl
+        },
+        _ => throw new InvalidOperationException($"API type '{config.Type}' does not support model listing.")
+    };
+
+    private static bool SupportsModelFetch(ApiConfigType type) =>
+        type is ApiConfigType.OpenAI or ApiConfigType.DeepSeek or ApiConfigType.OpenCodeGo;
+
+    private static bool SupportsTextCompletion(ApiConfigType type) =>
+        type is ApiConfigType.Kobold or ApiConfigType.Ollama or ApiConfigType.OpenAIText;
+
+    private void ShowStatus(string message, StatusKind kind)
+    {
+        _statusText = message;
+        _statusKind = kind;
+    }
+
+    private void ShowToast(string message, bool error)
+    {
+        _toastText = message;
+        _toastError = error;
+
+        _toastCts?.Cancel();
+        _toastCts?.Dispose();
+
+        var cts = new CancellationTokenSource();
+        _toastCts = cts;
+        _ = HideToastAsync(cts.Token);
+    }
+
+    private async Task HideToastAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(2600, token);
+            await InvokeAsync(() =>
+            {
+                if (token.IsCancellationRequested)
+                    return;
+
+                _toastText = null;
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // 新的提示覆盖旧提示时取消旧计时器，属于正常路径。
+        }
+        catch (ObjectDisposedException)
+        {
+            // 页面在提示消失前销毁，无需再更新 UI。
+        }
+    }
+
+    private static string StatusClass(StatusKind kind) => kind switch
+    {
+        StatusKind.Success => "success",
+        StatusKind.Error => "error",
+        _ => "info"
+    };
+
+    private static string StatusIcon(StatusKind kind) => kind switch
+    {
+        StatusKind.Success => "bi-check-circle-fill",
+        StatusKind.Error => "bi-exclamation-circle-fill",
+        _ => "bi-info-circle"
+    };
+
+    private static string DisplayName(ApiConfig config) =>
+        string.IsNullOrWhiteSpace(config.Name) ? config.Id.ToString() : config.Name;
+
+    private string TypeLabel(ApiConfigType type) => type switch
+    {
+        ApiConfigType.Kobold => Loc["api_settings.type_kobold"],
+        ApiConfigType.Ollama => Loc["api_settings.type_ollama"],
+        ApiConfigType.OpenAI => Loc["api_settings.type_openai"],
+        ApiConfigType.DeepSeek => Loc["api_settings.type_deepseek"],
+        ApiConfigType.OpenAIText => Loc["api_settings.type_openai_text"],
+        ApiConfigType.Pseudo => Loc["api_settings.type_pseudo"],
+        ApiConfigType.OpenCodeGo => Loc["api_settings.type_opencode_go"],
+        _ => type.ToString()
+    };
+
+    private string ChoiceMeta(ApiConfig config)
+    {
+        var parts = new List<string>(3);
+        var model = config.ModelName;
+        if (!string.IsNullOrWhiteSpace(model))
+            parts.Add(model);
+
+        var url = UrlSummary(config);
+        if (!string.IsNullOrWhiteSpace(url))
+            parts.Add(url);
+
+        parts.Add(TypeLabel(config.Type));
+        return string.Join(" · ", parts);
+    }
+
+    private static string UrlSummary(ApiConfig config) => config.Type switch
+    {
+        ApiConfigType.Kobold => config.KoboldUrl ?? "",
+        ApiConfigType.Ollama => config.OllamaUrl ?? "",
+        ApiConfigType.OpenAI => config.OpenAIUrl ?? "",
+        ApiConfigType.DeepSeek => config.DeepSeekUrl ?? "",
+        ApiConfigType.OpenAIText => config.OpenAITextUrl ?? "",
+        ApiConfigType.OpenCodeGo => config.OpenCodeGoUrl ?? "",
+        _ => ""
+    };
+
+    private bool Matches(ApiConfig config, string query)
+    {
+        static bool Contains(string? value, string query) =>
+            !string.IsNullOrEmpty(value)
+            && value.Contains(query, StringComparison.OrdinalIgnoreCase);
+
+        return Contains(config.Name, query)
+            || Contains(config.Id.ToString(), query)
+            || Contains(TypeLabel(config.Type), query)
+            || Contains(config.ModelName, query)
+            || Contains(UrlSummary(config), query);
+    }
+
+    private string NextName(string baseName)
+    {
+        var name = baseName;
+        var suffix = 2;
+        while (apiSettings.Any(config =>
+            string.Equals(config.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            name = $"{baseName} {suffix++}";
+        }
+
+        return name;
+    }
+
+    private static void Normalize(ApiConfig config)
+    {
+        config.KoboldConf ??= new();
+        config.TextCompletionSettings ??= [];
+
+        if (config.TextCompletionSettings.Count == 0)
+        {
+            config.SelectedTextCompletionSettingIndex = 0;
+        }
+        else
+        {
+            config.SelectedTextCompletionSettingIndex = Math.Clamp(
+                config.SelectedTextCompletionSettingIndex,
+                0,
+                config.TextCompletionSettings.Count - 1);
+        }
+    }
+
+    private static string[] SplitCsv(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? Array.Empty<string>()
+            : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private string SerializeConfigs() =>
+        Newtonsoft.Json.JsonConvert.SerializeObject(apiSettings);
+
+    private enum StatusKind
+    {
+        Info,
+        Success,
+        Error
+    }
 }

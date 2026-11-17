@@ -1,121 +1,151 @@
 @page "/toolmanager"
 @using ShimmerChatBuiltin.ToolManage
+@using ShimmerChatLib.Components
 @using ShimmerChatLib.Generation
 @using ShimmerChatLib.Panel
+@using System.Text.Json
 @attribute [PluginPanelAttribute("panel.tool_manager", "panel.tool_manager.desc", PanelDisplayPlace.Settings, Order = 2)]
 
 @inject IKVDataService KVData
 @inject IToolRegistry ToolRegistry
 @inject ILocService Loc
+@inject ILogger<ToolManager> Logger
 
-<h3>@Loc["panel_toolmanager.title"]</h3>
-
-@if (_loading)
-{
-    <p>@Loc["panel_toolmanager.loading"]</p>
-}
-else
-{
-    <div class="su-group" style="margin-top:16px;">
-        <h5>@Loc["panel_toolmanager.tool_preset"]</h5>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
-            <select class="su-select" style="max-width:240px;"
-                    @bind="_selectedPresetId" @bind:after="OnPresetChanged">
-                <option value="">@Loc["panel_toolmanager.new_preset_option"]</option>
-                @foreach (var p in _presets)
-                {
-                    <option value="@p.Id">@p.Name@(p.IsDefault ? Loc["panel_toolmanager.default_suffix"] : "")</option>
-                }
-            </select>
-            <input class="su-input" style="max-width:180px;" placeholder="@Loc["panel_toolmanager.preset_name_placeholder"]"
-                   @bind="_editName" @bind:event="oninput"
-                   disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
-            <label style="display:flex;align-items:center;gap:4px;font-size:0.85em;white-space:nowrap;cursor:pointer;">
-                <input type="checkbox" checked="@_isDefault"
-                       @onchange="e => _isDefault = (bool)(e.Value ?? false)"
-                       disabled="@(string.IsNullOrEmpty(_selectedPresetId))" />
-                @Loc["panel_toolmanager.label_default"]
-            </label>
-            <button class="su-btn su-btn-primary su-btn-sm" @onclick="SavePreset"
-                    disabled="@(string.IsNullOrEmpty(_editName) || string.IsNullOrEmpty(_selectedPresetId))">
-                @Loc["panel_toolmanager.save"]
-            </button>
-            <button class="su-btn su-btn-outline-primary su-btn-sm" @onclick="OpenSaveAsDialog">
-                @Loc["panel_toolmanager.save_as"]
-            </button>
-            <button class="su-btn su-btn-outline-danger su-btn-sm" @onclick="DeletePreset"
-                    disabled="@(string.IsNullOrEmpty(_selectedPresetId))">
-                @Loc["panel_toolmanager.delete"]
-            </button>
-        </div>
-        @if (!string.IsNullOrEmpty(_status))
+<ConfigShell T="ToolPreset"
+            Items="_presets"
+            SelectedId="@_selectedPresetId"
+            IdSelector="@(p => p.Id)"
+            NameSelector="@(p => p.Name)"
+            TypeSelector="@(p => p.IsDefault ? Loc["panel_toolmanager.default_suffix"].Trim() : null)"
+            MetaSelector="@(p => Loc.Format("tool_config.tool_count", p.EnabledToolTypeNames.Count))"
+            SearchSelector="@(p => string.Join(' ', p.EnabledToolTypeNames))"
+            PinSelector="@(p => p.Pinned)"
+            Title="@Loc["panel_toolmanager.title"]"
+            Description="@Loc["panel_tool_manager.desc"]"
+            Icon="bi-tools"
+            Flush="true"
+            IsDirty="IsDirty"
+            LoadError="@_loadError"
+            StatusMessage="@_statusText"
+            StatusKind="@_statusKind"
+            CanDelete="@(CanDeleteCurrent)"
+            OnCreate="CreatePreset"
+            OnSave="SaveAll"
+            OnSelect="SelectPreset"
+            OnClone="ClonePreset"
+            OnRename="RenamePreset"
+            OnDelete="DeletePreset"
+            OnTogglePin="TogglePin"
+            OnRetry="Reload">
+    <Body>
+        @if (_loading)
         {
-            <div class="su-alert @(_status.Contains("Error") ? "su-alert-danger" : "su-alert-success")" style="padding:4px 8px;font-size:0.85em;">@_status</div>
+            <section class="cfg-section">
+                <p class="su-text-sm su-text-2">@Loc["panel_toolmanager.loading"]</p>
+            </section>
         }
-    </div>
-
-    @* Save As dialog *@
-    @if (_showSaveAsDialog)
-    {
-        <div class="tm-overlay" @onclick="CancelSaveAsDialog">
-            <div class="tm-dialog" @onclick:stopPropagation="true">
-                <div class="tm-dialog-title">@Loc["panel_toolmanager.save_as_title"]</div>
-                <input class="su-input" style="width:100%;" placeholder="@Loc["panel_toolmanager.preset_name_placeholder"]"
-                       @bind="_saveAsName" @bind:event="oninput" />
-                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-                    <button class="su-btn su-btn-outline su-btn-sm" @onclick="CancelSaveAsDialog">@Loc["panel_toolmanager.cancel"]</button>
-                    <button class="su-btn su-btn-primary su-btn-sm" @onclick="ConfirmSaveAs"
-                            disabled="@(string.IsNullOrEmpty(_saveAsName))">
-                        @Loc["panel_toolmanager.save"]
-                    </button>
-                </div>
-            </div>
-        </div>
-    }
-
-    <div class="su-group" style="margin-top:16px;">
-        <h5>@Loc["panel_toolmanager.available_tools"]</h5>
-        <p class="su-text-2" style="font-size:0.85em;">@Loc["panel_toolmanager.available_tools_desc"]</p>
-
-        @foreach (var group in _groupedTools)
+        else if (Current is { } preset)
         {
-            <div class="tm-group">
-                <div class="tm-group-header">
-                    <span class="tm-group-icon">@(group.Key.Contains('/') ? "▸" : "▾")</span>
-                    <span class="tm-group-name">@string.Join(" / ", group.Key.Split('/').Select(k => Loc[k.Trim()]))</span>
-                    <span class="tm-group-count">@group.Value.Count</span>
-                </div>
-                @foreach (var tool in group.Value)
-                {
-                    <div class="tm-row">
-                        <div>
-                            <input type="checkbox" checked="@_enabledTools.Contains(tool.NameKey)"
-                                   @onchange="e => ToggleTool(tool.NameKey, (bool)(e.Value ?? false))" />
-                        </div>
-                        <div class="tm-name">@Loc[tool.NameKey]</div>
-                        <div class="tm-desc">@Loc[tool.DescriptionKey]</div>
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-info-circle"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["tool_config.basic"]</h3>
+                        <p>@Loc["tool_config.basic_desc"]</p>
                     </div>
+                </div>
+
+                <div class="cfg-grid">
+                    <div class="cfg-field cfg-span-6">
+                        <label class="su-label">@Loc["panel_toolmanager.preset_name_placeholder"]</label>
+                        <input class="su-input" @bind="preset.Name"
+                               placeholder="@Loc["panel_toolmanager.preset_name_placeholder"]" />
+                        <p class="cfg-field-hint">@Loc["tool_config.name_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["panel_toolmanager.label_default"]</label>
+                        <label class="cfg-toggle">
+                            <input type="checkbox" checked="@preset.IsDefault"
+                                   disabled="@preset.IsDefault"
+                                   @onchange="e => SetDefault(preset, (bool)(e.Value ?? false))" />
+                            <span>@Loc["tool_config.default_hint"]</span>
+                        </label>
+                        <p class="cfg-field-hint">@Loc["tool_config.default_switch_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["tool_config.preset_id"]</label>
+                        <div class="cfg-readonly-row">
+                            <code title="@preset.Id">@preset.Id</code>
+                        </div>
+                        <p class="cfg-field-hint">@Loc["tool_config.id_hint"]</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-check2-square"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["panel_toolmanager.available_tools"]</h3>
+                        <p>@Loc["panel_toolmanager.available_tools_desc"]</p>
+                    </div>
+                    <span class="su-badge su-badge-secondary">
+                        @Loc.Format("tool_config.enabled_count", preset.EnabledToolTypeNames.Count, ToolRegistry.AllTools.Count)
+                    </span>
+                </div>
+
+                @if (_groupedTools.Count == 0)
+                {
+                    <p class="su-text-sm su-text-2">@Loc["panel_toolmanager.no_tools"]</p>
                 }
-            </div>
+                else
+                {
+                    @foreach (var group in _groupedTools)
+                    {
+                        <div class="tm-group">
+                            <div class="tm-group-header">
+                                <span class="tm-group-icon">@(group.Key.Contains('/') ? "▸" : "▾")</span>
+                                <span class="tm-group-name">@string.Join(" / ", group.Key.Split('/').Select(k => Loc[k.Trim()]))</span>
+                                <span class="tm-group-count">@group.Value.Count</span>
+                            </div>
+                            @foreach (var tool in group.Value)
+                            {
+                                <label class="tm-row">
+                                    <input type="checkbox" checked="@IsToolEnabled(preset, tool.NameKey)"
+                                           @onchange="e => SetToolEnabled(preset, tool.NameKey, (bool)(e.Value ?? false))" />
+                                    <span class="tm-name">@Loc[tool.NameKey]</span>
+                                    <span class="tm-desc">@Loc[tool.DescriptionKey]</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                }
+            </section>
         }
-        @if (_groupedTools.Count == 0)
-        {
-            <div class="tm-row"><div colspan="3" style="color:#888;">@Loc["panel_toolmanager.no_tools"]</div></div>
-        }
-    </div>
-}
+    </Body>
+</ConfigShell>
 
 @code {
+    private const string StoreSpace = "ToolPresets";
+    private const string StoreKey = "__presets__";
+
     private bool _loading = true;
     private Dictionary<string, List<ToolMetadata>> _groupedTools = new();
-    private HashSet<string> _enabledTools = new();
     private List<ToolPreset> _presets = new();
-    private string _selectedPresetId = "";
-    private string _editName = "";
-    private bool _isDefault = false;
-    private bool _showSaveAsDialog = false;
-    private string _saveAsName = "";
-    private string _status = "";
+    private string _selectedPresetId = string.Empty;
+    private string? _loadError;
+    private string? _savedSnapshot;
+    private string _statusText = string.Empty;
+    private string _statusKind = "info";
+
+    private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
+
+    private ToolPreset? Current =>
+        _presets.FirstOrDefault(p => string.Equals(p.Id, _selectedPresetId, StringComparison.Ordinal));
+
+    private bool CanDeleteCurrent => Current is { IsDefault: false } && _presets.Count > 1;
+
+    private bool IsDirty => _loadError == null && Snapshot() != _savedSnapshot;
 
     protected override void OnInitialized()
     {
@@ -124,184 +154,259 @@ else
             .GroupBy(t => t.CategoryKeys is { Length: > 0 } ? string.Join("/", t.CategoryKeys) : "category.other")
             .ToDictionary(g => g.Key, g => g.ToList());
         LoadPresets();
-        EnsureDefaultExists();
-        var def = _presets.FirstOrDefault(p => p.IsDefault);
-        SelectPreset(def?.Id ?? "");
+        _loading = false;
+    }
+
+    private void Reload()
+    {
+        LoadPresets();
         _loading = false;
     }
 
     private void LoadPresets()
     {
-        var json = KVData.Read("ToolPresets", "__presets__");
-        if (string.IsNullOrEmpty(json))
-        {
-            _presets = new();
-            return;
-        }
-
-        // 尝试新格式 List<ToolPreset>
         try
         {
-            _presets = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ToolPreset>>(json) ?? new();
-            return;
-        }
-        catch (Newtonsoft.Json.JsonException) { }
+            var json = KVData.Read(StoreSpace, StoreKey);
+            _presets = string.IsNullOrEmpty(json)
+                ? []
+                : DeserializePresets(json);
 
-        // 旧格式 List<string> → 迁移
-        var oldNames = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json) ?? new();
-        _presets = new();
-        bool hasDefault = false;
-        foreach (var name in oldNames)
+            EnsureDefaultExists();
+
+            _loadError = null;
+            _selectedPresetId = _presets.FirstOrDefault(p => p.IsDefault)?.Id
+                ?? _presets.FirstOrDefault()?.Id
+                ?? string.Empty;
+            _savedSnapshot = Snapshot();
+        }
+        catch (Exception ex)
         {
-            var data = KVData.Read("ToolPresets", name);
+            Logger.LogError(ex, "加载工具预设失败");
+            _loadError = Loc.Format("tool_config.load_failed", ex.Message);
+            _presets = [];
+            _selectedPresetId = string.Empty;
+            _savedSnapshot = null;
+        }
+    }
+
+    /// <summary>
+    /// 兼容旧格式：早期版本只保存预设名列表，预设本体散落在 ToolPresets/{name}。
+    /// 新格式解析成功时直接返回；只有 JSON 结构不是对象列表时才尝试旧格式。
+    /// </summary>
+    private List<ToolPreset> DeserializePresets(string json)
+    {
+        try
+        {
+            return Newtonsoft.Json.JsonConvert.DeserializeObject<List<ToolPreset>>(json) ?? [];
+        }
+        catch (Newtonsoft.Json.JsonException)
+        {
+            Logger.LogWarning("工具预设不是新格式，尝试按旧版名称列表迁移");
+        }
+
+        var names = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(json) ?? [];
+        var presets = new List<ToolPreset>();
+        var hasDefault = false;
+
+        foreach (var name in names)
+        {
+            var data = KVData.Read(StoreSpace, name);
             if (string.IsNullOrEmpty(data)) continue;
-            try
-            {
-                var old = Newtonsoft.Json.JsonConvert.DeserializeObject<ToolPreset>(data);
-                if (old != null)
-                {
-                    old.Id = Guid.NewGuid().ToString();
-                    _presets.Add(old);
-                }
-            }
-            catch { }
+
+            var preset = Newtonsoft.Json.JsonConvert.DeserializeObject<ToolPreset>(data);
+            if (preset == null) continue;
+
+            preset.Id = Guid.NewGuid().ToString();
+            presets.Add(preset);
         }
-        // 也检查 _default_（旧格式不在 __presets__ 列表中）
-        var defData = KVData.Read("ToolPresets", "_default_");
-        if (!string.IsNullOrEmpty(defData))
+
+        var defaultData = KVData.Read(StoreSpace, "_default_");
+        if (!string.IsNullOrEmpty(defaultData))
         {
-            try
+            var preset = Newtonsoft.Json.JsonConvert.DeserializeObject<ToolPreset>(defaultData);
+            if (preset != null)
             {
-                var def = Newtonsoft.Json.JsonConvert.DeserializeObject<ToolPreset>(defData);
-                if (def != null)
-                {
-                    def.Id = Guid.NewGuid().ToString();
-                    def.IsDefault = true;
-                    hasDefault = true;
-                    _presets.Insert(0, def);
-                }
+                preset.Id = Guid.NewGuid().ToString();
+                preset.IsDefault = true;
+                hasDefault = true;
+                presets.Insert(0, preset);
             }
-            catch { }
         }
-        if (!hasDefault && _presets.Count > 0)
-            _presets[0].IsDefault = true;
-        Persist();
+
+        if (!hasDefault && presets.Count > 0)
+            presets[0].IsDefault = true;
+
+        return presets;
     }
 
     private void EnsureDefaultExists()
     {
-        if (!_presets.Any(p => p.IsDefault))
-        {
-            _presets.Insert(0, new ToolPreset
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = "Default",
-                IsDefault = true,
-                EnabledToolTypeNames = new()
-            });
-            Persist();
-        }
-    }
-
-    private void OnPresetChanged()
-    {
-        SelectPreset(_selectedPresetId);
-    }
-
-    private void SelectPreset(string id)
-    {
-        _selectedPresetId = id;
-        var preset = _presets.FirstOrDefault(p => p.Id == id);
-        if (preset == null)
-        {
-            _editName = "";
-            _isDefault = false;
-            _enabledTools.Clear();
-        }
-        else
-        {
-            _editName = preset.Name;
-            _isDefault = preset.IsDefault;
-            _enabledTools = preset.EnabledToolTypeNames.ToHashSet();
-        }
-    }
-
-    private void SavePreset()
-    {
-        if (string.IsNullOrEmpty(_selectedPresetId) || string.IsNullOrEmpty(_editName))
-            return;
-
-        var preset = _presets.FirstOrDefault(p => p.Id == _selectedPresetId);
-        if (preset == null) return;
-
-        if (_isDefault && !preset.IsDefault)
-        {
-            foreach (var p in _presets) p.IsDefault = false;
-        }
-
-        preset.Name = _editName;
-        preset.IsDefault = _isDefault;
-        preset.EnabledToolTypeNames = _enabledTools.ToList();
-        Persist();
-        _status = Loc.Format("panel_toolmanager.msg_saved", _editName, _enabledTools.Count);
-    }
-
-    private void OpenSaveAsDialog()
-    {
-        _saveAsName = "";
-        _showSaveAsDialog = true;
-    }
-
-    private void CancelSaveAsDialog()
-    {
-        _showSaveAsDialog = false;
-    }
-
-    private void ConfirmSaveAs()
-    {
-        _showSaveAsDialog = false;
-        if (string.IsNullOrEmpty(_saveAsName))
-            return;
-
-        if (_isDefault)
-        {
-            foreach (var p in _presets) p.IsDefault = false;
-        }
+        if (_presets.Any(p => p.IsDefault)) return;
 
         var preset = new ToolPreset
         {
             Id = Guid.NewGuid().ToString(),
-            Name = _saveAsName,
-            IsDefault = _isDefault,
-            EnabledToolTypeNames = _enabledTools.ToList()
+            Name = "Default",
+            IsDefault = true,
+            EnabledToolTypeNames = []
         };
-        _presets.Add(preset);
-        Persist();
-        _selectedPresetId = preset.Id;
-        _status = Loc.Format("panel_toolmanager.msg_saved", _saveAsName, _enabledTools.Count);
+        _presets.Insert(0, preset);
     }
 
-    private void DeletePreset()
+    private string Snapshot() =>
+        JsonSerializer.Serialize(_presets, _jsonOptions);
+
+    private async Task SaveAll()
     {
-        if (string.IsNullOrEmpty(_selectedPresetId))
+        if (_loadError is not null) return;
+
+        if (_presets.Count == 0)
+        {
+            SetStatus(Loc["tool_config.no_presets"], "error");
             return;
-        _presets.RemoveAll(p => p.Id == _selectedPresetId);
-        Persist();
-        var def = _presets.FirstOrDefault(p => p.IsDefault);
-        SelectPreset(def?.Id ?? "");
-        _status = Loc["panel_toolmanager.msg_deleted"];
+        }
+
+        if (_presets.Any(p => string.IsNullOrWhiteSpace(p.Name)))
+        {
+            SetStatus(Loc["tool_config.name_required"], "error");
+            return;
+        }
+
+        if (!_presets.Any(p => p.IsDefault))
+        {
+            SetStatus(Loc["tool_config.default_required"], "error");
+            return;
+        }
+
+        try
+        {
+            Persist();
+            _savedSnapshot = Snapshot();
+            SetStatus(Loc.Format("panel_toolmanager.msg_saved", Current?.Name ?? "", Current?.EnabledToolTypeNames.Count ?? 0), "success");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "保存工具预设失败");
+            SetStatus(Loc.Format("config_ui.save_failed", ex.Message), "error");
+        }
+
+        await Task.CompletedTask;
     }
 
     private void Persist()
     {
-        KVData.Write("ToolPresets", "__presets__",
+        KVData.Write(StoreSpace, StoreKey,
             Newtonsoft.Json.JsonConvert.SerializeObject(_presets));
     }
 
-    private void ToggleTool(string name, bool enabled)
+    private async Task CreatePreset()
     {
-        if (enabled) _enabledTools.Add(name);
-        else _enabledTools.Remove(name);
+        var preset = new ToolPreset
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = NextName(Loc["config_ui.new"]),
+            EnabledToolTypeNames = []
+        };
+
+        _presets.Add(preset);
+        _selectedPresetId = preset.Id;
+        SetStatus(Loc.Format("config_ui.created", DisplayName(preset)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task ClonePreset()
+    {
+        if (Current is not { } source) return;
+
+        var copy = source.Clone();
+        copy.Id = Guid.NewGuid().ToString();
+        copy.Name = NextName($"{DisplayName(source)} {Loc["config_ui.copy_suffix"]}");
+
+        var index = _presets.IndexOf(source);
+        _presets.Insert(index + 1, copy);
+        _selectedPresetId = copy.Id;
+        SetStatus(Loc.Format("config_ui.cloned", DisplayName(copy)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task RenamePreset(string name)
+    {
+        if (Current is not { } preset) return;
+
+        preset.Name = name;
+        SetStatus(Loc.Format("config_ui.renamed", DisplayName(preset)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task DeletePreset()
+    {
+        if (Current is not { } preset || !CanDeleteCurrent) return;
+
+        var index = _presets.IndexOf(preset);
+        _presets.Remove(preset);
+        _selectedPresetId = _presets[Math.Min(index, _presets.Count - 1)].Id;
+        SetStatus(Loc.Format("config_ui.deleted_pending", DisplayName(preset)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task TogglePin(ToolPreset preset)
+    {
+        preset.Pinned = !preset.Pinned;
+        SetStatus(Loc.Format(preset.Pinned ? "config_ui.pinned" : "config_ui.unpinned", DisplayName(preset)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task SelectPreset(string id)
+    {
+        _selectedPresetId = id;
+        await Task.CompletedTask;
+    }
+
+    private void SetDefault(ToolPreset preset, bool value)
+    {
+        if (!value || preset.IsDefault) return;
+
+        foreach (var item in _presets)
+            item.IsDefault = ReferenceEquals(item, preset);
+
+        SetStatus(Loc.Format("tool_config.default_set", DisplayName(preset)), "info");
+    }
+
+    private static bool IsToolEnabled(ToolPreset preset, string name) =>
+        preset.EnabledToolTypeNames.Contains(name);
+
+    private void SetToolEnabled(ToolPreset preset, string name, bool enabled)
+    {
+        if (enabled)
+        {
+            if (!preset.EnabledToolTypeNames.Contains(name))
+                preset.EnabledToolTypeNames.Add(name);
+        }
+        else
+        {
+            preset.EnabledToolTypeNames.Remove(name);
+        }
+    }
+
+    private void SetStatus(string message, string kind)
+    {
+        _statusText = message;
+        _statusKind = kind;
+    }
+
+    private string DisplayName(ToolPreset preset) =>
+        string.IsNullOrWhiteSpace(preset.Name) ? Loc["config_ui.untitled"] : preset.Name;
+
+    private string NextName(string baseName)
+    {
+        var name = string.IsNullOrWhiteSpace(baseName) ? Loc["config_ui.new"] : baseName.Trim();
+        var candidate = name;
+        var suffix = 2;
+
+        while (_presets.Any(p => string.Equals(p.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+            candidate = $"{name} ({suffix++})";
+
+        return candidate;
     }
 }
-

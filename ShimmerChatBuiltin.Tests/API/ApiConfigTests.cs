@@ -185,4 +185,30 @@ public class ApiConfigTests
 
         restored![0].OpenAIReasoningEchoMode.Should().Be(ReasoningEchoMode.Full);
     }
+
+    [Fact]
+    public void Pinned_DefaultsToFalseAndSurvivesRoundTrip()
+    {
+        // 旧配置没有 Pinned 字段时按未收藏处理。
+        var restored = JsonConvert.DeserializeObject<List<ApiConfig>>("[{\"Type\":4}]");
+        restored![0].Pinned.Should().BeFalse();
+
+        var configs = new List<ApiConfig>
+        {
+            new() { Name = "Pinned", Type = ApiConfigType.OpenAI, Pinned = true }
+        };
+
+        var roundTripped = JsonConvert.DeserializeObject<List<ApiConfig>>(
+            JsonConvert.SerializeObject(configs));
+
+        roundTripped![0].Pinned.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Clone_CopiesPinnedFlag()
+    {
+        var config = new ApiConfig { Name = "Pinned", Type = ApiConfigType.OpenAI, Pinned = true };
+
+        config.Clone().Pinned.Should().BeTrue();
+    }
 }

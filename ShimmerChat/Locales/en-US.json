@@ -634,5 +634,19 @@
   "home.widget.remove": "Remove",
   "home.widget.move_up": "Move up",
   "home.widget.move_down": "Move down",
-  "home.widget.already_added": "Added"
+  "home.widget.already_added": "Added",
+  "generation_config.desc": "Manage reusable node-tree presets. Save after editing; nodes reference presets by ID.",
+  "generation_config.post_desc": "Manage post-generation tree presets. Save after editing; nodes reference presets by ID.",
+  "generation_config.render_desc": "Manage render-modifier tree presets. Save after editing; nodes reference presets by ID.",
+  "generation_config.basic": "Basics",
+  "generation_config.basic_desc": "Preset name and stable ID.",
+  "generation_config.name_hint": "Identifies this preset in the switcher and search results.",
+  "generation_config.id_hint": "Nodes and agents reference this preset by ID; it never changes after creation.",
+  "generation_config.node_tree_desc": "Drag nodes to build the pipeline. Edits stay in memory until saved.",
+  "generation_config.empty_title": "No presets yet",
+  "generation_config.empty_desc": "Create your first node-tree preset.",
+  "generation_config.name_required": "Preset name cannot be empty.",
+  "generation_config.saved": "Preset saved",
+  "generation_config.load_failed": "Presets could not be loaded: {0}",
+  "generation_config.tree_bytes": "{0} chars"
 }

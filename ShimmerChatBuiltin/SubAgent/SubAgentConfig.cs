@@ -20,5 +20,21 @@ namespace ShimmerChatBuiltin.SubAgent
         /// 对标 Agent.PostGenerationTreeJson。
         /// </summary>
         public string? PostGenerationTreeJson { get; set; }
+
+        /// <summary>收藏标记；只影响子智能体选择器与检索列表的排序。</summary>
+        public bool Pinned { get; set; }
+
+        /// <summary>复制一份配置；Guid 由调用方重新分配。</summary>
+        public SubAgentConfig Clone() => new()
+        {
+            Name = Name,
+            Guid = Guid.Empty,
+            UseSharedPreset = UseSharedPreset,
+            ModifierPresetId = ModifierPresetId,
+            OutputMode = OutputMode,
+            ModifierTreeJson = ModifierTreeJson,
+            PostGenerationTreeJson = PostGenerationTreeJson,
+            Pinned = Pinned
+        };
     }
 }

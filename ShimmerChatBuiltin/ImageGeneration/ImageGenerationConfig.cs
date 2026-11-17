@@ -169,6 +169,9 @@ namespace ShimmerChatBuiltin.ImageGeneration
         /// <summary>自定义工作流的工具参数声明。</summary>
         public List<ImageWorkflowParameter> CustomWorkflowParameters { get; set; } = [];
 
+        /// <summary>收藏标记；只影响配置选择器与检索列表的排序。</summary>
+        public bool Pinned { get; set; }
+
         public static ImageGenerationProfile CreateDefault() => new()
         {
             Id = ImageGenerationConfigManager.DefaultProfileId,

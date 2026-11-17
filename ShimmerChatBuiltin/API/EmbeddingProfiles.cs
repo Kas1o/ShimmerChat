@@ -13,6 +13,20 @@ namespace ShimmerChatBuiltin.API
         public string BaseUrl { get; set; } = string.Empty;
         public string ApiKey { get; set; } = string.Empty;
         public string ModelName { get; set; } = string.Empty;
+
+        /// <summary>收藏标记；只影响配置选择器与检索列表的排序，不改变持久化顺序。</summary>
+        public bool Pinned { get; set; }
+
+        /// <summary>复制一份配置；Id 由调用方重新分配，避免与源配置冲突。</summary>
+        public EmbeddingProfile Clone() => new()
+        {
+            Id = string.Empty,
+            Name = Name,
+            BaseUrl = BaseUrl,
+            ApiKey = ApiKey,
+            ModelName = ModelName,
+            Pinned = Pinned
+        };
     }
 
     /// <summary>

@@ -12,6 +12,9 @@ namespace ShimmerChatLib.Generation
         /// 根节点的 JSON 序列化
         /// </summary>
         public string RootNodeJson { get; set; } = "{}";
+
+        /// <summary>收藏标记；只影响预设选择器与检索列表的排序。</summary>
+        public bool Pinned { get; set; }
     }
 
     /// <summary>
@@ -26,6 +29,9 @@ namespace ShimmerChatLib.Generation
         /// 根节点的 JSON 序列化
         /// </summary>
         public string RootNodeJson { get; set; } = "{}";
+
+        /// <summary>收藏标记；只影响预设选择器与检索列表的排序。</summary>
+        public bool Pinned { get; set; }
     }
 
     /// <summary>
@@ -40,5 +46,8 @@ namespace ShimmerChatLib.Generation
         /// 根节点的 JSON 序列化
         /// </summary>
         public string RootNodeJson { get; set; } = "{}";
+
+        /// <summary>收藏标记；只影响预设选择器与检索列表的排序。</summary>
+        public bool Pinned { get; set; }
     }
 }

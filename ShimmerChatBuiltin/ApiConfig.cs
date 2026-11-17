@@ -10,6 +10,12 @@ namespace ShimmerChatBuiltin
 		public Guid Id { get; set; } = Guid.NewGuid();
 		public string Name { get; set; } = string.Empty;
 
+		/// <summary>
+		/// 收藏标记：仅影响配置选择器的排序（置顶），不改变持久化列表本身。
+		/// 旧配置没有该字段时按未收藏处理。
+		/// </summary>
+		public bool Pinned { get; set; }
+
 		[JsonConverter(typeof(JsonStringEnumConverter))]
 		public ApiConfigType Type { get; set; }
 
@@ -304,6 +310,7 @@ namespace ShimmerChatBuiltin
 			{
 				// Intentional: clone gets a new Id via the default Guid.NewGuid()
 				Name = Name,
+				Pinned = Pinned,
 				Type = Type,
 
 				KoboldUrl = KoboldUrl,

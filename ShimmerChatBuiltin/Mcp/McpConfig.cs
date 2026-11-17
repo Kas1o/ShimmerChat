@@ -105,6 +105,9 @@ namespace ShimmerChatBuiltin.Mcp
         /// <summary>显示名称。</summary>
         public string Name { get; set; } = "";
 
+        /// <summary>收藏标记；只影响端点选择器与检索列表的排序。</summary>
+        public bool Pinned { get; set; }
+
         /// <summary>是否启用。禁用的端点在前生成节点与聊天面板中都会被整体跳过。</summary>
         public bool Enabled { get; set; } = true;
 

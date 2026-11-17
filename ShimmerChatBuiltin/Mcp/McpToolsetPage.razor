@@ -1,355 +1,401 @@
 @using ShimmerChatBuiltin.Mcp
+@using ShimmerChatLib.Components
 @using ShimmerChatLib.Interface
 @using ShimmerChatLib.Panel
 @using Microsoft.Extensions.Logging
+@using System.Text.Json
 @inject IKVDataService KVData
 @inject ILocService Loc
 @inject ILoggerFactory LoggerFactory
+@inject IJSRuntime JS
 
 @attribute [PluginPanelAttribute("panel.mcp_toolset", "panel.mcp_toolset.desc", PanelDisplayPlace.Settings, Order = 30)]
 
-<div class="shimmer-content su-p-4">
-    <h2 class="su-text-lg su-font-bold su-mb-2">@Loc["panel_mcp.title"]</h2>
-    <p class="su-text-2 su-mb-4">@Loc["panel_mcp.desc"]</p>
-
-    @if (!string.IsNullOrEmpty(statusMessage))
-    {
-        <div class="su-mb-4 su-px-3 su-py-2 su-rounded @(statusIsError ? "su-badge su-badge-danger" : "su-badge su-badge-success")">
-            @statusMessage
-        </div>
-    }
-
-    <div class="su-flex su-gap-2 su-mb-4 su-items-center su-flex-wrap">
-        <input type="text" class="shimmer-input su-flex-1" style="min-width:220px"
-               placeholder="@Loc["panel_mcp.new_placeholder"]" @bind="newEndpointName" @bind:event="oninput" />
-        <button class="su-btn su-btn-primary" @onclick="AddEndpoint" disabled="@busy">
-            <span class="bi bi-plus"></span> @Loc["panel_mcp.add"]
+<ConfigShell T="EditorModel"
+            Items="_endpoints"
+            SelectedId="@_selectedId"
+            IdSelector="@(e => e.Id)"
+            NameSelector="@(e => e.Name)"
+            TypeSelector="@(e => TransportLabel(e.Transport))"
+            MetaSelector="@(e => e.Transport == McpTransportType.Stdio ? e.Command : e.Url)"
+            SearchSelector="@(e => $"{e.Command} {e.Url} {string.Join(' ', e.Tools.Select(t => t.Name))}")"
+            PinSelector="@(e => e.Pinned)"
+            Title="@Loc["panel_mcp.title"]"
+            Description="@Loc["panel_mcp.desc"]"
+            Icon="bi-plug"
+            IsDirty="IsDirty"
+            LoadError="@_loadError"
+            StatusMessage="@_statusText"
+            StatusKind="@_statusKind"
+            OnCreate="AddEndpoint"
+            OnSave="SaveAll"
+            OnSelect="SelectEndpoint"
+            OnClone="CloneEndpoint"
+            OnRename="RenameEndpoint"
+            OnDelete="RemoveEndpoint"
+            OnTogglePin="TogglePin"
+            OnRetry="Reload">
+    <ToolbarExtras>
+        <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                disabled="@(Current == null || _probingEndpointId != null)"
+                @onclick="ProbeCurrentAsync"
+                title="@Loc["panel_mcp.probe"]" aria-label="@Loc["panel_mcp.probe"]">
+            <i class="bi @(_probingEndpointId != null ? "bi-hourglass-split" : "bi-plug")"></i>
+            <span class="cfg-btn-label">@Loc["panel_mcp.probe"]</span>
         </button>
-        <button class="su-btn" @onclick="Reload" disabled="@busy">
-            <span class="bi bi-arrow-clockwise"></span> @Loc["panel_mcp.reload"]
+        <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn"
+                disabled="@(Current == null)" @onclick="CopyNodeJson"
+                title="@Loc["panel_mcp.copy_node"]" aria-label="@Loc["panel_mcp.copy_node"]">
+            <i class="bi bi-clipboard-check"></i>
         </button>
-        <button class="su-btn" @onclick="SaveAll" disabled="@busy">
-            <span class="bi bi-save"></span> @Loc["panel_mcp.save"]
-        </button>
-    </div>
-
-    @if (endpoints.Count == 0)
-    {
-        <div class="su-alert su-alert-info">
-            <span class="bi bi-info-circle"></span> @Loc["panel_mcp.empty"]
-        </div>
-    }
-
-    <div class="su-flex su-flex-col su-gap-4">
-        @foreach (var endpoint in endpoints)
+    </ToolbarExtras>
+    <Body>
+        @if (Current is { } endpoint)
         {
-            var e = endpoint;
-            var probing = probingEndpointId == e.Id;
-            <div class="su-border su-rounded su-p-3" style="@(e.Enabled ? "" : "opacity:.6")">
-                <div class="su-flex su-items-center su-gap-2 su-flex-wrap su-mb-2">
-                    <input type="checkbox" class="su-check" checked="@e.Enabled"
-                           @onchange="ev => ToggleEnabled(e, ev)" />
-                    <input type="text" class="shimmer-input" style="max-width:240px" @bind="e.Name" @bind:event="oninput" />
-                    <span class="su-badge">@e.Id</span>
-                    <span class="su-badge">@e.Transport</span>
-                    <span class="su-flex-1"></span>
-                    <button class="su-btn su-btn-sm su-btn-outline-primary" @onclick="() => ProbeAsync(e)" disabled="@(busy || probing)">
-                        @if (probing)
-                        {
-                            <span>@Loc["panel_mcp.probing"]</span>
-                        }
-                        else
-                        {
-                            <span class="bi bi-plug"></span>
-                            <span>@Loc["panel_mcp.probe"]</span>
-                        }
-                    </button>
-                    <button class="su-btn su-btn-sm su-btn-outline-danger" @onclick="() => RemoveEndpoint(e)" disabled="@busy">
-                        <span class="bi bi-trash"></span>
-                    </button>
-                </div>
+            var probing = _probingEndpointId == endpoint.Id;
 
-                @if (probeResults.TryGetValue(e.Id, out var probe))
-                {
-                    <div class="su-mb-2 su-px-3 su-py-2 su-rounded su-text-sm @(probe.Success ? "bg-success/10" : "bg-danger/10")">
+            if (_probeResults.TryGetValue(endpoint.Id, out var probe))
+            {
+                <div class="cfg-note @(probe.Success ? "is-success" : "is-danger")">
+                    <i class="bi @(probe.Success ? "bi-check-circle-fill" : "bi-exclamation-octagon-fill")"></i>
+                    <span>
                         @if (probe.Success)
                         {
-                            <div><span class="bi bi-check-circle"></span> @Loc.Format("panel_mcp.probe_ok", probe.ServerName ?? "?", probe.ProtocolVersion ?? "?")</div>
-                            <div class="su-text-2">@Loc.Format("panel_mcp.probe_counts", probe.ToolCount, probe.ResourceCount, probe.PromptCount)</div>
+                            @Loc.Format("panel_mcp.probe_ok", probe.ServerName ?? "?", probe.ProtocolVersion ?? "?")
+                            <br />
+                            @Loc.Format("panel_mcp.probe_counts", probe.ToolCount, probe.ResourceCount, probe.PromptCount)
                             @if (probe.UsedSseFallback)
                             {
-                                <div class="su-text-2">@Loc["panel_mcp.probe_sse_fallback"]</div>
+                                <br />
+                                @Loc["panel_mcp.probe_sse_fallback"]
                             }
                             @if (!string.IsNullOrEmpty(probe.Instructions))
                             {
-                                <details class="su-mt-2">
+                                <details class="cfg-probe-instructions">
                                     <summary>@Loc["panel_mcp.probe_instructions"]</summary>
-                                    <pre class="su-text-sm" style="white-space:pre-wrap">@probe.Instructions</pre>
+                                    <pre>@probe.Instructions</pre>
                                 </details>
                             }
                         }
                         else
                         {
-                            <div><span class="bi bi-exclamation-triangle"></span> @Loc.Format("panel_mcp.probe_failed", probe.Error ?? "")</div>
+                            @Loc.Format("panel_mcp.probe_failed", probe.Error ?? "")
+                        }
+                    </span>
+                </div>
+            }
+
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-info-circle"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["mcp_config.basic"]</h3>
+                        <p>@Loc["mcp_config.basic_desc"]</p>
+                    </div>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" @bind="endpoint.Enabled" />
+                        <span>@Loc["panel_mcp.enabled"]</span>
+                    </label>
+                </div>
+
+                <div class="cfg-grid">
+                    <div class="cfg-field cfg-span-5">
+                        <label class="su-label">@Loc["panel_mcp.name"]</label>
+                        <input class="su-input" @bind="endpoint.Name" />
+                        <p class="cfg-field-hint">@Loc["mcp_config.name_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["mcp_config.id"]</label>
+                        <div class="cfg-readonly-row">
+                            <code title="@endpoint.Id">@endpoint.Id</code>
+                        </div>
+                        <p class="cfg-field-hint">@Loc["mcp_config.id_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-4">
+                        <label class="su-label">@Loc["panel_mcp.transport"]</label>
+                        <select class="su-select" @bind="endpoint.Transport">
+                            <option value="@McpTransportType.Stdio">@Loc["panel_mcp.transport_stdio"]</option>
+                            <option value="@McpTransportType.Http">@Loc["panel_mcp.transport_http"]</option>
+                        </select>
+                        <p class="cfg-field-hint">@Loc["mcp_config.transport_hint"]</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-hdd-network"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["mcp_config.connection"]</h3>
+                        <p>@Loc["mcp_config.connection_desc"]</p>
+                    </div>
+                </div>
+
+                <div class="cfg-grid">
+                    @if (endpoint.Transport == McpTransportType.Stdio)
+                    {
+                        <div class="cfg-field cfg-span-5">
+                            <label class="su-label">@Loc["panel_mcp.command"]</label>
+                            <input class="su-input" @bind="endpoint.Command" placeholder="npx" />
+                        </div>
+                        <div class="cfg-field cfg-span-7">
+                            <label class="su-label">@Loc["panel_mcp.working_dir"]</label>
+                            <input class="su-input" @bind="endpoint.WorkingDirectory" />
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["panel_mcp.arguments"]</label>
+                            <textarea class="su-input cfg-textarea" rows="3" @bind="endpoint.ArgumentsText"
+                                      placeholder="@Loc["panel_mcp.arguments_placeholder"]"></textarea>
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["panel_mcp.environment"]</label>
+                            <textarea class="su-input cfg-textarea" rows="3" @bind="endpoint.EnvironmentText"
+                                      placeholder="API_KEY=..."></textarea>
+                            <label class="cfg-toggle">
+                                <input type="checkbox" @bind="endpoint.InheritEnvironment" />
+                                <span>@Loc["panel_mcp.inherit_env"]</span>
+                            </label>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="cfg-field cfg-span-8">
+                            <label class="su-label">@Loc["panel_mcp.url"]</label>
+                            <input class="su-input" @bind="endpoint.Url" placeholder="https://example.com/mcp" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["panel_mcp.http_mode"]</label>
+                            <select class="su-select" @bind="endpoint.HttpMode">
+                                <option value="@McpHttpMode.AutoDetect">@Loc["panel_mcp.http_mode_auto"]</option>
+                                <option value="@McpHttpMode.StreamableHttp">@Loc["panel_mcp.http_mode_streamable"]</option>
+                                <option value="@McpHttpMode.Sse">@Loc["panel_mcp.http_mode_sse"]</option>
+                            </select>
+                            <p class="cfg-field-hint">@Loc["panel_mcp.http_mode_hint"]</p>
+                        </div>
+                        <div class="cfg-field cfg-span-12">
+                            <label class="su-label">@Loc["panel_mcp.headers"]</label>
+                            <textarea class="su-input cfg-textarea" rows="3" @bind="endpoint.HeadersText"
+                                      placeholder="Authorization: Bearer ..."></textarea>
+                        </div>
+                    }
+
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["panel_mcp.init_timeout"]</label>
+                        <input type="number" class="su-input" @bind="endpoint.InitializationTimeoutSeconds" />
+                    </div>
+                    <div class="cfg-field cfg-span-4">
+                        <label class="su-label">@Loc["panel_mcp.log_level"]</label>
+                        <select class="su-select" @bind="endpoint.LogLevel">
+                            <option value="@McpLogLevel.Off">@Loc["panel_mcp.log_level_off"]</option>
+                            <option value="@McpLogLevel.Error">@Loc["panel_mcp.log_level_error"]</option>
+                            <option value="@McpLogLevel.Info">@Loc["panel_mcp.log_level_info"]</option>
+                            <option value="@McpLogLevel.Debug">@Loc["panel_mcp.log_level_debug"]</option>
+                        </select>
+                        <p class="cfg-field-hint">@Loc["panel_mcp.log_level_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-5">
+                        <label class="su-label">@Loc["panel_mcp.protocol_mode"]</label>
+                        <select class="su-select" @bind="endpoint.ProtocolMode">
+                            <option value="@McpProtocolMode.Legacy">@Loc["panel_mcp.protocol_legacy"]</option>
+                            <option value="@McpProtocolMode.Auto">@Loc["panel_mcp.protocol_auto"]</option>
+                            <option value="@McpProtocolMode.Modern">@Loc["panel_mcp.protocol_modern"]</option>
+                        </select>
+                        <p class="cfg-field-hint">@Loc["panel_mcp.protocol_mode_hint"]</p>
+                    </div>
+                </div>
+
+                @if (probing)
+                {
+                    <div class="cfg-note">
+                        <i class="bi bi-hourglass-split"></i>
+                        <span>@Loc["panel_mcp.probing"]</span>
+                    </div>
+                }
+            </section>
+
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-broadcast"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["panel_mcp.exposure"]</h3>
+                        <p>@Loc["mcp_config.exposure_desc"]</p>
+                    </div>
+                </div>
+
+                <div class="cfg-toggle-row">
+                    <label class="cfg-toggle">
+                        <input type="checkbox" @bind="endpoint.ExposeTools" />
+                        <span>@Loc["panel_mcp.expose_tools"]</span>
+                    </label>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" @bind="endpoint.ToolsEnabledByDefault" />
+                        <span>@Loc["mcp_config.tools_default"]</span>
+                    </label>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" @bind="endpoint.ExposeResourceReadTool" />
+                        <span>@Loc["panel_mcp.expose_resource_tool"]</span>
+                    </label>
+                </div>
+
+                <div class="cfg-grid">
+                    <div class="cfg-field cfg-span-6">
+                        <label class="su-label">@Loc["panel_mcp.resource_injection"]</label>
+                        <select class="su-select" @bind="endpoint.ResourceInjection">
+                            <option value="@McpResourceInjection.Off">@Loc["panel_mcp.resource_off"]</option>
+                            <option value="@McpResourceInjection.Selected">@Loc["panel_mcp.resource_selected"]</option>
+                            <option value="@McpResourceInjection.All">@Loc["panel_mcp.resource_all"]</option>
+                        </select>
+                        <p class="cfg-field-hint">@Loc["panel_mcp.resource_injection_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["panel_mcp.budget"]</label>
+                        <input type="number" class="su-input" @bind="endpoint.ResourceCharBudget" />
+                    </div>
+                </div>
+
+                @if (_inventories.TryGetValue(endpoint.Id, out var inventory))
+                {
+                    <div class="cfg-action-row">
+                        <button type="button" class="su-btn su-btn-secondary su-btn-sm"
+                                @onclick="() => RebuildInventory(endpoint)" disabled="@probing">
+                            <i class="bi bi-arrow-repeat"></i> @Loc["mcp_config.rebuild_inventory"]
+                        </button>
+                    </div>
+
+                    <div class="cfg-subsection">
+                        <h4>@Loc.Format("panel_mcp.tools_found", inventory.Tools.Count)</h4>
+                        @if (inventory.Tools.Count == 0)
+                        {
+                            <p class="su-text-sm su-text-2">@Loc["panel_mcp.no_tools"]</p>
+                        }
+                        else
+                        {
+                            <div class="cfg-scroll-list">
+                                @foreach (var tool in inventory.Tools)
+                                {
+                                    var t = tool;
+                                    <label class="cfg-check-row">
+                                        <input type="checkbox" checked="@endpoint.IsToolEnabled(t.Name)"
+                                               @onchange="e => ToggleTool(endpoint, t.Name, e)" />
+                                        <span>
+                                            <strong>@t.Name</strong>
+                                            @if (t.ReadOnlyHint == true)
+                                            {
+                                                <span class="su-badge">@Loc["panel_mcp.readonly"]</span>
+                                            }
+                                            @if (t.DestructiveHint == true)
+                                            {
+                                                <span class="su-badge su-badge-danger">@Loc["panel_mcp.destructive"]</span>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(t.Description))
+                                            {
+                                                <span class="cfg-check-desc">@t.Description</span>
+                                            }
+                                        </span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="cfg-subsection">
+                        <h4>@Loc.Format("panel_mcp.resources_found", inventory.Resources.Count)</h4>
+                        @if (inventory.Resources.Count == 0)
+                        {
+                            <p class="su-text-sm su-text-2">@Loc["panel_mcp.no_resources"]</p>
+                        }
+                        else
+                        {
+                            <div class="cfg-scroll-list">
+                                @foreach (var resource in inventory.Resources)
+                                {
+                                    var r = resource;
+                                    <label class="cfg-check-row">
+                                        <input type="checkbox" checked="@endpoint.IsResourceEnabled(r.Uri)"
+                                               @onchange="e => ToggleResource(endpoint, r.Uri, e)" />
+                                        <span>
+                                            <strong>@r.Name</strong>
+                                            <span class="cfg-check-desc">@r.Uri</span>
+                                        </span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="cfg-subsection">
+                        <h4>@Loc.Format("panel_mcp.prompts_found", inventory.Prompts.Count)</h4>
+                        @if (inventory.Prompts.Count == 0)
+                        {
+                            <p class="su-text-sm su-text-2">@Loc["panel_mcp.no_prompts"]</p>
+                        }
+                        else
+                        {
+                            @foreach (var prompt in inventory.Prompts)
+                            {
+                                <div class="cfg-check-row cfg-check-row-static">
+                                    <i class="bi bi-chat-left-text"></i>
+                                    <span>
+                                        <strong>@prompt.Name</strong>
+                                        @if (!string.IsNullOrWhiteSpace(prompt.Description))
+                                        {
+                                            <span class="cfg-check-desc">@prompt.Description</span>
+                                        }
+                                        @if (prompt.Arguments.Count > 0)
+                                        {
+                                            <span class="cfg-check-desc">
+                                                @Loc.Format("panel_mcp.prompt_args",
+                                                    string.Join(", ", prompt.Arguments.Select(a => a.Required ? a.Name + "*" : a.Name)))
+                                            </span>
+                                        }
+                                    </span>
+                                </div>
+                            }
                         }
                     </div>
                 }
-
-                <div class="su-row su-gap-3">
-                    <div class="su-col-6">
-                        <h4 class="su-font-bold su-text-sm">@Loc["panel_mcp.transport"]</h4>
-                        <select class="su-select" value="@e.Transport"
-                                @onchange="ev => ChangeTransport(e, ev)">
-                            <option value="Stdio">@Loc["panel_mcp.transport_stdio"]</option>
-                            <option value="Http">@Loc["panel_mcp.transport_http"]</option>
-                        </select>
-
-                        @if (e.Transport == McpTransportType.Stdio)
-                        {
-                            <div class="su-mt-2">
-                                <label class="su-text-sm">@Loc["panel_mcp.command"]</label>
-                                <input type="text" class="shimmer-input su-w-full" @bind="e.Command" @bind:event="oninput"
-                                       placeholder="npx" />
-                            </div>
-                            <div class="su-mt-2">
-                                <label class="su-text-sm">@Loc["panel_mcp.arguments"]</label>
-                                <textarea class="shimmer-textarea su-w-full" rows="3" @bind="e.ArgumentsText"
-                                          placeholder="@Loc["panel_mcp.arguments_placeholder"]"></textarea>
-                            </div>
-                            <div class="su-mt-2">
-                                <label class="su-text-sm">@Loc["panel_mcp.environment"]</label>
-                                <textarea class="shimmer-textarea su-w-full" rows="3" @bind="e.EnvironmentText"
-                                          placeholder="API_KEY=..."></textarea>
-                            </div>
-                            <div class="su-mt-2">
-                                <label class="su-text-sm">@Loc["panel_mcp.working_dir"]</label>
-                                <input type="text" class="shimmer-input su-w-full" @bind="e.WorkingDirectory" @bind:event="oninput" />
-                            </div>
-                            <div class="su-mt-2">
-                                <label class="su-flex su-items-center su-gap-2 su-text-sm">
-                                    <input type="checkbox" class="su-check" checked="@e.InheritEnvironment"
-                                           @onchange="ev => ToggleInheritEnvironment(e, ev)" />
-                                    @Loc["panel_mcp.inherit_env"]
-                                </label>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="su-mt-2">
-                                <label class="su-text-sm">@Loc["panel_mcp.url"]</label>
-                                <input type="text" class="shimmer-input su-w-full" @bind="e.Url" @bind:event="oninput"
-                                       placeholder="https://example.com/mcp" />
-                            </div>
-                            <div class="su-mt-2">
-                                <label class="su-text-sm">@Loc["panel_mcp.http_mode"]</label>
-                                <select class="su-select" value="@e.HttpMode"
-                                        @onchange="ev => ChangeHttpMode(e, ev)">
-                                    <option value="AutoDetect">@Loc["panel_mcp.http_mode_auto"]</option>
-                                    <option value="StreamableHttp">@Loc["panel_mcp.http_mode_streamable"]</option>
-                                    <option value="Sse">@Loc["panel_mcp.http_mode_sse"]</option>
-                                </select>
-                                <p class="su-text-sm su-text-2">@Loc["panel_mcp.http_mode_hint"]</p>
-                            </div>
-                            <div class="su-mt-2">
-                                <label class="su-text-sm">@Loc["panel_mcp.headers"]</label>
-                                <textarea class="shimmer-textarea su-w-full" rows="3" @bind="e.HeadersText"
-                                          placeholder="Authorization: Bearer ..."></textarea>
-                            </div>
-                        }
-
-                        <div class="su-mt-2">
-                            <label class="su-text-sm">@Loc["panel_mcp.init_timeout"]</label>
-                            <input type="number" class="shimmer-input" style="max-width:140px" @bind="e.InitializationTimeoutSeconds" />
-                        </div>
-
-                        <div class="su-mt-2">
-                            <label class="su-text-sm">@Loc["panel_mcp.log_level"]</label>
-                            <select class="su-select" value="@e.LogLevel"
-                                    @onchange="ev => ChangeLogLevel(e, ev)">
-                                <option value="Off">@Loc["panel_mcp.log_level_off"]</option>
-                                <option value="Error">@Loc["panel_mcp.log_level_error"]</option>
-                                <option value="Info">@Loc["panel_mcp.log_level_info"]</option>
-                                <option value="Debug">@Loc["panel_mcp.log_level_debug"]</option>
-                            </select>
-                            <p class="su-text-sm su-text-2">@Loc["panel_mcp.log_level_hint"]</p>
-                        </div>
-
-                        <div class="su-mt-2">
-                            <label class="su-text-sm">@Loc["panel_mcp.protocol_mode"]</label>
-                            <select class="su-select" value="@e.ProtocolMode"
-                                    @onchange="ev => ChangeProtocolMode(e, ev)">
-                                <option value="Legacy">@Loc["panel_mcp.protocol_legacy"]</option>
-                                <option value="Auto">@Loc["panel_mcp.protocol_auto"]</option>
-                                <option value="Modern">@Loc["panel_mcp.protocol_modern"]</option>
-                            </select>
-                            <p class="su-text-sm su-text-2">@Loc["panel_mcp.protocol_mode_hint"]</p>
-                        </div>
-                    </div>
-
-                    <div class="su-col-6">
-                        <h4 class="su-font-bold su-text-sm">@Loc["panel_mcp.exposure"]</h4>
-                        <label class="su-flex su-items-center su-gap-2 su-text-sm">
-                            <input type="checkbox" class="su-check" checked="@e.ExposeTools"
-                                   @onchange="ev => ToggleExposeTools(e, ev)" />
-                            @Loc["panel_mcp.expose_tools"]
-                        </label>
-                        <label class="su-flex su-items-center su-gap-2 su-text-sm su-mt-1">
-                            <input type="checkbox" class="su-check" checked="@e.ExposeResourceReadTool"
-                                   @onchange="ev => ToggleExposeResourceTool(e, ev)" />
-                            @Loc["panel_mcp.expose_resource_tool"]
-                        </label>
-
-                        <div class="su-mt-2">
-                            <label class="su-text-sm">@Loc["panel_mcp.resource_injection"]</label>
-                            <select class="su-select" value="@e.ResourceInjection"
-                                    @onchange="ev => ChangeResourceInjection(e, ev)">
-                                <option value="Off">@Loc["panel_mcp.resource_off"]</option>
-                                <option value="Selected">@Loc["panel_mcp.resource_selected"]</option>
-                                <option value="All">@Loc["panel_mcp.resource_all"]</option>
-                            </select>
-                            <p class="su-text-sm su-text-2">@Loc["panel_mcp.resource_injection_hint"]</p>
-                        </div>
-
-                        <div class="su-mt-2">
-                            <label class="su-text-sm">@Loc["panel_mcp.budget"]</label>
-                            <input type="number" class="shimmer-input" style="max-width:160px" @bind="e.ResourceCharBudget" />
-                        </div>
-
-                        @if (inventories.TryGetValue(e.Id, out var inventory))
-                        {
-                            <div class="su-mt-3">
-                                <h5 class="su-font-bold su-text-sm">
-                                    @Loc.Format("panel_mcp.tools_found", inventory.Tools.Count)
-                                </h5>
-                                @if (inventory.Tools.Count == 0)
-                                {
-                                    <p class="su-text-sm su-text-2">@Loc["panel_mcp.no_tools"]</p>
-                                }
-                                else
-                                {
-                                    <div style="max-height:260px;overflow:auto">
-                                        @foreach (var tool in inventory.Tools)
-                                        {
-                                            var t = tool;
-                                            <label class="su-flex su-items-start su-gap-2 su-text-sm su-mb-1">
-                                                <input type="checkbox" class="su-check" checked="@e.IsToolEnabled(t.Name)"
-                                                       @onchange="ev => ToggleTool(e, t.Name, ev)" />
-                                                <span>
-                                                    <span class="su-font-bold">@t.Name</span>
-                                                    @if (t.ReadOnlyHint == true)
-                                                    {
-                                                        <span class="su-badge">@Loc["panel_mcp.readonly"]</span>
-                                                    }
-                                                    @if (t.DestructiveHint == true)
-                                                    {
-                                                        <span class="su-badge su-badge-danger">@Loc["panel_mcp.destructive"]</span>
-                                                    }
-                                                    @if (!string.IsNullOrWhiteSpace(t.Description))
-                                                    {
-                                                        <br />
-                                                        <span class="su-text-2">@t.Description</span>
-                                                    }
-                                                </span>
-                                            </label>
-                                        }
-                                    </div>
-                                }
-                            </div>
-
-                            <div class="su-mt-3">
-                                <h5 class="su-font-bold su-text-sm">
-                                    @Loc.Format("panel_mcp.resources_found", inventory.Resources.Count)
-                                </h5>
-                                @if (inventory.Resources.Count == 0)
-                                {
-                                    <p class="su-text-sm su-text-2">@Loc["panel_mcp.no_resources"]</p>
-                                }
-                                else
-                                {
-                                    <div style="max-height:200px;overflow:auto">
-                                        @foreach (var resource in inventory.Resources)
-                                        {
-                                            var r = resource;
-                                            <label class="su-flex su-items-start su-gap-2 su-text-sm su-mb-1">
-                                                <input type="checkbox" class="su-check" checked="@e.IsResourceEnabled(r.Uri)"
-                                                       @onchange="ev => ToggleResource(e, r.Uri, ev)" />
-                                                <span>
-                                                    <span>@r.Name</span>
-                                                    <br />
-                                                    <span class="su-text-2">@r.Uri</span>
-                                                </span>
-                                            </label>
-                                        }
-                                    </div>
-                                }
-                            </div>
-
-                            <div class="su-mt-3">
-                                <h5 class="su-font-bold su-text-sm">
-                                    @Loc.Format("panel_mcp.prompts_found", inventory.Prompts.Count)
-                                </h5>
-                                @if (inventory.Prompts.Count == 0)
-                                {
-                                    <p class="su-text-sm su-text-2">@Loc["panel_mcp.no_prompts"]</p>
-                                }
-                                else
-                                {
-                                    @foreach (var prompt in inventory.Prompts)
-                                    {
-                                        <div class="su-text-sm su-mb-1">
-                                            <span class="bi bi-chat-left-text"></span>
-                                            <span class="su-font-bold">@prompt.Name</span>
-                                            @if (!string.IsNullOrWhiteSpace(prompt.Description))
-                                            {
-                                                <span class="su-text-2">— @prompt.Description</span>
-                                            }
-                                            @if (prompt.Arguments.Count > 0)
-                                            {
-                                                <div class="su-text-2">
-                                                    @Loc.Format("panel_mcp.prompt_args",
-                                                        string.Join(", ", prompt.Arguments.Select(a => a.Required ? a.Name + "*" : a.Name)))
-                                                </div>
-                                            }
-                                        </div>
-                                    }
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <p class="su-text-sm su-text-2 su-mt-3">@Loc["panel_mcp.probe_to_enumerate"]</p>
-                        }
-                    </div>
-                </div>
-
-                <div class="su-mt-3 su-flex su-gap-2 su-items-center">
-                    <button class="su-btn su-btn-sm su-btn-primary" @onclick="() => CopyNodeJson(e)" disabled="@busy">
-                        <span class="bi bi-clipboard"></span> @Loc["panel_mcp.copy_node"]
-                    </button>
-                    <button class="su-btn su-btn-sm" @onclick="() => DiscardEndpoint(e)" disabled="@busy">
-                        @Loc["panel_mcp.discard"]
-                    </button>
-                    @if (dirty)
-                    {
-                        <span class="su-text-sm su-text-2">@Loc["panel_mcp.unsaved"]</span>
-                    }
-                </div>
-            </div>
+                else
+                {
+                    <p class="cfg-note">
+                        <i class="bi bi-info-circle-fill"></i>
+                        <span>@Loc["panel_mcp.probe_to_enumerate"]</span>
+                    </p>
+                }
+            </section>
         }
-    </div>
-</div>
+    </Body>
+
+    <EmptyState>
+        <div class="cfg-empty">
+            <span class="cfg-empty-icon"><i class="bi bi-plug"></i></span>
+            <h2>@Loc["mcp_config.empty_title"]</h2>
+            <p>@Loc["mcp_config.empty_desc"]</p>
+            <button type="button" class="su-btn su-btn-primary" @onclick="AddEndpoint">
+                <i class="bi bi-plus-lg"></i> @Loc["panel_mcp.add"]
+            </button>
+        </div>
+    </EmptyState>
+</ConfigShell>
 
 @code {
-    private List<EditorModel> endpoints = [];
-    private readonly Dictionary<string, ProbeResult> probeResults = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, Inventory> inventories = new(StringComparer.OrdinalIgnoreCase);
+    private List<EditorModel> _endpoints = [];
+    private string? _selectedId;
+    private string? _loadError;
+    private string? _savedSnapshot;
+    private string _statusText = string.Empty;
+    private string _statusKind = "info";
 
-    private string newEndpointName = "";
-    private string statusMessage = "";
-    private bool statusIsError;
-    private bool busy;
-    private bool dirty;
-    private string? probingEndpointId;
+    private readonly Dictionary<string, ProbeResult> _probeResults = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Inventory> _inventories = new(StringComparer.OrdinalIgnoreCase);
+
+    private string? _probingEndpointId;
+
+    private static readonly JsonSerializerOptions _snapshotOptions = new() { WriteIndented = false };
+
+    private EditorModel? Current =>
+        _endpoints.FirstOrDefault(e => string.Equals(e.Id, _selectedId, StringComparison.OrdinalIgnoreCase));
+
+    private bool IsDirty => _loadError == null && Snapshot() != _savedSnapshot;
 
     protected override void OnInitialized() => Reload();
 
@@ -357,69 +403,103 @@
     {
         try
         {
-            endpoints = McpEndpointCatalog.Load(KVData).Select(EditorModel.From).ToList();
-            probeResults.Clear();
-            inventories.Clear();
-            dirty = false;
-            ShowStatus(Loc.Format("panel_mcp.loaded", endpoints.Count), false);
+            _endpoints = McpEndpointCatalog.Load(KVData).Select(EditorModel.From).ToList();
+            _probeResults.Clear();
+            _inventories.Clear();
+            _loadError = null;
+            _selectedId = _endpoints.FirstOrDefault()?.Id;
+            _savedSnapshot = Snapshot();
+            _statusText = string.Empty;
         }
         catch (McpConfigException ex)
         {
-            ShowStatus(Loc.Format("panel_mcp.load_failed", ex.Message), true);
+            _endpoints = [];
+            _selectedId = null;
+            _savedSnapshot = null;
+            _loadError = Loc.Format("panel_mcp.load_failed", ex.Message);
+            SetStatus(_loadError, "error");
         }
-    }
-
-    private void AddEndpoint()
-    {
-        var name = string.IsNullOrWhiteSpace(newEndpointName)
-            ? Loc["panel_mcp.default_name"]
-            : newEndpointName.Trim();
-
-        var config = McpEndpointCatalog.CreateNew(name, endpoints.Select(x => x.ToConfig()));
-        endpoints.Add(EditorModel.From(config));
-        newEndpointName = "";
-        MarkDirty();
-    }
-
-    private void RemoveEndpoint(EditorModel endpoint)
-    {
-        endpoints.Remove(endpoint);
-        probeResults.Remove(endpoint.Id);
-        inventories.Remove(endpoint.Id);
-        MarkDirty();
-    }
-
-    private void DiscardEndpoint(EditorModel endpoint)
-    {
-        try
+        catch (Exception ex)
         {
-            var stored = McpEndpointCatalog.Find(McpEndpointCatalog.Load(KVData), endpoint.Id);
-            if (stored == null)
-            {
-                RemoveEndpoint(endpoint);
-                ShowStatus(Loc["panel_mcp.discarded_new"], false);
-                return;
-            }
-
-            var index = endpoints.IndexOf(endpoint);
-            endpoints[index] = EditorModel.From(stored);
-            ShowStatus(Loc["panel_mcp.discarded"], false);
-        }
-        catch (McpConfigException ex)
-        {
-            ShowStatus(Loc.Format("panel_mcp.load_failed", ex.Message), true);
+            LoggerFactory.CreateLogger<McpToolsetPage>().LogError(ex, "加载 MCP 端点配置失败");
+            _endpoints = [];
+            _selectedId = null;
+            _savedSnapshot = null;
+            _loadError = Loc.Format("panel_mcp.load_failed", ex.Message);
+            SetStatus(_loadError, "error");
         }
     }
 
-    private void SaveAll()
+    private string Snapshot() => JsonSerializer.Serialize(_endpoints.Select(e => e.ToConfig()), _snapshotOptions);
+
+    private async Task AddEndpoint()
     {
-        var configs = endpoints.Select(x => x.ToConfig()).ToList();
+        var name = NextName(Loc["panel_mcp.default_name"]);
+        var config = McpEndpointCatalog.CreateNew(name, _endpoints.Select(e => e.ToConfig()));
+        _endpoints.Add(EditorModel.From(config));
+        _selectedId = config.Id;
+        SetStatus(Loc.Format("config_ui.created", config.Name), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task CloneEndpoint()
+    {
+        if (Current is not { } source) return;
+
+        var copy = McpEndpointCatalog.Clone(source.ToConfig());
+        copy.Name = NextName($"{DisplayName(source)} {Loc["config_ui.copy_suffix"]}");
+        copy.Id = McpEndpointCatalog.CreateUniqueId(copy.Name, _endpoints.Select(e => e.ToConfig()));
+
+        var index = _endpoints.IndexOf(source);
+        _endpoints.Insert(index + 1, EditorModel.From(copy));
+        _selectedId = copy.Id;
+        SetStatus(Loc.Format("config_ui.cloned", copy.Name), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task RenameEndpoint(string name)
+    {
+        if (Current is not { } endpoint) return;
+        endpoint.Name = name;
+        SetStatus(Loc.Format("config_ui.renamed", endpoint.Name), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task RemoveEndpoint()
+    {
+        if (Current is not { } endpoint) return;
+
+        var index = _endpoints.IndexOf(endpoint);
+        _endpoints.Remove(endpoint);
+        _probeResults.Remove(endpoint.Id);
+        _inventories.Remove(endpoint.Id);
+        _selectedId = _endpoints.Count == 0 ? null : _endpoints[Math.Min(index, _endpoints.Count - 1)].Id;
+        SetStatus(Loc.Format("config_ui.deleted_pending", DisplayName(endpoint)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task TogglePin(EditorModel endpoint)
+    {
+        endpoint.Pinned = !endpoint.Pinned;
+        SetStatus(Loc.Format(endpoint.Pinned ? "config_ui.pinned" : "config_ui.unpinned", DisplayName(endpoint)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task SelectEndpoint(string id)
+    {
+        _selectedId = id;
+        await Task.CompletedTask;
+    }
+
+    private async Task SaveAll()
+    {
+        if (_loadError != null) return;
+
+        var configs = _endpoints.Select(e => e.ToConfig()).ToList();
         var errors = new List<string>();
+
         foreach (var config in configs)
-        {
-            var endpointErrors = McpEndpointCatalog.Validate(config, Loc);
-            errors.AddRange(endpointErrors.Select(msg => $"[{config.Name}] {msg}"));
-        }
+            errors.AddRange(McpEndpointCatalog.Validate(config, Loc).Select(msg => $"[{config.Name}] {msg}"));
 
         var duplicates = configs.GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1)
@@ -429,41 +509,46 @@
 
         if (errors.Count > 0)
         {
-            ShowStatus(string.Join(" | ", errors), true);
+            SetStatus(string.Join(" | ", errors), "error");
             return;
         }
 
         try
         {
             McpEndpointCatalog.Save(KVData, configs);
-            dirty = false;
-
-            // 已保存的配置是连接的唯一真源：丢弃缓存里的旧连接，下次取用时按新配置重建。
-            // 正在被租约占用的连接不立即打断，会在租约释放后自然淘汰。
+            _savedSnapshot = Snapshot();
             McpRegistry.Instance.InvalidateAll();
-
-            ShowStatus(Loc.Format("panel_mcp.saved", configs.Count), false);
+            SetStatus(Loc.Format("panel_mcp.saved", configs.Count), "success");
         }
         catch (Exception ex)
         {
-            ShowStatus(Loc.Format("panel_mcp.save_failed", ex.Message), true);
+            LoggerFactory.CreateLogger<McpToolsetPage>().LogError(ex, "保存 MCP 端点配置失败");
+            SetStatus(Loc.Format("panel_mcp.save_failed", ex.Message), "error");
         }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task ProbeCurrentAsync()
+    {
+        if (Current is not { } endpoint) return;
+        await ProbeAsync(endpoint);
     }
 
     private async Task ProbeAsync(EditorModel endpoint)
     {
-        busy = true;
-        probingEndpointId = endpoint.Id;
-        probeResults.Remove(endpoint.Id);
-        inventories.Remove(endpoint.Id);
+        _probingEndpointId = endpoint.Id;
+        _probeResults.Remove(endpoint.Id);
+        _inventories.Remove(endpoint.Id);
+        StateHasChanged();
 
         var config = endpoint.ToConfig();
         var errors = McpEndpointCatalog.Validate(config, Loc);
         if (errors.Count > 0)
         {
-            probeResults[endpoint.Id] = new ProbeResult(false, null, null, 0, 0, 0, false, null, string.Join(" | ", errors));
-            busy = false;
-            probingEndpointId = null;
+            _probeResults[endpoint.Id] = new ProbeResult(false, null, null, 0, 0, 0, false, null, string.Join(" | ", errors));
+            _probingEndpointId = null;
+            SetStatus(string.Join(" | ", errors), "error");
             return;
         }
 
@@ -477,8 +562,8 @@
             var resources = McpDescriptorFactory.Resources(await session.GetResourcesAsync(cts.Token));
             var prompts = McpDescriptorFactory.Prompts(await session.GetPromptsAsync(cts.Token));
 
-            inventories[endpoint.Id] = new Inventory(tools, resources, prompts);
-            probeResults[endpoint.Id] = new ProbeResult(
+            _inventories[endpoint.Id] = new Inventory(tools, resources, prompts);
+            _probeResults[endpoint.Id] = new ProbeResult(
                 true,
                 session.ServerInfo?.Name,
                 session.Client.NegotiatedProtocolVersion?.ToString(),
@@ -487,129 +572,97 @@
                 session.ServerInstructions,
                 null);
 
-            // 新发现的条目按当前默认策略补齐开关状态，避免出现「未列出」的隐式条目。
             foreach (var tool in tools)
                 if (endpoint.Tools.All(t => !string.Equals(t.Name, tool.Name, StringComparison.Ordinal)))
                     endpoint.Tools.Add(new McpNamedToggle { Name = tool.Name, Enabled = endpoint.ToolsEnabledByDefault });
+
             foreach (var resource in resources)
                 if (endpoint.Resources.All(r => !string.Equals(r.Name, resource.Uri, StringComparison.Ordinal)))
                     endpoint.Resources.Add(new McpNamedToggle { Name = resource.Uri, Enabled = endpoint.ResourceInjection == McpResourceInjection.All });
 
-            ShowStatus(Loc.Format("panel_mcp.probe_summary", config.Name, tools.Count, resources.Count, prompts.Count), false);
+            SetStatus(Loc.Format("panel_mcp.probe_summary", config.Name, tools.Count, resources.Count, prompts.Count), "success");
         }
         catch (Exception ex)
         {
-            probeResults[endpoint.Id] = new ProbeResult(false, null, null, 0, 0, 0, false, null, ex.Message);
-            ShowStatus(Loc.Format("panel_mcp.probe_error", config.Name, ex.Message), true);
+            LoggerFactory.CreateLogger<McpToolsetPage>().LogError(ex, "探测 MCP 端点 {EndpointId} 失败", config.Id);
+            _probeResults[endpoint.Id] = new ProbeResult(false, null, null, 0, 0, 0, false, null, ex.Message);
+            SetStatus(Loc.Format("panel_mcp.probe_error", config.Name, ex.Message), "error");
         }
         finally
         {
             if (session != null)
             {
-                try { await session.DisposeAsync(); }
-                catch (Exception ex) { ShowStatus(Loc.Format("panel_mcp.dispose_failed", ex.Message), true); }
+                try
+                {
+                    await session.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    LoggerFactory.CreateLogger<McpToolsetPage>().LogError(ex, "释放 MCP 探测会话失败");
+                    SetStatus(Loc.Format("panel_mcp.dispose_failed", ex.Message), "error");
+                }
             }
 
-            busy = false;
-            probingEndpointId = null;
+            _probingEndpointId = null;
+            StateHasChanged();
         }
     }
 
-    private void CopyNodeJson(EditorModel endpoint)
+    private async Task RebuildInventory(EditorModel endpoint)
     {
-        // 给出可直接粘贴到前生成节点的配置值，避免用户手抄 Id。
-        ShowStatus(Loc.Format("panel_mcp.node_hint", endpoint.Id), false);
+        await ProbeAsync(endpoint);
     }
 
-    private void MarkDirty()
+    private async Task CopyNodeJson()
     {
-        dirty = true;
-        StateHasChanged();
+        if (Current is not { } endpoint) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("copyTextToClipboard", endpoint.Id);
+            SetStatus(Loc.Format("panel_mcp.node_hint", endpoint.Id), "success");
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or InvalidOperationException)
+        {
+            SetStatus(Loc.Format("config_ui.toast_copy_failed", ex.Message), "error");
+        }
     }
 
-    private void ToggleEnabled(EditorModel endpoint, ChangeEventArgs e)
+    private void ToggleTool(EditorModel endpoint, string name, ChangeEventArgs e)
     {
-        endpoint.Enabled = e.Value is bool flag && flag;
-        MarkDirty();
-    }
-
-    private void ToggleInheritEnvironment(EditorModel endpoint, ChangeEventArgs e)
-    {
-        endpoint.InheritEnvironment = e.Value is bool flag && flag;
-    }
-
-    private void ToggleExposeTools(EditorModel endpoint, ChangeEventArgs e)
-    {
-        endpoint.ExposeTools = e.Value is bool flag && flag;
-        MarkDirty();
-    }
-
-    private void ToggleExposeResourceTool(EditorModel endpoint, ChangeEventArgs e)
-    {
-        endpoint.ExposeResourceReadTool = e.Value is bool flag && flag;
-        MarkDirty();
-    }
-
-    private void ToggleTool(EditorModel endpoint, string toolName, ChangeEventArgs e)
-    {
-        endpoint.SetToolEnabled(toolName, e.Value is bool flag && flag);
-        MarkDirty();
+        endpoint.SetToolEnabled(name, e.Value is bool flag && flag);
     }
 
     private void ToggleResource(EditorModel endpoint, string uri, ChangeEventArgs e)
     {
         endpoint.SetResourceEnabled(uri, e.Value is bool flag && flag);
-        MarkDirty();
     }
 
-    private void ChangeTransport(EditorModel endpoint, ChangeEventArgs e)
+    private void SetStatus(string message, string kind)
     {
-        if (!Enum.TryParse<McpTransportType>(e.Value?.ToString(), out var transport))
-        {
-            ShowStatus(Loc.Format("mcp_err.transport_unknown", e.Value?.ToString() ?? ""), true);
-            return;
-        }
-
-        endpoint.Transport = transport;
-        MarkDirty();
+        _statusText = message;
+        _statusKind = kind;
     }
 
-    private void ChangeHttpMode(EditorModel endpoint, ChangeEventArgs e)
+    private string TransportLabel(McpTransportType transport) => transport switch
     {
-        endpoint.HttpMode = Enum.TryParse<McpHttpMode>(e.Value?.ToString(), out var mode)
-            ? mode
-            : McpHttpMode.AutoDetect;
-        MarkDirty();
-    }
+        McpTransportType.Stdio => Loc["panel_mcp.transport_stdio"],
+        _ => Loc["panel_mcp.transport_http"]
+    };
 
-    private void ChangeResourceInjection(EditorModel endpoint, ChangeEventArgs e)
-    {
-        endpoint.ResourceInjection = Enum.TryParse<McpResourceInjection>(e.Value?.ToString(), out var injection)
-            ? injection
-            : McpResourceInjection.Off;
-        MarkDirty();
-    }
+    private string DisplayName(EditorModel endpoint) =>
+        string.IsNullOrWhiteSpace(endpoint.Name) ? Loc["config_ui.untitled"] : endpoint.Name;
 
-    private void ChangeLogLevel(EditorModel endpoint, ChangeEventArgs e)
+    private string NextName(string baseName)
     {
-        endpoint.LogLevel = Enum.TryParse<McpLogLevel>(e.Value?.ToString(), out var level)
-            ? level
-            : McpLogLevel.Info;
-        MarkDirty();
-    }
+        var name = string.IsNullOrWhiteSpace(baseName) ? Loc["panel_mcp.default_name"] : baseName.Trim();
+        var candidate = name;
+        var suffix = 2;
 
-    private void ChangeProtocolMode(EditorModel endpoint, ChangeEventArgs e)
-    {
-        endpoint.ProtocolMode = Enum.TryParse<McpProtocolMode>(e.Value?.ToString(), out var mode)
-            ? mode
-            : McpProtocolMode.Legacy;
-        MarkDirty();
-    }
+        while (_endpoints.Any(e => string.Equals(e.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+            candidate = $"{name} ({suffix++})";
 
-    private void ShowStatus(string message, bool isError)
-    {
-        statusMessage = message;
-        statusIsError = isError;
+        return candidate;
     }
 
     private sealed record ProbeResult(
@@ -628,10 +681,6 @@
         IReadOnlyList<McpResourceDescriptor> Resources,
         IReadOnlyList<McpPromptDescriptor> Prompts);
 
-    /// <summary>
-    /// 编辑用模型：把「每行一条」的文本字段与配置对象互相转换，
-    /// 避免在 Razor 里直接处理 List&lt;string&gt; 的绑定。
-    /// </summary>
     private sealed class EditorModel
     {
         public required McpEndpointConfig Config { get; init; }
@@ -639,6 +688,7 @@
         public string Id => Config.Id;
         public string Name { get => Config.Name; set => Config.Name = value; }
         public bool Enabled { get => Config.Enabled; set => Config.Enabled = value; }
+        public bool Pinned { get => Config.Pinned; set => Config.Pinned = value; }
         public McpTransportType Transport { get => Config.Transport; set => Config.Transport = value; }
         public string Command { get => Config.Command; set => Config.Command = value; }
         public string WorkingDirectory { get => Config.WorkingDirectory; set => Config.WorkingDirectory = value; }

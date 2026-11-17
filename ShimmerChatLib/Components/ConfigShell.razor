@@ -1,0 +1,773 @@
+@typeparam T
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using ShimmerChatLib.Interface
+
+@*
+    配置页面统一外壳。设计契约见 Docs/ConfigUI.md：
+    固定操作面板、切换器、收藏、检索、重命名、删除确认、状态与 Ctrl+S。
+    页面只负责数据加载、草稿状态与正文；外壳不持有任何页面数据模型。
+*@
+
+@implements IAsyncDisposable
+@inject ILocService Loc
+@inject IJSRuntime JS
+
+<div class="cfg-page @(Flush ? "cfg-page-main" : "")" @onkeydown="OnPageKeyDown">
+    <!-- 固定操作面板：页面滚动时保持可见 -->
+    <header class="cfg-topbar">
+        <div class="cfg-topbar-main">
+            <div class="cfg-identity">
+                <span class="cfg-identity-icon"><i class="bi @Icon"></i></span>
+                <div class="cfg-identity-text">
+                    <div class="cfg-identity-title">
+                        <span>@Title</span>
+                        <span class="su-badge su-badge-secondary">@Loc.Format("config_ui.count", Items.Count)</span>
+                        <span class="cfg-dirty @(IsDirty ? "is-dirty" : "is-clean")">
+                            @(IsDirty ? Loc["config_ui.unsaved"] : Loc["config_ui.saved"])
+                        </span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(Description))
+                    {
+                        <div class="cfg-identity-sub">@Description</div>
+                    }
+                </div>
+            </div>
+
+            <div class="cfg-topbar-actions">
+                @if (CanCreate)
+                {
+                    <button type="button" class="su-btn su-btn-primary su-btn-sm"
+                            disabled="@(LoadError != null)"
+                            aria-label="@Loc["config_ui.new"]"
+                            title="@Loc["config_ui.new"]"
+                            @onclick="CreateAsync">
+                        <i class="bi bi-plus-lg"></i>
+                        <span class="cfg-btn-label">@Loc["config_ui.new"]</span>
+                    </button>
+                }
+                <button type="button" class="su-btn su-btn-primary su-btn-sm cfg-btn"
+                        disabled="@(LoadError != null || !CanSave)"
+                        aria-label="@Loc["config_ui.save"]"
+                        title="@Loc["config_ui.save"]"
+                        @onclick="SaveAsync">
+                    <i class="bi bi-check-lg"></i>
+                    <span class="cfg-btn-label">@Loc["config_ui.save"]</span>
+                    <kbd>@Loc["config_ui.shortcut_save"]</kbd>
+                </button>
+            </div>
+        </div>
+
+        <div class="cfg-topbar-sub">
+            <label class="cfg-switcher" title="@Loc["config_ui.switch"]">
+                <i class="bi bi-collection"></i>
+                <select @key="_switchSignature" class="su-select su-select-sm"
+                        @bind="_switchValue" @bind:after="OnSwitchChanged"
+                        aria-label="@Loc["config_ui.switch"]"
+                        disabled="@(Items.Count == 0)">
+                    @foreach (var item in OrderedItems)
+                    {
+                        <option value="@IdSelector(item)">@SwitchLabel(item)</option>
+                    }
+                </select>
+            </label>
+
+            <div class="cfg-topbar-divider"></div>
+
+            <div class="cfg-topbar-tools">
+                @if (CanClone)
+                {
+                    <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                            disabled="@(!HasSelection)" @onclick="CloneAsync"
+                            aria-label="@Loc["config_ui.clone"]"
+                            title="@Loc["config_ui.clone"]">
+                        <i class="bi bi-files"></i>
+                        <span class="cfg-btn-label">@Loc["config_ui.clone"]</span>
+                    </button>
+                }
+                @if (CanRename)
+                {
+                    <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                            disabled="@(!HasSelection)" @onclick="OpenRenameAsync"
+                            aria-label="@Loc["config_ui.rename"]"
+                            title="@Loc["config_ui.rename"]">
+                        <i class="bi bi-pencil"></i>
+                        <span class="cfg-btn-label">@Loc["config_ui.rename"]</span>
+                    </button>
+                }
+                @if (ShowPin && PinSelector != null)
+                {
+                    <button type="button"
+                            class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn @(IsSelectedPinned ? "is-active" : "")"
+                            disabled="@(!HasSelection)" @onclick="TogglePinnedAsync"
+                            aria-label="@(IsSelectedPinned ? Loc["config_ui.unfavorite"] : Loc["config_ui.favorite"])"
+                            title="@(IsSelectedPinned ? Loc["config_ui.unfavorite"] : Loc["config_ui.favorite"])">
+                        <i class="bi @(IsSelectedPinned ? "bi-star-fill" : "bi-star")"></i>
+                    </button>
+                }
+                @if (CanDelete)
+                {
+                    <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn is-danger"
+                            disabled="@(!HasSelection)" @onclick="OpenDelete"
+                            aria-label="@Loc["config_ui.delete"]"
+                            title="@Loc["config_ui.delete"]">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                }
+                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                        disabled="@(!HasSelection)" @onclick="CopySelectedIdAsync"
+                        aria-label="@Loc["config_ui.copy_id"]"
+                        title="@Loc["config_ui.copy_id"]">
+                    <i class="bi bi-clipboard"></i>
+                    <span class="cfg-btn-label">@Loc["config_ui.copy_id"]</span>
+                </button>
+                <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                        disabled="@(Items.Count == 0)" @onclick="OpenSearchAsync"
+                        aria-label="@Loc["config_ui.search"]"
+                        title="@Loc["config_ui.search"]">
+                    <i class="bi bi-search"></i>
+                    <span class="cfg-btn-label">@Loc["config_ui.search"]</span>
+                </button>
+                @if (ToolbarExtras != null)
+                {
+                    @ToolbarExtras
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(StatusMessage))
+            {
+                <span class="cfg-status is-@StatusClass" role="status">
+                    <i class="bi @StatusIcon"></i>
+                    @StatusMessage
+                </span>
+            }
+        </div>
+    </header>
+
+    @if (LoadError != null)
+    {
+        <div class="cfg-note is-danger">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+            <span>@LoadError</span>
+            <button type="button" class="su-btn su-btn-sm su-btn-secondary" @onclick="RetryAsync">
+                <i class="bi bi-arrow-clockwise"></i> @Loc["config_ui.retry"]
+            </button>
+        </div>
+    }
+    else if (Items.Count == 0)
+    {
+        @if (EmptyState != null)
+        {
+            @EmptyState
+        }
+        else
+        {
+            <div class="cfg-empty">
+                <span class="cfg-empty-icon"><i class="bi @Icon"></i></span>
+                <h2>@Loc["config_ui.empty_generic_title"]</h2>
+                <p>@Loc["config_ui.empty_generic_desc"]</p>
+                @if (CanCreate)
+                {
+                    <button type="button" class="su-btn su-btn-primary" @onclick="CreateAsync">
+                        <i class="bi bi-plus-lg"></i> @Loc["config_ui.empty_create"]
+                    </button>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="cfg-body">
+            @Body
+        </div>
+    }
+</div>
+
+<!-- 检索 / 高级选择 -->
+@if (_searchOpen)
+{
+    <div class="su-modal-mask" @onclick="CloseSearch">
+        <div class="cfg-dialog cfg-dialog-lg" role="dialog" aria-modal="true"
+             @onclick:stopPropagation="true" @onkeydown="OnSearchDialogKeyDown">
+            <div class="cfg-dialog-head">
+                <span class="cfg-dialog-icon"><i class="bi bi-search"></i></span>
+                <div class="cfg-dialog-heading">
+                    <h2>@Loc["config_ui.select_title"]</h2>
+                    <p>@Loc["config_ui.select_desc_generic"]</p>
+                </div>
+                <button type="button" class="cfg-dialog-close" aria-label="@Loc["config_ui.dismiss"]"
+                        @onclick="CloseSearch">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="cfg-dialog-body">
+                <div class="cfg-searchbox">
+                    <i class="bi bi-search"></i>
+                    <input @ref="_searchInput" @bind="_searchQuery" @bind:event="oninput"
+                           @onkeydown="OnSearchInputKeyDown"
+                           placeholder="@Loc["config_ui.search_placeholder"]" />
+                    <kbd class="cfg-search-kbd">Esc</kbd>
+                </div>
+
+                <div class="cfg-choice-list">
+                    @if (!FilteredItems.Any())
+                    {
+                        <div class="cfg-choice-empty">@Loc["config_ui.no_results"]</div>
+                    }
+                    else
+                    {
+                        @foreach (var item in FilteredItems)
+                        {
+                            <button type="button"
+                                    class="cfg-choice @(IdSelector(item) == SelectedId ? "is-active" : "")"
+                                    @onclick="() => SelectFromSearch(item)">
+                                <span class="cfg-choice-main">
+                                    <span class="cfg-choice-title">
+                                        <strong>@DisplayName(item)</strong>
+                                        @if (IsPinned(item))
+                                        {
+                                            <i class="bi bi-star-fill cfg-switch-star"></i>
+                                        }
+                                        @if (TypeSelector?.Invoke(item) is { Length: > 0 } type)
+                                        {
+                                            <span class="su-badge su-badge-secondary">@type</span>
+                                        }
+                                    </span>
+                                    @if (ChoiceMeta(item) is { Length: > 0 } meta)
+                                    {
+                                        <span class="cfg-choice-meta">@meta</span>
+                                    }
+                                </span>
+                                <code class="cfg-choice-id">@IdSelector(item)</code>
+                                <span class="cfg-choice-check"><i class="bi bi-check-lg"></i></span>
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="cfg-dialog-footer cfg-dialog-footer-spread">
+                <span class="cfg-dialog-meta">@Loc.Format("config_ui.count", FilteredItems.Count())</span>
+                <button type="button" class="su-btn su-btn-secondary su-btn-sm" @onclick="CloseSearch">
+                    @Loc["config_ui.dismiss"]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- 重命名 -->
+@if (_renameOpen && _renameTarget is { } renameTarget)
+{
+    <div class="su-modal-mask" @onclick="CloseRename">
+        <div class="cfg-dialog cfg-dialog-sm" role="dialog" aria-modal="true"
+             @onclick:stopPropagation="true" @onkeydown="OnRenameDialogKeyDown">
+            <div class="cfg-dialog-head">
+                <span class="cfg-dialog-icon"><i class="bi bi-pencil"></i></span>
+                <div class="cfg-dialog-heading">
+                    <h2>@Loc["config_ui.rename_title"]</h2>
+                    <p>@Loc["config_ui.rename_desc"]</p>
+                </div>
+                <button type="button" class="cfg-dialog-close" aria-label="@Loc["config_ui.dismiss"]"
+                        @onclick="CloseRename">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="cfg-dialog-body">
+                <div class="cfg-field">
+                    <label class="su-label">@Loc["config_ui.rename_name"]</label>
+                    <input @ref="_renameInput" class="su-input" @bind="_renameValue" @bind:event="oninput"
+                           @onkeydown="OnRenameInputKeyDown"
+                           placeholder="@Loc["config_ui.rename_placeholder"]" />
+                    @if (_renameError != null)
+                    {
+                        <p class="cfg-field-error">@_renameError</p>
+                    }
+                </div>
+                <p class="cfg-dialog-meta">ID: <code>@IdSelector(renameTarget)</code></p>
+            </div>
+            <div class="cfg-dialog-footer">
+                <button type="button" class="su-btn su-btn-secondary" @onclick="CloseRename">
+                    @Loc["config_ui.dialog_cancel"]
+                </button>
+                <button type="button" class="su-btn su-btn-primary" @onclick="ConfirmRename">
+                    @Loc["config_ui.dialog_confirm"]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- 删除确认 -->
+@if (_deleteOpen && _deleteTarget is { } deleteTarget)
+{
+    <div class="su-modal-mask" @onclick="CloseDelete">
+        <div class="cfg-dialog cfg-dialog-sm" role="dialog" aria-modal="true"
+             @onclick:stopPropagation="true" @onkeydown="OnDeleteDialogKeyDown">
+            <div class="cfg-dialog-head">
+                <span class="cfg-dialog-icon is-danger"><i class="bi bi-trash3"></i></span>
+                <div class="cfg-dialog-heading">
+                    <h2>@Loc["config_ui.delete_title"]</h2>
+                    <p>@Loc["config_ui.delete_desc"]</p>
+                </div>
+                <button type="button" class="cfg-dialog-close" aria-label="@Loc["config_ui.dismiss"]"
+                        @onclick="CloseDelete">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="cfg-dialog-body">
+                <div class="cfg-note is-danger">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>@Loc.Format("config_ui.delete_warning", DisplayName(deleteTarget))</span>
+                </div>
+                <p class="cfg-dialog-meta">ID: <code>@IdSelector(deleteTarget)</code></p>
+            </div>
+            <div class="cfg-dialog-footer">
+                <button @ref="_deleteCancelButton" type="button" class="su-btn su-btn-secondary"
+                        @onclick="CloseDelete">
+                    @Loc["config_ui.dialog_cancel"]
+                </button>
+                <button type="button" class="su-btn su-btn-danger" @onclick="ConfirmDelete">
+                    <i class="bi bi-trash3"></i> @Loc["config_ui.dialog_delete"]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_toastText != null)
+{
+    <div class="cfg-toast @(_toastError ? "is-error" : "")" role="status">
+        <i class="bi @(_toastError ? "bi-exclamation-circle-fill" : "bi-check-circle-fill")"></i>
+        <span>@_toastText</span>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<T> Items { get; set; } = [];
+    [Parameter] public string? SelectedId { get; set; }
+    [Parameter, EditorRequired] public Func<T, string> IdSelector { get; set; } = _ => string.Empty;
+    [Parameter, EditorRequired] public Func<T, string> NameSelector { get; set; } = _ => string.Empty;
+    [Parameter] public Func<T, string>? TypeSelector { get; set; }
+    [Parameter] public Func<T, string?>? MetaSelector { get; set; }
+    [Parameter] public Func<T, string>? SearchSelector { get; set; }
+    [Parameter] public Func<T, bool>? PinSelector { get; set; }
+
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = "bi-sliders";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public bool Flush { get; set; }
+    [Parameter] public bool IsDirty { get; set; }
+    [Parameter] public string? LoadError { get; set; }
+    [Parameter] public string? StatusMessage { get; set; }
+    [Parameter] public string StatusKind { get; set; } = "info";
+
+    [Parameter] public bool CanCreate { get; set; } = true;
+    [Parameter] public bool CanSave { get; set; } = true;
+    [Parameter] public bool CanClone { get; set; } = true;
+    [Parameter] public bool CanRename { get; set; } = true;
+    [Parameter] public bool CanDelete { get; set; } = true;
+    [Parameter] public bool ShowPin { get; set; } = true;
+
+    [Parameter] public RenderFragment? ToolbarExtras { get; set; }
+    [Parameter] public RenderFragment? Body { get; set; }
+    [Parameter] public RenderFragment? EmptyState { get; set; }
+
+    [Parameter] public EventCallback OnCreate { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+    [Parameter] public EventCallback OnClone { get; set; }
+    [Parameter] public EventCallback<string> OnRename { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
+    [Parameter] public EventCallback<T> OnTogglePin { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+
+    private bool _searchOpen;
+    private bool _renameOpen;
+    private bool _deleteOpen;
+    private T? _renameTarget;
+    private T? _deleteTarget;
+    private bool _focusSearch;
+    private bool _focusRename;
+    private bool _focusDeleteCancel;
+    private string _searchQuery = string.Empty;
+    private string _renameValue = string.Empty;
+    private string? _renameError;
+    private string _switchValue = string.Empty;
+    private string? _lastSelectedId;
+    private string _switchSignature = string.Empty;
+    private string? _toastText;
+    private bool _toastError;
+    private CancellationTokenSource? _toastCts;
+    private DotNetObjectReference<ConfigShell<T>>? _shortcutRef;
+    private string? _lastStatusMessage;
+    private ElementReference _searchInput;
+    private ElementReference _renameInput;
+    private ElementReference _deleteCancelButton;
+
+    private IEnumerable<T> OrderedItems =>
+        PinSelector == null
+            ? Items
+            : Items.OrderByDescending(PinSelector);
+
+    private T? SelectedItem =>
+        Items.FirstOrDefault(item => string.Equals(IdSelector(item), SelectedId, StringComparison.Ordinal));
+
+    private bool HasSelection => SelectedItem != null;
+
+    private bool IsSelectedPinned => SelectedItem is { } item && IsPinned(item);
+
+    private IEnumerable<T> FilteredItems
+    {
+        get
+        {
+            var query = _searchQuery.Trim();
+            var ordered = OrderedItems;
+
+            if (query.Length == 0)
+                return ordered;
+
+            return ordered.Where(item => Matches(item, query));
+        }
+    }
+
+    private string StatusClass => StatusKind switch
+    {
+        "success" => "success",
+        "error" => "danger",
+        "warning" => "warning",
+        _ => "info"
+    };
+
+    private string StatusIcon => StatusKind switch
+    {
+        "success" => "bi-check-circle-fill",
+        "error" => "bi-exclamation-octagon-fill",
+        "warning" => "bi-exclamation-triangle-fill",
+        _ => "bi-info-circle-fill"
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(SelectedId, _lastSelectedId, StringComparison.Ordinal))
+        {
+            _switchValue = SelectedId ?? string.Empty;
+            _lastSelectedId = SelectedId;
+        }
+
+        _switchSignature = string.Join("|", OrderedItems.Select(item =>
+            $"{IdSelector(item)}:{IsPinned(item)}"));
+
+        if (!string.IsNullOrEmpty(StatusMessage) && StatusMessage != _lastStatusMessage)
+        {
+            ShowToast(StatusMessage, StatusKind == "error");
+        }
+
+        _lastStatusMessage = StatusMessage;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _shortcutRef = DotNetObjectReference.Create(this);
+            try
+            {
+                await JS.InvokeVoidAsync("configPageShortcuts.register", _shortcutRef);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or ObjectDisposedException or InvalidOperationException)
+            {
+                // 页面在电路断开 / 渲染器销毁过程中关闭时无需注册快捷键。
+            }
+        }
+
+        // 焦点必须在对话框真正渲染之后设置；事件处理器里直接 FocusAsync 会拿到旧元素引用。
+        if (_focusSearch)
+        {
+            _focusSearch = false;
+            await FocusAsync(_searchInput);
+        }
+
+        if (_focusRename)
+        {
+            _focusRename = false;
+            await FocusAsync(_renameInput);
+        }
+
+        if (_focusDeleteCancel)
+        {
+            _focusDeleteCancel = false;
+            await FocusAsync(_deleteCancelButton);
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (LoadError != null) return;
+        await OnCreate.InvokeAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (LoadError != null || !CanSave) return;
+        await OnSave.InvokeAsync();
+    }
+
+    private async Task RetryAsync() => await OnRetry.InvokeAsync();
+
+    private async Task OnSwitchChanged()
+    {
+        if (string.IsNullOrEmpty(_switchValue) || _switchValue == SelectedId) return;
+        await OnSelect.InvokeAsync(_switchValue);
+    }
+
+    private async Task CloneAsync() => await OnClone.InvokeAsync();
+
+    private async Task TogglePinnedAsync()
+    {
+        if (SelectedItem is { } item)
+            await OnTogglePin.InvokeAsync(item);
+    }
+
+    private async Task CopySelectedIdAsync()
+    {
+        if (SelectedItem is not { } item) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("copyTextToClipboard", IdSelector(item));
+            ShowToast(Loc["config_ui.toast_copied"], error: false);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException or InvalidOperationException)
+        {
+            ShowToast(Loc.Format("config_ui.toast_copy_failed", ex.Message), error: true);
+        }
+    }
+
+    private async Task OpenSearchAsync()
+    {
+        _searchQuery = string.Empty;
+        _searchOpen = true;
+        _focusSearch = true;
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private void CloseSearch() => _searchOpen = false;
+
+    private async Task SelectFromSearch(T item)
+    {
+        _searchOpen = false;
+        await OnSelect.InvokeAsync(IdSelector(item));
+    }
+
+    private async Task OpenRenameAsync()
+    {
+        if (SelectedItem is not { } item) return;
+        _renameTarget = item;
+        _renameValue = NameSelector(item);
+        _renameError = null;
+        _renameOpen = true;
+        _focusRename = true;
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private void CloseRename()
+    {
+        _renameOpen = false;
+        _renameTarget = default;
+    }
+
+    private async Task ConfirmRename()
+    {
+        var name = _renameValue.Trim();
+        if (name.Length == 0)
+        {
+            _renameError = Loc["config_ui.rename_required"];
+            return;
+        }
+
+        _renameOpen = false;
+        _renameTarget = default;
+        await OnRename.InvokeAsync(name);
+    }
+
+    private async Task OpenDelete()
+    {
+        if (SelectedItem is not { } item) return;
+        _deleteTarget = item;
+        _deleteOpen = true;
+        _focusDeleteCancel = true;
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private void CloseDelete()
+    {
+        _deleteOpen = false;
+        _deleteTarget = default;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        _deleteOpen = false;
+        _deleteTarget = default;
+        await OnDelete.InvokeAsync();
+    }
+
+    private void OnPageKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Escape") return;
+
+        if (_searchOpen) _searchOpen = false;
+        else if (_renameOpen) CloseRename();
+        else if (_deleteOpen) CloseDelete();
+    }
+
+    private void OnSearchDialogKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") _searchOpen = false;
+    }
+
+    private async Task OnSearchInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            _searchOpen = false;
+            return;
+        }
+
+        if (e.Key != "Enter") return;
+
+        var first = FilteredItems.FirstOrDefault();
+        if (first is not null)
+            await SelectFromSearch(first);
+    }
+
+    private void OnRenameDialogKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") CloseRename();
+    }
+
+    private async Task OnRenameInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") CloseRename();
+        else if (e.Key == "Enter") await ConfirmRename();
+    }
+
+    private void OnDeleteDialogKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") CloseDelete();
+    }
+
+    private async Task FocusAsync(ElementReference element)
+    {
+        try
+        {
+            await element.FocusAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or ObjectDisposedException or InvalidOperationException)
+        {
+            // 电路已断开或元素尚未渲染时忽略焦点请求，不影响对话框其余操作。
+        }
+    }
+
+    [JSInvokable]
+    public async Task SaveFromShortcut()
+    {
+        if (_searchOpen || _renameOpen || _deleteOpen) return;
+        await SaveAsync();
+    }
+
+    private void ShowToast(string message, bool error)
+    {
+        _toastText = message;
+        _toastError = error;
+
+        _toastCts?.Cancel();
+        _toastCts?.Dispose();
+        _toastCts = null;
+
+        if (error) return;
+
+        var cts = new CancellationTokenSource();
+        _toastCts = cts;
+        _ = HideToastLaterAsync(cts.Token);
+    }
+
+    private async Task HideToastLaterAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(2600, token);
+            if (token.IsCancellationRequested) return;
+            _toastText = null;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (TaskCanceledException)
+        {
+            // 新消息覆盖旧消息时取消上一次隐藏任务，属于正常路径。
+        }
+        catch (ObjectDisposedException)
+        {
+            // 页面在等待期间销毁，停止更新即可。
+        }
+    }
+
+    private bool Matches(T item, string query)
+    {
+        if (query.Length == 0) return true;
+
+        if (DisplayName(item).Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        if (IdSelector(item).Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        if (TypeSelector?.Invoke(item).Contains(query, StringComparison.OrdinalIgnoreCase) == true) return true;
+        if (MetaSelector?.Invoke(item) is { } meta && meta.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        if (SearchSelector?.Invoke(item) is { } search && search.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+
+        return false;
+    }
+
+    private string DisplayName(T item)
+    {
+        var name = NameSelector(item);
+        return string.IsNullOrWhiteSpace(name) ? Loc["config_ui.untitled"] : name;
+    }
+
+    private string SwitchLabel(T item)
+    {
+        var label = DisplayName(item);
+        if (TypeSelector?.Invoke(item) is { Length: > 0 } type)
+            label = $"{label} · {type}";
+
+        return IsPinned(item) ? $"★ {label}" : label;
+    }
+
+    private string? ChoiceMeta(T item) => MetaSelector?.Invoke(item);
+
+    private bool IsPinned(T item) => PinSelector?.Invoke(item) == true;
+
+    public async ValueTask DisposeAsync()
+    {
+        _toastCts?.Cancel();
+        _toastCts?.Dispose();
+        _toastCts = null;
+
+        if (_shortcutRef != null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("configPageShortcuts.unregister");
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or ObjectDisposedException or InvalidOperationException)
+            {
+                // 电路已断开时无需再调用 JS。
+            }
+
+            _shortcutRef.Dispose();
+            _shortcutRef = null;
+        }
+    }
+}

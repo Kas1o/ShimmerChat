@@ -1,95 +1,174 @@
 @using ShimmerChatBuiltin.API
 @using ShimmerChatBuiltin.Memory
+@using ShimmerChatLib.Components
 @using ShimmerChatLib.Interface
+@using System.Text.Json
 @attribute [PluginPanel("panel.embedding_api_config", "panel.embedding_api_config.desc")]
-
 @inject IKVDataService KVData
 @inject ILocService Loc
+@inject ILogger<EmbeddingAPIConfig> Logger
 
-<div class="shimmer-content su-p-4">
-    <h2 class="su-text-lg su-font-bold su-mb-2">@Loc["panel.embedding_api_config"]</h2>
-    <p class="su-text-sm su-text-2 su-mb-3">@Loc["api_config.profiles_hint"]</p>
-
-    @if (_loadError is not null)
-    {
-        <p class="su-text-sm" style="color: var(--su-danger);">@_loadError</p>
-    }
-
-    @if (_profiles.Count == 0)
-    {
-        <p class="su-text-sm su-text-2">@Loc["api_config.empty"]</p>
-    }
-
-    @foreach (var profile in _profiles)
-    {
-        <div class="su-card su-mb-3">
-            <div class="su-card-body">
-                <div class="su-flex su-gap-2 su-mb-2" style="align-items:center;">
-                    <input class="su-input" @bind="profile.Name" @bind:after="SaveProfiles" placeholder="@Loc["api_config.name"]" />
-                    @if (profile.Id == _activeId)
-                    {
-                        <span class="su-badge su-badge-success">@Loc["api_config.active"]</span>
-                    }
-                    else
-                    {
-                        <button class="su-btn su-btn-sm" @onclick="() => SetActive(profile.Id)">@Loc["api_config.set_active"]</button>
-                    }
+<ConfigShell T="EmbeddingProfile"
+            Items="_profiles"
+            SelectedId="@_selectedId"
+            IdSelector="@(p => p.Id)"
+            NameSelector="@(p => p.Name)"
+            TypeSelector="@(p => p.ModelName)"
+            MetaSelector="@(p => p.BaseUrl)"
+            SearchSelector="@(p => $"{p.BaseUrl} {p.ModelName}")"
+            PinSelector="@(p => p.Pinned)"
+            Title="@Loc["panel.embedding_api_config"]"
+            Description="@Loc["panel.embedding_api_config.desc"]"
+            Icon="bi-vector-pen"
+            IsDirty="IsDirty"
+            LoadError="@_loadError"
+            StatusMessage="@_statusText"
+            StatusKind="@_statusKind"
+            OnCreate="CreateProfile"
+            OnSave="SaveProfiles"
+            OnSelect="SelectProfile"
+            OnClone="CloneProfile"
+            OnRename="RenameProfile"
+            OnDelete="DeleteProfile"
+            OnTogglePin="TogglePin"
+            OnRetry="Reload">
+    <ToolbarExtras>
+        <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
+                disabled="@(Current == null || _testingId != null)"
+                @onclick="TestCurrentAsync"
+                title="@Loc["api_config.test"]" aria-label="@Loc["api_config.test"]">
+            <i class="bi @(_testingId != null ? "bi-hourglass-split" : "bi-lightning-charge")"></i>
+            <span class="cfg-btn-label">@Loc["api_config.test"]</span>
+        </button>
+    </ToolbarExtras>
+    <Body>
+        @if (Current is { } profile)
+        {
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-info-circle"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["embedding_config.basic"]</h3>
+                        <p>@Loc["embedding_config.basic_desc"]</p>
+                    </div>
                 </div>
 
-                <div class="su-row su-gap-3">
-                    <div class="su-col-12">
+                <div class="cfg-grid">
+                    <div class="cfg-field cfg-span-6">
+                        <label class="su-label">@Loc["api_config.name"]</label>
+                        <input class="su-input" @bind="profile.Name" />
+                        <p class="cfg-field-hint">@Loc["embedding_config.name_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["embedding_config.id"]</label>
+                        <div class="cfg-readonly-row">
+                            <code title="@profile.Id">@profile.Id</code>
+                        </div>
+                        <p class="cfg-field-hint">@Loc["embedding_config.id_hint"]</p>
+                    </div>
+                    <div class="cfg-field cfg-span-3">
+                        <label class="su-label">@Loc["embedding_config.active"]</label>
+                        <div class="cfg-active-row">
+                            @if (profile.Id == _activeId)
+                            {
+                                <span class="su-badge su-badge-success">
+                                    <i class="bi bi-check-circle-fill"></i> @Loc["api_config.active"]
+                                </span>
+                            }
+                            else
+                            {
+                                <button type="button" class="su-btn su-btn-secondary su-btn-sm"
+                                        @onclick="() => SetActive(profile)">
+                                    <i class="bi bi-check2-circle"></i> @Loc["api_config.set_active"]
+                                </button>
+                            }
+                        </div>
+                        <p class="cfg-field-hint">@Loc["embedding_config.active_hint"]</p>
+                    </div>
+                </div>
+
+                @if (_testResult is not null && _testResultId == profile.Id)
+                {
+                    <div class="cfg-note @(_testFailed ? "is-danger" : "is-success")">
+                        <i class="bi @(_testFailed ? "bi-exclamation-octagon-fill" : "bi-check-circle-fill")"></i>
+                        <span>@_testResult</span>
+                    </div>
+                }
+            </section>
+
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-plug"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["embedding_config.connection"]</h3>
+                        <p>@Loc["embedding_config.connection_desc"]</p>
+                    </div>
+                </div>
+
+                <div class="cfg-grid">
+                    <div class="cfg-field cfg-span-12">
                         <label class="su-label">@Loc["api_config.embedding_uri"]</label>
-                        <input class="su-input su-w-full" @bind="profile.BaseUrl" @bind:after="SaveProfiles" placeholder="@Loc["api_config.embedding_uri_placeholder"]" />
+                        <input class="su-input" @bind="profile.BaseUrl"
+                               placeholder="@Loc["api_config.embedding_uri_placeholder"]" />
                     </div>
-                    <div class="su-col-6">
+                    <div class="cfg-field cfg-span-6">
                         <label class="su-label">@Loc["api_config.embedding_model"]</label>
-                        <input class="su-input su-w-full" @bind="profile.ModelName" @bind:after="SaveProfiles" placeholder="@Loc["api_config.embedding_model_placeholder"]" />
+                        <input class="su-input" @bind="profile.ModelName"
+                               placeholder="@Loc["api_config.embedding_model_placeholder"]" />
                     </div>
-                    <div class="su-col-6">
+                    <div class="cfg-field cfg-span-6">
                         <label class="su-label">@Loc["api_config.embedding_apikey"]</label>
-                        <input class="su-input su-w-full" type="password" @bind="profile.ApiKey" @bind:after="SaveProfiles" placeholder="@Loc["api_config.embedding_apikey_placeholder"]" />
+                        <input class="su-input" type="password" @bind="profile.ApiKey"
+                               placeholder="@Loc["api_config.embedding_apikey_placeholder"]" />
                     </div>
                 </div>
 
-                <div class="su-flex su-gap-2 su-mt-2" style="align-items:center;">
-                    <button class="su-btn su-btn-sm" @onclick="() => TestAsync(profile)" disabled="@(_testingId == profile.Id)">
-                        @Loc["api_config.test"]
-                    </button>
-                    <span class="su-text-sm su-text-2">@TestText(profile.Id)</span>
-
-                    @if (_confirmDelete == profile.Id)
-                    {
-                        <button class="su-btn su-btn-danger su-btn-sm" @onclick="() => Delete(profile.Id)">@Loc["api_config.confirm_delete"]</button>
-                        <button class="su-btn su-btn-sm" @onclick="() => _confirmDelete = null">@Loc["api_config.cancel"]</button>
-                    }
-                    else
-                    {
-                        <button class="su-btn su-btn-sm" @onclick="() => _confirmDelete = profile.Id">@Loc["api_config.delete"]</button>
-                    }
+                <div class="cfg-note is-warning">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>@Loc["api_config.switch_hint"]</span>
                 </div>
-            </div>
+            </section>
+        }
+    </Body>
+
+    <EmptyState>
+        <div class="cfg-empty">
+            <span class="cfg-empty-icon"><i class="bi bi-vector-pen"></i></span>
+            <h2>@Loc["embedding_config.empty_title"]</h2>
+            <p>@Loc["embedding_config.empty_desc"]</p>
+            <button type="button" class="su-btn su-btn-primary" @onclick="CreateProfile">
+                <i class="bi bi-plus-lg"></i> @Loc["api_config.add"]
+            </button>
         </div>
-    }
-
-    <div class="su-flex su-gap-2">
-        <button class="su-btn su-btn-primary" @onclick="Add" disabled="@(_loadError is not null)">@Loc["api_config.add"]</button>
-    </div>
-
-    <p class="su-text-sm su-text-2 su-mt-3">@Loc["api_config.switch_hint"]</p>
-</div>
+    </EmptyState>
+</ConfigShell>
 
 @code {
     private List<EmbeddingProfile> _profiles = [];
+    private string? _selectedId;
     private string? _activeId;
-    private string? _confirmDelete;
-    private string? _testingId;
     private string? _loadError;
-    private readonly Dictionary<string, string> _testResults = [];
+    private string? _savedSnapshot;
 
-    protected override void OnInitialized()
+    private string _statusText = string.Empty;
+    private string _statusKind = "info";
+
+    private string? _testingId;
+    private string? _testResult;
+    private string? _testResultId;
+    private bool _testFailed;
+
+    private static readonly JsonSerializerOptions _jsonOptions = new()
     {
-        Reload();
-    }
+        WriteIndented = false
+    };
+
+    private EmbeddingProfile? Current =>
+        _profiles.FirstOrDefault(p => string.Equals(p.Id, _selectedId, StringComparison.Ordinal));
+
+    private bool IsDirty => _loadError == null && Snapshot() != _savedSnapshot;
+
+    protected override void OnInitialized() => Reload();
 
     private void Reload()
     {
@@ -97,74 +176,158 @@
         if (loadError is not null)
         {
             _loadError = Loc.Format("api_config.load_error", loadError);
+            _selectedId = null;
             _activeId = null;
+            _savedSnapshot = null;
+            Logger.LogError("嵌入配置加载失败：{Error}", loadError);
             return;
         }
 
         _loadError = null;
-        _activeId = EmbeddingProfileStore.GetActiveId(KVData);
+        _activeId = EmbeddingProfileStore.GetActiveId(KVData) ?? string.Empty;
 
         if (_profiles.Count == 0)
         {
-            _activeId = null;
-            EmbeddingProfileStore.SetActive(KVData, string.Empty);
+            _activeId = string.Empty;
+            _selectedId = null;
+            _savedSnapshot = Snapshot();
             return;
         }
 
-        if (_activeId is null || _profiles.All(x => x.Id != _activeId))
+        if (string.IsNullOrEmpty(_activeId) || _profiles.All(p => p.Id != _activeId))
         {
-            _activeId = _profiles[0].Id;
-            EmbeddingProfileStore.SetActive(KVData, _activeId);
+            var fallback = _profiles[0].Id;
+            Logger.LogWarning("嵌入配置的当前项 {ActiveId} 不存在，回退到 {FallbackId}", _activeId, fallback);
+            _activeId = fallback;
         }
+
+        _selectedId = _activeId;
+        _savedSnapshot = Snapshot();
     }
 
-    private void SaveProfiles()
+    private string Snapshot() =>
+        JsonSerializer.Serialize(_profiles, _jsonOptions) + "\nactive=" + (_activeId ?? string.Empty);
+
+    private async Task SaveProfiles()
     {
         if (_loadError is not null) return;
-        EmbeddingProfileStore.Save(KVData, _profiles);
+
+        try
+        {
+            EmbeddingProfileStore.Save(KVData, _profiles);
+            EmbeddingProfileStore.SetActive(KVData, _activeId ?? string.Empty);
+            _savedSnapshot = Snapshot();
+            SetStatus(Loc["config_ui.toast_saved"], "success");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "保存嵌入配置失败");
+            SetStatus(Loc.Format("config_ui.save_failed", ex.Message), "error");
+        }
+
+        await Task.CompletedTask;
     }
 
-    private void Add()
+    private async Task CreateProfile()
     {
         if (_loadError is not null) return;
 
         var profile = new EmbeddingProfile
         {
             Id = EmbeddingProfileStore.NewId(),
-            Name = $"配置 {_profiles.Count + 1}"
+            Name = NextName(Loc["config_ui.new"])
         };
 
         _profiles.Add(profile);
-        SaveProfiles();
+        _selectedId = profile.Id;
+        if (string.IsNullOrEmpty(_activeId)) _activeId = profile.Id;
 
-        if (_activeId is null) SetActive(profile.Id);
+        SetStatus(Loc.Format("config_ui.created", DisplayName(profile)), "info");
+        await Task.CompletedTask;
     }
 
-    private void SetActive(string id)
+    private async Task CloneProfile()
     {
-        _activeId = id;
-        EmbeddingProfileStore.SetActive(KVData, id);
+        if (Current is not { } source) return;
+        if (_loadError is not null) return;
+
+        var copy = source.Clone();
+        copy.Id = EmbeddingProfileStore.NewId();
+        copy.Name = NextName($"{DisplayName(source)} {Loc["config_ui.copy_suffix"]}");
+
+        var index = _profiles.IndexOf(source);
+        _profiles.Insert(index + 1, copy);
+        _selectedId = copy.Id;
+
+        SetStatus(Loc.Format("config_ui.cloned", DisplayName(copy)), "info");
+        await Task.CompletedTask;
     }
 
-    private void Delete(string id)
+    private async Task RenameProfile(string name)
     {
-        _profiles.RemoveAll(x => x.Id == id);
-        _testResults.Remove(id);
-        SaveProfiles();
+        if (Current is not { } profile) return;
 
-        if (_activeId == id)
-        {
+        profile.Name = name;
+        SetStatus(Loc.Format("config_ui.renamed", DisplayName(profile)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task DeleteProfile()
+    {
+        if (Current is not { } profile) return;
+
+        var index = _profiles.IndexOf(profile);
+        _profiles.Remove(profile);
+
+        if (_activeId == profile.Id)
             _activeId = _profiles.FirstOrDefault()?.Id;
-            EmbeddingProfileStore.SetActive(KVData, _activeId ?? string.Empty);
+
+        _selectedId = _profiles.Count == 0
+            ? null
+            : _profiles[Math.Min(index, _profiles.Count - 1)].Id;
+
+        if (_testResultId == profile.Id)
+        {
+            _testResult = null;
+            _testResultId = null;
         }
 
-        _confirmDelete = null;
+        SetStatus(Loc.Format("config_ui.deleted_pending", DisplayName(profile)), "info");
+        await Task.CompletedTask;
     }
 
-    private async Task TestAsync(EmbeddingProfile profile)
+    private async Task TogglePin(EmbeddingProfile profile)
     {
+        profile.Pinned = !profile.Pinned;
+        SetStatus(
+            Loc.Format(profile.Pinned ? "config_ui.pinned" : "config_ui.unpinned", DisplayName(profile)),
+            "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task SelectProfile(string id)
+    {
+        _selectedId = id;
+        _testResult = null;
+        _testResultId = null;
+        await Task.CompletedTask;
+    }
+
+    private async Task SetActive(EmbeddingProfile profile)
+    {
+        _activeId = profile.Id;
+        SetStatus(Loc.Format("embedding_config.active_set", DisplayName(profile)), "info");
+        await Task.CompletedTask;
+    }
+
+    private async Task TestCurrentAsync()
+    {
+        if (Current is not { } profile) return;
+
         _testingId = profile.Id;
-        _testResults[profile.Id] = Loc["api_config.testing"];
+        _testResultId = profile.Id;
+        _testFailed = false;
+        _testResult = Loc["api_config.testing"];
         StateHasChanged();
 
         try
@@ -172,11 +335,14 @@
             var config = new MemoryModelConfig(profile.BaseUrl, profile.ApiKey, profile.ModelName, profile.Id, profile.Name);
             var started = DateTimeOffset.UtcNow;
             var dimensions = await new MemoryEmbeddingClient(config).ProbeDimensionsAsync();
-            _testResults[profile.Id] = $"{Loc["api_config.test_ok"]}: dim={dimensions}, {(DateTimeOffset.UtcNow - started).TotalMilliseconds:F0} ms";
+            _testResult = $"{Loc["api_config.test_ok"]}: dim={dimensions}, {(DateTimeOffset.UtcNow - started).TotalMilliseconds:F0} ms";
+            _testFailed = false;
         }
         catch (Exception ex)
         {
-            _testResults[profile.Id] = $"{Loc["api_config.test_failed"]}: {ex.Message}";
+            Logger.LogError(ex, "测试嵌入配置 {ProfileId} 失败", profile.Id);
+            _testResult = $"{Loc["api_config.test_failed"]}: {ex.Message}";
+            _testFailed = true;
         }
         finally
         {
@@ -184,5 +350,24 @@
         }
     }
 
-    private string TestText(string id) => _testResults.TryGetValue(id, out var value) ? value : string.Empty;
+    private void SetStatus(string message, string kind)
+    {
+        _statusText = message;
+        _statusKind = kind;
+    }
+
+    private string DisplayName(EmbeddingProfile profile) =>
+        string.IsNullOrWhiteSpace(profile.Name) ? Loc["config_ui.untitled"] : profile.Name;
+
+    private string NextName(string baseName)
+    {
+        var name = string.IsNullOrWhiteSpace(baseName) ? Loc["config_ui.new"] : baseName.Trim();
+        var candidate = name;
+        var suffix = 2;
+
+        while (_profiles.Any(p => string.Equals(p.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+            candidate = $"{name} ({suffix++})";
+
+        return candidate;
+    }
 }

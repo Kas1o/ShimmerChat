@@ -1,0 +1,1044 @@
+/* ═══════════════════════════════════════════════════════════════
+   Config UI — 预设管理 / 配置页面的统一外壳
+   设计契约见 Docs/ConfigUI.md。页面只使用 cfg-* 类，不再自行
+   拼装顶部操作栏或弹窗样式，以保证所有配置页行为一致。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 页面与固定操作面板 ─────────────────────────── */
+.cfg-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 100%;
+}
+
+.cfg-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* 负外边距把操作面板铺满插件面板的内边距，避免滚动时露出缝隙。 */
+    margin: calc(-1 * var(--su-space-4)) calc(-1 * var(--su-space-4)) 0;
+    padding: 12px var(--su-space-4) 10px;
+    background: color-mix(in srgb, var(--su-surface-1) 96%, transparent);
+    border-bottom: 1px solid var(--su-border-1);
+    border-radius: var(--su-radius-lg) var(--su-radius-lg) 0 0;
+    box-shadow: 0 10px 24px -20px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(14px) saturate(1.15);
+}
+
+/* 主项目页面：.shimmer-content 自带 24px 内边距，需要更大的负外边距。 */
+.cfg-page-main .cfg-topbar {
+    margin: -24px -24px 0;
+    padding-left: 24px;
+    padding-right: 24px;
+}
+
+@media (max-width: 900px) {
+    .cfg-page-main .cfg-topbar {
+        margin: -16px -16px 0;
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+}
+
+.cfg-topbar-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.cfg-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1 1 300px;
+}
+
+.cfg-identity-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: var(--su-accent-soft);
+    color: var(--su-accent);
+    font-size: 17px;
+}
+
+.cfg-identity-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.cfg-identity-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    color: var(--su-text-0);
+    font-size: var(--su-font-lg);
+    font-weight: 650;
+    line-height: 1.25;
+}
+
+.cfg-identity-sub {
+    overflow: hidden;
+    color: var(--su-text-2);
+    font-size: var(--su-font-sm);
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cfg-topbar-actions,
+.cfg-topbar-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.cfg-topbar-sub {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.cfg-topbar-divider {
+    width: 1px;
+    height: 22px;
+    margin: 0 2px;
+    background: var(--su-border-1);
+}
+
+/* ── 切换器 ─────────────────────────────────────── */
+.cfg-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1 1 260px;
+    max-width: 420px;
+}
+
+.cfg-switcher > i {
+    flex-shrink: 0;
+    color: var(--su-text-2);
+    font-size: 13px;
+}
+
+.cfg-switcher .su-select {
+    min-width: 0;
+    flex: 1;
+}
+
+.cfg-switch-star {
+    color: var(--su-warning);
+}
+
+/* ── 按钮与状态 ─────────────────────────────────── */
+.cfg-btn kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 16px;
+    margin-left: 2px;
+    padding: 0 4px;
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    font-family: var(--su-font-mono);
+    font-size: 9px;
+    line-height: 1;
+    opacity: 0.72;
+}
+
+.cfg-icon-btn {
+    padding: 5px 8px;
+}
+
+.cfg-icon-btn.is-danger:hover {
+    background: var(--su-danger-soft);
+    color: var(--su-danger);
+}
+
+.cfg-icon-btn.is-active {
+    background: var(--su-warning-soft);
+    color: var(--su-warning);
+}
+
+.cfg-dirty {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: var(--su-font-xs);
+    font-weight: 500;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.cfg-dirty::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.cfg-dirty.is-dirty {
+    background: var(--su-warning-soft);
+    color: var(--su-warning);
+}
+
+.cfg-dirty.is-clean {
+    background: var(--su-success-soft);
+    color: var(--su-success);
+}
+
+.cfg-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: var(--su-font-xs);
+    line-height: 1.6;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cfg-status.is-info {
+    background: var(--su-surface-3);
+    color: var(--su-text-1);
+}
+
+.cfg-status.is-success {
+    background: var(--su-success-soft);
+    color: var(--su-success);
+}
+
+.cfg-status.is-error {
+    background: var(--su-danger-soft);
+    color: var(--su-danger);
+    white-space: normal;
+    text-align: left;
+}
+
+/* ── 正文与分区 ─────────────────────────────────── */
+.cfg-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-bottom: 4px;
+}
+
+.cfg-section {
+    padding: 14px;
+    background: var(--su-surface-2);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+}
+
+.cfg-section-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--su-border-1);
+}
+
+.cfg-section-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    background: var(--su-surface-1);
+    color: var(--su-accent);
+    font-size: 13px;
+}
+
+.cfg-section-title {
+    min-width: 0;
+    flex: 1;
+}
+
+.cfg-section-title h3 {
+    margin: 0;
+    color: var(--su-text-0);
+    font-size: var(--su-font-base);
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+.cfg-section-title p {
+    margin: 2px 0 0;
+    color: var(--su-text-2);
+    font-size: var(--su-font-xs);
+    line-height: 1.5;
+}
+
+.cfg-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.cfg-span-2 { grid-column: span 2; }
+.cfg-span-3 { grid-column: span 3; }
+.cfg-span-4 { grid-column: span 4; }
+.cfg-span-5 { grid-column: span 5; }
+.cfg-span-6 { grid-column: span 6; }
+.cfg-span-7 { grid-column: span 7; }
+.cfg-span-8 { grid-column: span 8; }
+.cfg-span-9 { grid-column: span 9; }
+.cfg-span-12 { grid-column: span 12; }
+
+.cfg-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.cfg-field > .su-label {
+    margin: 0;
+}
+
+.cfg-field > .su-input,
+.cfg-field > .su-select,
+.cfg-field > .su-textarea {
+    width: 100%;
+}
+
+.cfg-field-hint {
+    margin: 0;
+    color: var(--su-text-2);
+    font-size: var(--su-font-xs);
+    line-height: 1.5;
+}
+
+.cfg-field-error {
+    margin: 0;
+    color: var(--su-danger);
+    font-size: var(--su-font-xs);
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.cfg-input-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.cfg-input-row > .su-input,
+.cfg-input-row > .su-select {
+    flex: 1;
+    min-width: 0;
+}
+
+.cfg-code {
+    font-family: var(--su-font-mono);
+    font-size: var(--su-font-sm);
+    line-height: 1.45;
+    tab-size: 2;
+}
+
+.cfg-readonly-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 6px 10px;
+    background: var(--su-surface-1);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+}
+
+.cfg-readonly-row code {
+    overflow: hidden;
+    flex: 1;
+    min-width: 0;
+    color: var(--su-text-1);
+    font-family: var(--su-font-mono);
+    font-size: var(--su-font-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cfg-active-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+}
+
+/* ── 开关与提示 ─────────────────────────────────── */
+.cfg-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.cfg-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--su-text-1);
+    font-size: var(--su-font-sm);
+    cursor: pointer;
+    user-select: none;
+}
+
+.cfg-toggle input {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--su-accent);
+}
+
+.cfg-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.cfg-inline .su-badge {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cfg-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 11px;
+    color: var(--su-text-2);
+    font-size: var(--su-font-sm);
+    line-height: 1.55;
+    background: var(--su-surface-1);
+    border: 1px dashed var(--su-border-1);
+    border-radius: var(--su-radius-md);
+}
+
+.cfg-note.is-warning {
+    color: var(--su-warning);
+    background: var(--su-warning-soft);
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--su-warning) 25%, transparent);
+}
+
+.cfg-note.is-danger {
+    color: var(--su-danger);
+    background: var(--su-danger-soft);
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--su-danger) 25%, transparent);
+}
+
+.cfg-note.is-success {
+    color: var(--su-success);
+    background: var(--su-success-soft);
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--su-success) 25%, transparent);
+}
+
+.cfg-note i {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.cfg-probe-instructions {
+    margin-top: 6px;
+}
+
+.cfg-probe-instructions summary {
+    cursor: pointer;
+}
+
+.cfg-probe-instructions pre {
+    margin: 6px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: var(--su-font-xs);
+}
+
+.cfg-tree-editor {
+    padding: 10px;
+    background: var(--su-surface-1);
+    border: 1px solid var(--su-border-1);
+    border-radius: var(--su-radius-md);
+    overflow: auto;
+}
+
+.cfg-tree-editor.is-readonly {
+    pointer-events: none;
+    opacity: 0.72;
+}
+
+/* ── 条目列表（DynPrompt / 子智能体等） ─────────── */.cfg-section-subhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 4px 0 10px;
+    flex-wrap: wrap;
+}
+
+.cfg-action-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+}
+
+.cfg-subsection {
+    margin-top: 14px;
+    min-width: 0;
+}
+
+.cfg-subsection h4 {
+    margin: 0 0 6px;
+    font-size: var(--su-font-sm);
+    color: var(--su-text-1);
+}
+
+.cfg-scroll-list {
+    max-height: 260px;
+    overflow: auto;
+    padding: 4px;
+    background: var(--su-surface-1);
+    border: 1px solid var(--su-border-1);
+    border-radius: var(--su-radius-md);
+}
+
+.cfg-check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 5px 6px;
+    font-size: var(--su-font-sm);
+    color: var(--su-text-1);
+    border-radius: var(--su-radius-sm);
+    cursor: pointer;
+}
+
+.cfg-check-row:hover {
+    background: var(--su-surface-2);
+}
+
+.cfg-check-row input {
+    margin-top: 2px;
+    accent-color: var(--su-accent);
+}
+
+.cfg-check-row-static {
+    cursor: default;
+    align-items: center;
+}
+
+.cfg-check-desc {
+    display: block;
+    color: var(--su-text-2);
+    font-size: var(--su-font-xs);
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.cfg-term-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cfg-term-card {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--su-surface-1);
+    border: 1px solid var(--su-border-1);
+    border-radius: var(--su-radius-md);
+}
+
+.cfg-term-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.cfg-term-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: var(--su-font-sm);
+}
+
+.cfg-term-preview {
+    margin: 4px 0 0;
+    color: var(--su-text-2);
+    font-size: var(--su-font-sm);
+    line-height: 1.5;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.cfg-term-meta {
+    margin: 4px 0 0;
+    color: var(--su-text-2);
+    font-size: var(--su-font-xs);
+    font-family: var(--su-font-mono);
+    word-break: break-all;
+}
+
+.cfg-term-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.cfg-textarea {
+    resize: vertical;
+    min-height: 72px;
+    font-family: var(--su-font-mono);
+    line-height: 1.5;
+}
+
+.cfg-empty-compact {
+    min-height: 0;
+    padding: 24px 16px;
+}
+
+/* ── 空状态 ─────────────────────────────────────── */
+.cfg-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 320px;
+    padding: 44px 20px;
+    text-align: center;
+    background: var(--su-surface-2);
+    border: 1px dashed var(--su-border-0);
+    border-radius: var(--su-radius-lg);
+}
+
+.cfg-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    background: var(--su-accent-soft);
+    color: var(--su-accent);
+    font-size: 26px;
+}
+
+.cfg-empty h2 {
+    margin: 0;
+    color: var(--su-text-0);
+    font-size: var(--su-font-lg);
+    font-weight: 650;
+}
+
+.cfg-empty p {
+    max-width: 46ch;
+    margin: 0;
+    color: var(--su-text-2);
+    font-size: var(--su-font-sm);
+    line-height: 1.6;
+}
+
+/* ── 弹窗 ───────────────────────────────────────── */
+.cfg-dialog {
+    display: flex;
+    flex-direction: column;
+    width: min(560px, 94vw);
+    max-height: 88vh;
+    overflow: hidden;
+    background: var(--su-surface-1);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-lg);
+    box-shadow: var(--su-shadow-lg);
+    animation: cfg-dialog-in 0.16s ease-out both;
+}
+
+.cfg-dialog-sm { width: min(440px, 94vw); }
+.cfg-dialog-lg { width: min(760px, 94vw); }
+
+.cfg-dialog-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 16px 18px 13px;
+    border-bottom: 1px solid var(--su-border-1);
+}
+
+.cfg-dialog-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: var(--su-accent-soft);
+    color: var(--su-accent);
+    font-size: 15px;
+}
+
+.cfg-dialog-icon.is-danger {
+    background: var(--su-danger-soft);
+    color: var(--su-danger);
+}
+
+.cfg-dialog-heading {
+    flex: 1;
+    min-width: 0;
+}
+
+.cfg-dialog-heading h2 {
+    margin: 0;
+    color: var(--su-text-0);
+    font-size: var(--su-font-lg);
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+.cfg-dialog-heading p {
+    margin: 2px 0 0;
+    color: var(--su-text-2);
+    font-size: var(--su-font-sm);
+    line-height: 1.5;
+}
+
+.cfg-dialog-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    margin: -3px -3px 0 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--su-radius-md);
+    background: transparent;
+    color: var(--su-text-2);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background var(--su-transition), color var(--su-transition);
+}
+
+.cfg-dialog-close:hover {
+    background: var(--su-surface-3);
+    color: var(--su-text-0);
+}
+
+.cfg-dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 18px;
+    overflow-y: auto;
+}
+
+.cfg-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 18px 16px;
+    border-top: 1px solid var(--su-border-1);
+}
+
+.cfg-dialog-footer-spread {
+    justify-content: space-between;
+}
+
+.cfg-dialog-meta {
+    color: var(--su-text-2);
+    font-size: var(--su-font-xs);
+}
+
+/* ── 检索 / 选择器 ──────────────────────────────── */
+.cfg-searchbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    background: var(--su-surface-0);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+    transition: border-color var(--su-transition), box-shadow var(--su-transition);
+}
+
+.cfg-searchbox:focus-within {
+    border-color: var(--su-accent);
+    box-shadow: 0 0 0 3px var(--su-accent-soft);
+}
+
+.cfg-searchbox > i {
+    flex-shrink: 0;
+    color: var(--su-text-2);
+    font-size: 13px;
+}
+
+.cfg-searchbox input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--su-text-0);
+    font-family: var(--su-font-sans);
+    font-size: var(--su-font-base);
+}
+
+.cfg-searchbox input::placeholder {
+    color: var(--su-text-2);
+}
+
+.cfg-search-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border: 1px solid var(--su-border-0);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--su-surface-1);
+    color: var(--su-text-2);
+    font-family: var(--su-font-mono);
+    font-size: 10px;
+    line-height: 1;
+}
+
+.cfg-choice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 120px;
+}
+
+.cfg-choice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 11px;
+    text-align: left;
+    font: inherit;
+    color: var(--su-text-1);
+    background: var(--su-surface-2);
+    border: 1px solid var(--su-border-0);
+    border-radius: var(--su-radius-md);
+    cursor: pointer;
+    transition: border-color var(--su-transition), background var(--su-transition);
+}
+
+.cfg-choice:hover {
+    border-color: var(--su-border-1);
+    background: var(--su-surface-1);
+}
+
+.cfg-choice.is-active {
+    border-color: var(--su-accent);
+    background: var(--su-accent-soft);
+}
+
+.cfg-choice-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.cfg-choice-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.cfg-choice-title strong {
+    overflow: hidden;
+    color: var(--su-text-0);
+    font-size: var(--su-font-base);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cfg-choice-meta {
+    overflow: hidden;
+    color: var(--su-text-2);
+    font-size: var(--su-font-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cfg-choice-id {
+    flex-shrink: 0;
+    color: var(--su-text-2);
+    font-family: var(--su-font-mono);
+    font-size: 10px;
+}
+
+.cfg-choice-check {
+    flex-shrink: 0;
+    color: var(--su-accent);
+    font-size: 15px;
+    opacity: 0;
+}
+
+.cfg-choice.is-active .cfg-choice-check {
+    opacity: 1;
+}
+
+.cfg-choice-empty {
+    padding: 28px 12px;
+    color: var(--su-text-2);
+    font-size: var(--su-font-sm);
+    text-align: center;
+}
+
+/* ── 保存反馈 ───────────────────────────────────── */
+.cfg-toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(420px, calc(100vw - 48px));
+    padding: 10px 15px;
+    color: var(--su-text-0);
+    font-size: var(--su-font-base);
+    line-height: 1.45;
+    background: var(--su-surface-1);
+    border: 1px solid var(--su-border-0);
+    border-left: 3px solid var(--su-success);
+    border-radius: var(--su-radius-md);
+    box-shadow: var(--su-shadow-lg);
+    animation: cfg-toast-in 0.18s ease-out both;
+}
+
+.cfg-toast.is-error {
+    border-left-color: var(--su-danger);
+}
+
+.cfg-toast > i {
+    flex-shrink: 0;
+    color: var(--su-success);
+    font-size: 15px;
+}
+
+.cfg-toast.is-error > i {
+    color: var(--su-danger);
+}
+
+/* ── 动画 ───────────────────────────────────────── */
+@keyframes cfg-dialog-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.99); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes cfg-toast-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cfg-dialog,
+    .cfg-toast {
+        animation: none;
+    }
+}
+
+/* ── 响应式 ─────────────────────────────────────── */
+@media (max-width: 900px) {
+    .cfg-btn-label {
+        display: none;
+    }
+
+    .cfg-btn kbd {
+        display: none;
+    }
+
+    .cfg-topbar-actions .su-btn,
+    .cfg-topbar-tools .su-btn {
+        padding: 5px 9px;
+    }
+
+    .cfg-switcher {
+        flex-basis: 100%;
+        max-width: none;
+    }
+
+    .cfg-status {
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 720px) {
+    .cfg-span-2,
+    .cfg-span-3,
+    .cfg-span-4,
+    .cfg-span-5,
+    .cfg-span-6,
+    .cfg-span-7,
+    .cfg-span-8,
+    .cfg-span-9 {
+        grid-column: span 12;
+    }
+
+    .cfg-topbar {
+        gap: 8px;
+        padding: 10px 12px 9px;
+        margin-left: calc(-1 * var(--su-space-4));
+        margin-right: calc(-1 * var(--su-space-4));
+    }
+
+    .cfg-identity-sub {
+        display: none;
+    }
+
+    .cfg-toast {
+        right: 12px;
+        bottom: 12px;
+    }
+}

@@ -45,6 +45,30 @@ window.agentSelectShortcuts = {
     },
 };
 
+// 配置管理类页面的页面级快捷键：Ctrl/Cmd + S 保存。
+// 弹窗打开时不触发，避免把重命名/删除弹窗里的输入误当作已提交。
+window.configPageShortcuts = {
+    handler: null,
+    register(dotNetRef) {
+        window.configPageShortcuts.unregister();
+        window.configPageShortcuts.handler = (event) => {
+            const isSave = (event.ctrlKey || event.metaKey)
+                && !event.altKey
+                && (event.key === 's' || event.key === 'S');
+            if (!isSave || event.defaultPrevented) return;
+            if (document.querySelector('.su-modal-mask')) return;
+            event.preventDefault();
+            dotNetRef.invokeMethodAsync('SaveFromShortcut');
+        };
+        document.addEventListener('keydown', window.configPageShortcuts.handler);
+    },
+    unregister() {
+        if (!window.configPageShortcuts.handler) return;
+        document.removeEventListener('keydown', window.configPageShortcuts.handler);
+        window.configPageShortcuts.handler = null;
+    },
+};
+
 window.downloadFileFromStream = async (fileName, contentStreamReference) => {
     const arrayBuffer = await contentStreamReference.arrayBuffer();
     const blob = new Blob([arrayBuffer]);
