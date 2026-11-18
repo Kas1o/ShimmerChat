@@ -864,24 +864,27 @@
     width: 28px;
     height: 28px;
     padding: 0;
-    border: none;
+    /* 悬浮在封面图上，靠主题表面色 + 描边在明暗两种主题下都保持可辨识。 */
+    border: 1px solid var(--su-border-0);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.9);
-    color: #1f2328;
+    background: var(--su-surface-1);
+    color: var(--su-text-0);
     font-size: 13px;
     line-height: 1;
     cursor: pointer;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
-    transition: background var(--su-transition), color var(--su-transition), transform var(--su-transition);
+    box-shadow: var(--su-shadow-md);
+    transition: background var(--su-transition), border-color var(--su-transition), color var(--su-transition), transform var(--su-transition);
 }
 
 .agent-action-btn:hover {
-    background: #fff;
+    background: var(--su-surface-2);
+    border-color: var(--su-accent);
     color: var(--su-accent);
     transform: translateY(-1px);
 }
 
 .agent-action-btn.agent-action-danger:hover {
+    border-color: var(--su-danger);
     color: var(--su-danger);
 }
 
