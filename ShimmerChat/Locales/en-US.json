@@ -128,7 +128,8 @@
 
   "node_editor.filter_placeholder": "Filter...",
   "node_editor.back": "Back",
-  "node_editor.add_child": "Add child",
+  "node_editor.add_child": "Add child (insert at end)",
+  "node_editor.insert_here": "Insert node here",
   "node_editor.paste_copied": "Paste copied node",
   "node_editor.move_up": "Move up",
   "node_editor.move_down": "Move down",

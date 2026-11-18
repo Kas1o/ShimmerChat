@@ -15,38 +15,47 @@
         }
     </div>
 
-    @if (_showAddMenu)
+    @* 每个间隙一条插入行：与拖拽共用同一条 DropStrip，悬停时在左侧操作列位置浮现 + 按钮；
+       菜单就地展开在选中的间隙里，菜单位置即插入位置。 *@
+    @for (int i = 0; i <= ChildNodes.Count; i++)
     {
-        <NodePickerMenu OnSelect="AddChild" OnClose="CloseAddMenu" />
-    }
+        var insertIndex = i;
 
-    <DropStrip TargetList="@ChildNodes" InsertIndex="0" OnDropCommitted="Refresh" />
-
-    @for (int i = 0; i < ChildNodes.Count; i++)
-    {
-        var index = i;
-        var child = ChildNodes[i];
-        <div class="tn-child-row" @key="((ITreeNode)child).Id">
-            <div class="tn-child-actions">
-                <button class="tn-btn tn-btn-move"
-                        @onclick="() => MoveChildUp(index)"
-                        @onclick:stopPropagation="true"
-                        disabled="@(index == 0)" title="@Loc["node_editor.move_up"]">⇧</button>
-                <button class="tn-btn tn-btn-move"
-                        @onclick="() => MoveChildDown(index)"
-                        @onclick:stopPropagation="true"
-                        disabled="@(index == ChildNodes.Count - 1)" title="@Loc["node_editor.move_down"]">⇩</button>
-            </div>
-            <div class="tn-child-tree">
-                <TreeEditor Node="@((ITreeNode)child)" Depth="@(Depth + 1)"
-                            ParentList="@ChildNodes"
-                            OnDragSourceChanged="HandleDragSourceChanged"
-                            RemoveMe="RemoveChild"
-                            CopyMe="CopyMe" />
-            </div>
+        <div class="tn-insert-row">
+            <DropStrip TargetList="@ChildNodes" InsertIndex="@insertIndex" OnDropCommitted="Refresh" />
+            <button class="tn-insert-btn"
+                    @onclick="() => ToggleInsertMenu(insertIndex)"
+                    title="@Loc["node_editor.insert_here"]">+</button>
+            @if (_menuInsertIndex == insertIndex)
+            {
+                <NodePickerMenu OnSelect="t => InsertChild(t, insertIndex)" OnClose="CloseInsertMenu" />
+            }
         </div>
 
-        <DropStrip TargetList="@ChildNodes" InsertIndex="@(index + 1)" OnDropCommitted="Refresh" />
+        @if (insertIndex < ChildNodes.Count)
+        {
+            var index = insertIndex;
+            var child = (ITreeNode)ChildNodes[insertIndex]!;
+            <div class="tn-child-row" @key="child.Id">
+                <div class="tn-child-actions">
+                    <button class="tn-btn tn-btn-move"
+                            @onclick="() => MoveChildUp(index)"
+                            @onclick:stopPropagation="true"
+                            disabled="@(index == 0)" title="@Loc["node_editor.move_up"]">⇧</button>
+                    <button class="tn-btn tn-btn-move"
+                            @onclick="() => MoveChildDown(index)"
+                            @onclick:stopPropagation="true"
+                            disabled="@(index == ChildNodes.Count - 1)" title="@Loc["node_editor.move_down"]">⇩</button>
+                </div>
+                <div class="tn-child-tree">
+                    <TreeEditor Node="@child" Depth="@(Depth + 1)"
+                                ParentList="@ChildNodes"
+                                OnDragSourceChanged="HandleDragSourceChanged"
+                                RemoveMe="RemoveChild"
+                                CopyMe="CopyMe" />
+                </div>
+            </div>
+        }
     }
     @if (ChildNodes.Count == 0)
     {
@@ -62,7 +71,11 @@
 
     [CascadingParameter] public TreeEditorContext? EditorContext { get; set; }
 
-    private bool _showAddMenu;
+    /// <summary>
+    /// 添加菜单当前展开的间隙索引（即插入位置）；null 表示菜单关闭。
+    /// 菜单渲染在该间隙内，用户选中的节点插入到同一位置——菜单位置即插入位置。
+    /// </summary>
+    private int? _menuInsertIndex;
 
     protected override void OnInitialized()
     {
@@ -91,21 +104,36 @@
         await InvokeAsync(StateHasChanged);
     }
 
+    /// <summary>头部 + 固定指向列表末尾：菜单展开在末尾间隙，与追加语义一致。</summary>
     private void ToggleAddMenu()
     {
-        _showAddMenu = !_showAddMenu;
+        var endIndex = ChildNodes.Count;
+        _menuInsertIndex = _menuInsertIndex == endIndex ? null : endIndex;
     }
 
-    private void CloseAddMenu()
+    /// <summary>间隙 + 切换该间隙的菜单：再次点击同一间隙关闭，点击其他间隙则移动菜单。</summary>
+    private void ToggleInsertMenu(int insertIndex)
     {
-        _showAddMenu = false;
+        _menuInsertIndex = _menuInsertIndex == insertIndex ? null : insertIndex;
     }
 
-    private void AddChild(Type type)
+    private void CloseInsertMenu()
+    {
+        _menuInsertIndex = null;
+    }
+
+    private void InsertChild(Type type, int insertIndex)
     {
         var instance = EditorContext?.CreateNode(type);
         if (instance != null)
-            ChildNodes.Add(instance);
+        {
+            // 间隙索引可能因增删/拖拽而过期，插入前夹回有效区间，宁可落点偏移也不抛越界异常。
+            var index = Math.Clamp(insertIndex, 0, ChildNodes.Count);
+            ChildNodes.Insert(index, instance);
+            // 菜单保持展开并后移一位：连续添加时新节点依次排在前一个之后，
+            // 与旧版「末尾连续添加」行为一致，间隙处连续插入也保持同样的节奏。
+            _menuInsertIndex = index + 1;
+        }
         InvokeAsync(StateHasChanged);
     }
 

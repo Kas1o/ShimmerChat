@@ -418,6 +418,38 @@
     outline-offset: -1px;
 }
 
+/* ── Insert Rows (任意位置插入) ────────────────── */
+/* 间隙行包住 DropStrip：拖放与点按共用同一条间隙。
+   padding 把命中区从 4px 放宽到 10px，鼠标纵向扫过间隙即可唤出 + 按钮；
+   按钮绝对定位在左侧操作列（⇧⇩ 一列）的延长线上，不挤占布局。 */
+.tn-insert-row {
+    position: relative;
+    padding: 3px 0;
+}
+.tn-insert-btn {
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 18px; height: 16px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px dashed var(--su-border-0);
+    border-radius: 4px;
+    background: var(--su-surface-1);
+    color: var(--su-text-1);
+    font-size: 0.72em; line-height: 1;
+    cursor: pointer; z-index: 5;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+/* 平时隐藏（pointer-events:none）避免误触相邻卡片边缘；
+   悬停整个间隙行时浮现并可点击，按钮本身在行内所以悬停不会中断。 */
+.tn-insert-row:hover .tn-insert-btn { opacity: 1; pointer-events: auto; }
+.tn-insert-btn:hover {
+    color: var(--su-text-0);
+    border-color: rgba(100, 150, 255, 0.45);
+    background: rgba(100, 150, 255, 0.12);
+}
+
 /* ── Floating Save Button（三个节点编辑页面共用） ── */
 
 /* 固定在视口右下角，节点树很长时无需滚动到底部即可保存 */

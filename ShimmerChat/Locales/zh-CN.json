@@ -128,7 +128,8 @@
 
   "node_editor.filter_placeholder": "筛选...",
   "node_editor.back": "返回",
-  "node_editor.add_child": "添加子节点",
+  "node_editor.add_child": "添加子节点（插入到末尾）",
+  "node_editor.insert_here": "在此处插入节点",
   "node_editor.paste_copied": "粘贴复制的节点",
   "node_editor.move_up": "上移",
   "node_editor.move_down": "下移",

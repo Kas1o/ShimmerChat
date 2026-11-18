@@ -249,8 +249,8 @@ TreeEditor
               │     ├── .po-search (选项 ≥ 8 且声明可搜索时)
               │     └── .po-list (分组标题 + 选项 + 副标题)
               ├── [NodeProperty] List<T> → ChildListEditor
-              │     ├── NodePickerMenu (添加菜单)
-              │     ├── DropStrip × (插入点)
+              │     ├── 插入行 × (N+1 个间隙：DropStrip + 悬停浮现的 + 按钮)
+              │     │     └── 就地展开的 NodePickerMenu（菜单位置 = 插入位置）
               │     └── TreeEditor × (子节点卡片)
               └── [NodeProperty] T → SlotEditor
                     ├── NodePickerMenu (添加菜单)
@@ -308,7 +308,7 @@ public class ConfigNode : IPreGenerationNode { ... }
 
 | 组件 | 用途 | 关键参数 |
 |------|------|---------|
-| `ChildListEditor` | 子列表编辑（添加/删除/排序/拖拽/粘贴） | `ChildNodes`, `Depth`, `CopyMe` |
+| `ChildListEditor` | 子列表编辑（任意位置插入/删除/排序/拖拽/粘贴） | `ChildNodes`, `Depth`, `CopyMe` |
 | `SlotEditor` | 单槽编辑（添加/删除/拖拽/粘贴） | `SlotNode`, `Depth`, `OnSet`, `OnClear`, `CopyMe` |
 | `NodePickerMenu` | 添加节点菜单（分类导航 + 搜索） | `OnSelect`, `OnClose` |
 | `DropStrip` | 拖拽放置条 | `TargetList`, `InsertIndex` |
@@ -337,11 +337,24 @@ public List<PreGenerationNodeWrapper> Children { get; set; } = new();
 
 `GenericNodeEditor` 通过 `TreeNodeReflection.IsListOfTreeNode()` 自动检测子列表属性（支持 `List<T>` 和 `IList<T>`，其中 `T : ITreeNode` 包装器）。`ChildListEditor` 自动提供：
 
-- 添加按钮 → NodePickerMenu
-- 粘贴按钮 → 剪贴板粘贴
+- 间隙 + 按钮（悬停浮现）→ NodePickerMenu 就地展开，选中的节点插入到该间隙 —— **任意位置插入**
+- 头部 + 按钮 → 同一菜单展开在末尾间隙（追加语义）
+- 粘贴按钮 → 剪贴板粘贴（追加到末尾）
 - 上下箭头 → 手动排序
 - 删除按钮
-- 拖拽排序 → DropStrip 插入点
+- 拖拽排序 → DropStrip 插入点（与间隙 + 按钮共用同一插入行）
+
+### 任意位置插入
+
+子列表的每个间隙（含首尾，共 N+1 个）渲染为一条插入行 `.tn-insert-row`，同时承担两种操作：
+
+| 行为 | 说明 |
+|------|------|
+| 间隙 + 按钮 | 鼠标掠过间隙时在左侧操作列（⇧⇩ 一列）位置浮现，平时隐藏不占注意力，也不会误触相邻卡片 |
+| 菜单位置即插入位置 | 点击 + 后 NodePickerMenu 就地展开在该间隙里，选中类型后节点插入到同一索引 |
+| 连续插入 | 插入后菜单保持展开并后移一位：连续添加的节点依次排在前一个之后（末尾连续追加与间隙连续插入节奏一致） |
+| 头部 + | 等价于打开末尾间隙的菜单；列表为空时末尾间隙即首间隙，与旧行为一致 |
+| 索引过期 | 菜单展开期间列表被增删/拖拽导致间隙索引越界时，插入前夹回有效区间（`Math.Clamp`），宁可落点偏移也不抛异常 |
 
 ### 单节点槽
 
@@ -362,7 +375,7 @@ public PreGenerationNodeWrapper? Then { get; set; }
 CascadingValue<TreeDragContext>       ← 全局级联
   ├── TreeEditor (.tn-header)         ← 拖拽源 (ParentList / OnDragRemove)
   ├── DropStrip                       ← 放置目标 (TargetList + InsertIndex)
-  ├── ChildListEditor                 ← 封装 DropStrip + TreeEditor
+  ├── ChildListEditor                 ← 封装插入行(DropStrip + 间隙 + 按钮 + 菜单) + TreeEditor
   └── SlotEditor                      ← 封装 NodePickerMenu + TreeEditor
 ```
 
@@ -527,6 +540,7 @@ public sealed class NodeDeserializationResult
 | `.ge-children` / `.ge-children-header` | 子列表容器/标题 |
 | `.tn-child-row` / `.tn-child-actions` / `.tn-child-tree` | 子节点行/按钮/TreeEditor |
 | `.tn-drop-strip` / `.tn-drop-strip-active` | 放置条 |
+| `.tn-insert-row` / `.tn-insert-btn` | 间隙插入行与悬停浮现的 + 按钮（任意位置插入） |
 | `.tn-btn-add` / `.tn-btn-del` / `.tn-btn-copy` / `.tn-btn-paste` / `.tn-btn-move` | 按钮 |
 | `.tn-btn-bypass` / `.tn-btn-bypass.is-active` | 旁路按钮（已旁路时警告色高亮） |
 | `.tree-node-card.tn-bypassed` | 已旁路卡片：左边框转警告色、头部降透明度、名称划线 |
