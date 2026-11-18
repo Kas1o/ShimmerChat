@@ -21,23 +21,12 @@
     gap: 24px;
     flex-wrap: wrap;
     padding: 22px 24px;
-    /* 扁平设计：纯色 accent-soft 面板 + 左侧 accent 色条，不使用渐变。 */
+    /* 扁平设计：纯色 accent-soft 面板，不使用渐变与装饰色条。 */
     background: var(--su-accent-soft);
     border: 1px solid color-mix(in srgb, var(--su-accent) 18%, transparent);
     border-radius: calc(var(--su-radius-lg) + 4px);
     box-shadow: var(--su-shadow-sm);
     overflow: hidden;
-}
-
-.agent-hero::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    background: var(--su-accent);
-    pointer-events: none;
 }
 
 .agent-hero::after {
