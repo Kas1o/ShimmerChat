@@ -53,6 +53,50 @@ public class NodeTreeSerializationTests
     }
 
     [Fact]
+    public void RoundTrip_PreservesBypassStateOnWrapper()
+    {
+        var serializer = CreateSerializer();
+        var root = new PreGenerationNodeWrapper(new SequenceNode(), "Root") { IsBypassed = true };
+        ((SequenceNode)root.Node!).Nodes.Add(new PreGenerationNodeWrapper(new FragmentNode(), "Child"));
+
+        var json = serializer.Serialize(root);
+        var obj = JObject.Parse(json);
+
+        // 旁路状态属于包装器，不进入负载；子节点默认不旁路
+        obj["IsBypassed"]!.Value<bool>().Should().BeTrue();
+        obj["Node"]!["IsBypassed"].Should().BeNull();
+
+        var restored = serializer.Deserialize(json)!;
+        restored.IsBypassed.Should().BeTrue();
+        var restoredPayload = (SequenceNode)restored.Node!;
+        restoredPayload.Nodes[0].IsBypassed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Deserialize_JsonWithoutBypassField_DefaultsToNotBypassed()
+    {
+        // 旁路是新增字段：已保存的树 JSON 里没有 IsBypassed，读取后必须是「未旁路」，
+        // 行为与旧版本一致，不需要任何手动迁移。
+        var serializer = CreateSerializer();
+        var legacy = $$"""
+        {
+          "Id": "root-1",
+          "Name": "Old Tree",
+          "IsExpanded": true,
+          "Node": {
+            "$type": "{{typeof(SequenceNode).FullName}}",
+            "Repeat": 1
+          }
+        }
+        """;
+
+        var restored = serializer.Deserialize(legacy)!;
+
+        restored.IsBypassed.Should().BeFalse();
+        restored.Name.Should().Be("Old Tree");
+    }
+
+    [Fact]
     public void Deserialize_LegacyTree_MigratesIdNameAndChildren()
     {
         var serializer = CreateSerializer();

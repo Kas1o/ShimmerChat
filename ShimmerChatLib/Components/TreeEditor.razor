@@ -5,7 +5,7 @@
 
 @if (Node.Payload == null)
 {
-    <div class="tree-node-card" style="border-left-color: var(--node-error, #d9534f);">
+    <div class="tree-node-card @(Node.IsBypassed ? "tn-bypassed" : "")" style="border-left-color: var(--node-error, #d9534f);">
         <div class="tn-header @(_isDraggingSelf ? "tn-dragging" : "")"
              draggable="@(_isDraggable ? "true" : null)"
              @ondragstart="OnDragStart" @ondragend="OnDragEnd">
@@ -13,6 +13,10 @@
             <span class="tn-label">@Loc["tree_editor.payload_missing"]</span>
             <span class="tn-name" title="@Loc["tree_editor.payload_missing.hint"]">@Node.Name</span>
             <div class="tn-actions">
+                <button class="tn-btn tn-btn-bypass @(Node.IsBypassed ? "is-active" : "")"
+                        @onclick="ToggleBypass"
+                        @onclick:stopPropagation="true"
+                        title="@BypassButtonTitle">⊘</button>
                 @if (CopyMe != null)
                 {
                     <button class="tn-btn tn-btn-copy" @onclick="() => CopyMe?.Invoke(Node)"
@@ -35,7 +39,7 @@
 }
 else if (_info == null)
 {
-    <div class="tree-node-card" style="border-left-color: var(--node-debug);">
+    <div class="tree-node-card @(Node.IsBypassed ? "tn-bypassed" : "")" style="border-left-color: var(--node-debug);">
         <div class="tn-header @(_isDraggingSelf ? "tn-dragging" : "")"
              draggable="@(_isDraggable ? "true" : null)"
              @ondragstart="OnDragStart" @ondragend="OnDragEnd">
@@ -43,6 +47,10 @@ else if (_info == null)
             <span class="tn-label">@Node.PayloadType.Name</span>
             <span class="tn-name">@Node.Name</span>
             <div class="tn-actions">
+                <button class="tn-btn tn-btn-bypass @(Node.IsBypassed ? "is-active" : "")"
+                        @onclick="ToggleBypass"
+                        @onclick:stopPropagation="true"
+                        title="@BypassButtonTitle">⊘</button>
                 @if (CopyMe != null)
                 {
                     <button class="tn-btn tn-btn-copy" @onclick="() => CopyMe?.Invoke(Node)"
@@ -59,7 +67,7 @@ else if (_info == null)
 }
 else
 {
-    <div class="tree-node-card" style="border-left-color: @_info.Color;">
+    <div class="tree-node-card @(Node.IsBypassed ? "tn-bypassed" : "")" style="border-left-color: @_info.Color;">
         <div class="tn-header @(_isDraggingSelf ? "tn-dragging" : "")"
              @onclick="ToggleExpand"
              draggable="@(_isDraggable ? "true" : null)"
@@ -69,6 +77,10 @@ else
             <input class="tn-name-input" @bind="Node.Name" @bind:event="oninput"
                    @onkeydown="OnNameKeyDown" @onclick:stopPropagation="true" placeholder="@Loc["tree_editor.name_placeholder"]" />
             <div class="tn-actions">
+                <button class="tn-btn tn-btn-bypass @(Node.IsBypassed ? "is-active" : "")"
+                        @onclick="ToggleBypass"
+                        @onclick:stopPropagation="true"
+                        title="@BypassButtonTitle">⊘</button>
                 @if (CopyMe != null)
                 {
                     <button class="tn-btn tn-btn-copy" @onclick="() => CopyMe?.Invoke(Node)"
@@ -142,6 +154,11 @@ else
     private bool _isDraggingSelf => DragContext?.DraggedNode == Node;
     private bool _isDraggable => (ParentList != null && Depth > 0) || OnDragRemove != null;
 
+    /// <summary>旁路按钮提示语：未旁路时说明旁路效果，已旁路时说明如何恢复。</summary>
+    private string BypassButtonTitle => Node.IsBypassed
+        ? Loc["tree_editor.unbypass"]
+        : Loc["tree_editor.bypass"];
+
     protected override void OnParametersSet()
     {
         var payloadType = Node.Payload?.GetType();
@@ -156,6 +173,12 @@ else
     }
 
     private void ToggleExpand() => Node.IsExpanded = !Node.IsExpanded;
+
+    /// <summary>
+    /// 旁路开关写在包装器上，随节点树持久化；执行阶段由包装器短路，子树一并跳过。
+    /// 三个分支（含负载缺失卡片）都提供开关，损坏节点可以先旁路再等插件恢复。
+    /// </summary>
+    private void ToggleBypass() => Node.IsBypassed = !Node.IsBypassed;
 
     private Task OnNameKeyDown(KeyboardEventArgs e)
     {

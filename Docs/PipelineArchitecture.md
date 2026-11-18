@@ -54,6 +54,7 @@ public interface ITreeNode
     string Id { get; set; }          // 唯一标识 (GUID)
     string Name { get; set; }        // 用户可编辑名称
     bool IsExpanded { get; set; }    // 展开状态，随树持久化
+    bool IsBypassed { get; set; }    // 旁路：执行时跳过该节点及整棵子树，随树持久化
     object? Payload { get; }         // 业务节点实例（可能为 null，表示数据缺失）
     Type PayloadType { get; }
 }
@@ -73,6 +74,8 @@ IRenderModifierNode  // Execute(RenderNodeExecutionContext)
 ```
 
 包装器负责补齐执行错误的 `NodeId`/`NodeName`、维护展开状态，并在反序列化失败时把缺失负载暴露为可见错误。
+旁路（`IsBypassed`）也由包装器实施：三个管线的 `Execute` 入口统一短路，开启时负载与整棵子树不执行、直接返回成功；
+根包装器旁路 = 整条管线空跑。详见 [节点编辑器系统](NodeEditorSystem.md#旁路isbypassed)。
 
 ---
 

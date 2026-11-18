@@ -53,6 +53,18 @@
 .tn-btn-copy:hover  { opacity: 0.75; }
 .tn-btn-exp   { background: transparent; color: var(--su-text-1); font-size: 0.65em; }
 
+/* ── Bypass (旁路) ────────────────────────────── */
+/* 未旁路：低调的幽灵按钮，避免与复制/删除抢注意力；
+   已旁路：警告色高亮，卡片整体降透明度 + 名称划线，折叠状态下也一眼可辨。 */
+.tn-btn-bypass { background: transparent; color: var(--su-text-1); font-size: 0.75em; }
+.tn-btn-bypass:hover { background: var(--su-surface-3); color: var(--su-text-2); }
+.tn-btn-bypass.is-active { background: var(--su-warning-soft); color: var(--su-warning); }
+.tn-btn-bypass.is-active:hover { opacity: 0.8; }
+.tree-node-card.tn-bypassed { border-left-color: var(--su-warning); }
+.tree-node-card.tn-bypassed .tn-header { opacity: 0.6; }
+.tree-node-card.tn-bypassed .tn-name,
+.tree-node-card.tn-bypassed .tn-name-input { text-decoration: line-through; }
+
 /* ── tn-child-row / tn-child-actions ──────────── */
 .tn-child-row { display: flex; align-items: flex-start; gap: 2px; }
 .tn-child-tree { flex: 1; min-width: 0; }

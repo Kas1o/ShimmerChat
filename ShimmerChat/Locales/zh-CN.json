@@ -143,6 +143,8 @@
   "tree_editor.name_placeholder": "名称",
   "tree_editor.collapse": "折叠",
   "tree_editor.expand": "展开",
+  "tree_editor.bypass": "旁路：执行时跳过该节点及其子树",
+  "tree_editor.unbypass": "取消旁路：恢复执行该节点",
   "tree_editor.payload_missing": "节点数据缺失",
   "tree_editor.payload_missing.hint": "该节点的数据无法加载（未知类型或 JSON 损坏）。编辑器保留错误提示，而不是把它隐藏起来。",
 

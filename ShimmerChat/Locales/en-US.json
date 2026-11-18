@@ -143,6 +143,8 @@
   "tree_editor.name_placeholder": "Name",
   "tree_editor.collapse": "Collapse",
   "tree_editor.expand": "Expand",
+  "tree_editor.bypass": "Bypass: skip this node and its subtree during execution",
+  "tree_editor.unbypass": "Clear bypass: execute this node again",
   "tree_editor.payload_missing": "Node data missing",
   "tree_editor.payload_missing.hint": "This node's payload could not be loaded (unknown type or corrupted JSON). The tree fell back instead of hiding the error.",
 

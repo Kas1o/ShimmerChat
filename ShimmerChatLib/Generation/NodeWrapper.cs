@@ -3,7 +3,7 @@ using System.Reflection;
 namespace ShimmerChatLib.Generation
 {
     /// <summary>
-    /// 节点包装器基类。持有树结构状态（Id / 显示名 / 展开状态），把这些状态从业务节点类中移出。
+    /// 节点包装器基类。持有树结构状态（Id / 显示名 / 展开状态 / 旁路状态），把这些状态从业务节点类中移出。
     /// 序列化时包装器只写出自身状态与 <c>Node</c> 负载，负载仍按白名单类型解析。
     /// </summary>
     /// <typeparam name="TNode">管线节点接口类型。</typeparam>
@@ -14,6 +14,12 @@ namespace ShimmerChatLib.Generation
         public string Name { get; set; } = "";
 
         public bool IsExpanded { get; set; } = true;
+
+        /// <summary>
+        /// 旁路开关。开启后包装器的 Execute/ExecuteAsync 直接返回成功，负载与子树都不执行；
+        /// 容器节点的子包装器经由包装器入口执行，因此旁路会整棵子树生效。
+        /// </summary>
+        public bool IsBypassed { get; set; }
 
         /// <summary>业务节点实例。反序列化失败或数据缺失时为 null。</summary>
         public TNode? Node { get; set; }
@@ -43,6 +49,11 @@ namespace ShimmerChatLib.Generation
 
         public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
+            // 旁路先于负载检查：被旁路的节点不执行，负载是否完整无关紧要；
+            // 这也允许用户临时摘除因插件卸载而损坏的节点，等插件恢复后再启用。
+            if (IsBypassed)
+                return NodeResult.SuccessResult();
+
             if (Node == null)
                 return NodeResult.Failure(
                     NodeErrorCodes.PayloadMissing,
@@ -84,6 +95,10 @@ namespace ShimmerChatLib.Generation
 
         public async Task<PostNodeResult> ExecuteAsync(PostNodeExecutionContext context)
         {
+            // 旁路先于负载检查：被旁路的节点不执行，负载是否完整无关紧要（与 Pre 包装器一致）。
+            if (IsBypassed)
+                return PostNodeResult.SuccessResult();
+
             if (Node == null)
             {
                 var missing = PostNodeResult.Failure(
@@ -116,6 +131,10 @@ namespace ShimmerChatLib.Generation
 
         public void Execute(RenderNodeExecutionContext context)
         {
+            // 旁路先于负载检查：被旁路的节点不改写内容，也不抛异常（与 Pre/Post 包装器一致）。
+            if (IsBypassed)
+                return;
+
             if (Node == null)
                 throw new RenderNodeException(
                     NodeErrorCodes.PayloadMissing,

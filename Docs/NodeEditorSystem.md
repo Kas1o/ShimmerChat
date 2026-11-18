@@ -1,6 +1,6 @@
 # 节点编辑器系统
 
-三个管线共用同一套节点编辑器 UI 组件。业务节点只实现管线接口；树结构状态（Id、显示名、展开状态）由 `NodeWrapper<TNode>` 持有。所有组件通过 `ITreeNode`（包装器）操作树，通过 `TreeEditorContext` 获取管线特化的序列化器和类型目录。
+三个管线共用同一套节点编辑器 UI 组件。业务节点只实现管线接口；树结构状态（Id、显示名、展开状态、旁路状态）由 `NodeWrapper<TNode>` 持有。所有组件通过 `ITreeNode`（包装器）操作树，通过 `TreeEditorContext` 获取管线特化的序列化器和类型目录。
 
 > **为什么需要包装器**：名称、Id、展开状态不是节点业务逻辑，而是「树中的位置」的元数据。
 > 把它们放在包装器里，业务节点类不再被迫声明 `Id`/`Name`，序列化也不会把展示字段混进节点负载；
@@ -14,6 +14,7 @@ public interface ITreeNode
     string Id { get; set; }
     string Name { get; set; }
     bool IsExpanded { get; set; }
+    bool IsBypassed { get; set; }   // 旁路：执行时跳过该节点及整棵子树
     object? Payload { get; }
     Type PayloadType { get; }
 }
@@ -23,6 +24,7 @@ public class NodeWrapper<TNode> : ITreeNode where TNode : class
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Name { get; set; } = "";
     public bool IsExpanded { get; set; } = true;
+    public bool IsBypassed { get; set; }
     public TNode? Node { get; set; }            // 业务节点负载
 }
 
@@ -40,6 +42,19 @@ public List<PreGenerationNodeWrapper> Children { get; set; } = new();
 
 包装器的 `ExecuteAsync`/`Execute` 会转发到负载，并在失败时补齐 `NodeId`/`NodeName`；
 渲染节点用 `context.CurrentNodeName` 读取当前显示名。
+
+### 旁路（IsBypassed）
+
+包装器的 `ExecuteAsync`/`Execute` 在入口处检查 `IsBypassed`：开启时直接返回成功，
+负载与整棵子树都不执行——对宿主而言等价于这棵子树被临时摘除，配置原样保留。
+
+| 语义 | 说明 |
+|------|------|
+| 生效范围 | 该节点及其全部子孙（容器经由包装器入口执行子节点，短路自然传播） |
+| 根节点 | 也可旁路，效果是整条管线空跑（Pre 环境保持默认 / Post 响应原样 / Render 内容不变） |
+| 检查顺序 | 旁路先于「负载缺失」检查：损坏节点（插件卸载后残留）可以先旁路止血，插件恢复后再启用；未旁路时缺失负载仍显式失败 `NODE_PAYLOAD_MISSING` |
+| 持久化 | 随节点树一起保存（与 `IsExpanded` 同层），旧 JSON 无此字段时读取为 `false`，无需迁移 |
+| 编辑器 | 卡片头部的 ⊘ 按钮切换；已旁路的卡片降透明度、名称划线、左边框转警告色，折叠状态下一眼可辨 |
 
 ---
 
@@ -224,7 +239,7 @@ public class NodeEditorAttribute : Attribute
 
 ```
 TreeEditor
-  ├── .tn-header (图标 + 标签 + 名称输入框 + 复制/删除按钮)
+  ├── .tn-header (图标 + 标签 + 名称输入框 + 旁路/复制/删除按钮)
   └── .tn-body (展开时)
         ├── 有 [NodeEditor] → DynamicComponent 加载自定义编辑器
         └── 无 [NodeEditor] → NodeBodyRenderer → GenericNodeEditor<T>
@@ -440,6 +455,7 @@ _editorContext = new TreeEditorContext(serializer, nodeTypeCatalog, typeof(IRend
   "Id": "…",
   "Name": "System Prompt",
   "IsExpanded": false,
+  "IsBypassed": false,
   "Node": {
     "$type": "ShimmerChatBuiltin.Fragments.FragmentNode",
     "Content": "You are a helpful AI assistant."
@@ -447,9 +463,10 @@ _editorContext = new TreeEditorContext(serializer, nodeTypeCatalog, typeof(IRend
 }
 ```
 
-- `Id` / `Name` / `IsExpanded` 属于包装器，由编辑器维护；业务节点类不再声明它们。
+- `Id` / `Name` / `IsExpanded` / `IsBypassed` 属于包装器，由编辑器维护；业务节点类不再声明它们。
 - `Node` 的 `$type` 仍走白名单（`SerializationBinder`）。包装器类型本身也被加入白名单，因为 `TypeNameHandling.Objects` 可能给根包装器写出 `$type`。
 - 展开状态随树保存：折叠/展开会改变 `IsExpanded`，下一次保存预设/Agent 树时一起写回。
+- 旁路状态同理随树保存；旧版本保存的 JSON 没有 `IsBypassed` 字段，读取后为 `false`（未旁路），行为与升级前一致。
 
 ### 7.2 反序列化结果
 
@@ -478,6 +495,7 @@ public sealed class NodeDeserializationResult
 
 失败时**不返回空树**：序列化器输出 `LogError`，页面显示 `generation_config.tree_load_failed`（附错误原因）并回退到空白根节点。
 节点负载缺失（`Node == null`）时编辑器卡片显示 `tree_editor.payload_missing`，执行时返回 `NODE_PAYLOAD_MISSING`，不会被当成空节点静默跳过。
+唯一的例外是旁路：`IsBypassed = true` 的包装器不检查负载，直接返回成功——这是用户显式摘除节点，不是静默兜底。
 
 ### 7.3 旧格式懒迁移
 
@@ -510,5 +528,7 @@ public sealed class NodeDeserializationResult
 | `.tn-child-row` / `.tn-child-actions` / `.tn-child-tree` | 子节点行/按钮/TreeEditor |
 | `.tn-drop-strip` / `.tn-drop-strip-active` | 放置条 |
 | `.tn-btn-add` / `.tn-btn-del` / `.tn-btn-copy` / `.tn-btn-paste` / `.tn-btn-move` | 按钮 |
+| `.tn-btn-bypass` / `.tn-btn-bypass.is-active` | 旁路按钮（已旁路时警告色高亮） |
+| `.tree-node-card.tn-bypassed` | 已旁路卡片：左边框转警告色、头部降透明度、名称划线 |
 | `.tn-add-menu` / `.tn-add-search` / `.tn-add-item` | 添加节点菜单 |
 | `.tree-node-card` / `.tn-header` / `.tn-body` | 节点卡片 |

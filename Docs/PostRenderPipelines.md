@@ -19,6 +19,8 @@ public interface IPostGenerationNode
 ```
 
 > 树结构状态由 `PostGenerationNodeWrapper` 持有；执行失败时包装器补齐 `NodeId`/`NodeName`。
+> 包装器旁路（`IsBypassed`）：开启后该节点及整棵子树执行时被跳过并返回成功，`LoopDirective` 等副作用都不会产生；
+> 旁路整个后处理树时，响应原样提交、循环按默认 `Stop` 结束。
 
 ### PostNodeExecutionContext
 
@@ -161,6 +163,8 @@ public interface IRenderModifierNode
 ```
 
 注意：`IRenderModifierNode.Execute` 是**同步 void 方法**，与前两个管线的 `async Task<NodeResult>` 模式不同。失败时通过抛出 `RenderNodeException` 来报告错误。
+
+包装器旁路（`IsBypassed`）在 `RenderModifierNodeWrapper.Execute` 入口短路：被旁路的节点不改写内容、不产生 `ChangeLog` 记录，也不抛异常——下游节点读到的是上一个未旁路节点的输出。旁路整个渲染树时内容原样通过。
 
 ### RenderNodeExecutionContext
 

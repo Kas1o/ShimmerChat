@@ -13,8 +13,10 @@ public interface IPreGenerationNode
 }
 ```
 
-> 树中的 Id、显示名与展开状态由 `PreGenerationNodeWrapper` 持有；业务节点不再声明 `Id`/`Name`。
+> 树中的 Id、显示名、展开状态与旁路状态由 `PreGenerationNodeWrapper` 持有；业务节点不再声明 `Id`/`Name`。
 > 执行失败时包装器会自动补齐 `NodeResult.NodeId` / `NodeName`。
+> 包装器旁路（`IsBypassed`，编辑器卡片头部的 ⊘ 按钮）：开启后该节点及整棵子树执行时被跳过并返回成功，
+> 配置原样保留、随树持久化；损坏节点（插件卸载后负载缺失）也可先旁路止血。
 
 ### 最小实现
 
