@@ -36,6 +36,13 @@
   "tool.web_fetch.desc": "抓取指定 URL 的网页正文（仅部分搜索服务支持）",
   "tool.generate_image": "生成图像",
   "tool.generate_image.desc": "通过已配置的 ComfyUI 或 A1111 端点生成图像，并返回可嵌入回复的 /userimages/ 链接",
+  "tool.creator_agent": "Creator：智能体管理",
+  "tool.creator_agent.desc": "新建、列出、查看、修改与删除智能体，并读取或替换其私有管线树（前生成 / 后生成 / 渲染修改）",
+  "tool.creator_node_catalog": "Creator：节点目录",
+  "tool.creator_node_catalog.desc": "列出所有可用管线节点类型及其属性元数据，并列出已注册工具",
+  "tool.creator_preset": "Creator：管线预设",
+  "tool.creator_preset.desc": "列出、查看、新建、修改与删除前生成 / 后生成 / 渲染修改预设",
+  "category.creator": "Creator",
 
   "panel.api_settings": "API 设置",
   "panel.api_settings.desc": "配置 LLM API 连接参数和模型选择",

@@ -1,4 +1,3 @@
-using Newtonsoft.Json;
 using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
@@ -19,11 +18,10 @@ namespace ShimmerChatBuiltin.NodeBasic.PostGeneration
                 return Fail(NodeErrorCodes.DataMissing, "Preset ID is empty");
 
             var kvData = context.Env.Persistent.KVData;
-            var json = kvData.Read("PostGenerationManager", "post_generation_presets");
-            if (string.IsNullOrEmpty(json))
+            var presets = PipelinePresetStore.ReadAll<PostGenerationPreset>(kvData, GenerationPipeline.PostGeneration);
+            if (presets.Count == 0)
                 return Fail(NodeErrorCodes.DataMissing, "No post-generation presets found");
 
-            var presets = JsonConvert.DeserializeObject<List<PostGenerationPreset>>(json) ?? new();
             var preset = presets.FirstOrDefault(p => p.Id == PresetId);
             if (preset == null)
                 return Fail(NodeErrorCodes.PresetNotFound, $"Post-generation preset not found: {PresetId}");

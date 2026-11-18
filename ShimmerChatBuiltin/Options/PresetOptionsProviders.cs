@@ -8,9 +8,13 @@ namespace ShimmerChatBuiltin.Options
     {
         public override string Key => "pre_generation_presets";
 
-        protected override string SpaceId => "GenerationManager";
+        // 存储位置由 PipelinePresetStore 统一定义，选项提供者只保留自己的 OptionsKey。
+        private static (string SpaceId, string StoreKey) Location =>
+            PipelinePresetStore.GetLocation(GenerationPipeline.PreGeneration);
 
-        protected override string StoreKey => "generation_presets";
+        protected override string SpaceId => Location.SpaceId;
+
+        protected override string StoreKey => Location.StoreKey;
 
         protected override string GetId(PreGenerationPreset item, IServiceProvider services) => item.Id;
 
@@ -22,9 +26,12 @@ namespace ShimmerChatBuiltin.Options
     {
         public override string Key => "post_generation_presets";
 
-        protected override string SpaceId => "PostGenerationManager";
+        private static (string SpaceId, string StoreKey) Location =>
+            PipelinePresetStore.GetLocation(GenerationPipeline.PostGeneration);
 
-        protected override string StoreKey => "post_generation_presets";
+        protected override string SpaceId => Location.SpaceId;
+
+        protected override string StoreKey => Location.StoreKey;
 
         protected override string GetId(PostGenerationPreset item, IServiceProvider services) => item.Id;
 
@@ -36,9 +43,12 @@ namespace ShimmerChatBuiltin.Options
     {
         public override string Key => "render_modifier_presets";
 
-        protected override string SpaceId => "RenderModifierManager";
+        private static (string SpaceId, string StoreKey) Location =>
+            PipelinePresetStore.GetLocation(GenerationPipeline.RenderModifier);
 
-        protected override string StoreKey => "render_modifier_presets";
+        protected override string SpaceId => Location.SpaceId;
+
+        protected override string StoreKey => Location.StoreKey;
 
         protected override string GetId(RenderModifierPreset item, IServiceProvider services) => item.Id;
 

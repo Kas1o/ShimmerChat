@@ -91,5 +91,17 @@ namespace ShimmerChatLib.Generation
 
         /// <summary>代码工具被配置为不输出图像，却尝试附加图像。</summary>
         public const string ImageOutputDisabled = "TOOL_IMAGE_OUTPUT_DISABLED";
+
+        /// <summary>操作目标（Agent / 预设等按 Id 寻址的对象）不存在。</summary>
+        public const string TargetNotFound = "TOOL_TARGET_NOT_FOUND";
+
+        /// <summary>操作目标受系统管理（如 "__default__" 预设），拒绝修改或删除。</summary>
+        public const string ProtectedTarget = "TOOL_PROTECTED_TARGET";
+
+        /// <summary>传入的节点树 JSON 未通过对应管线序列化器的白名单校验。</summary>
+        public const string TreeJsonInvalid = "TOOL_TREE_JSON_INVALID";
+
+        /// <summary>工具依赖的宿主服务（节点目录、序列化器、界面注册表等）在当前上下文不可用。</summary>
+        public const string HostServiceUnavailable = "TOOL_HOST_SERVICE_UNAVAILABLE";
     }
 }

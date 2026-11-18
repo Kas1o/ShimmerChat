@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using SharperLLM.Util;
 using ShimmerChatBuiltin.Misc.Node.PostGeneration;
 using ShimmerChatBuiltin.NodeBasic.PostGeneration;
@@ -116,10 +115,8 @@ namespace ShimmerChat.Singletons
 
         private void EnsureDefaultPostPreset()
         {
-            var json = _kvData.Read("PostGenerationManager", "post_generation_presets");
-            var presets = string.IsNullOrEmpty(json)
-                ? new List<PostGenerationPreset>()
-                : (JsonConvert.DeserializeObject<List<PostGenerationPreset>>(json) ?? new List<PostGenerationPreset>());
+            // 读取与写回都走 PipelinePresetStore（存储位置的唯一事实来源）。
+            var presets = PipelinePresetStore.ReadAll<PostGenerationPreset>(_kvData, GenerationPipeline.PostGeneration);
 
             presets.RemoveAll(p => p.Id == "__default__");
 
@@ -138,8 +135,7 @@ namespace ShimmerChat.Singletons
                 }, "Default"))
             });
 
-            _kvData.Write("PostGenerationManager", "post_generation_presets",
-                JsonConvert.SerializeObject(presets, Formatting.Indented));
+            PipelinePresetStore.WriteAll(_kvData, GenerationPipeline.PostGeneration, presets);
         }
 
         private static PostGenerationNodeWrapper CreateFallbackRoot()

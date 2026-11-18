@@ -1,4 +1,3 @@
-using Newtonsoft.Json;
 using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.NodeBasic.Render
@@ -19,12 +18,12 @@ namespace ShimmerChatBuiltin.NodeBasic.Render
                 throw new RenderNodeException(
                     NodeErrorCodes.DataMissing, "Preset ID is empty", context.CurrentNodeId, context.CurrentNodeName);
 
-            var json = context.Env.KVData.Read("RenderModifierManager", "render_modifier_presets");
-            if (string.IsNullOrEmpty(json))
+            var presets = PipelinePresetStore.ReadAll<RenderModifierPreset>(
+                context.Env.KVData, GenerationPipeline.RenderModifier);
+            if (presets.Count == 0)
                 throw new RenderNodeException(
                     NodeErrorCodes.DataMissing, "No render modifier presets found", context.CurrentNodeId, context.CurrentNodeName);
 
-            var presets = JsonConvert.DeserializeObject<List<RenderModifierPreset>>(json) ?? new();
             var preset = presets.FirstOrDefault(p => p.Id == PresetId);
             if (preset == null)
                 throw new RenderNodeException(

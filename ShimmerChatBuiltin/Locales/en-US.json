@@ -36,6 +36,13 @@
   "tool.web_fetch.desc": "Fetch the text content of a URL (only offered by some search services)",
   "tool.generate_image": "Generate Image",
   "tool.generate_image.desc": "Generate an image through a configured ComfyUI or A1111 endpoint and return /userimages/ links that can be embedded in the reply",
+  "tool.creator_agent": "Creator: Agent Manager",
+  "tool.creator_agent.desc": "Create, list, inspect, update and delete agents, and read or replace their private pipeline trees (pre-generation / post-generation / render modifier)",
+  "tool.creator_node_catalog": "Creator: Node Catalog",
+  "tool.creator_node_catalog.desc": "List every available pipeline node type with its property metadata, and list the registered tools",
+  "tool.creator_preset": "Creator: Pipeline Presets",
+  "tool.creator_preset.desc": "List, inspect, create, update and delete pre-generation / post-generation / render modifier presets",
+  "category.creator": "Creator",
 
   "panel.api_settings": "API Settings",
   "panel.api_settings.desc": "Configure LLM API connection parameters and model selection",

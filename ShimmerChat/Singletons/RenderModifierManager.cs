@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using ShimmerChatBuiltin.Misc.Node.Render;
 using ShimmerChatBuiltin.NodeBasic.Render;
 using ShimmerChatLib;
@@ -101,10 +100,8 @@ namespace ShimmerChat.Singletons
 
         private void EnsureDefaultRenderPreset()
         {
-            var json = _kvData.Read("RenderModifierManager", "render_modifier_presets");
-            var presets = string.IsNullOrEmpty(json)
-                ? new List<RenderModifierPreset>()
-                : (JsonConvert.DeserializeObject<List<RenderModifierPreset>>(json) ?? new List<RenderModifierPreset>());
+            // 读取与写回都走 PipelinePresetStore（存储位置的唯一事实来源）。
+            var presets = PipelinePresetStore.ReadAll<RenderModifierPreset>(_kvData, GenerationPipeline.RenderModifier);
 
             presets.RemoveAll(p => p.Id == "__default__");
 
@@ -122,8 +119,7 @@ namespace ShimmerChat.Singletons
                     }, "Default"))
             });
 
-            _kvData.Write("RenderModifierManager", "render_modifier_presets",
-                JsonConvert.SerializeObject(presets, Formatting.Indented));
+            PipelinePresetStore.WriteAll(_kvData, GenerationPipeline.RenderModifier, presets);
         }
 
         private static RenderModifierNodeWrapper CreateFallbackRoot()

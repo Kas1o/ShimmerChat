@@ -1,4 +1,3 @@
-using Newtonsoft.Json;
 using ShimmerChatLib.Generation;
 
 namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
@@ -25,13 +24,12 @@ namespace ShimmerChatBuiltin.NodeBasic.PreGeneration
                     loc["node_err.call_empty_id"]);
 
             var kvData = context.Env.Persistent.KVData;
-            var json = kvData.Read("GenerationManager", "generation_presets");
-            if (string.IsNullOrEmpty(json))
+            var presets = PipelinePresetStore.ReadAll<PreGenerationPreset>(kvData, GenerationPipeline.PreGeneration);
+            if (presets.Count == 0)
                 return NodeResult.Failure(
                     NodeErrorCodes.DataMissing,
                     loc["node_err.call_no_presets"]);
 
-            var presets = JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? new();
             var preset = presets.FirstOrDefault(p => p.Id == PresetId);
             if (preset == null)
                 return NodeResult.Failure(

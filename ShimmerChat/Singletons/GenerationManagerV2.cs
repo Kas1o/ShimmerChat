@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using SharperLLM.API;
 using SharperLLM.FunctionCalling;
 using SharperLLM.Util;
@@ -59,10 +58,8 @@ namespace ShimmerChat.Singletons
 
         private void EnsureDefaultPreset()
         {
-            var json = _kvData.Read("GenerationManager", "generation_presets");
-            var presets = string.IsNullOrEmpty(json)
-                ? new List<PreGenerationPreset>()
-                : (JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json) ?? new List<PreGenerationPreset>());
+            // 读取与写回都走 PipelinePresetStore（存储位置的唯一事实来源）。
+            var presets = PipelinePresetStore.ReadAll<PreGenerationPreset>(_kvData, GenerationPipeline.PreGeneration);
 
             presets.RemoveAll(p => p.Id == "__default__");
 
@@ -86,8 +83,7 @@ namespace ShimmerChat.Singletons
                 }, "Default"))
             });
 
-            _kvData.Write("GenerationManager", "generation_presets",
-                JsonConvert.SerializeObject(presets, Formatting.Indented));
+            PipelinePresetStore.WriteAll(_kvData, GenerationPipeline.PreGeneration, presets);
         }
 
         /// <summary>

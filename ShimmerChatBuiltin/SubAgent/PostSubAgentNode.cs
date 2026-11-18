@@ -242,8 +242,7 @@ namespace ShimmerChatBuiltin.SubAgent
 
             if (config.UseSharedPreset && !string.IsNullOrEmpty(config.ModifierPresetId))
             {
-                var json = kvData.Read("GenerationManager", "generation_presets");
-                var presets = JsonConvert.DeserializeObject<List<PreGenerationPreset>>(json ?? "[]") ?? [];
+                var presets = PipelinePresetStore.ReadAll<PreGenerationPreset>(kvData, GenerationPipeline.PreGeneration);
                 var preset = presets.FirstOrDefault(p => p.Id == config.ModifierPresetId);
                 if (preset != null)
                     return serializer.Deserialize(preset.RootNodeJson);

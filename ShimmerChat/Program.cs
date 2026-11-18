@@ -56,6 +56,8 @@ builder.Services.AddSingleton<IPostGenerationManagerService, PostGenerationManag
 
 // Render Modifier 管线
 builder.Services.AddSingleton<RenderModifierNodeSerializer>();
+// 接口注册：Creator 工具集等按管线分派的调用方需要以统一方式解析三种序列化器
+builder.Services.AddSingleton<IRenderModifierNodeSerializer>(sp => sp.GetRequiredService<RenderModifierNodeSerializer>());
 builder.Services.AddSingleton<IRenderModifierManager, RenderModifierManager>();
 
 // 生成提供器系统（Agent 级生成事件：CRON / Hook / 聊天软件集成等）

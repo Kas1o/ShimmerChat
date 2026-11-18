@@ -7,7 +7,7 @@ namespace ShimmerChat.Singletons
     /// <summary>
     /// 渲染修改节点树序列化器。扫描所有 IRenderModifierNode 实现构建类型白名单。
     /// </summary>
-    public class RenderModifierNodeSerializer : NodeJsonSerializerBase, ITreeNodeSerializer
+    public class RenderModifierNodeSerializer : NodeJsonSerializerBase, ITreeNodeSerializer, IRenderModifierNodeSerializer
     {
         protected override Type RootWrapperType => typeof(RenderModifierNodeWrapper);
 
