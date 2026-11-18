@@ -1211,13 +1211,19 @@
 
     static string GetCoverStyle(Agent agent)
     {
+        // 扁平设计：封面一律不使用渐变蒙版；徽章与操作按钮自带纯色底板保证可读性。
         if (agent.BackgroundGuid != null)
-            return $"background-image: linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 100%), url('/userimages/{agent.BackgroundGuid}.png');";
+            return $"background-image: url('/userimages/{agent.BackgroundGuid}.png');";
 
         if (agent.AvatarGuid != null)
-            return $"background-image: linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.45) 100%), url('/userimages/{agent.AvatarGuid}.png');";
+            return $"background-image: url('/userimages/{agent.AvatarGuid}.png');";
 
+        // 无图封面：角色色低透明纯色底 + 同色圆点纹理（SVG data URI，全部为纯色，无渐变）。
+        // _avatarColors 中的颜色固定为 #rrggbb，可直接拼接 alpha 与 URL 编码。
         var color = GetAvatarColor(agent.Name);
-        return $"background-image: radial-gradient(circle at 18% 18%, {color} 0%, {color}b3 48%, {color}66 100%);";
+        var hex = color.TrimStart('#');
+        var dots = "url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2218%22 height=%2218%22%3E%3Ccircle cx=%224%22 cy=%224%22 r=%222%22 fill=%22%23"
+            + hex + "%22 fill-opacity=%220.24%22/%3E%3C/svg%3E')";
+        return $"background-color: {color}2b; background-image: {dots}; background-size: 18px 18px;";
     }
 }

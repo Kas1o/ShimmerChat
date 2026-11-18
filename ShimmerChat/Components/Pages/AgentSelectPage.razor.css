@@ -21,13 +21,23 @@
     gap: 24px;
     flex-wrap: wrap;
     padding: 22px 24px;
-    background:
-        radial-gradient(circle at 92% -20%, color-mix(in srgb, var(--su-accent) 22%, transparent) 0%, transparent 55%),
-        linear-gradient(120deg, var(--su-accent-soft) 0%, var(--su-surface-1) 46%, var(--su-surface-1) 100%);
-    border: 1px solid var(--su-border-0);
+    /* 扁平设计：纯色 accent-soft 面板 + 左侧 accent 色条，不使用渐变。 */
+    background: var(--su-accent-soft);
+    border: 1px solid color-mix(in srgb, var(--su-accent) 18%, transparent);
     border-radius: calc(var(--su-radius-lg) + 4px);
     box-shadow: var(--su-shadow-sm);
     overflow: hidden;
+}
+
+.agent-hero::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--su-accent);
+    pointer-events: none;
 }
 
 .agent-hero::after {
@@ -38,10 +48,10 @@
     width: 240px;
     height: 240px;
     border-radius: 50%;
-    border: 1px solid color-mix(in srgb, var(--su-accent) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--su-accent) 22%, transparent);
     box-shadow:
-        0 0 0 26px color-mix(in srgb, var(--su-accent) 5%, transparent),
-        0 0 0 58px color-mix(in srgb, var(--su-accent) 3%, transparent);
+        0 0 0 26px color-mix(in srgb, var(--su-accent) 7%, transparent),
+        0 0 0 58px color-mix(in srgb, var(--su-accent) 4%, transparent);
     pointer-events: none;
 }
 
@@ -68,7 +78,8 @@
     border-radius: 16px;
     color: #fff;
     font-size: 24px;
-    background: linear-gradient(135deg, var(--su-accent), color-mix(in srgb, var(--su-accent) 55%, #a855f7));
+    /* 扁平纯色图标底板，不混色、不渐变。 */
+    background: var(--su-accent);
     box-shadow: 0 6px 16px color-mix(in srgb, var(--su-accent) 32%, transparent);
 }
 
@@ -555,13 +566,7 @@
     overflow: visible;
 }
 
-.agent-card-cover::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, transparent 35%, rgba(0, 0, 0, 0.22) 100%);
-    pointer-events: none;
-}
+/* 封面不再叠加渐变压暗层；徽章与操作按钮自带纯色底板，图片上仍可辨识。 */
 
 .agent-card-chat-badge {
     position: absolute;
