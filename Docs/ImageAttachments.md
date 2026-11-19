@@ -97,7 +97,7 @@ Linux 另有 arm / arm64 / musl 等变体。native 缺失时异常（`DllNotFoun
 | 文生图（见 [ImageGeneration.md](ImageGeneration.md)） | 每个 Profile 的 `OutputImageProcessing`；设置 → 文生图面板可编辑 | 跟随全局 |
 | MCP 图像（见 [McpIntegration.md](McpIntegration.md)） | 每个端点的 `ImageOutputProcessing`；MCP 端点编辑面板可编辑 | 跟随全局 |
 | `read_image`（见 [FileSystemTools.md](FileSystemTools.md)） | 工具参数 `image_processing`（`auto` / `original` / `budget` + `pixel_budget`），由调用方逐次指定 | `auto`（跟随全局） |
-| CodeAct `AddImageAsync` | 无配置；被调用工具的产物已在源头按各自配置处理，再次压缩只会二次损失画质 | 原样落盘 |
+| CodeAct `AddImageAsync`（见 [CodeAct.md](CodeAct.md)） | 无独立配置；落盘跟随全局上传处理设置，与 `read_image` 的 `auto` 语义一致。`Images.Add` 搬运已处理产物不走落盘，不会被二次压缩 | 跟随全局 |
 
 旧配置数据没有这些字段时按「跟随全局」处理（`ResolveOutput` 对 null 配置与全局等价）；
 `read_image` 的产物从内联 Base64 改为**落盘 + 文件引用**，与生成图同一条路径，

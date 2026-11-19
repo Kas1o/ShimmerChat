@@ -102,9 +102,16 @@ Images.Add(result);              // 等价于 Images.Add(result.Images)
 - 内联图像（`Base64`）的显示地址为 `data:` URL；文件引用交给 `IImageAttachmentService` 解析；
 - `Images.Add` 会校验 MIME 类型、图像必须有 Base64 或 FileName、内联大小不超过
   `ImageAttachmentRules.MaxBytes`，任何一项不满足都显式失败；
+- `Images.Add` 搬运的是**引用**：工具产物的文件引用直接进入结果消息，指向已落盘的那一份，
+  **不会产生第二次存储**。要让某份字节获得自己的文件与稳定链接时才用 `AddImageAsync`
+  （它会存出一个新文件）；
 - 单次结果最多 16 张图，超过上限时 `Images.Add` 直接失败（不会静默丢弃）；
 - `AddImageAsync(path)` / `AddImageAsync(bytes, mimeType)` 会先落盘再放入容器，返回
-  `/userimages/...` 链接；格式按文件头识别，只接受 PNG / JPEG / WebP / GIF；
+  `/userimages/...` 链接；格式按文件头识别，只接受 PNG / JPEG / WebP / GIF。
+  **落盘前跟随全局「上传图像处理方式」设置**（与 `read_image` 的 `auto` 语义一致）：
+  处理模式下，脚本读入的超预算图像同样会被缩放压缩，CodeAct 不是绕过体积控制的入口；
+  原图模式下原样落盘，与旧版一致。`Images.Add` 搬运的是被调用工具已处理过的产物，
+  不经过落盘，因此不会被二次压缩；
 - 图像服务不可用（如子代理虚拟会话）时，`AddImageAsync` 返回 `TOOL_CONFIG_INVALID`，不会静默内联 Base64。
 
 关闭图像输出时：

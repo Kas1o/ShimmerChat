@@ -326,7 +326,11 @@ namespace ShimmerChatBuiltin.CodeAct
             try
             {
                 using var stream = new MemoryStream(content, writable: false);
-                saved = await _imageAttachments.SaveGeneratedAsync(stream, mimeType, _ct);
+                // 落盘前跟随全局上传处理设置：脚本读入的任意磁盘图像 / 内存产物与
+                // read_image 的 auto 语义一致，不会绕过应用的体积控制。
+                // 被调用工具产物的搬运（Images.Add）不走这里，因此不会被二次压缩。
+                saved = await _imageAttachments.SaveGeneratedAsync(
+                    stream, mimeType, _imageAttachments.UploadProcessing, _ct);
             }
             catch (OperationCanceledException) when (_ct.IsCancellationRequested)
             {

@@ -1,6 +1,7 @@
 using SharperLLM.FunctionCalling;
 using ShimmerChatBuiltin.CodeAct;
 using ShimmerChatBuiltin.Tests.ImageGeneration;
+using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Tests.CodeAct;
@@ -152,8 +153,9 @@ public class CodeActToolTests
     {
         var imageTool = Stub("read_image", (_, _) => Task.FromResult(
             ToolResult.Ok("image attached", [MessageImage.FromFile("a.png", "image/png")])));
+        var attachments = new FakeImageAttachmentService();
 
-        var tool = new CodeActToolV2([imageTool], CreateEnv(new FakeImageAttachmentService()));
+        var tool = new CodeActToolV2([imageTool], CreateEnv(attachments));
 
         var result = await tool.ExecuteAsync(
             Args("""
@@ -167,6 +169,10 @@ public class CodeActToolTests
         result.Content.Should().Be("image attached");
         result.Images.Should().ContainSingle();
         result.Images![0].FileName.Should().Be("a.png");
+
+        // Images.Add 登记的是工具已落盘产物的文件引用：不能产生第二份存储
+        attachments.Saved.Should().BeEmpty("搬运文件引用不落盘");
+        attachments.SavedProcessings.Should().BeEmpty();
     }
 
     [Fact]
@@ -300,6 +306,41 @@ public class CodeActToolTests
         result.Images.Should().ContainSingle();
         images.Saved.Should().ContainSingle();
         images.Saved[0].ContentType.Should().Be("image/png");
+    }
+
+    [Fact]
+    public async Task Execute_AddImage_FollowsTheGlobalUploadProcessing()
+    {
+        // 脚本读入的任意图像与 read_image 的 auto 语义一致：跟随全局上传处理设置，
+        // 否则 CodeAct 成为唯一绕过应用体积控制的图像入口
+        var images = new FakeImageAttachmentService
+        {
+            UploadProcessing = new ImageProcessingOptions { PixelBudget = 1024L * 1024 }
+        };
+        var tool = new CodeActToolV2([], CreateEnv(images));
+
+        var result = await tool.ExecuteAsync(
+            Args($$"""await AddImageAsync(Convert.FromBase64String("{{OnePixelPngBase64Header}}"), "image/png")"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        images.SavedProcessings.Should().ContainSingle()
+            .Which.PixelBudget.Should().Be(1024L * 1024);
+    }
+
+    [Fact]
+    public async Task Execute_AddImage_GlobalOriginalMode_SavesWithoutProcessing()
+    {
+        // 全局为原图模式（默认）时跟随为 null：行为与旧版完全一致
+        var images = new FakeImageAttachmentService();
+        var tool = new CodeActToolV2([], CreateEnv(images));
+
+        var result = await tool.ExecuteAsync(
+            Args($$"""await AddImageAsync(Convert.FromBase64String("{{OnePixelPngBase64Header}}"), "image/png")"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        images.SavedProcessings.Should().ContainSingle().Which.Should().BeNull();
     }
 
     [Fact]
