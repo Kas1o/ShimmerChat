@@ -63,6 +63,10 @@
 	</select>
 	<p>@Loc["misc.image_processing_hint"]</p>
 
+	<label for="image-always-reencode">@Loc["misc.image_always_reencode"]</label>
+	<input type="checkbox" id="image-always-reencode" @bind="_ImageAlwaysReencode" />
+	<p>@Loc["misc.image_always_reencode_hint"]</p>
+
 	<label for="image-pixel-budget">@Loc["misc.image_pixel_budget"]</label>
 	<input type="number" class="su-input" id="image-pixel-budget"
 	       min="@ImageAttachmentRules.MinPixelBudget" max="@ImageAttachmentRules.MaxPixelBudget"
@@ -200,6 +204,18 @@
 		}
 	} = ImageAttachmentRules.DefaultCompressionQuality;
 
+	/// <summary>处理模式下预算内的图像也强制重编码。</summary>
+	private bool _ImageAlwaysReencode
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = false;
+
 	private bool _thinkingCollapsed
 	{
 		get => field;
@@ -261,6 +277,7 @@
 		KVData.Write("App", ImageAttachmentService.UploadPixelBudgetKey, _ImagePixelBudget.ToString());
 		KVData.Write("App", ImageAttachmentService.UploadCompressionKey, _ImageCompression);
 		KVData.Write("App", ImageAttachmentService.UploadQualityKey, _ImageQuality.ToString());
+		KVData.Write("App", ImageAttachmentService.UploadAlwaysReencodeKey, _ImageAlwaysReencode ? "true" : "false");
 		KVData.Write("User", "username", _UserName);
 	}
 
@@ -308,6 +325,9 @@
 			out var quality)
 			? ImageAttachmentRules.ClampCompressionQuality(quality)
 			: ImageAttachmentRules.DefaultCompressionQuality;
+		_ImageAlwaysReencode = bool.TryParse(
+			KVData.Read("App", ImageAttachmentService.UploadAlwaysReencodeKey),
+			out var alwaysReencode) && alwaysReencode;
 		Initialized = true;
 	}
 

@@ -414,6 +414,7 @@ public class ImageGenerationToolTests
             processing.PixelBudget = 2048L * 2048;
             processing.Algorithm = ImageCompressionAlgorithm.Jpeg;
             processing.Quality = 70;
+            processing.AlwaysReencode = true;
         });
         attachments.UploadProcessing = new ImageProcessingOptions { PixelBudget = 1024L * 1024 };
 
@@ -424,5 +425,6 @@ public class ImageGenerationToolTests
         saved!.PixelBudget.Should().Be(2048L * 2048);
         saved.Algorithm.Should().Be(ImageCompressionAlgorithm.Jpeg);
         saved.Quality.Should().Be(70);
+        saved.AlwaysReencode.Should().BeTrue();
     }
 }

@@ -119,5 +119,6 @@
   "panel_imagegen.output_webp": "WebP (smallest size)",
   "panel_imagegen.output_jpeg": "JPEG (best compatibility)",
   "panel_imagegen.output_quality": "Compression quality",
+  "panel_imagegen.output_always_reencode": "Always re-encode (even within budget)",
   "panel_imagegen.workflow_mode": "Workflow mode"
 }

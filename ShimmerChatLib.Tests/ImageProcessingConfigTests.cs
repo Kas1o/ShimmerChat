@@ -78,6 +78,30 @@ public class ImageProcessingConfigTests
     }
 
     [Fact]
+    public void Custom_PassesTheAlwaysReencodeFlag()
+    {
+        new ImageProcessingConfig
+            {
+                Mode = ToolImageOutputProcessing.Custom,
+                AlwaysReencode = true
+            }
+            .Resolve(Global)!.AlwaysReencode.Should().BeTrue();
+        new ImageProcessingConfig { Mode = ToolImageOutputProcessing.Custom }
+            .Resolve(Global)!.AlwaysReencode.Should().BeFalse();
+    }
+
+    [Fact]
+    public void NonCustomModes_DeriveAlwaysReencodeFromTheGlobalSettings()
+    {
+        // FollowGlobal 完全跟随全局（含总是重编码开关）；Original 不处理
+        var alwaysGlobal = new ImageProcessingOptions { AlwaysReencode = true };
+
+        new ImageProcessingConfig().Resolve(alwaysGlobal)!.AlwaysReencode.Should().BeTrue();
+        new ImageProcessingConfig { Mode = ToolImageOutputProcessing.Original }
+            .Resolve(alwaysGlobal).Should().BeNull();
+    }
+
+    [Fact]
     public void ResolveOutput_TreatsMissingConfigAsFollowGlobal()
     {
         // 旧配置数据没有该字段（序列化为 null）：语义是跟随全局，而不是抛 NRE

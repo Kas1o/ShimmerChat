@@ -10,12 +10,14 @@ namespace ShimmerChat.Tests;
 public class ImageNormalizerTests
 {
 	private static ImageProcessingOptions Options(
-		long? budget = null, ImageCompressionAlgorithm algorithm = ImageCompressionAlgorithm.WebP, int quality = 85)
+		long? budget = null, ImageCompressionAlgorithm algorithm = ImageCompressionAlgorithm.WebP, int quality = 85,
+		bool alwaysReencode = false)
 		=> new()
 		{
 			PixelBudget = budget ?? ImageAttachmentRules.DefaultPixelBudget,
 			Algorithm = algorithm,
-			Quality = quality
+			Quality = quality,
+			AlwaysReencode = alwaysReencode
 		};
 
 	[Fact]
@@ -29,6 +31,68 @@ public class ImageNormalizerTests
 		result.Changed.Should().BeFalse();
 		result.MimeType.Should().Be("image/png");
 		result.Data.Should().BeSameAs(data);
+	}
+
+	[Fact]
+	public void AlwaysReencode_WithinBudget_ReencodesWithoutScaling()
+	{
+		// 总是重编码补的是「转码」语义：预算内不缩放，但按算法重编码，
+		// 让体积肥大而分辨率不高的图像（如无损 PNG）也能被压小
+		var data = TestImageFactory.RenderNoisePng(64, 64);
+
+		var result = ImageNormalizer.Process(
+			data, "image/png", Options(budget: 512L * 512, alwaysReencode: true));
+
+		result.Changed.Should().BeTrue();
+		result.MimeType.Should().Be("image/webp");
+
+		var (width, height, format) = TestImageFactory.Probe(result.Data);
+		(width, height).Should().Be((64, 64), "预算内只重编码，绝不缩放");
+		format.Should().Be(SKEncodedImageFormat.Webp);
+		result.Data.Length.Should().BeLessThan(data.Length);
+	}
+
+	[Fact]
+	public void AlwaysReencode_OverBudget_StillScalesIntoTheBudget()
+	{
+		var data = TestImageFactory.RenderNoisePng(1500, 1000);
+
+		var result = ImageNormalizer.Process(
+			data, "image/png", Options(budget: 512L * 512, alwaysReencode: true));
+
+		result.Changed.Should().BeTrue();
+		var (width, height, _) = TestImageFactory.Probe(result.Data);
+		width.Should().Be(627);
+		height.Should().Be(418);
+		((long)width * height).Should().BeLessOrEqualTo(512L * 512);
+	}
+
+	[Fact]
+	public void AlwaysReencode_GifIsStillSkipped()
+	{
+		// 动画例外优先级最高：强制重编码也不能悄悄丢帧
+		var data = new byte[] { 0x47, 0x49, 0x46, 0x38, 0x39, 0x61 };
+
+		var result = ImageNormalizer.Process(
+			data, "image/gif", Options(budget: 1, alwaysReencode: true));
+
+		result.Changed.Should().BeFalse();
+		result.Data.Should().BeSameAs(data);
+	}
+
+	[Fact]
+	public void AlwaysReencode_WithNoneAlgorithm_KeepsTheOriginalFormatWithinBudget()
+	{
+		var data = TestImageFactory.RenderNoisePng(64, 64);
+
+		var result = ImageNormalizer.Process(
+			data, "image/png",
+			Options(budget: 512L * 512, algorithm: ImageCompressionAlgorithm.None, alwaysReencode: true));
+
+		result.Changed.Should().BeTrue();
+		result.MimeType.Should().Be("image/png");
+		var (width, height, format) = TestImageFactory.Probe(result.Data);
+		(width, height, format).Should().Be((64, 64, SKEncodedImageFormat.Png));
 	}
 
 	[Fact]

@@ -53,10 +53,13 @@ SharperLLM（只处理 Base64 内容块，不接触文件系统）
 | `image_upload_pixel_budget` | 像素预算（`宽 × 高` 乘积） | 2048×2048 = 4194304 |
 | `image_upload_compression` | `WebP` / `Jpeg` / `None` | `WebP` |
 | `image_upload_quality` | 有损编码质量 1-100 | 85 |
+| `image_upload_always_reencode` | `true` / `false` | `false` |
 
 - **原图模式**：字节原样存储，行为与旧版完全一致（默认，保证兼容与数据预期）。
 - **处理模式**：像素总量超过预算的图像先**等比缩放**到预算内，再按所选算法**重编码**后存储；
-  同时落盘与内联路径都会变小。**不超预算的图像保持原字节，零质量损失。**
+  同时落盘与内联路径都会变小。**不超预算的图像保持原字节，零质量损失**——
+  除非打开「总是重编码」，此时预算内的图像也按所选算法重编码（不缩放），
+  用于把体积肥大而分辨率不高的图像（如无损 PNG 截图）统一压小。
 
 设置在设置 → 杂项 → 图像设置中配置；处理模式开启时，聊天上传按钮与节点编辑器的图像列表都会给出提示。
 
@@ -73,8 +76,9 @@ Linux 另有 arm / arm64 / musl 等变体。native 缺失时异常（`DllNotFoun
 不伪装成图像数据错误。约 80MB 的原生符号文件已在发布产物中移除（`RemoveNativeSymbolFilesFromPublish`）。
 
 1. **GIF 永远跳过**：重编码只保留第一帧，等于悄悄丢动画，因此原样返回。
-   多帧动画 WebP 同理（探测阶段 `FrameCount > 1` 即跳过）。
-2. **先探测后解码**：只读图像头部即可判断像素总量与帧数，预算内的图像不付出解码成本。
+   多帧动画 WebP 同理（探测阶段 `FrameCount > 1` 即跳过）。「总是重编码」也不能越过该例外。
+2. **先探测后解码**：只读图像头部即可判断像素总量与帧数，预算内且未开「总是重编码」的图像
+   不付出解码成本。
 3. **缩放**：`scale = √(预算 / 当前像素)`，等比缩放且宽高至少 1px；顺带按 EXIF 方向展开手机照片。
 4. **重编码**：
    - `WebP`：体积收益最大，质量参数生效，保留透明通道；
@@ -86,7 +90,7 @@ Linux 另有 arm / arm64 / musl 等变体。native 缺失时异常（`DllNotFoun
 
 ### 3.2 工具 / 端点产生的图像（配置级输出处理）
 
-工具产物不再与全局上传设置无关：**文生图 Profile、MCP 端点、`read_image` 工具**都有各自的输出处理配置，默认**跟随全局**（全局原图模式 = 不处理），可按需改为**原图**或**自定义预算**。折算入口是 `ImageProcessingConfig.ResolveOutput`，落盘统一走 `IImageAttachmentService.SaveGeneratedAsync(stream, mime, processing, ct)`（旧实现经接口默认实现退化为原样落盘）。
+工具产物不再与全局上传设置无关：**文生图 Profile、MCP 端点、`read_image` 工具**都有各自的输出处理配置，默认**跟随全局**（全局原图模式 = 不处理），可按需改为**原图**或**自定义预算**（自定义参数含「总是重编码」开关）。折算入口是 `ImageProcessingConfig.ResolveOutput`，落盘统一走 `IImageAttachmentService.SaveGeneratedAsync(stream, mime, processing, ct)`（旧实现经接口默认实现退化为原样落盘）。
 
 | 入口 | 配置位置 | 默认 |
 |------|----------|------|

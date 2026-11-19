@@ -83,6 +83,23 @@ public class TestImageNode
     public string ImagesJson { get; set; } = "";
 }
 
+/// <summary>
+/// 带整数 / 长整数 / 浮点属性的测试节点：数字类型必须渲染成可编辑控件而不是只读文本，
+/// 结构对应 AppendChatMessagesNode 的像素预算 / 质量等属性。
+/// </summary>
+[NodeInfo("test.numbers_node", Icon = "N", Color = "#000000", CategoryKeys = ["category.test"])]
+public class TestNumbersNode
+{
+    [NodeProperty("test.numbers_node.pixel_budget", Order = 1)]
+    public long PixelBudget { get; set; } = 4_194_304;
+
+    [NodeProperty("test.numbers_node.quality", Order = 2)]
+    public int Quality { get; set; } = 85;
+
+    [NodeProperty("test.numbers_node.scale", Order = 3)]
+    public double Scale { get; set; } = 0.7;
+}
+
 /// <summary>节点编辑器测试共享辅助。</summary>
 public static class EditorTestHelpers
 {

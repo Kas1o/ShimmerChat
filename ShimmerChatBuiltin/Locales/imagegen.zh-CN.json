@@ -119,5 +119,6 @@
   "panel_imagegen.output_webp": "WebP（体积最小）",
   "panel_imagegen.output_jpeg": "JPEG（兼容性最好）",
   "panel_imagegen.output_quality": "压缩质量",
+  "panel_imagegen.output_always_reencode": "总是重编码（即使未超预算）",
   "panel_imagegen.workflow_mode": "工作流模式"
 }

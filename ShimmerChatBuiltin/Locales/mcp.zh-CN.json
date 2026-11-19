@@ -76,6 +76,7 @@
   "panel_mcp.image_output_webp": "WebP（体积最小）",
   "panel_mcp.image_output_jpeg": "JPEG（兼容性最好）",
   "panel_mcp.image_output_quality": "压缩质量",
+  "panel_mcp.image_output_always_reencode": "总是重编码（即使未超预算）",
   "panel_mcp.probe": "测试连接",
   "panel_mcp.probing": "连接中…",
   "panel_mcp.probe_ok": "已连接到 {0}（协议 {1}）。",

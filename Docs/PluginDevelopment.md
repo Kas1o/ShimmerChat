@@ -418,7 +418,7 @@ public class MyFragmentNode : IPreGenerationNode
 | 概念 | 说明 |
 |------|------|
 | `IPreGenerationNode` | 业务节点接口：`ExecuteAsync`（Id/名称/展开状态由包装器持有） || `[NodeInfo]` | 类级元数据：标签 Key、图标、颜色、分类 |
-| `[NodeProperty]` | 属性级元数据：标签 Key、提示、排序。支持 string/int/float/bool/enum |
+| `[NodeProperty]` | 属性级元数据：标签 Key、提示、排序。支持 string / int / long / float / double / bool / enum；其余类型在表单中显式只读展示 |
 | `[NodeEditor(typeof(...))]` | 指定自定义 Blazor 编辑器组件 |
 | `List<PreGenerationNodeWrapper>` | 标记 `[NodeProperty]` 后生成子节点列表 UI，支持拖拽排序 |
 | `PreGenerationNodeWrapper` (单个) | 标记 `[NodeProperty]` 后生成单节点槽 UI |

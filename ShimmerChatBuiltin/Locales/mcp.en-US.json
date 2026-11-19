@@ -76,6 +76,7 @@
   "panel_mcp.image_output_webp": "WebP (smallest size)",
   "panel_mcp.image_output_jpeg": "JPEG (best compatibility)",
   "panel_mcp.image_output_quality": "Compression quality",
+  "panel_mcp.image_output_always_reencode": "Always re-encode (even within budget)",
   "panel_mcp.probe": "Test connection",
   "panel_mcp.probing": "Connecting…",
   "panel_mcp.probe_ok": "Connected to {0} (protocol {1}).",

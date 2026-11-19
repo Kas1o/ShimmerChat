@@ -57,7 +57,11 @@ namespace ShimmerChat.Singletons
 				return new Result(data, mimeType, false);
 
 			var pixels = (long)codec.Info.Width * codec.Info.Height;
-			if (pixels <= options.PixelBudget)
+			var overBudget = pixels > options.PixelBudget;
+
+			// 预算内且不要求重编码的图像零质量损失地原样返回；
+			// AlwaysReencode 只补重编码，不会把预算内的图像缩放。
+			if (!overBudget && !options.AlwaysReencode)
 				return new Result(data, mimeType, false);
 
 			if (pixels > DecodablePixelCeiling)
@@ -65,7 +69,7 @@ namespace ShimmerChat.Singletons
 					$"Image is {codec.Info.Width}x{codec.Info.Height} ({pixels} pixels), beyond the " +
 					$"{DecodablePixelCeiling} pixel processing ceiling. Downscale it externally or store it as original.");
 
-			// 解码 → 展开手机照片的 EXIF 方向 → 等比缩放到预算内 → 重编码。
+			// 解码 → 展开手机照片的 EXIF 方向 →（仅超预算时）等比缩放 → 重编码。
 			using var source = SKBitmap.Decode(codecData);
 			if (source == null)
 				throw new InvalidDataException(
@@ -74,28 +78,38 @@ namespace ShimmerChat.Singletons
 
 			// 返回 null 表示方向已是默认（TopLeft），直接用原图，避免无谓的整帧重画。
 			using var orientedExtra = ApplyEncodedOrientation(source, codec.EncodedOrigin);
-			var oriented = orientedExtra ?? source;
+			var target = orientedExtra ?? source;
 
-			var scale = Math.Sqrt((double)options.PixelBudget / pixels);
-			var width = Math.Max(1, (int)Math.Floor(oriented.Width * scale));
-			var height = Math.Max(1, (int)Math.Floor(oriented.Height * scale));
-			using var scaled = oriented.Resize(
-				new SKImageInfo(width, height),
-				new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+			// using 必须在方法作用域：块内的 using var 会在离开块时释放，
+			// 后续编码就会访问已释放的 native 位图。
+			using var scaled = overBudget ? ScaleIntoBudget(target, pixels, options.PixelBudget) : null;
+			if (scaled != null)
+				target = scaled;
 
 			// JPEG 没有透明通道：有透明像素的图像先合成白底，避免透明区域编码后变黑。
 			// 对不含透明的图像该操作是空操作。
 			var quality = ImageAttachmentRules.ClampCompressionQuality(options.Quality);
 			var (encoded, outputMime) = options.Algorithm switch
 			{
-				ImageCompressionAlgorithm.WebP => (Encode(scaled, SKEncodedImageFormat.Webp, quality), "image/webp"),
-				ImageCompressionAlgorithm.Jpeg => (Encode(FlattenToWhite(scaled), SKEncodedImageFormat.Jpeg, quality), "image/jpeg"),
-				ImageCompressionAlgorithm.None => (EncodeOriginalFormat(scaled, mimeType, quality), mimeType),
+				ImageCompressionAlgorithm.WebP => (Encode(target, SKEncodedImageFormat.Webp, quality), "image/webp"),
+				ImageCompressionAlgorithm.Jpeg => (Encode(FlattenToWhite(target), SKEncodedImageFormat.Jpeg, quality), "image/jpeg"),
+				ImageCompressionAlgorithm.None => (EncodeOriginalFormat(target, mimeType, quality), mimeType),
 				_ => throw new ArgumentOutOfRangeException(
 					nameof(options), options.Algorithm, "Unknown image compression algorithm.")
 			};
 
 			return new Result(encoded, outputMime, true);
+		}
+
+		/// <summary>等比缩放到像素预算内：scale = √(预算 / 当前像素)，宽高至少 1px。</summary>
+		private static SKBitmap ScaleIntoBudget(SKBitmap bitmap, long pixels, long budget)
+		{
+			var scale = Math.Sqrt((double)budget / pixels);
+			var width = Math.Max(1, (int)Math.Floor(bitmap.Width * scale));
+			var height = Math.Max(1, (int)Math.Floor(bitmap.Height * scale));
+			return bitmap.Resize(
+				new SKImageInfo(width, height),
+				new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
 		}
 
 		/// <summary>编码到目标格式；失败（如该格式的编码器不可用）显式抛错，不吞。</summary>

@@ -22,6 +22,8 @@
   "misc.image_processing_original": "Original (no processing)",
   "misc.image_processing_processed": "Processed (scale & compress to budget)",
   "misc.image_processing_hint": "Original stores uploaded bytes as-is (identical to earlier versions). In Processed mode, images above the pixel budget are first scaled down proportionally and then re-encoded with the chosen algorithm, keeping storage and per-round request payloads small; images within the budget are untouched, and GIF animations plus tool-generated images are never modified.",
+  "misc.image_always_reencode": "Always re-encode (even within budget)",
+  "misc.image_always_reencode_hint": "When enabled, images within the pixel budget are also re-encoded with the chosen algorithm (no scaling) — useful for shrinking large-but-low-resolution images such as lossless PNGs; GIF and animations remain exceptions. Only effective in Processed mode.",
   "misc.image_pixel_budget": "Pixel budget (width × height)",
   "misc.image_pixel_budget_hint": "An image whose width × height exceeds this value is scaled down proportionally: 1024×1024 ≈ 1.05M, 2048×2048 ≈ 4.19M, 4096×4096 ≈ 16.78M.",
   "misc.image_compression": "Compression algorithm",

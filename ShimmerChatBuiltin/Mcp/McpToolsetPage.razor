@@ -312,6 +312,12 @@
                             <label class="su-label">@Loc["panel_mcp.image_output_quality"]</label>
                             <input type="number" class="su-input" @bind="endpoint.ImageOutputQuality" />
                         </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="cfg-toggle">
+                                <input type="checkbox" @bind="endpoint.ImageOutputAlwaysReencode" />
+                                <span>@Loc["panel_mcp.image_output_always_reencode"]</span>
+                            </label>
+                        </div>
                     }
                 </div>
 
@@ -866,6 +872,11 @@
         {
             get => Config.ImageOutputProcessing.Quality;
             set => Config.ImageOutputProcessing.Quality = value;
+        }
+        public bool ImageOutputAlwaysReencode
+        {
+            get => Config.ImageOutputProcessing.AlwaysReencode;
+            set => Config.ImageOutputProcessing.AlwaysReencode = value;
         }
         public List<McpNamedToggle> Tools => Config.Tools;
         public List<McpNamedToggle> Resources => Config.Resources;

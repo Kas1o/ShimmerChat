@@ -67,6 +67,12 @@ namespace ShimmerChatLib
 
 		/// <summary>有损编码的质量（1-100）。</summary>
 		public int Quality { get; init; } = ImageAttachmentRules.DefaultCompressionQuality;
+
+		/// <summary>
+		/// 预算内的图像也强制按算法重编码（不缩放）：用于把体积肥大但分辨率不高的图像
+		/// （如无损 PNG 截图、照片）统一压小。GIF 与多帧动画永远是例外——重编码等于丢帧。
+		/// </summary>
+		public bool AlwaysReencode { get; init; }
 	}
 
 	/// <summary>
@@ -102,6 +108,9 @@ namespace ShimmerChatLib
 		/// <summary>Custom 模式的有损编码质量。</summary>
 		public int Quality { get; set; } = ImageAttachmentRules.DefaultCompressionQuality;
 
+		/// <summary>Custom 模式下预算内的图像也强制重编码（仅缩放语义不受影响）。</summary>
+		public bool AlwaysReencode { get; set; }
+
 		/// <summary>
 		/// 折算实际生效的处理参数：<b>null 表示原样存储，不处理</b>。
 		/// <paramref name="global"/> 是当前全局上传处理设置（原图模式下为 null）。
@@ -113,7 +122,8 @@ namespace ShimmerChatLib
 			{
 				PixelBudget = ImageAttachmentRules.ClampPixelBudget(PixelBudget),
 				Algorithm = Algorithm,
-				Quality = ImageAttachmentRules.ClampCompressionQuality(Quality)
+				Quality = ImageAttachmentRules.ClampCompressionQuality(Quality),
+				AlwaysReencode = AlwaysReencode
 			},
 			_ => global
 		};

@@ -33,6 +33,7 @@ namespace ShimmerChat.Singletons
 		public const string UploadPixelBudgetKey = "image_upload_pixel_budget";
 		public const string UploadCompressionKey = "image_upload_compression";
 		public const string UploadQualityKey = "image_upload_quality";
+		public const string UploadAlwaysReencodeKey = "image_upload_always_reencode";
 
 		/// <summary>图像文件目录（同时由 Program.cs 以 /userimages 暴露为静态资源）。</summary>
 		public static readonly string UploadDirectory = Path.Combine(AppContext.BaseDirectory, "UserUploadImage");
@@ -102,9 +103,27 @@ namespace ShimmerChat.Singletons
 				{
 					PixelBudget = ReadPixelBudget(),
 					Algorithm = ReadCompressionAlgorithm(),
-					Quality = ReadCompressionQuality()
+					Quality = ReadCompressionQuality(),
+					AlwaysReencode = ReadAlwaysReencode()
 				};
 			}
+		}
+
+		/// <summary>读取「总是重编码」开关；非法或缺失时按默认关闭收敛并记录错误。</summary>
+		private bool ReadAlwaysReencode()
+		{
+			var raw = _kvData.Read(SettingsSpace, UploadAlwaysReencodeKey);
+			if (bool.TryParse(raw, out var enabled))
+				return enabled;
+
+			if (!string.IsNullOrWhiteSpace(raw))
+			{
+				// 空值视为「未配置」直接走默认关闭；非空但解析失败才是坏配置。
+				_logger.LogError(
+					"[ImageAttachmentService] Invalid always-reencode flag '{Raw}' in KV {Space}/{Key}; disabled.",
+					raw, SettingsSpace, UploadAlwaysReencodeKey);
+			}
+			return false;
 		}
 
 		/// <summary>读取像素预算；非法或缺失时按默认收敛并记录错误。</summary>

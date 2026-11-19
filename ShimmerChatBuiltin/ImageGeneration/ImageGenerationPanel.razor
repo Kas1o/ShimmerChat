@@ -186,6 +186,12 @@
                             <label class="su-label">@Loc["panel_imagegen.output_quality"]</label>
                             <input class="su-input" inputmode="numeric" @bind="profile.OutputQuality" />
                         </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="cfg-toggle">
+                                <input type="checkbox" @bind="profile.OutputAlwaysReencode" />
+                                <span>@Loc["panel_imagegen.output_always_reencode"]</span>
+                            </label>
+                        </div>
                     }
                 </div>
             </section>
@@ -510,7 +516,8 @@
         OutputProcessingMode = profile.OutputImageProcessing.Mode,
         OutputPixelBudget = profile.OutputImageProcessing.PixelBudget.ToString(CultureInfo.InvariantCulture),
         OutputCompression = profile.OutputImageProcessing.Algorithm,
-        OutputQuality = profile.OutputImageProcessing.Quality.ToString(CultureInfo.InvariantCulture)
+        OutputQuality = profile.OutputImageProcessing.Quality.ToString(CultureInfo.InvariantCulture),
+        OutputAlwaysReencode = profile.OutputImageProcessing.AlwaysReencode
     };
 
     private static ParameterEditor ToEditor(ImageWorkflowParameter parameter) => new()
@@ -689,7 +696,8 @@
                     Mode = editor.OutputProcessingMode,
                     PixelBudget = outputBudget,
                     Algorithm = editor.OutputCompression,
-                    Quality = outputQuality
+                    Quality = outputQuality,
+                    AlwaysReencode = editor.OutputAlwaysReencode
                 }
             });
         }
@@ -1091,6 +1099,7 @@
         public string OutputPixelBudget { get; set; } = "";
         public ImageCompressionAlgorithm OutputCompression { get; set; } = ImageCompressionAlgorithm.WebP;
         public string OutputQuality { get; set; } = "";
+        public bool OutputAlwaysReencode { get; set; }
 
         public ProfileEditor Clone() => new()
         {
@@ -1120,7 +1129,8 @@
             OutputProcessingMode = OutputProcessingMode,
             OutputPixelBudget = OutputPixelBudget,
             OutputCompression = OutputCompression,
-            OutputQuality = OutputQuality
+            OutputQuality = OutputQuality,
+            OutputAlwaysReencode = OutputAlwaysReencode
         };
     }
 

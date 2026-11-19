@@ -25,7 +25,8 @@ public class ImageAttachmentServiceTests
         string? processingMode,
         long? pixelBudget = null,
         string? compression = null,
-        int? quality = null)
+        int? quality = null,
+        string? alwaysReencode = null)
     {
         var kv = new Mock<IKVDataService>();
         kv.Setup(k => k.Read(ImageAttachmentService.SettingsSpace, ImageAttachmentService.StorageModeKey))
@@ -41,6 +42,9 @@ public class ImageAttachmentServiceTests
         if (quality != null)
             kv.Setup(k => k.Read(ImageAttachmentService.SettingsSpace, ImageAttachmentService.UploadQualityKey))
                 .Returns(quality.ToString());
+        if (alwaysReencode != null)
+            kv.Setup(k => k.Read(ImageAttachmentService.SettingsSpace, ImageAttachmentService.UploadAlwaysReencodeKey))
+                .Returns(alwaysReencode);
         return new ImageAttachmentService(kv.Object, NullLogger<ImageAttachmentService>.Instance);
     }
 
@@ -255,12 +259,14 @@ public class ImageAttachmentServiceTests
             nameof(ImageUploadProcessingMode.Processed),
             pixelBudget: 1024L * 1024,
             compression: nameof(ImageCompressionAlgorithm.Jpeg),
-            quality: 70).UploadProcessing;
+            quality: 70,
+            alwaysReencode: "true").UploadProcessing;
 
         processing.Should().NotBeNull();
         processing!.PixelBudget.Should().Be(1024L * 1024);
         processing.Algorithm.Should().Be(ImageCompressionAlgorithm.Jpeg);
         processing.Quality.Should().Be(70);
+        processing.AlwaysReencode.Should().BeTrue();
     }
 
     [Fact]
@@ -323,6 +329,30 @@ public class ImageAttachmentServiceTests
         {
             image.MimeType.Should().Be("image/png");
             File.ReadAllBytes(PathOf(image)).Should().Equal(bytes);
+        }
+        finally
+        {
+            File.Delete(PathOf(image));
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsync_ProcessedModeWithAlwaysReencode_CompressesSmallImagesToo()
+    {
+        // 总是重编码：预算内的小图也要被压小，而不是原样落盘
+        var bytes = TestImageFactory.RenderNoisePng(64, 64);
+        var service = CreateService(
+            nameof(ImageStorageMode.UserUploadImage),
+            nameof(ImageUploadProcessingMode.Processed),
+            alwaysReencode: "true");
+
+        var image = await service.SaveAsync(new MemoryStream(bytes), "image/png");
+
+        try
+        {
+            image.MimeType.Should().Be("image/webp");
+            image.FileName.Should().EndWith(".webp");
+            File.ReadAllBytes(PathOf(image)).Length.Should().BeLessThan(bytes.Length);
         }
         finally
         {

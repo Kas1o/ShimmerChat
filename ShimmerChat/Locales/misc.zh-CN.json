@@ -22,6 +22,8 @@
   "misc.image_processing_original": "原图模式（不处理）",
   "misc.image_processing_processed": "处理模式（按预算缩放压缩）",
   "misc.image_processing_hint": "原图模式按上传字节原样保存（与旧版一致）。处理模式下，像素总量超过预算的图像会先等比缩放、再按所选算法重编码后保存，用于控制存储与每轮请求的体积；不超预算的图像保持原样，GIF 动画与工具生成的图像不受影响。",
+  "misc.image_always_reencode": "总是重编码（即使未超预算）",
+  "misc.image_always_reencode_hint": "开启后，预算内的图像也会按所选算法重编码（不缩放），用于把体积肥大但分辨率不高的图像（如无损 PNG）统一压小；GIF 与动画仍是例外。仅在处理模式下生效。",
   "misc.image_pixel_budget": "像素预算（宽×高乘积）",
   "misc.image_pixel_budget_hint": "单张图像宽×高的乘积超过该值即被等比缩小：1024×1024≈105 万，2048×2048≈419 万，4096×4096≈1677 万。",
   "misc.image_compression": "压缩算法",

@@ -188,6 +188,16 @@
                 v => prop.SetValue(Node, v), (int)(value ?? 0)));
             builder.CloseElement();
         }
+        else if (prop.PropertyType == typeof(long))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "number");
+            builder.AddAttribute(2, "class", "ge-input ge-input-num");
+            builder.AddAttribute(3, "value", (long)(value ?? 0L));
+            builder.AddAttribute(4, "onchange", EventCallback.Factory.CreateBinder<long>(this,
+                v => prop.SetValue(Node, v), (long)(value ?? 0L)));
+            builder.CloseElement();
+        }
         else if (prop.PropertyType == typeof(bool))
         {
             builder.OpenElement(0, "input");
@@ -226,8 +236,20 @@
                 v => prop.SetValue(Node, v), (float)(value ?? 0f)));
             builder.CloseElement();
         }
+        else if (prop.PropertyType == typeof(double))
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "number");
+            builder.AddAttribute(2, "step", "0.1");
+            builder.AddAttribute(3, "class", "ge-input ge-input-num");
+            builder.AddAttribute(4, "value", (double)(value ?? 0d));
+            builder.AddAttribute(5, "onchange", EventCallback.Factory.CreateBinder<double>(this,
+                v => prop.SetValue(Node, v), (double)(value ?? 0d)));
+            builder.CloseElement();
+        }
         else
         {
+            // 没有编辑控件的类型显式只读展示：宁可让用户发现“改不了”，也不静默丢弃或猜一个控件。
             builder.AddContent(0, value?.ToString() ?? Loc["node_editor.null_value"]);
         }
     };
