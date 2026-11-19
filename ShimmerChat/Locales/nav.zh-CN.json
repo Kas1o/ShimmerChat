@@ -1,0 +1,9 @@
+{
+  "nav.generation_manager": "生成管理器",
+  "nav.section_representation": "表示",
+  "nav.message_render": "消息渲染",
+  "nav.theme_manager": "主题管理",
+  "nav.debug_output": "调试输出",
+  "nav.section_plugin_panels": "插件面板",
+  "nav.version_prefix": "版本"
+}

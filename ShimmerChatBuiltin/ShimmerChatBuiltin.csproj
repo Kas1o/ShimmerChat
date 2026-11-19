@@ -37,6 +37,9 @@
     <Content Remove="Locales\*.json" />
     <None Remove="Locales\*.json" />
     <EmbeddedResource Include="Locales\*.json">
+      <!-- 文件名形如 {领域}.{culture}.json 会被 AssignCulture 当成附属资源分流到卫星程序集；
+           显式标记非文化资源，确保全部键值直接嵌入主程序集供 LocService 后缀匹配。 -->
+      <WithCulture>false</WithCulture>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </EmbeddedResource>

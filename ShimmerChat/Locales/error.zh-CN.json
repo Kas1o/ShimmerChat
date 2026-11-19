@@ -1,0 +1,9 @@
+{
+  "error.page_title": "错误",
+  "error.heading": "错误。",
+  "error.subheading": "处理您的请求时发生错误。",
+  "error.request_id": "请求 ID:",
+  "error.dev_mode": "开发模式",
+  "error.dev_mode_text": "切换到 <strong>Development</strong> 环境将显示更详细的错误信息。",
+  "error.dev_mode_warning": "<strong>已部署的应用程序不应启用开发环境。</strong>它可能导致向最终用户显示异常的敏感信息。"
+}

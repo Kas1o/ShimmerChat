@@ -1,0 +1,9 @@
+{
+  "error.page_title": "Error",
+  "error.heading": "Error.",
+  "error.subheading": "An error occurred while processing your request.",
+  "error.request_id": "Request ID:",
+  "error.dev_mode": "Development Mode",
+  "error.dev_mode_text": "Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.",
+  "error.dev_mode_warning": "<strong>The Development environment shouldn't be enabled for deployed applications.</strong> It can result in displaying sensitive information from exceptions to end users."
+}

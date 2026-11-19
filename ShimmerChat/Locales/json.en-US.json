@@ -1,0 +1,7 @@
+{
+  "json.object": "Object",
+  "json.n_properties": "{0} properties",
+  "json.array_count": "Array[{0}]",
+  "json.array_placeholder": "[ ... ]",
+  "json.unknown_type": "Unknown Type"
+}

@@ -127,14 +127,8 @@ public class ChatViewRegistryContractTests
     }
 
     private static Dictionary<string, string> LoadBuiltinLocale(string culture)
-    {
-        var resourceName = BuiltinAssembly.GetManifestResourceNames()
-            .Single(n => n.EndsWith($"Locales.{culture}.json", StringComparison.OrdinalIgnoreCase));
-
-        using var stream = BuiltinAssembly.GetManifestResourceStream(resourceName)!;
-        using var reader = new StreamReader(stream);
-        return JsonSerializer.Deserialize<Dictionary<string, string>>(reader.ReadToEnd())!;
-    }
+        // 本地化已按领域拆分为多个 *.{culture}.json，聚合全部匹配资源。
+        => LocaleTestHelpers.MergeEntries(LocaleTestHelpers.LoadAssemblyEntries(BuiltinAssembly, culture));
 
     /// <summary>仅提供类型扫描能力的插件加载器桩。</summary>
     private sealed class StubPluginLoader(params Assembly[] assemblies) : IPluginLoaderService

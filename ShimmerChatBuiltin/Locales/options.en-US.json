@@ -1,0 +1,14 @@
+{
+  "options.tool_preset.desc": "{0} tools",
+  "options.dyn_prompt_set.desc": "{0} rules",
+  "options.subagent_output.last_message": "Inject the sub-agent's last message only",
+  "options.subagent_output.full_json": "Inject the sub-agent's full message JSON",
+  "options.subagent_output.none": "Inject nothing",
+  "options.disabled": "Disabled",
+  "options.image_workflow.enabled": "Enabled",
+  "options.image_workflow.disabled": "Not enabled",
+  "options.image_config.enabled": "Enabled",
+  "options.image_config.disabled": "Not enabled",
+  "options.image_config.custom": "Custom workflow",
+  "options.image_config.default": "Default workflow"
+}

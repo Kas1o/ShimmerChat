@@ -1,0 +1,19 @@
+{
+  "generation_config.desc": "Manage reusable node-tree presets. Save after editing; nodes reference presets by ID.",
+  "generation_config.post_desc": "Manage post-generation tree presets. Save after editing; nodes reference presets by ID.",
+  "generation_config.render_desc": "Manage render-modifier tree presets. Save after editing; nodes reference presets by ID.",
+  "generation_config.basic": "Basics",
+  "generation_config.basic_desc": "Preset name and stable ID.",
+  "generation_config.name_hint": "Identifies this preset in the switcher and search results.",
+  "generation_config.id_hint": "Nodes and agents reference this preset by ID; it never changes after creation.",
+  "generation_config.node_tree_desc": "Drag nodes to build the pipeline. Edits stay in memory until saved.",
+  "generation_config.empty_title": "No presets yet",
+  "generation_config.empty_desc": "Create your first node-tree preset.",
+  "generation_config.name_required": "Preset name cannot be empty.",
+  "generation_config.saved": "Preset saved",
+  "generation_config.load_failed": "Presets could not be loaded: {0}",
+  "generation_config.tree_load_failed": "Node tree could not be loaded: {0}. The editor fell back to an empty tree; saving will overwrite the broken tree.",
+  "generation_config.tree_empty_fallback": "Node tree has an unexpected type. The editor fell back to an empty tree.",
+  "generation_config.tree_migrated": "Legacy node tree was migrated to the new wrapper format. Save to persist it.",
+  "generation_config.tree_bytes": "{0} chars"
+}

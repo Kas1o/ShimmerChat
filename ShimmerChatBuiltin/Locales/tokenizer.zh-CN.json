@@ -1,0 +1,20 @@
+{
+  "panel_tokenizer.load": "加载",
+  "panel_tokenizer.reload": "重新加载",
+  "panel_tokenizer.loading": "加载中...",
+  "panel_tokenizer.status": "状态",
+  "panel_tokenizer.status_loaded": "✅ 已加载",
+  "panel_tokenizer.status_not_loaded": "未加载",
+  "panel_tokenizer.test_label": "测试编码",
+  "panel_tokenizer.test_placeholder": "输入要编码的文本...",
+  "panel_tokenizer.encode": "编码",
+  "panel_tokenizer.clear": "清除",
+  "panel_tokenizer.token_count": "Token 数",
+  "panel_tokenizer.token_ids": "Token IDs",
+  "panel_tokenizer.tokens": "Tokens",
+  "panel_tokenizer.msg_path_empty": "请先输入 Tokenizer 模型路径",
+  "panel_tokenizer.msg_file_not_found": "Tokenizer 模型文件不存在",
+  "panel_tokenizer.msg_load_success": "加载成功",
+  "panel_tokenizer.msg_load_failed": "加载失败: {0}",
+  "panel_tokenizer.msg_encode_failed": "编码失败: {0}"
+}

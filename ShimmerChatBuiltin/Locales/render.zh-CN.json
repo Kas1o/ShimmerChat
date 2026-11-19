@@ -1,0 +1,9 @@
+{
+  "svg.render.label": "SVG",
+  "svg.render.alt": "SVG 图像",
+  "code.actions.copy": "复制",
+  "code.actions.download": "下载",
+  "code.actions.copied": "已复制",
+  "builtin.regex_render_modifier.name": "正则替换",
+  "builtin.regex_render_modifier.desc": "对消息内容应用一组正则替换规则。输入: 要应用的 Regex 集合名称。"
+}

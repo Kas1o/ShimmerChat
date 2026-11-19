@@ -1,0 +1,9 @@
+{
+  "nav.generation_manager": "Generation Manager",
+  "nav.section_representation": "Representation",
+  "nav.message_render": "Message Render",
+  "nav.theme_manager": "Theme Manager",
+  "nav.section_plugin_panels": "Plugin Panels",
+  "nav.version_prefix": "Version",
+  "nav.debug_output": "Debug Output"
+}

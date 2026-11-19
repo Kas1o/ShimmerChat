@@ -88,7 +88,7 @@ The image is attached to this tool result so you can see it.
 1. 文件系统工具集节点：勾选“读取图像”（`prop.fs_tool_set.enable_image_read`，默认开启）。
 2. 通用工具实例化节点 / 工具预设：选择 `FileSystemImageReadToolV2`。
 
-新增/修改工具后不需要改中央注册表；本地化 Key 必须同时补齐 `Locales/en-US.json` 与 `Locales/zh-CN.json`。
+新增/修改工具后不需要改中央注册表；本地化 Key 必须在 `Locales/` 下以 `.zh-CN.json` 与 `.en-US.json` 结尾的对应文件中补齐（同一键在两种语言都要存在）。
 
 ---
 

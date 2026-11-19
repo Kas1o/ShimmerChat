@@ -1,0 +1,14 @@
+{
+  "sub.collapse": "Collapse",
+  "sub.expand": "Expand",
+  "sub.plugin_panels": "Plugin Panels",
+  "sub.add_modifier_title": "Add Message Render Modifier",
+  "sub.select_modifier": "Select Modifier",
+  "sub.please_select": "Please select...",
+  "sub.config_value": "Value (optional config)",
+  "sub.config_value_placeholder": "Enter config value...",
+  "sub.add": "Add",
+  "sub.edit_modifier_title": "Edit Message Render Modifier",
+  "sub.modifier_name": "Modifier Name",
+  "sub.update": "Update"
+}

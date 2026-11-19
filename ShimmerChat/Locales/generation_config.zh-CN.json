@@ -1,0 +1,19 @@
+{
+  "generation_config.desc": "管理可复用的节点树预设；编辑后保存，节点通过预设 ID 引用。",
+  "generation_config.post_desc": "管理后生成节点树预设；编辑后保存，节点通过预设 ID 引用。",
+  "generation_config.render_desc": "管理渲染修改节点树预设；编辑后保存，节点通过预设 ID 引用。",
+  "generation_config.basic": "基本信息",
+  "generation_config.basic_desc": "预设名称与稳定 ID。",
+  "generation_config.name_hint": "仅用于在预设选择器与检索列表中识别这份预设。",
+  "generation_config.id_hint": "节点与智能体通过该 ID 引用预设，创建后不会改变。",
+  "generation_config.node_tree_desc": "拖拽节点构建管线；修改会保留在内存中，保存后写入存储。",
+  "generation_config.empty_title": "还没有预设",
+  "generation_config.empty_desc": "创建第一份节点树预设。",
+  "generation_config.name_required": "预设名称不能为空。",
+  "generation_config.saved": "预设已保存",
+  "generation_config.load_failed": "预设加载失败：{0}",
+  "generation_config.tree_load_failed": "节点树加载失败：{0}。编辑器已回退到空白树；保存会覆盖损坏的树。",
+  "generation_config.tree_empty_fallback": "节点树类型异常，编辑器已回退到空白树。",
+  "generation_config.tree_migrated": "旧格式节点树已迁移到新的包装器格式，保存后写回。",
+  "generation_config.tree_bytes": "{0} 字符"
+}

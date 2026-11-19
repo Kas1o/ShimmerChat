@@ -1,0 +1,9 @@
+{
+  "svg.render.label": "SVG",
+  "svg.render.alt": "SVG image",
+  "code.actions.copy": "Copy",
+  "code.actions.download": "Download",
+  "code.actions.copied": "Copied",
+  "builtin.regex_render_modifier.name": "Regex Replacement",
+  "builtin.regex_render_modifier.desc": "Applies a set of Regex replacement rules to the message content. Input: Name of the Regex Set to apply."
+}

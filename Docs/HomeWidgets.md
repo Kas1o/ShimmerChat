@@ -152,8 +152,10 @@ https://api.github.com/repos/{owner}/{repo}/releases/latest
 ## 6. 本地化
 
 Widget 元数据的 `NameKey` / `DescriptionKey` 以及所有用户可见文本都必须提供本地化 Key。
-内置 Widget 的 Key 位于 `ShimmerChatBuiltin/Locales/{culture}.json`，首页框架的 Key 位于
-`ShimmerChat/Locales/{culture}.json`。支持的 culture 至少包括 `zh-CN` 与 `en-US`。
+内置 Widget 的 Key 位于 `ShimmerChatBuiltin/Locales/widgets.{culture}.json`，首页框架的
+Key 位于 `ShimmerChat/Locales/`（按领域拆分的 `home.*` 等多个 `*.{culture}.json` 文件）。
+`Locales/` 目录下文件名以 `.{culture}.json` 结尾都会被自动发现；支持的 culture 至少
+包括 `zh-CN` 与 `en-US`。
 
 ## 7. 测试
 

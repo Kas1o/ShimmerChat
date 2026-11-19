@@ -25,4 +25,18 @@
     <ProjectReference Include="..\ShimmerChatBuiltin\ShimmerChatBuiltin.csproj" />
   </ItemGroup>
 
+  <!-- LocServiceTests 的多文件加载测试数据：与产品项目同一嵌入形态（Locales/*.json）。
+       TestLocales 用于验证 Locales/ 目录之外的资源不会被后缀匹配误捡。
+       WithCulture=false 防止 {领域}.{culture}.json 被分流到卫星程序集。 -->
+  <ItemGroup>
+    <Content Remove="Locales\*.json" />
+    <None Remove="Locales\*.json" />
+    <EmbeddedResource Include="Locales\*.json">
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
+    <EmbeddedResource Include="TestLocales\*.json">
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

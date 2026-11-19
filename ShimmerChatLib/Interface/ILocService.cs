@@ -20,7 +20,10 @@ namespace ShimmerChatLib.Interface
         /// <summary>带命名插值的本地化字符串。占位符: {name}</summary>
         string Format(string key, params (string name, object value)[] args);
 
-        /// <summary>切换语言，立即生效并持久化</summary>
+        /// <summary>
+        /// 切换语言，立即生效并持久化。
+        /// 仅接受 <see cref="SupportedCultures"/> 中登记的值；未支持的语言会被拒绝并记录日志，当前语言保持不变。
+        /// </summary>
         void SetCulture(string culture);
     }
 }

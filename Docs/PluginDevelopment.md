@@ -84,9 +84,13 @@ git clone https://github.com/Kas1o/ShimmerChat.git
     <ProjectReference Include="..\ShimmerChat\ShimmerChatLib\ShimmerChatLib.csproj" />
   </ItemGroup>
 
-  <!-- 本地化文件嵌入 -->
+  <!-- 本地化文件嵌入：WithCulture=false 防止 *.zh-CN.json 被分流到卫星程序集 -->
   <ItemGroup>
-    <EmbeddedResource Include="Locales\*.json" />
+    <EmbeddedResource Include="Locales\*.json">
+      <WithCulture>false</WithCulture>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </EmbeddedResource>
   </ItemGroup>
 </Project>
 ```
@@ -680,11 +684,32 @@ if (PanelContext is LiveAgentPanelContext live)
 
 ### 文件结构
 
+每个程序集可以为同一 culture 提供多份翻译文件：`Locales/` 目录下文件名以
+`.{culture}.json` 结尾的都会被后缀匹配发现并按键合并。
+
 ```
 Locales/
-├── zh-CN.json
-└── en-US.json
+├── zh-CN.json          # 主文件（可选；小项目可以只有它）
+├── nodes.zh-CN.json    # 按领域拆分的扩展文件
+├── tools.zh-CN.json
+├── en-US.json
+├── nodes.en-US.json
+└── tools.en-US.json
 ```
+
+内置项目已经按领域拆分（`ShimmerChatBuiltin/Locales/` 的 `nodes.*`、`mcp.*`、
+`imagegen.*` 等；`ShimmerChat/Locales/` 的 `theme.*`、`agent.*`、`debug.*` 等）。
+新键放进对应领域的文件；没有明显归属时可以新建领域文件。主文件形态保持兼容
+（`ShimmerChatLib/Locales/{culture}.json` 即未拆分的主文件）。
+
+### 合并顺序与失败语义
+
+- 先加载 en-US 基线，再用目标 culture 覆盖；目标缺失的键回退英文，仍缺失回退 Key 本身。
+- 程序集之间按装配顺序（Lib → Builtin → 宿主 → 插件），后者覆盖前者。
+- 同一程序集内按资源名排序依次合并，后合并者覆盖先合并者。
+  重复键有契约测试守卫（`LocaleContractTests`），不要依赖覆盖行为。
+- 单个文件解析失败只作废该文件：跳过并记录 `LogError`，不影响同 culture 的其它文件。
+- 文件名不以 `.{culture}.json` 结尾、或不在 `Locales/` 目录下的资源不会被识别。
 
 ### Key 命名规范
 
@@ -730,7 +755,20 @@ Locales/
 }
 ```
 
-文件必须设为 `EmbeddedResource`（在 `.csproj` 中配置），启动时 `LocService` 自动从所有已加载程序集发现并加载。
+文件必须设为 `EmbeddedResource`（在 `.csproj` 中配置），启动时 `LocService` 自动从所有
+已加载程序集发现并加载；发现规则的唯一定义是 `LocService.GetLocaleResourceNames`
+（后缀 `.Locales.{文件名以 .{culture}.json 结尾}`），契约测试与文档都以它为准。
+
+注意：`{领域}.{culture}.json` 形态的文件名会被 MSBuild 的文化推断分流到卫星程序集，
+主程序集里反而找不到；必须显式标记 `WithCulture=false`：
+
+```xml
+<EmbeddedResource Include="Locales\*.json">
+  <WithCulture>false</WithCulture>
+  <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+  <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+</EmbeddedResource>
+```
 
 ---
 

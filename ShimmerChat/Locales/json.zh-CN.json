@@ -1,0 +1,7 @@
+{
+  "json.object": "对象",
+  "json.n_properties": "{0} 个属性",
+  "json.array_count": "数组[{0}]",
+  "json.array_placeholder": "[ ... ]",
+  "json.unknown_type": "未知类型"
+}

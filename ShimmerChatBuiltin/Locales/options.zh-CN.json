@@ -1,0 +1,14 @@
+{
+  "options.tool_preset.desc": "{0} 个工具",
+  "options.dyn_prompt_set.desc": "{0} 条规则",
+  "options.subagent_output.last_message": "只注入子代理最后一条消息",
+  "options.subagent_output.full_json": "注入子代理的完整消息 JSON",
+  "options.subagent_output.none": "不注入任何输出",
+  "options.disabled": "已停用",
+  "options.image_workflow.enabled": "已启用",
+  "options.image_workflow.disabled": "未启用",
+  "options.image_config.enabled": "已启用",
+  "options.image_config.disabled": "未启用",
+  "options.image_config.custom": "自定义工作流",
+  "options.image_config.default": "默认工作流"
+}

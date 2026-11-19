@@ -1,0 +1,5 @@
+{
+  "plugin_panel.fallback_title": "插件面板",
+  "plugin_panel.not_found": "面板不存在",
+  "plugin_panel.not_found_msg": "未找到名称为 \"{0}\" 的插件面板"
+}

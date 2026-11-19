@@ -1,0 +1,14 @@
+{
+  "sub.collapse": "收起",
+  "sub.expand": "展开",
+  "sub.plugin_panels": "插件面板",
+  "sub.add_modifier_title": "添加消息渲染修改器",
+  "sub.select_modifier": "选择修改器",
+  "sub.please_select": "请选择...",
+  "sub.config_value": "输入值 (可选配置)",
+  "sub.config_value_placeholder": "输入配置值...",
+  "sub.add": "添加",
+  "sub.edit_modifier_title": "编辑消息渲染修改器",
+  "sub.modifier_name": "修改器名称",
+  "sub.update": "更新"
+}

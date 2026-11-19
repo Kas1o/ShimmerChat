@@ -1,0 +1,5 @@
+{
+  "plugin_panel.fallback_title": "Plugin Panel",
+  "plugin_panel.not_found": "Panel Not Found",
+  "plugin_panel.not_found_msg": "Plugin panel \"{0}\" not found."
+}

@@ -1,0 +1,11 @@
+{
+  "msg_render.title": "消息渲染器配置",
+  "msg_render.debug_mode": "启用调试模式",
+  "msg_render.debug_mode_desc": "开启后，渲染出错时将显示完整的渲染流程中间结果，便于排查问题。",
+  "msg_render.add_modifier": "添加渲染修改器",
+  "msg_render.active_modifiers": "已激活的修改器",
+  "msg_render.edit": "编辑",
+  "msg_render.remove": "移除",
+  "msg_render.no_active_modifiers": "无激活的渲染修改器",
+  "msg_render.save_config": "保存配置"
+}

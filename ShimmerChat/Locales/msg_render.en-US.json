@@ -1,0 +1,11 @@
+{
+  "msg_render.title": "Message Render Config",
+  "msg_render.debug_mode": "Enable Debug Mode",
+  "msg_render.debug_mode_desc": "When enabled, full rendering pipeline intermediate results will be displayed on error for troubleshooting.",
+  "msg_render.add_modifier": "Add Render Modifier",
+  "msg_render.active_modifiers": "Active Modifiers",
+  "msg_render.edit": "Edit",
+  "msg_render.remove": "Remove",
+  "msg_render.no_active_modifiers": "No active render modifiers.",
+  "msg_render.save_config": "Save Config"
+}
