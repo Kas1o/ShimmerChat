@@ -1,3 +1,4 @@
+using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Mcp
@@ -191,6 +192,12 @@ namespace ShimmerChatBuiltin.Mcp
 
         /// <summary>资源上下文注入的总字符预算，超出部分截断并标注。</summary>
         public int ResourceCharBudget { get; set; } = 24000;
+
+        /// <summary>
+        /// 该端点返回图像的输出处理配置：跟随全局（默认）/ 原图 / 自定义预算。
+        /// 控制这些图像的磁盘占用与进入请求的体积；旧配置无该字段时按「跟随全局」处理。
+        /// </summary>
+        public ImageProcessingConfig ImageOutputProcessing { get; set; } = new();
 
         /// <summary>该端点的日志详细程度（控制调试输出与服务端 stderr 转发）。</summary>
         public McpLogLevel LogLevel { get; set; } = McpLogLevel.Info;

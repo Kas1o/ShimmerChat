@@ -284,6 +284,37 @@
                     </div>
                 </div>
 
+                <div class="cfg-grid">
+                    <div class="cfg-field cfg-span-6">
+                        <label class="su-label">@Loc["panel_mcp.image_output_processing"]</label>
+                        <select class="su-select" @bind="endpoint.ImageOutputMode">
+                            <option value="@ToolImageOutputProcessing.FollowGlobal">@Loc["panel_mcp.image_output_follow_global"]</option>
+                            <option value="@ToolImageOutputProcessing.Original">@Loc["panel_mcp.image_output_original"]</option>
+                            <option value="@ToolImageOutputProcessing.Custom">@Loc["panel_mcp.image_output_custom"]</option>
+                        </select>
+                        <p class="cfg-field-hint">@Loc["panel_mcp.image_output_processing_hint"]</p>
+                    </div>
+                    @if (endpoint.ImageOutputMode == ToolImageOutputProcessing.Custom)
+                    {
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_mcp.image_output_budget"]</label>
+                            <input type="number" class="su-input" @bind="endpoint.ImageOutputPixelBudget" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_mcp.image_output_compression"]</label>
+                            <select class="su-select" @bind="endpoint.ImageOutputCompression">
+                                <option value="@ImageCompressionAlgorithm.None">@Loc["panel_mcp.image_output_scale_only"]</option>
+                                <option value="@ImageCompressionAlgorithm.WebP">@Loc["panel_mcp.image_output_webp"]</option>
+                                <option value="@ImageCompressionAlgorithm.Jpeg">@Loc["panel_mcp.image_output_jpeg"]</option>
+                            </select>
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_mcp.image_output_quality"]</label>
+                            <input type="number" class="su-input" @bind="endpoint.ImageOutputQuality" />
+                        </div>
+                    }
+                </div>
+
                 @if (_inventories.TryGetValue(endpoint.RefKey, out var inventory))
                 {
                     <div class="cfg-action-row">
@@ -816,6 +847,26 @@
         public int ResourceCharBudget { get => Config.ResourceCharBudget; set => Config.ResourceCharBudget = value; }
         public McpLogLevel LogLevel { get => Config.LogLevel; set => Config.LogLevel = value; }
         public McpProtocolMode ProtocolMode { get => Config.ProtocolMode; set => Config.ProtocolMode = value; }
+        public ToolImageOutputProcessing ImageOutputMode
+        {
+            get => Config.ImageOutputProcessing.Mode;
+            set => Config.ImageOutputProcessing.Mode = value;
+        }
+        public long ImageOutputPixelBudget
+        {
+            get => Config.ImageOutputProcessing.PixelBudget;
+            set => Config.ImageOutputProcessing.PixelBudget = value;
+        }
+        public ImageCompressionAlgorithm ImageOutputCompression
+        {
+            get => Config.ImageOutputProcessing.Algorithm;
+            set => Config.ImageOutputProcessing.Algorithm = value;
+        }
+        public int ImageOutputQuality
+        {
+            get => Config.ImageOutputProcessing.Quality;
+            set => Config.ImageOutputProcessing.Quality = value;
+        }
         public List<McpNamedToggle> Tools => Config.Tools;
         public List<McpNamedToggle> Resources => Config.Resources;
 

@@ -345,6 +345,66 @@ public class ImageAttachmentServiceTests
     // ── 请求侧预算处理（ToChatImageAsync 重载）──────────────────
 
     [Fact]
+    public async Task SaveGeneratedAsync_WithProcessing_StoresTheProcessedImage()
+    {
+        // 工具 / 端点产物的落盘处理：处理后的文件必须满足预算，MIME / 扩展名跟随输出格式
+        var bytes = TestImageFactory.RenderNoisePng(1500, 1000);
+        var service = CreateService(nameof(ImageStorageMode.UserUploadImage));
+
+        var image = await service.SaveGeneratedAsync(
+            new MemoryStream(bytes), "image/png",
+            new ImageProcessingOptions { PixelBudget = 512L * 512 });
+
+        try
+        {
+            image.MimeType.Should().Be("image/webp");
+            image.FileName.Should().EndWith(".webp");
+
+            var stored = File.ReadAllBytes(PathOf(image));
+            stored.Length.Should().BeLessThan(bytes.Length);
+            var (width, height, format) = TestImageFactory.Probe(stored);
+            ((long)width * height).Should().BeLessOrEqualTo(512L * 512);
+            format.Should().Be(SkiaSharp.SKEncodedImageFormat.Webp);
+        }
+        finally
+        {
+            File.Delete(PathOf(image));
+        }
+    }
+
+    [Fact]
+    public async Task SaveGeneratedAsync_WithoutProcessing_KeepsOriginalBytes()
+    {
+        // processing = null 即原图落盘（「无压缩」配置），流式路径不读入内存
+        var bytes = TestImageFactory.RenderPng(64, 64);
+        var service = CreateService(nameof(ImageStorageMode.UserUploadImage));
+
+        var image = await service.SaveGeneratedAsync(
+            new MemoryStream(bytes), "image/png", processing: null);
+
+        try
+        {
+            image.MimeType.Should().Be("image/png");
+            File.ReadAllBytes(PathOf(image)).Should().Equal(bytes);
+        }
+        finally
+        {
+            File.Delete(PathOf(image));
+        }
+    }
+
+    [Fact]
+    public async Task SaveGeneratedAsync_WithProcessing_RejectsUndecodableData()
+    {
+        var service = CreateService(nameof(ImageStorageMode.UserUploadImage));
+
+        var act = async () => await service.SaveGeneratedAsync(
+            PngStream(), "image/png", new ImageProcessingOptions { PixelBudget = 512L * 512 });
+
+        await act.Should().ThrowAsync<InvalidDataException>();
+    }
+
+    [Fact]
     public async Task ToChatImageAsync_WithBudget_ProcessesOverBudgetStoredFile()
     {
         // 工具生成图始终原图落盘；它的请求体积由这里兜底，且消息与文件都不被改写

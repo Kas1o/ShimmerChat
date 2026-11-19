@@ -60,6 +60,20 @@ namespace ShimmerChatLib.Interface
             => SaveAsync(content, contentType);
 
         /// <summary>
+        /// 保存工具 / 端点产物，并在 <paramref name="processing"/> 非 null 时先按预算
+        /// 处理（缩放 + 重编码）再落盘。null 时原样落盘，与上面的重载行为一致。
+        /// 处理失败（数据无法解码等）显式抛 <see cref="InvalidDataException"/>。
+        /// <para>
+        /// 默认实现退化为原样落盘，兼容没有处理能力的旧实现；
+        /// 处理预算因此不生效时由实现记录日志，调用方不应假定预算一定被满足。
+        /// </para>
+        /// </summary>
+        Task<MessageImage> SaveGeneratedAsync(
+            Stream content, string contentType, ImageProcessingOptions? processing,
+            CancellationToken cancellationToken = default)
+            => SaveGeneratedAsync(content, contentType, cancellationToken);
+
+        /// <summary>
         /// 把消息中的图像附件解析为请求可用的内容块。
         /// 附件引用的文件缺失时抛出 <see cref="FileNotFoundException"/>，不静默跳过。
         /// </summary>

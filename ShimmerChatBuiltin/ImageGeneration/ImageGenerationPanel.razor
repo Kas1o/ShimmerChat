@@ -149,6 +149,47 @@
                 }
             </section>
 
+            <section class="cfg-section">
+                <div class="cfg-section-head">
+                    <span class="cfg-section-icon"><i class="bi bi-image"></i></span>
+                    <div class="cfg-section-title">
+                        <h3>@Loc["panel_imagegen.section_output_processing"]</h3>
+                        <p>@Loc["imagegen_config.output_processing_desc"]</p>
+                    </div>
+                </div>
+
+                <div class="cfg-grid">
+                    <div class="cfg-field cfg-span-6">
+                        <label class="su-label">@Loc["panel_imagegen.output_processing_mode"]</label>
+                        <select class="su-select" @bind="profile.OutputProcessingMode">
+                            <option value="@ToolImageOutputProcessing.FollowGlobal">@Loc["panel_imagegen.output_follow_global"]</option>
+                            <option value="@ToolImageOutputProcessing.Original">@Loc["panel_imagegen.output_original"]</option>
+                            <option value="@ToolImageOutputProcessing.Custom">@Loc["panel_imagegen.output_custom"]</option>
+                        </select>
+                        <p class="cfg-field-hint">@Loc["panel_imagegen.output_processing_hint"]</p>
+                    </div>
+                    @if (profile.OutputProcessingMode == ToolImageOutputProcessing.Custom)
+                    {
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.output_pixel_budget"]</label>
+                            <input class="su-input" inputmode="numeric" @bind="profile.OutputPixelBudget" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.output_compression"]</label>
+                            <select class="su-select" @bind="profile.OutputCompression">
+                                <option value="@ImageCompressionAlgorithm.None">@Loc["panel_imagegen.output_scale_only"]</option>
+                                <option value="@ImageCompressionAlgorithm.WebP">@Loc["panel_imagegen.output_webp"]</option>
+                                <option value="@ImageCompressionAlgorithm.Jpeg">@Loc["panel_imagegen.output_jpeg"]</option>
+                            </select>
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.output_quality"]</label>
+                            <input class="su-input" inputmode="numeric" @bind="profile.OutputQuality" />
+                        </div>
+                    }
+                </div>
+            </section>
+
             @if (isComfy)
             {
                 <section class="cfg-section">
@@ -465,7 +506,11 @@
         BatchSize = profile.DefaultWorkflow.BatchSize.ToString(CultureInfo.InvariantCulture),
         CustomWorkflowJson = profile.CustomWorkflowJson,
         Parameters = profile.CustomWorkflowParameters.Select(ToEditor).ToList(),
-        Pinned = profile.Pinned
+        Pinned = profile.Pinned,
+        OutputProcessingMode = profile.OutputImageProcessing.Mode,
+        OutputPixelBudget = profile.OutputImageProcessing.PixelBudget.ToString(CultureInfo.InvariantCulture),
+        OutputCompression = profile.OutputImageProcessing.Algorithm,
+        OutputQuality = profile.OutputImageProcessing.Quality.ToString(CultureInfo.InvariantCulture)
     };
 
     private static ParameterEditor ToEditor(ImageWorkflowParameter parameter) => new()
@@ -535,6 +580,29 @@
             {
                 error = Loc.Format("panel_imagegen.msg_invalid_int_profile", label, Loc["panel_imagegen.batch_size"]);
                 return null;
+            }
+
+            // 输出处理参数仅在 Custom 模式下有意义；其它模式不需要解析，
+            // 非法残留文本直接按默认值写回（Validate 只校验 Custom）。
+            var outputBudget = ImageAttachmentRules.DefaultPixelBudget;
+            var outputQuality = ImageAttachmentRules.DefaultCompressionQuality;
+            if (editor.OutputProcessingMode == ToolImageOutputProcessing.Custom)
+            {
+                if (!long.TryParse(
+                        editor.OutputPixelBudget, NumberStyles.Integer, CultureInfo.InvariantCulture,
+                        out outputBudget))
+                {
+                    error = Loc.Format("panel_imagegen.msg_invalid_int_profile",
+                        label, Loc["panel_imagegen.output_pixel_budget"]);
+                    return null;
+                }
+
+                if (!TryParseInt(editor.OutputQuality, out outputQuality))
+                {
+                    error = Loc.Format("panel_imagegen.msg_invalid_int_profile",
+                        label, Loc["panel_imagegen.output_quality"]);
+                    return null;
+                }
             }
 
             var parameters = new List<ImageWorkflowParameter>(editor.Parameters.Count);
@@ -615,7 +683,14 @@
                 },
                 CustomWorkflowJson = editor.CustomWorkflowJson ?? "",
                 CustomWorkflowParameters = parameters,
-                Pinned = editor.Pinned
+                Pinned = editor.Pinned,
+                OutputImageProcessing = new ImageProcessingConfig
+                {
+                    Mode = editor.OutputProcessingMode,
+                    PixelBudget = outputBudget,
+                    Algorithm = editor.OutputCompression,
+                    Quality = outputQuality
+                }
             });
         }
 
@@ -1011,6 +1086,12 @@
         public string CustomWorkflowJson { get; set; } = "";
         public List<ParameterEditor> Parameters { get; set; } = [];
 
+        public ToolImageOutputProcessing OutputProcessingMode { get; set; } =
+            ToolImageOutputProcessing.FollowGlobal;
+        public string OutputPixelBudget { get; set; } = "";
+        public ImageCompressionAlgorithm OutputCompression { get; set; } = ImageCompressionAlgorithm.WebP;
+        public string OutputQuality { get; set; } = "";
+
         public ProfileEditor Clone() => new()
         {
             Id = Id,
@@ -1035,7 +1116,11 @@
             NegativePrompt = NegativePrompt,
             BatchSize = BatchSize,
             CustomWorkflowJson = CustomWorkflowJson,
-            Parameters = Parameters.Select(p => p.Clone()).ToList()
+            Parameters = Parameters.Select(p => p.Clone()).ToList(),
+            OutputProcessingMode = OutputProcessingMode,
+            OutputPixelBudget = OutputPixelBudget,
+            OutputCompression = OutputCompression,
+            OutputQuality = OutputQuality
         };
     }
 

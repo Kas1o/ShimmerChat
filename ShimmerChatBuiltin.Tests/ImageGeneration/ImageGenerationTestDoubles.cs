@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SharperLLM.Util;
 using ShimmerChatBuiltin.ImageGeneration;
+using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Tests.ImageGeneration;
@@ -75,20 +76,36 @@ internal sealed class FakeA1111Client : IA1111Client
     }
 }
 
-/// <summary>内存版图像附件服务：记录落盘内容，并返回稳定的 /userimages/ 链接。</summary>
+/// <summary>内存版图像附件服务：记录落盘内容与处理参数，并返回稳定的 /userimages/ 链接。</summary>
 internal sealed class FakeImageAttachmentService : IImageAttachmentService
 {
     public List<(string ContentType, byte[] Content)> Saved { get; } = [];
+
+    /// <summary>每次落盘收到的处理参数（null = 原样）；与 <see cref="Saved"/> 一一对应。</summary>
+    public List<ImageProcessingOptions?> SavedProcessings { get; } = [];
+
+    /// <summary>模拟全局上传处理设置：auto 类工具参数跟随它。</summary>
+    public ImageProcessingOptions? UploadProcessing { get; set; }
+
+    /// <summary>模拟「落盘成功但显示链接解析失败」的契约破坏场景。</summary>
+    public bool ReturnNoDisplayUrl { get; set; }
 
     public bool ThrowOnSave { get; set; }
 
     public ImageStorageMode Mode => ImageStorageMode.UserUploadImage;
 
+    ImageProcessingOptions? IImageAttachmentService.UploadProcessing => UploadProcessing;
+
     public Task<MessageImage> SaveAsync(Stream content, string contentType) =>
         throw new NotSupportedException("Tests should call SaveGeneratedAsync.");
 
-    public async Task<MessageImage> SaveGeneratedAsync(
+    public Task<MessageImage> SaveGeneratedAsync(
         Stream content, string contentType, CancellationToken cancellationToken = default)
+        => SaveGeneratedAsync(content, contentType, processing: null, cancellationToken);
+
+    public async Task<MessageImage> SaveGeneratedAsync(
+        Stream content, string contentType, ImageProcessingOptions? processing,
+        CancellationToken cancellationToken = default)
     {
         if (ThrowOnSave)
             throw new IOException("Simulated disk failure.");
@@ -96,6 +113,7 @@ internal sealed class FakeImageAttachmentService : IImageAttachmentService
         using var buffer = new MemoryStream();
         await content.CopyToAsync(buffer, cancellationToken);
         Saved.Add((contentType, buffer.ToArray()));
+        SavedProcessings.Add(processing);
 
         return MessageImage.FromFile($"{Saved.Count:D4}.png", contentType);
     }
@@ -103,8 +121,12 @@ internal sealed class FakeImageAttachmentService : IImageAttachmentService
     public Task<ChatImage> ToChatImageAsync(MessageImage image, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
+    public Task<ChatImage> ToChatImageAsync(
+        MessageImage image, ImageProcessingOptions? processing, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
     public string? GetDisplayUrl(MessageImage image) =>
-        image.FileName == null ? null : $"/userimages/{image.FileName}";
+        ReturnNoDisplayUrl || image.FileName == null ? null : $"/userimages/{image.FileName}";
 
     public void DeleteStoredFile(MessageImage image) { }
 }

@@ -106,5 +106,18 @@
   "imagegen_config.reset_draft": "已恢复默认配置，保存后生效。",
   "imagegen_config.empty_title": "还没有文生图配置",
   "imagegen_config.empty_desc": "创建第一份配置，连接 ComfyUI 或 Automatic1111 服务。",
+  "imagegen_config.output_processing_desc": "生成结果落盘前是否按像素预算缩放压缩，控制磁盘占用与下一轮进入请求的体积。",
+  "panel_imagegen.section_output_processing": "输出图像处理",
+  "panel_imagegen.output_processing_mode": "处理方式",
+  "panel_imagegen.output_follow_global": "跟随全局设置（默认）",
+  "panel_imagegen.output_original": "原图（不处理）",
+  "panel_imagegen.output_custom": "自定义预算",
+  "panel_imagegen.output_processing_hint": "跟随全局：按设置 → 杂项 → 图像设置中的「上传图像处理方式」处理；原图：始终原样落盘；自定义：像素总量超过预算时先等比缩小，再按所选算法重编码。",
+  "panel_imagegen.output_pixel_budget": "像素预算（宽×高乘积）",
+  "panel_imagegen.output_compression": "压缩算法",
+  "panel_imagegen.output_scale_only": "仅缩放（保持原格式）",
+  "panel_imagegen.output_webp": "WebP（体积最小）",
+  "panel_imagegen.output_jpeg": "JPEG（兼容性最好）",
+  "panel_imagegen.output_quality": "压缩质量",
   "panel_imagegen.workflow_mode": "工作流模式"
 }

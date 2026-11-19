@@ -68,4 +68,67 @@ namespace ShimmerChatLib
 		/// <summary>有损编码的质量（1-100）。</summary>
 		public int Quality { get; init; } = ImageAttachmentRules.DefaultCompressionQuality;
 	}
+
+	/// <summary>
+	/// 工具 / 端点产物图像的输出处理策略。
+	/// 文生图 Profile、MCP 端点等配置级别持久化该策略，落盘前据此折算实际参数。
+	/// </summary>
+	public enum ToolImageOutputProcessing
+	{
+		/// <summary>跟随全局「上传图像处理方式」设置（默认，旧配置缺省落到此值）。</summary>
+		FollowGlobal = 0,
+
+		/// <summary>原样存储，不处理：画质优先，接受磁盘与请求体积代价。</summary>
+		Original = 1,
+
+		/// <summary>按自定义参数处理：超像素预算先缩放，再按指定算法重编码。</summary>
+		Custom = 2
+	}
+
+	/// <summary>
+	/// 配置级别（文生图 Profile、MCP 端点）持久化的图像输出处理配置。
+	/// 与全局上传处理设置折算出实际生效的 <see cref="ImageProcessingOptions"/>。
+	/// </summary>
+	public sealed class ImageProcessingConfig
+	{
+		public ToolImageOutputProcessing Mode { get; set; } = ToolImageOutputProcessing.FollowGlobal;
+
+		/// <summary>Custom 模式的像素预算；越界值在折算时收敛，配置校验负责提前提示。</summary>
+		public long PixelBudget { get; set; } = ImageAttachmentRules.DefaultPixelBudget;
+
+		/// <summary>Custom 模式的压缩算法。</summary>
+		public ImageCompressionAlgorithm Algorithm { get; set; } = ImageCompressionAlgorithm.WebP;
+
+		/// <summary>Custom 模式的有损编码质量。</summary>
+		public int Quality { get; set; } = ImageAttachmentRules.DefaultCompressionQuality;
+
+		/// <summary>
+		/// 折算实际生效的处理参数：<b>null 表示原样存储，不处理</b>。
+		/// <paramref name="global"/> 是当前全局上传处理设置（原图模式下为 null）。
+		/// </summary>
+		public ImageProcessingOptions? Resolve(ImageProcessingOptions? global) => Mode switch
+		{
+			ToolImageOutputProcessing.Original => null,
+			ToolImageOutputProcessing.Custom => new ImageProcessingOptions
+			{
+				PixelBudget = ImageAttachmentRules.ClampPixelBudget(PixelBudget),
+				Algorithm = Algorithm,
+				Quality = ImageAttachmentRules.ClampCompressionQuality(Quality)
+			},
+			_ => global
+		};
+	}
+
+	/// <summary>
+	/// 输出处理配置的解析入口。配置缺失（旧数据无该字段被序列化成 null）时
+	/// 与「跟随全局」等价，避免每处调用都要写 null 检查。
+	/// 注意不能写成 <c>config?.Resolve(global) ?? global</c>：
+	/// Original 模式的 Resolve <b>有意</b>返回 null（不处理），`??` 会把它误折成全局值。
+	/// </summary>
+	public static class ImageProcessingConfigExtensions
+	{
+		public static ImageProcessingOptions? ResolveOutput(
+			this ImageProcessingConfig? config, ImageProcessingOptions? global)
+			=> config != null ? config.Resolve(global) : global;
+	}
 }

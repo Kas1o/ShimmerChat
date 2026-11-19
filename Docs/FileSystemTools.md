@@ -54,18 +54,25 @@
 - 单文件上限：`ImageAttachmentRules.MaxBytes`（20 MiB），与聊天上传、生成图像使用同一份上限。
 - 格式按**文件头**识别（PNG/JPEG/GIF/WebP 魔数），不信任扩展名；扩展名是 `.png` 的文本文件会明确报错。
   识别逻辑由 `ImageMimeDetector` 统一提供，MCP、CodeAct 等其它图像入口共用同一份实现。
-- 图像以 Base64 内联进 `MessageImage`，不依赖 `UserUploadImage` 目录。
+- 图像**落盘**到 `UserUploadImage` 并以文件引用进入消息，与生成图 / MCP 图像同一条路径
+  （旧版直接内联 Base64，大图会把消息存储与每轮请求撑爆）。工具结果同时给出稳定的
+  `/userimages/...` 链接。用户磁盘上的原文件永远不被修改。
+- 落盘前的处理由工具参数 `image_processing` 决定：`auto`（默认）跟随全局上传处理设置、
+  `original` 原样落盘、`budget` 用 `pixel_budget` 参数（默认 `ImageAttachmentRules.DefaultPixelBudget`）
+  作为像素预算，算法与质量沿用全局设置。非法取值显式返回 `TOOL_INVALID_ARGUMENTS`，不猜测修正。
+- 无图像存储的会话（如子代理虚拟环境）返回 `TOOL_CONFIG_INVALID`，不退回内联掩盖问题。
 - 工具响应取消令牌；读取期间用户取消会抛 `OperationCanceledException`，由执行节点中止本轮，不写伪造结果。
 
 ### 返回值
 
-成功时 `Content` 包含路径、MIME、大小、修改时间，`Images` 包含一张内联图像：
+成功时 `Content` 包含路径、MIME、大小、修改时间与保存链接，`Images` 包含一张文件引用附件：
 
 ```text
 Image: D:\pics\cat.png
 Type: image/png
 Size: 42.31 KB
 Last Modified: 2026-01-02 03:04:05
+Saved as: /userimages/0001.png
 The image is attached to this tool result so you can see it.
 ```
 
@@ -73,9 +80,11 @@ The image is attached to this tool result so you can see it.
 
 | 场景 | 错误码 |
 |------|--------|
-| 缺 `path`、路径非法、文件不存在、路径是目录、空文件、超出大小上限、格式不支持 | `TOOL_INVALID_ARGUMENTS` |
+| 缺 `path`、路径非法、文件不存在、路径是目录、空文件、超出大小上限、格式不支持、非法 `image_processing` 取值 | `TOOL_INVALID_ARGUMENTS` |
 | 全局/节点访问范围拒绝 | `TOOL_ACCESS_DENIED` |
 | 文件读取 I/O 失败 | `TOOL_SERVICE_ERROR` |
+| 会话没有图像存储 | `TOOL_CONFIG_INVALID` |
+| 落盘失败或保存后无法解析显示链接 | `TOOL_OUTPUT_WRITE_FAILED` |
 
 失败时不会附带图像；技术详情写入 `DebugOutput`，不塞进模型可见文本。
 

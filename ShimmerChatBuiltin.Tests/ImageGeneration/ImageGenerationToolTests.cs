@@ -1,6 +1,7 @@
 using Newtonsoft.Json.Linq;
 using ShimmerChatBuiltin.ImageGeneration;
 using ShimmerChatBuiltin.Tests.SubAgent;
+using ShimmerChatLib;
 
 namespace ShimmerChatBuiltin.Tests.ImageGeneration;
 
@@ -366,5 +367,62 @@ public class ImageGenerationToolTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             tool.ExecuteAsync(
                 ImageGenerationTestData.Arguments("""{"prompt":"a cat"}"""), cts.Token));
+    }
+
+    // ── 输出处理配置（跟随全局 / 原图 / 自定义）──────────────────────
+
+    private static ToolInvocationContext MinimalArguments() =>
+        ImageGenerationTestData.Arguments("""{"prompt":"a cat"}""");
+
+    [Fact]
+    public async Task OutputProcessing_FollowsGlobal_WhenProfileLeavesDefault()
+    {
+        // Profile 缺省即跟随全局：全局设置热切换后，同一份 Profile 的落盘行为立即变化
+        var global = new ImageProcessingOptions { PixelBudget = 1024L * 1024 };
+        var kv = new FakeKVDataService();
+        kv.Write("ImageGeneration", "Config", ImageGenerationTestData.ConfigJson());
+        var attachments = new FakeImageAttachmentService { UploadProcessing = global };
+        var tool = new ImageGenerationToolV2(kv, attachments, profileId: null, _ => new FakeComfyUiClient());
+
+        var result = await tool.ExecuteAsync(MinimalArguments(), CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        attachments.SavedProcessings.Should().ContainSingle()
+            .Which.PixelBudget.Should().Be(1024L * 1024);
+    }
+
+    [Fact]
+    public async Task OutputProcessing_Original_SavesBytesWithoutProcessing()
+    {
+        var (tool, _, attachments, _) = CreateDefaultTool(c =>
+            c.DefaultProfile().OutputImageProcessing.Mode = ToolImageOutputProcessing.Original);
+        attachments.UploadProcessing = new ImageProcessingOptions { PixelBudget = 1024L * 1024 };
+
+        var result = await tool.ExecuteAsync(MinimalArguments(), CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        attachments.SavedProcessings.Should().ContainSingle().Which.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OutputProcessing_Custom_UsesProfileParameters()
+    {
+        var (tool, _, attachments, _) = CreateDefaultTool(c =>
+        {
+            var processing = c.DefaultProfile().OutputImageProcessing;
+            processing.Mode = ToolImageOutputProcessing.Custom;
+            processing.PixelBudget = 2048L * 2048;
+            processing.Algorithm = ImageCompressionAlgorithm.Jpeg;
+            processing.Quality = 70;
+        });
+        attachments.UploadProcessing = new ImageProcessingOptions { PixelBudget = 1024L * 1024 };
+
+        var result = await tool.ExecuteAsync(MinimalArguments(), CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        var saved = attachments.SavedProcessings.Should().ContainSingle().Subject;
+        saved!.PixelBudget.Should().Be(2048L * 2048);
+        saved.Algorithm.Should().Be(ImageCompressionAlgorithm.Jpeg);
+        saved.Quality.Should().Be(70);
     }
 }

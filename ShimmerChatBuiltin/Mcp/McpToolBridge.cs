@@ -236,6 +236,7 @@ namespace ShimmerChatBuiltin.Mcp
                     content,
                     $"tool '{_descriptor.Name}'",
                     _imageAttachments,
+                    _session.Config.ImageOutputProcessing.ResolveOutput(_imageAttachments?.UploadProcessing),
                     _session.DiagnosticsLogger,
                     ct).ConfigureAwait(false);
             }
@@ -387,6 +388,7 @@ namespace ShimmerChatBuiltin.Mcp
                     content,
                     string.IsNullOrWhiteSpace(uri) ? "resource list" : $"resource '{uri}'",
                     _imageAttachments,
+                    _session.Config.ImageOutputProcessing.ResolveOutput(_imageAttachments?.UploadProcessing),
                     _session.DiagnosticsLogger,
                     ct).ConfigureAwait(false);
             }
@@ -449,6 +451,7 @@ namespace ShimmerChatBuiltin.Mcp
     /// <para>
     /// 只返回链接不会让模型真正看到图像，因此这里必须落盘 + 附加；
     /// 落盘失败属于显式失败（<see cref="ToolErrorCodes.OutputWriteFailed"/>），不静默丢弃图像。
+    /// 落盘前按端点的输出处理配置先处理（null 即原图），控制磁盘与请求体积。
     /// </para>
     /// </summary>
     internal static class McpToolResultImages
@@ -457,6 +460,16 @@ namespace ShimmerChatBuiltin.Mcp
             McpContentResult content,
             string source,
             IImageAttachmentService? attachments,
+            ILogger? logger,
+            CancellationToken ct)
+            => await ToToolResultAsync(
+                content, source, attachments, processing: null, logger, ct).ConfigureAwait(false);
+
+        public static async Task<ToolResult> ToToolResultAsync(
+            McpContentResult content,
+            string source,
+            IImageAttachmentService? attachments,
+            ImageProcessingOptions? processing,
             ILogger? logger,
             CancellationToken ct)
         {
@@ -480,7 +493,8 @@ namespace ShimmerChatBuiltin.Mcp
                 foreach (var image in content.Images)
                 {
                     using var stream = new MemoryStream(image.Data, writable: false);
-                    saved.Add(await attachments.SaveGeneratedAsync(stream, image.MimeType, ct).ConfigureAwait(false));
+                    saved.Add(await attachments.SaveGeneratedAsync(stream, image.MimeType, processing, ct)
+                        .ConfigureAwait(false));
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)

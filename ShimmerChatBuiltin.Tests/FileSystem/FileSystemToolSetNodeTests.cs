@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using ShimmerChatBuiltin.Tests.Generation.Nodes;
+using ShimmerChatBuiltin.Tests.ImageGeneration;
 using ShimmerChatBuiltin.Tests.SubAgent;
 using ShimmerChatLib.Interface;
 
@@ -53,7 +54,8 @@ public class FileSystemToolSetNodeTests : NodeTestBase, IDisposable
     {
         return new StubToolRegistry()
             .Register(FileSystemImageReadToolV2.NameKey, typeof(FileSystemImageReadToolV2))
-            .SetInstance(typeof(FileSystemImageReadToolV2), new FileSystemImageReadToolV2(kv));
+            .SetInstance(typeof(FileSystemImageReadToolV2),
+                new FileSystemImageReadToolV2(kv, new FakeImageAttachmentService()));
     }
 
     private static FileSystemToolSetNode CreateImageOnlyNode() => new()
@@ -94,7 +96,9 @@ public class FileSystemToolSetNodeTests : NodeTestBase, IDisposable
         result.Status.Should().Be(ToolResultStatus.Completed);
         result.Images.Should().ContainSingle();
         result.Images![0].MimeType.Should().Be("image/png");
-        result.Images[0].Base64.Should().Be(Convert.ToBase64String(PngBytes));
+        result.Images[0].FileName.Should().NotBeNull("工具产物落盘，消息只保存文件引用");
+        result.Images[0].Base64.Should().BeNull();
+        result.Content.Should().Contain("Saved as: /userimages/");
     }
 
     [Fact]

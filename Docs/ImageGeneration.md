@@ -47,7 +47,13 @@
       "WorkflowMode": "Default",      // 或 "Custom"（仅 ComfyUI）
       "DefaultWorkflow": { "Model": "", "Width": 512, "Height": 512, "...": "..." },
       "CustomWorkflowJson": "",
-      "CustomWorkflowParameters": []
+      "CustomWorkflowParameters": [],
+      "OutputImageProcessing": {      // 生成结果落盘前的输出处理（新增；缺省按 FollowGlobal）
+        "Mode": "FollowGlobal",        // 或 "Original" / "Custom"
+        "PixelBudget": 4194304,        // Custom 模式的像素预算（宽×高乘积）
+        "Algorithm": "WebP",           // Custom 模式的压缩算法：WebP / Jpeg / None
+        "Quality": 85
+      }
     }
   ]
 }
@@ -70,6 +76,9 @@
 - ComfyUI 必须填写采样器与调度器；A1111 必须填写采样器，调度器字段不参与请求。
 - `Model` 允许为空：ComfyUI 默认工作流会在工具集节点处显式失败；A1111 表示使用服务当前模型。
 - 启用的自定义工作流会校验：占位符与参数声明一一对应、参数名合法、非必填参数默认值可解析、模板能渲染为 JSON 对象。
+- `OutputImageProcessing.Mode` 必须是 `FollowGlobal` / `Original` / `Custom`；`Custom` 模式下
+  `PixelBudget`（`ImageAttachmentRules.MinPixelBudget` ~ `MaxPixelBudget`）、`Quality`（1 ~ 100）、
+  `Algorithm` 均按共享规则校验，越界直接报配置错误而不是静默收敛。
 - 停用的配置视为草稿，跳过自定义工作流模板与参数校验。
 
 ---
@@ -273,6 +282,10 @@ GET /sdapi/v1/samplers    → name 作为采样器候选
 
 - 无论上传图像存储方式是什么，都写入 `UserUploadImage` 目录，并返回只含文件名的 `MessageImage`。
 - 文件名为新 Guid + 按 MIME 决定的扩展名。
+- **落盘前按该 Profile 的 `OutputImageProcessing` 处理**（每次执行时折算，全局设置热切换立即生效）：
+  `FollowGlobal`（默认）跟随设置 → 杂项 → 图像设置中的「上传图像处理方式」；`Original` 原样落盘；
+  `Custom` 按本 Profile 的像素预算与算法把超预算图像缩放压缩（处理后的 MIME / 扩展名跟随输出格式，
+  如 WebP）。处理语义、预算与质量边界见 [ImageAttachments.md](ImageAttachments.md)。
 - 空内容会被删除并显式报错。
 - 读取时通过 `GetDisplayUrl` 得到 `/userimages/{文件名}`；Program.cs 已把该目录挂载为静态资源。
 

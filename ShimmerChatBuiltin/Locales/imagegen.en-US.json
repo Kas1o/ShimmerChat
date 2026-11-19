@@ -106,5 +106,18 @@
   "imagegen_config.reset_draft": "Defaults restored. Save to apply.",
   "imagegen_config.empty_title": "No image generation profiles yet",
   "imagegen_config.empty_desc": "Create your first profile and connect to ComfyUI or Automatic1111.",
+  "imagegen_config.output_processing_desc": "Whether generated results are scaled / compressed to a pixel budget before saving, keeping disk usage and next-round request payloads small.",
+  "panel_imagegen.section_output_processing": "Output image processing",
+  "panel_imagegen.output_processing_mode": "Processing",
+  "panel_imagegen.output_follow_global": "Follow global settings (default)",
+  "panel_imagegen.output_original": "Original (no processing)",
+  "panel_imagegen.output_custom": "Custom budget",
+  "panel_imagegen.output_processing_hint": "Follow global uses the app-wide uploaded-image processing setting; Original always stores bytes as-is; Custom scales images above the pixel budget and re-encodes with the chosen algorithm.",
+  "panel_imagegen.output_pixel_budget": "Pixel budget (width × height)",
+  "panel_imagegen.output_compression": "Compression algorithm",
+  "panel_imagegen.output_scale_only": "Scale only (keep format)",
+  "panel_imagegen.output_webp": "WebP (smallest size)",
+  "panel_imagegen.output_jpeg": "JPEG (best compatibility)",
+  "panel_imagegen.output_quality": "Compression quality",
   "panel_imagegen.workflow_mode": "Workflow mode"
 }

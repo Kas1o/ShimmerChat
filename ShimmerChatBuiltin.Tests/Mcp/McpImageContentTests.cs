@@ -1,6 +1,7 @@
 using ModelContextProtocol.Protocol;
 using ShimmerChatBuiltin.Mcp;
 using ShimmerChatBuiltin.Tests.ImageGeneration;
+using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.Tests.Mcp;
@@ -207,5 +208,20 @@ public class McpToolResultImagesTests
         result.Status.Should().Be(ToolResultStatus.Failed);
         result.ErrorCode.Should().Be(ToolErrorCodes.ConfigInvalid);
         result.ErrorMessage.Should().Contain("image storage is unavailable");
+    }
+
+    [Fact]
+    public async Task ToToolResultAsync_WithProcessing_PassesItToTheStorage()
+    {
+        // 端点配置折算出的处理参数必须到达存储层，否则「跟随全局 / 自定义」就是空话
+        var attachments = new FakeImageAttachmentService();
+        var processing = new ImageProcessingOptions { PixelBudget = 2048L * 2048 };
+
+        var result = await McpToolResultImages.ToToolResultAsync(
+            ContentWithImage(), "tool 'render_chart'", attachments, processing, null, CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        attachments.SavedProcessings.Should().ContainSingle()
+            .Which.PixelBudget.Should().Be(2048L * 2048);
     }
 }

@@ -251,6 +251,10 @@ mcp_{端点 Id}_{净化后的工具名}
 - 通过校验的图像经 `IImageAttachmentService.SaveGeneratedAsync` 落盘（与生成图像一样获得稳定的
   `/userimages/...` 链接），再写入 `ToolResult.Images`；`PostToolCallNode` 把它写进 tool_result 消息的
   `Message.Images`，下一轮构建请求时变成多模态内容块。
+- **落盘前按该端点的 `ImageOutputProcessing` 配置处理**（端点编辑面板「返回图像处理」可编辑）：
+  `FollowGlobal`（默认）跟随全局上传处理设置、`Original` 原样落盘、`Custom` 按端点自定义的像素预算
+  与算法缩放压缩。每次工具调用时折算，全局设置热切换立即生效；语义与边界见
+  [ImageAttachments.md](ImageAttachments.md)。旧端点配置无该字段时按「跟随全局」处理。
 - 落盘失败返回 `TOOL_OUTPUT_WRITE_FAILED`（并清理已写入的部分），不返回「看似成功但没有图」的结果。
 - 无图像存储服务时退化得更早：会话直接以 `DescribeOnly` 渲染，文本明确写「未注入上下文」。
 - 资源注入（`McpPreGenerationNode` 的 fragments）与设置页的资源预览只能放文本，因此使用

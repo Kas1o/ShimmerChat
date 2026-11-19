@@ -190,14 +190,34 @@ namespace ShimmerChat.Singletons
 		/// <summary>
 		/// 生成结果始终落盘：工具返回的链接必须在消息之外也能被访问，
 		/// 因此不受 <see cref="Mode"/> 的 Base64 设置影响。
-		/// 生成图是用户明确要求的产品，同样不受「上传处理模式」影响——画质不能被悄悄压低；
-		/// 它进入下一轮请求的体积问题由加载对话消息节点的预算处理兜底。
+		/// 是否按预算处理由工具 / 端点的输出处理配置决定（processing == null 即原图落盘），
+		/// 调用方负责把「跟随全局 / 原图 / 自定义」折算成这里的参数。
 		/// </summary>
 		public async Task<MessageImage> SaveGeneratedAsync(
 			Stream content, string contentType, CancellationToken cancellationToken = default)
+			=> await SaveGeneratedAsync(content, contentType, processing: null, cancellationToken);
+
+		/// <inheritdoc cref="IImageAttachmentService.SaveGeneratedAsync(Stream,string,ImageProcessingOptions?,CancellationToken)"/>
+		public async Task<MessageImage> SaveGeneratedAsync(
+			Stream content, string contentType, ImageProcessingOptions? processing,
+			CancellationToken cancellationToken = default)
 		{
 			var mimeType = ResolveMimeType(contentType);
-			return await SaveFileAsync(content, mimeType, cancellationToken);
+
+			// 原图落盘保持流式路径，不读入内存。
+			if (processing == null)
+				return await SaveFileAsync(content, mimeType, cancellationToken);
+
+			// 处理必须先读入内存才能解码；20MiB 上限决定了这不会失控。
+			using var buffer = new MemoryStream();
+			await content.CopyToAsync(buffer, cancellationToken);
+			var bytes = buffer.ToArray();
+			if (bytes.Length == 0)
+				throw new InvalidDataException($"Image is empty ({mimeType}).");
+
+			var result = ImageNormalizer.Process(bytes, mimeType, processing);
+			await using var processed = new MemoryStream(result.Data);
+			return await SaveFileAsync(processed, result.MimeType, cancellationToken);
 		}
 
 		private static async Task<MessageImage> SaveFileAsync(

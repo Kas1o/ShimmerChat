@@ -84,13 +84,20 @@ Linux 另有 arm / arm64 / musl 等变体。native 缺失时异常（`DllNotFoun
    显式拒绝处理（解码会占用数百 MB 内存），报 `InvalidDataException`，不冒险解码。
 6. **失败显式**：数据无法解码时抛 `InvalidDataException` 并附原因，绝不静默退回原图掩盖失败。
 
-### 3.2 不受上传处理方式影响的图像
+### 3.2 工具 / 端点产生的图像（配置级输出处理）
 
-| 入口 | 原因 |
-|------|------|
-| 工具生成图（`SaveGeneratedAsync`，见 [ImageGeneration.md](ImageGeneration.md)） | 生成结果是用户明确要求的产品，画质不能被悄悄压低；始终原图落盘。其进入请求的体积问题由第 4 节兜底 |
-| MCP 图像（见 [McpIntegration.md](McpIntegration.md)） | 与生成图同路径（`SaveGeneratedAsync`） |
-| `read_image` / CodeAct 内联图像 | 不经落盘，直接内联 Base64（见 [FileSystemTools.md](FileSystemTools.md)、[CodeAct.md](CodeAct.md)）；请求侧由第 4 节兜底 |
+工具产物不再与全局上传设置无关：**文生图 Profile、MCP 端点、`read_image` 工具**都有各自的输出处理配置，默认**跟随全局**（全局原图模式 = 不处理），可按需改为**原图**或**自定义预算**。折算入口是 `ImageProcessingConfig.ResolveOutput`，落盘统一走 `IImageAttachmentService.SaveGeneratedAsync(stream, mime, processing, ct)`（旧实现经接口默认实现退化为原样落盘）。
+
+| 入口 | 配置位置 | 默认 |
+|------|----------|------|
+| 文生图（见 [ImageGeneration.md](ImageGeneration.md)） | 每个 Profile 的 `OutputImageProcessing`；设置 → 文生图面板可编辑 | 跟随全局 |
+| MCP 图像（见 [McpIntegration.md](McpIntegration.md)） | 每个端点的 `ImageOutputProcessing`；MCP 端点编辑面板可编辑 | 跟随全局 |
+| `read_image`（见 [FileSystemTools.md](FileSystemTools.md)） | 工具参数 `image_processing`（`auto` / `original` / `budget` + `pixel_budget`），由调用方逐次指定 | `auto`（跟随全局） |
+| CodeAct `AddImageAsync` | 无配置；被调用工具的产物已在源头按各自配置处理，再次压缩只会二次损失画质 | 原样落盘 |
+
+旧配置数据没有这些字段时按「跟随全局」处理（`ResolveOutput` 对 null 配置与全局等价）；
+`read_image` 的产物从内联 Base64 改为**落盘 + 文件引用**，与生成图同一条路径，
+用户磁盘上的原文件永远不被修改。
 
 ---
 
@@ -111,8 +118,8 @@ Linux 另有 arm / arm64 / musl 等变体。native 缺失时异常（`DllNotFoun
 - 越界的节点属性值（手改 JSON）在消费前收敛到合法区间，收敛动作写入 DebugOutput。
 - 旧节点树反序列化后落到 `AsStored`，行为与旧版一致。
 
-该策略覆盖了第 3.2 节的例外入口：生成图、MCP 图、`read_image` 内联图即使落盘 / 内联为原图，
-进入请求前也会被压回预算内，历史遗留的大图对话因此可以救活。
+该策略与第 3.2 节互补：即使某个入口按配置保留原图（画质优先），它进入历史后仍可在这里被压回预算内，
+历史遗留的大图对话因此可以救活。
 
 接口层面：`IImageAttachmentService.ToChatImageAsync(image, processing, ct)` 为带处理参数的重载；
 旧实现（测试替身、虚拟会话）经接口默认实现退化为原样解析——预算不生效但不会失败。
@@ -127,9 +134,11 @@ Linux 另有 arm / arm64 / musl 等变体。native 缺失时异常（`DllNotFoun
 | 处理模式下数据无法解码 | `ImageNormalizer` 抛 `InvalidDataException`，上传失败并提示，不静默存原图 |
 | 声明尺寸超过像素安全上限 | `ImageNormalizer` 显式拒绝（消息带具体尺寸与上限值） |
 | 消息引用的文件缺失 | `ToChatImageAsync` 抛 `FileNotFoundException`，节点转成 `DATA_MISSING` 失败，不静默丢图 |
-| 图像服务不可用（虚拟会话等） | `AppendChatMessagesNode` 返回 `SERVICE_ERROR` |
+| 图像服务不可用（虚拟会话等） | `AppendChatMessagesNode` 返回 `SERVICE_ERROR`；`read_image` 返回 `TOOL_CONFIG_INVALID` |
 | KV 设置值非法 | `LogError` 后回退默认值（原图模式 / 默认参数），界面不会因坏配置挂掉 |
 | 节点属性越界（手改 JSON） | 收敛到合法区间 + DebugOutput 留痕 |
+| 工具参数 `image_processing` 非法 | `read_image` 返回 `TOOL_INVALID_ARGUMENTS`，不猜测修正 |
+| 工具产物落盘失败 / 链接解析失败 | `TOOL_OUTPUT_WRITE_FAILED`，已落盘部分被清理 |
 
 ## 6. 关键文件
 

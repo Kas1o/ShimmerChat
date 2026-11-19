@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 
 namespace ShimmerChatBuiltin.ImageGeneration
@@ -171,6 +172,12 @@ namespace ShimmerChatBuiltin.ImageGeneration
 
         /// <summary>收藏标记；只影响配置选择器与检索列表的排序。</summary>
         public bool Pinned { get; set; }
+
+        /// <summary>
+        /// 生成结果落盘前的输出处理配置：跟随全局（默认）/ 原图 / 自定义预算。
+        /// 控制生成图的磁盘占用与下一轮进入请求的体积；旧配置无该字段时按「跟随全局」处理。
+        /// </summary>
+        public ImageProcessingConfig OutputImageProcessing { get; set; } = new();
 
         public static ImageGenerationProfile CreateDefault() => new()
         {
@@ -622,6 +629,43 @@ namespace ShimmerChatBuiltin.ImageGeneration
 
             if (profile.DefaultWorkflow == null)
                 return $"Image configuration '{profile.Id}' DefaultWorkflow must not be null.";
+
+            // 输出处理配置：Custom 模式必须给出合法参数（越界直接报错，不静默收敛，
+            // 让用户在面板上就知道写错了；FollowGlobal / Original 不需要参数）。
+            var outputProcessing = profile.OutputImageProcessing;
+            if (outputProcessing == null)
+                return $"Image configuration '{profile.Id}' OutputImageProcessing must not be null.";
+
+            if (!Enum.IsDefined(outputProcessing.Mode))
+            {
+                return $"Image configuration '{profile.Id}' has unsupported output processing mode " +
+                       $"{outputProcessing.Mode}.";
+            }
+
+            if (outputProcessing.Mode == ToolImageOutputProcessing.Custom)
+            {
+                if (outputProcessing.PixelBudget is < ImageAttachmentRules.MinPixelBudget
+                    or > ImageAttachmentRules.MaxPixelBudget)
+                {
+                    return $"Image configuration '{profile.Id}' output pixel budget must be between " +
+                           $"{ImageAttachmentRules.MinPixelBudget} and {ImageAttachmentRules.MaxPixelBudget}, " +
+                           $"got {outputProcessing.PixelBudget}.";
+                }
+
+                if (outputProcessing.Quality is < ImageAttachmentRules.MinCompressionQuality
+                    or > ImageAttachmentRules.MaxCompressionQuality)
+                {
+                    return $"Image configuration '{profile.Id}' output quality must be between " +
+                           $"{ImageAttachmentRules.MinCompressionQuality} and " +
+                           $"{ImageAttachmentRules.MaxCompressionQuality}, got {outputProcessing.Quality}.";
+                }
+
+                if (!Enum.IsDefined(outputProcessing.Algorithm))
+                {
+                    return $"Image configuration '{profile.Id}' has unsupported output compression " +
+                           $"algorithm {outputProcessing.Algorithm}.";
+                }
+            }
 
             var settingsError = ValidateGenerationSettings(profile, descriptor);
             if (settingsError != null)

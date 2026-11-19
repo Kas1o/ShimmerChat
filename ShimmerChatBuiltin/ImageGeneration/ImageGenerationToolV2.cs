@@ -174,13 +174,16 @@ namespace ShimmerChatBuiltin.ImageGeneration
             var links = new List<string>(images.Count);
             var savedImages = new List<MessageImage>(images.Count);
 
+            // 每次执行时折算输出处理：全局设置热切换后立即生效，不缓存到工具实例里。
+            var processing = profile.OutputImageProcessing.ResolveOutput(_imageAttachments.UploadProcessing);
+
             foreach (var image in images)
             {
                 MessageImage saved;
                 try
                 {
                     using var stream = new MemoryStream(image.Content, writable: false);
-                    saved = await _imageAttachments.SaveGeneratedAsync(stream, image.ContentType, ct);
+                    saved = await _imageAttachments.SaveGeneratedAsync(stream, image.ContentType, processing, ct);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
