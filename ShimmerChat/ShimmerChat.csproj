@@ -19,6 +19,13 @@
   <ItemGroup>
     <PackageReference Include="LiteDB" Version="5.0.21" />
     <PackageReference Include="Markdig" Version="0.41.0" />
+    <!-- 图像规范化（缩放 / 压缩）：Chrome / Android 同源的解码器（libpng-turbo / libjpeg-turbo / libwebp），
+         MIT 许可、无安全公告，RID 发布自动携带 native 库（Tauri 打包不受影响）。
+         Windows / macOS 的 native 由主包默认覆盖；Linux 需显式引用 NoDependencies 变体
+         （静态链接，不依赖系统 libfontconfig），未选 ImageSharp：3.1.x 挂 6 条公告，
+         4.x 的 Split License 在 Release 构建强制 license key -->
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4" />
     <PackageReference Include="Nerdbank.GitVersioning" Version="3.9.50">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -35,6 +42,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <!-- libSkiaSharp 的原生符号文件约 80MB，对桌面分发只是体积负担：发布产物中移除。
+       开发期调试仍可直接从 NuGet 包缓存读取符号，不受影响。 -->
+  <Target Name="RemoveNativeSymbolFilesFromPublish" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)libSkiaSharp.pdb" Condition="Exists('$(PublishDir)libSkiaSharp.pdb')" />
+  </Target>
 
   <ItemGroup>
     <Content Remove="Locales\*.json" />

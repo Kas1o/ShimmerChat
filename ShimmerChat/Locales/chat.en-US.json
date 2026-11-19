@@ -22,6 +22,7 @@
   "chat.gen_error": "Error during generation! {0}",
   "chat.new_message_notification": "New message from {0}",
   "chat.attach_image": "Attach image",
+  "chat.attach_image_processed": "Attach image (processed mode: pixel budget {0})",
   "chat.attached_image": "Attached image",
   "chat.remove_image": "Remove this image",
   "chat.image_uploading": "Processing image…",

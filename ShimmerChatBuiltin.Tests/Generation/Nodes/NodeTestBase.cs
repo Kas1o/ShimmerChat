@@ -27,9 +27,17 @@ public abstract class NodeTestBase
 
     protected NodeTestBase()
     {
+        // 旧的两参解析桩：AdvancedFragment 等节点仍走这条路径。
         ImageAttachmentsMock
             .Setup(s => s.ToChatImageAsync(It.IsAny<MessageImage>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((MessageImage image, CancellationToken _) =>
+                ChatImage.FromBase64(image.Base64 ?? "resolved", image.MimeType));
+
+        // 带处理参数的新重载：预算处理对测试是透明的，同样只回显已有 Base64。
+        ImageAttachmentsMock
+            .Setup(s => s.ToChatImageAsync(
+                It.IsAny<MessageImage>(), It.IsAny<ImageProcessingOptions?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((MessageImage image, ImageProcessingOptions? _, CancellationToken _) =>
                 ChatImage.FromBase64(image.Base64 ?? "resolved", image.MimeType));
     }
 

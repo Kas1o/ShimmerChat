@@ -135,7 +135,7 @@ public class PreGenerationPreset
 | `AdvancedFragmentNode` | 注入带图像、tool_calls、tool_call_id、thinking 与自定义参数的复杂角色片段 |
 | `SpecialRoleImageCarrierNode` | 把特殊角色的图像搬到相邻伪 user 消息，并与原消息成组 |
 | `CallNode` | 通过 PresetId 引用预设 |
-| `AppendChatMessagesNode` | 加载聊天历史并注入 Fragments |
+| `AppendChatMessagesNode` | 加载聊天历史并注入 Fragments；图像附件解析点，可选预算处理 |
 | `APISelectNode` | 选择 API 配置 |
 | `ToolPresetNode` | 按预设名加载工具列表 |
 | `ToolInstantiateNode` | 实例化单个工具 |
@@ -175,6 +175,23 @@ OpenAI Chat Completions 规范中只有 `user` 消息允许 `image_url`；`syste
 - **assistant**：伪 user 在前、原 assistant 在后，assistant 带 `tool_calls` 时同样不破坏配对。
 
 节点是显式兼容开关：目标端点本身支持特殊角色图像时不要加入。只有被勾选的角色会被处理，`user` 图像永远不动；图像 Base64 缺失时返回 `DATA_MISSING`，且不会对上下文做部分改写。
+
+
+### 加载聊天历史 `AppendChatMessagesNode`
+
+从 `PersistentEnv.Chat.Messages` 实时读取对话消息追加到 Fragments（执行期间对 `chat.Messages` 的修改立即可见），同时是**图像附件的解析点**与**工具调用完整性**的唯一检查点（悬空的 assistant 工具调用默认注入占位 tool_result 并留痕，`FailFast` 改为直接失败，错误码 `PARSE_ERROR`）。
+
+| 属性 | 说明 |
+|------|------|
+| `DanglingToolCalls` | 悬空工具调用的处理策略：`InjectPlaceholder`（默认）/ `FailFast` |
+| `ImageProcessing` | 历史图像进入请求前的处理策略：`AsStored`（默认，按存储原样发送）/ `Budgeted`（超预算先缩放压缩） |
+| `ImagePixelBudget` | 单张图像 `宽 × 高` 乘积上限，超出即等比缩小；默认 2048×2048 ≈ 419 万像素，取值范围与默认值见 `ImageAttachmentRules` |
+| `ImageCompression` | 超预算图像缩放后的重编码算法：`WebP`（默认，体积最小、保留透明）/ `Jpeg`（兼容性最好，透明填白）/ `None`（仅缩放，保持原格式） |
+| `ImageQuality` | 有损编码质量（1-100，默认 85） |
+
+历史图像每轮都会重发给模型，超预算的大图会持续放大请求体积，直到被端点的 payload / token 上限拒绝，**对话从此无法继续**。`Budgeted` 在解析为请求内容块时把超预算图像压回预算内——只作用于本次请求的内存副本，消息持久化数据与 `UserUploadImage` 文件都不被修改；越界的节点属性值在消费前收敛到合法区间并写入 DebugOutput。图像数据无法解码、引用的文件缺失、图像服务不可用都显式失败（`DATA_MISSING` / `SERVICE_ERROR`），绝不静默丢图。详见 [ImageAttachments.md](ImageAttachments.md)。
+
+旧节点树反序列化后 `ImageProcessing` 落到默认值 `AsStored`，行为与旧版完全一致；实现 `IImageAttachmentService` 的旧插件通过接口默认实现自动忽略预算参数（原样解析）。
 
 
 ### 子智能体工具 `subagent_call` 的会话

@@ -55,6 +55,33 @@
 		<option value="@nameof(ImageStorageMode.MessageBase64)">@Loc["misc.image_storage_base64"]</option>
 	</select>
 	<p>@Loc["misc.image_storage_hint"]</p>
+
+	<label for="image-processing-mode">@Loc["misc.image_processing_mode"]</label>
+	<select class="su-input" id="image-processing-mode" @bind="_ImageProcessingMode">
+		<option value="@nameof(ImageUploadProcessingMode.Original)">@Loc["misc.image_processing_original"]</option>
+		<option value="@nameof(ImageUploadProcessingMode.Processed)">@Loc["misc.image_processing_processed"]</option>
+	</select>
+	<p>@Loc["misc.image_processing_hint"]</p>
+
+	<label for="image-pixel-budget">@Loc["misc.image_pixel_budget"]</label>
+	<input type="number" class="su-input" id="image-pixel-budget"
+	       min="@ImageAttachmentRules.MinPixelBudget" max="@ImageAttachmentRules.MaxPixelBudget"
+	       @bind="_ImagePixelBudget" />
+	<p>@Loc["misc.image_pixel_budget_hint"]</p>
+
+	<label for="image-compression">@Loc["misc.image_compression"]</label>
+	<select class="su-input" id="image-compression" @bind="_ImageCompression">
+		<option value="@nameof(ImageCompressionAlgorithm.None)">@Loc["misc.image_compression_none"]</option>
+		<option value="@nameof(ImageCompressionAlgorithm.WebP)">@Loc["misc.image_compression_webp"]</option>
+		<option value="@nameof(ImageCompressionAlgorithm.Jpeg)">@Loc["misc.image_compression_jpeg"]</option>
+	</select>
+	<p>@Loc["misc.image_compression_hint"]</p>
+
+	<label for="image-quality">@Loc["misc.image_quality"]</label>
+	<input type="number" class="su-input" id="image-quality"
+	       min="@ImageAttachmentRules.MinCompressionQuality" max="@ImageAttachmentRules.MaxCompressionQuality"
+	       @bind="_ImageQuality" />
+	<p>@Loc["misc.image_quality_hint"]</p>
 </div>
 
 @code {
@@ -125,6 +152,54 @@
 		}
 	} = nameof(ImageStorageMode.UserUploadImage);
 
+	/// <summary>上传图像处理模式；取枚举名字符串，与 <see cref="IImageAttachmentService"/> 读取的值一致。</summary>
+	private string _ImageProcessingMode
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = nameof(ImageUploadProcessingMode.Original);
+
+	/// <summary>处理模式的像素预算（宽×高的最大乘积）。</summary>
+	private long _ImagePixelBudget
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = ImageAttachmentRules.DefaultPixelBudget;
+
+	/// <summary>处理模式的压缩算法；取枚举名字符串。</summary>
+	private string _ImageCompression
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = nameof(ImageCompressionAlgorithm.WebP);
+
+	/// <summary>处理模式的有损编码质量。</summary>
+	private int _ImageQuality
+	{
+		get => field;
+		set
+		{
+			if (field == value) return;
+			field = value;
+			Save();
+		}
+	} = ImageAttachmentRules.DefaultCompressionQuality;
+
 	private bool _thinkingCollapsed
 	{
 		get => field;
@@ -161,6 +236,15 @@
 
 	private string notificationPermissionStatus = "";
 
+	/// <summary>读取以枚举名存储的 KV 设置；缺失或非法时回退默认值（服务读取侧同样收敛并记日志）。</summary>
+	private string ReadEnumSetting<TEnum>(string key, TEnum fallback) where TEnum : struct, Enum
+	{
+		var raw = KVData.Read("App", key);
+		return Enum.TryParse<TEnum>(raw, ignoreCase: true, out var value) && Enum.IsDefined(value)
+			? value.ToString()
+			: fallback.ToString();
+	}
+
 	bool Initialized = false;
 	private void Save()
 	{
@@ -173,6 +257,10 @@
 		KVData.Write("App", "toolcall_collapsed", _toolCallCollapsed ? "true" : "false");
 		KVData.Write("App", "toolresult_collapsed", _toolResultCollapsed ? "true" : "false");
 		KVData.Write("App", ImageAttachmentService.StorageModeKey, _ImageStorageMode);
+		KVData.Write("App", ImageAttachmentService.UploadProcessingModeKey, _ImageProcessingMode);
+		KVData.Write("App", ImageAttachmentService.UploadPixelBudgetKey, _ImagePixelBudget.ToString());
+		KVData.Write("App", ImageAttachmentService.UploadCompressionKey, _ImageCompression);
+		KVData.Write("App", ImageAttachmentService.UploadQualityKey, _ImageQuality.ToString());
 		KVData.Write("User", "username", _UserName);
 	}
 
@@ -205,8 +293,21 @@
 			_toolResultCollapsed = toolResultCollapsed;
 		}
 		_UserName = KVData.Read("User", "username") ?? "";
-		_ImageStorageMode = KVData.Read("App", ImageAttachmentService.StorageModeKey)
-			?? nameof(ImageStorageMode.UserUploadImage);
+		_ImageStorageMode = ReadEnumSetting(ImageAttachmentService.StorageModeKey, ImageStorageMode.UserUploadImage);
+		_ImageProcessingMode = ReadEnumSetting(
+			ImageAttachmentService.UploadProcessingModeKey, ImageUploadProcessingMode.Original);
+		_ImagePixelBudget = long.TryParse(
+			KVData.Read("App", ImageAttachmentService.UploadPixelBudgetKey),
+			out var budget)
+			? ImageAttachmentRules.ClampPixelBudget(budget)
+			: ImageAttachmentRules.DefaultPixelBudget;
+		_ImageCompression = ReadEnumSetting(
+			ImageAttachmentService.UploadCompressionKey, ImageCompressionAlgorithm.WebP);
+		_ImageQuality = int.TryParse(
+			KVData.Read("App", ImageAttachmentService.UploadQualityKey),
+			out var quality)
+			? ImageAttachmentRules.ClampCompressionQuality(quality)
+			: ImageAttachmentRules.DefaultCompressionQuality;
 		Initialized = true;
 	}
 

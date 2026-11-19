@@ -25,6 +25,8 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
     /// 这里也是图像附件的解析点：消息持久化的图像可能是 UserUploadImage 里的文件引用，
     /// 在此按需读成 Base64 内容块（SharperLLM 侧只处理 Base64），
     /// 避免把文件系统细节带进 LLM 连接库。解析发生在消息副本上，不会污染被持久化的消息。
+    /// 图像预算处理（<see cref="ChatImageRequestProcessing.Budgeted"/>）同样只作用于请求副本：
+    /// 超出像素预算的图像先缩放压缩再发送，消息数据与磁盘文件都不被修改。
     /// <para>
     /// 同时是<strong>工具调用完整性</strong>的唯一检查点：assistant 消息带 toolCalls 却没有配对的
     /// tool_result 时，OpenAI 兼容 API 会直接拒绝请求。历史里出现悬空调用的来源有：进程崩溃、
@@ -39,6 +41,26 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
         [NodeProperty("prop.append_chat_messages.dangling_tool_calls",
             HintKey = "prop.append_chat_messages.dangling_tool_calls.hint", Order = 10)]
         public DanglingToolCallPolicy DanglingToolCalls { get; set; } = DanglingToolCallPolicy.InjectPlaceholder;
+
+        /// <summary>
+        /// 历史图像进入请求前的处理策略。历史图像每轮都会重发，超预算的大图会持续放大
+        /// 请求体积直到被端点拒绝，对话从此无法继续；预算处理只改内存副本，不动消息数据。
+        /// </summary>
+        [NodeProperty("prop.append_chat_messages.image_processing",
+            HintKey = "prop.append_chat_messages.image_processing.hint", Order = 20)]
+        public ChatImageRequestProcessing ImageProcessing { get; set; } = ChatImageRequestProcessing.AsStored;
+
+        [NodeProperty("prop.append_chat_messages.pixel_budget",
+            HintKey = "prop.append_chat_messages.pixel_budget.hint", Order = 21)]
+        public long ImagePixelBudget { get; set; } = ImageAttachmentRules.DefaultPixelBudget;
+
+        [NodeProperty("prop.append_chat_messages.compression",
+            HintKey = "prop.append_chat_messages.compression.hint", Order = 22)]
+        public ImageCompressionAlgorithm ImageCompression { get; set; } = ImageCompressionAlgorithm.WebP;
+
+        [NodeProperty("prop.append_chat_messages.quality",
+            HintKey = "prop.append_chat_messages.quality.hint", Order = 23)]
+        public int ImageQuality { get; set; } = ImageAttachmentRules.DefaultCompressionQuality;
 
         public async Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
         {
@@ -183,6 +205,8 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
         /// <summary>
         /// 把消息的图像附件解析为请求内容块。缺服务、缺文件、附件数据非法都视为明确失败，
         /// 由管线向上汇报，绝不静默丢图让用户以为模型看到了图像。
+        /// <paramref name="ImageProcessing"/> 为预算处理时，超出像素预算的图像先被缩放 /
+        /// 重编码再进入请求；越界的节点属性值收敛到合法区间并写入 DebugOutput。
         /// </summary>
         private async Task<(List<ChatImage>? Images, NodeResult? Failure)> ResolveImagesAsync(
             PreNodeExecutionContext context, IReadOnlyList<MessageImage> images)
@@ -196,12 +220,37 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
                     details: "PersistentEnv.ImageAttachments is null."));
             }
 
+            ImageProcessingOptions? processing = null;
+            if (ImageProcessing == ChatImageRequestProcessing.Budgeted)
+            {
+                var budget = ImageAttachmentRules.ClampPixelBudget(ImagePixelBudget);
+                if (budget != ImagePixelBudget)
+                {
+                    context.Env.Persistent.DebugOutput.Write("AppendChatMessagesNode", "ImageBudget",
+                        $"ImagePixelBudget {ImagePixelBudget} is out of range; clamped to {budget}.");
+                }
+
+                var quality = ImageAttachmentRules.ClampCompressionQuality(ImageQuality);
+                if (quality != ImageQuality)
+                {
+                    context.Env.Persistent.DebugOutput.Write("AppendChatMessagesNode", "ImageBudget",
+                        $"ImageQuality {ImageQuality} is out of range; clamped to {quality}.");
+                }
+
+                processing = new ImageProcessingOptions
+                {
+                    PixelBudget = budget,
+                    Algorithm = ImageCompression,
+                    Quality = quality
+                };
+            }
+
             var resolved = new List<ChatImage>(images.Count);
             foreach (var image in images)
             {
                 try
                 {
-                    resolved.Add(await attachments.ToChatImageAsync(image, context.CancellationToken));
+                    resolved.Add(await attachments.ToChatImageAsync(image, processing, context.CancellationToken));
                 }
                 catch (Exception ex)
                 {

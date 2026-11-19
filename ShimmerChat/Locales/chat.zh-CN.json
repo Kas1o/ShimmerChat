@@ -22,6 +22,7 @@
   "chat.gen_error": "生成时出错！{0}",
   "chat.new_message_notification": "来自 {0} 的新消息",
   "chat.attach_image": "添加图像",
+  "chat.attach_image_processed": "添加图像（处理模式：像素预算 {0}）",
   "chat.attached_image": "已附加的图像",
   "chat.remove_image": "移除该图像",
   "chat.image_uploading": "图像处理中…",

@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using ShimmerChat.Singletons;
 using ShimmerChatBuiltin.Fragments;
+using ShimmerChatBuiltin.Misc.Node.PreGeneration;
 using ShimmerChatBuiltin.NodeBasic.PreGeneration;
+using ShimmerChatLib;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
 
@@ -13,11 +15,12 @@ namespace ShimmerChat.Tests;
 /// </summary>
 public class NodeTreeSerializationTests
 {
-    private static PreGenerationNodeSerializer CreateSerializer()
+    private static PreGenerationNodeSerializer CreateSerializer(params Type[] extraTypes)
     {
         var loader = new Mock<IPluginLoaderService>();
         loader.Setup(l => l.GetImplementingTypes(typeof(IPreGenerationNode)))
-            .Returns(new List<Type> { typeof(SequenceNode), typeof(FragmentNode) });
+            .Returns(new List<Type> { typeof(SequenceNode), typeof(FragmentNode) }
+                .Concat(extraTypes).ToList());
         return new PreGenerationNodeSerializer(
             loader.Object, NullLogger<PreGenerationNodeSerializer>.Instance);
     }
@@ -178,5 +181,51 @@ public class NodeTreeSerializationTests
         result.Success.Should().BeTrue();
         result.IsEmpty.Should().BeTrue();
         result.Root.Should().BeNull();
+    }
+
+    [Fact]
+    public void RoundTrip_AppendChatMessages_ImageProcessingOptionsArePreserved()
+    {
+        // 预算处理是逐树配置：序列化往返后必须原样保留，否则用户配置会悄悄丢失
+        var serializer = CreateSerializer(typeof(AppendChatMessagesNode));
+        var node = new AppendChatMessagesNode
+        {
+            ImageProcessing = ChatImageRequestProcessing.Budgeted,
+            ImagePixelBudget = 1024L * 1024,
+            ImageCompression = ImageCompressionAlgorithm.Jpeg,
+            ImageQuality = 70
+        };
+        var root = new PreGenerationNodeWrapper(node, "History");
+
+        var restored = (AppendChatMessagesNode)serializer.Deserialize(serializer.Serialize(root))!.Node!;
+
+        restored.ImageProcessing.Should().Be(ChatImageRequestProcessing.Budgeted);
+        restored.ImagePixelBudget.Should().Be(1024L * 1024);
+        restored.ImageCompression.Should().Be(ImageCompressionAlgorithm.Jpeg);
+        restored.ImageQuality.Should().Be(70);
+    }
+
+    [Fact]
+    public void Deserialize_LegacyTreeWithoutImageFields_DefaultsToAsStored()
+    {
+        // 旧版本保存的树没有图像预算字段：读取后必须落到 AsStored 默认，行为与旧版一致
+        var serializer = CreateSerializer(typeof(AppendChatMessagesNode));
+        var legacy = $$"""
+        {
+          "Id": "root-1",
+          "Name": "Old History",
+          "Node": {
+            "$type": "{{typeof(AppendChatMessagesNode).FullName}}",
+            "DanglingToolCalls": "InjectPlaceholder"
+          }
+        }
+        """;
+
+        var restored = (AppendChatMessagesNode)serializer.Deserialize(legacy)!.Node!;
+
+        restored.ImageProcessing.Should().Be(ChatImageRequestProcessing.AsStored);
+        restored.ImagePixelBudget.Should().Be(ImageAttachmentRules.DefaultPixelBudget);
+        restored.ImageCompression.Should().Be(ImageCompressionAlgorithm.WebP);
+        restored.ImageQuality.Should().Be(ImageAttachmentRules.DefaultCompressionQuality);
     }
 }

@@ -102,6 +102,13 @@
 
         <div class="ge-image-hint">
             @Loc.Format("node_editor.image_add_hint", ImageAttachmentRules.MaxBytes / 1024 / 1024)
+            @if (Attachments.UploadProcessing is { } processing)
+            {
+                <span class="ge-image-hint-processing">
+                    @Loc.Format("node_editor.image_add_hint_processed",
+                        ImageAttachmentRules.ClampPixelBudget(processing.PixelBudget))
+                </span>
+            }
         </div>
 
         @if (_uploading)

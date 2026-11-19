@@ -33,6 +33,13 @@ namespace ShimmerChatLib.Interface
         ImageStorageMode Mode { get; }
 
         /// <summary>
+        /// 当前生效的上传处理参数；null 一律表示「字节原样存储，不做处理」（原图模式、
+        /// 配置缺失或非法时的回退值都是 null）。默认实现同样返回 null，
+        /// 兼容没有处理能力的旧实现。每次读取，设置切换后对新的上传立即生效。
+        /// </summary>
+        ImageProcessingOptions? UploadProcessing => null;
+
+        /// <summary>
         /// 保存一张用户上传的图像，返回可写入消息的图像附件。
         /// 图像格式不受支持时抛出 <see cref="NotSupportedException"/>。
         /// </summary>
@@ -57,6 +64,23 @@ namespace ShimmerChatLib.Interface
         /// 附件引用的文件缺失时抛出 <see cref="FileNotFoundException"/>，不静默跳过。
         /// </summary>
         Task<ChatImage> ToChatImageAsync(MessageImage image, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 解析图像附件为请求内容块，并在超出像素预算时先缩放 / 重编码。
+        /// <paramref name="processing"/> 为 null 时等价于
+        /// <see cref="ToChatImageAsync(MessageImage, CancellationToken)"/>（按存储原样发送）。
+        /// <para>
+        /// 处理只影响本次请求的内存副本，消息持久化的图像数据不被修改；
+        /// 图像数据无法解码时显式抛 <see cref="InvalidDataException"/>，不静默跳图。
+        /// </para>
+        /// <para>
+        /// 默认实现退化为原样解析，用于兼容没有处理能力的旧实现（如测试替身、虚拟会话）；
+        /// 预算处理不生效时由实现记录日志，调用方不应假定预算一定被满足。
+        /// </para>
+        /// </summary>
+        Task<ChatImage> ToChatImageAsync(
+            MessageImage image, ImageProcessingOptions? processing, CancellationToken cancellationToken = default)
+            => ToChatImageAsync(image, cancellationToken);
 
         /// <summary>
         /// 取得界面显示该图像用的 URL（内联 Base64 为 data URL，文件存储为 /userimages/...）。

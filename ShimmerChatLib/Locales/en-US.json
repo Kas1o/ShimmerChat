@@ -46,6 +46,7 @@
   "node_editor.option_missing": "Current value is not in the option list: {0}",
   "node_editor.image_add": "Add images",
   "node_editor.image_add_hint": "PNG / JPEG / WebP / GIF, up to {0} MB per image.",
+  "node_editor.image_add_hint_processed": "Processed mode is on: images above the pixel budget are scaled and compressed (budget {0} pixels).",
   "node_editor.image_uploading": "Saving image…",
   "node_editor.image_empty": "No images yet; uploaded images are saved with the node.",
   "node_editor.image_remove": "Remove image",

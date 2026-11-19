@@ -36,6 +36,37 @@ namespace ShimmerChatLib
         /// <summary>单条消息 / 单个节点属性建议携带的最大图像数量。</summary>
         public const int MaxPerMessage = 5;
 
+        // ── 处理模式 / 预算处理的参数边界（唯一来源，设置页与节点属性共用） ──
+
+        /// <summary>像素预算默认值：2048 × 2048，对齐主流多模态模型的高清上限。</summary>
+        public const long DefaultPixelBudget = 2048L * 2048;
+
+        /// <summary>像素预算下限：再小将明显损害模型读图（文字、细节）。</summary>
+        public const long MinPixelBudget = 512L * 512;
+
+        /// <summary>像素预算上限：8192 × 8192，与生成图像的尺寸上限一致。</summary>
+        public const long MaxPixelBudget = 8192L * 8192;
+
+        /// <summary>有损编码的默认质量。</summary>
+        public const int DefaultCompressionQuality = 85;
+
+        /// <summary>有损编码质量下限。</summary>
+        public const int MinCompressionQuality = 1;
+
+        /// <summary>有损编码质量上限。</summary>
+        public const int MaxCompressionQuality = 100;
+
+        /// <summary>
+        /// 把像素预算夹紧到合法区间。节点属性 / KV 设置里的值在消费前都应经过它，
+        /// 使越界值（手改的 JSON、手输的数字）按显式边界收敛而不是流入解码器。
+        /// </summary>
+        public static long ClampPixelBudget(long budget)
+            => Math.Clamp(budget, MinPixelBudget, MaxPixelBudget);
+
+        /// <summary>把压缩质量夹紧到合法区间（语义同 <see cref="ClampPixelBudget"/>）。</summary>
+        public static int ClampCompressionQuality(int quality)
+            => Math.Clamp(quality, MinCompressionQuality, MaxCompressionQuality);
+
         private static readonly Regex DataUrlPattern = new(
             @"^data:(?<mime>[^;,]+)?;base64,(?<data>.*)$",
             RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);

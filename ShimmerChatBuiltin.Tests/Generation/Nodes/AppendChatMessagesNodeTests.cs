@@ -133,7 +133,8 @@ public class AppendChatMessagesNodeTests : NodeTestBase
     public async Task UnresolvableImage_FailsInsteadOfDroppingTheImage()
     {
         ImageAttachmentsMock
-            .Setup(s => s.ToChatImageAsync(It.IsAny<MessageImage>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.ToChatImageAsync(
+                It.IsAny<MessageImage>(), It.IsAny<ImageProcessingOptions?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new FileNotFoundException("missing"));
 
         var node = new AppendChatMessagesNode();
@@ -263,5 +264,73 @@ public class AppendChatMessagesNodeTests : NodeTestBase
         result.Success.Should().BeFalse();
         result.Code.Should().Be(NodeErrorCodes.ParseError);
         result.Message.Should().Contain("ask_user");
+    }
+
+    [Fact]
+    public async Task AsStoredByDefault_PassesNoProcessingToTheResolution()
+    {
+        // 默认策略必须与旧版完全一致：不传处理参数，历史图像按存储原样发送
+        var env = new PreGenerationEnv(CreatePersistentEnv());
+        var message = CreateMsg(Sender.User, "look");
+        message.Images = new List<MessageImage> { MessageImage.FromBase64("AAAA", "image/png") };
+        env.Persistent.Chat.Messages.Add(message);
+
+        await new AppendChatMessagesNode().ExecuteAsync(CreateContext(env));
+
+        ImageAttachmentsMock.Verify(s => s.ToChatImageAsync(
+            It.IsAny<MessageImage>(), null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task BudgetedProcessing_PassesTheNodeOptionsToTheResolution()
+    {
+        var node = new AppendChatMessagesNode
+        {
+            ImageProcessing = ChatImageRequestProcessing.Budgeted,
+            ImagePixelBudget = 1024L * 1024,
+            ImageCompression = ImageCompressionAlgorithm.Jpeg,
+            ImageQuality = 70
+        };
+        var env = new PreGenerationEnv(CreatePersistentEnv());
+        var message = CreateMsg(Sender.User, "look");
+        message.Images = new List<MessageImage> { MessageImage.FromBase64("AAAA", "image/png") };
+        env.Persistent.Chat.Messages.Add(message);
+
+        await node.ExecuteAsync(CreateContext(env));
+
+        ImageAttachmentsMock.Verify(s => s.ToChatImageAsync(
+            It.IsAny<MessageImage>(),
+            It.Is<ImageProcessingOptions?>(o =>
+                o != null
+                && o.PixelBudget == 1024L * 1024
+                && o.Algorithm == ImageCompressionAlgorithm.Jpeg
+                && o.Quality == 70),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task BudgetedProcessing_ClampsOutOfRangeNodeValues()
+    {
+        // 手改节点 JSON 可能带出越界值：消费前收敛到合法区间，而不是让解码器收到垃圾参数
+        var node = new AppendChatMessagesNode
+        {
+            ImageProcessing = ChatImageRequestProcessing.Budgeted,
+            ImagePixelBudget = 0,
+            ImageQuality = 999
+        };
+        var env = new PreGenerationEnv(CreatePersistentEnv());
+        var message = CreateMsg(Sender.User, "look");
+        message.Images = new List<MessageImage> { MessageImage.FromBase64("AAAA", "image/png") };
+        env.Persistent.Chat.Messages.Add(message);
+
+        await node.ExecuteAsync(CreateContext(env));
+
+        ImageAttachmentsMock.Verify(s => s.ToChatImageAsync(
+            It.IsAny<MessageImage>(),
+            It.Is<ImageProcessingOptions?>(o =>
+                o != null
+                && o.PixelBudget == ImageAttachmentRules.MinPixelBudget
+                && o.Quality == ImageAttachmentRules.MaxCompressionQuality),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }

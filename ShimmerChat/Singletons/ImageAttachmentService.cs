@@ -13,6 +13,11 @@ namespace ShimmerChat.Singletons
 	/// 或直接以 Base64 内联进消息。设置每次读取，切换后立即对新的上传生效。
 	/// </para>
 	/// <para>
+	/// 上传处理方式由 KV 设置 <c>App/image_upload_processing_mode</c> 决定（默认原图模式，
+	/// 行为与旧版一致）：处理模式下，超过像素预算的图像先经 <see cref="ImageNormalizer"/>
+	/// 缩放压缩，再按存储方式落盘 / 内联。
+	/// </para>
+	/// <para>
 	/// 目录方式下消息里只有文件名，读取成 Base64 发生在这里（构建请求之前），
 	/// 因此 SharperLLM 侧只需要处理 Base64 内容块。
 	/// </para>
@@ -22,6 +27,12 @@ namespace ShimmerChat.Singletons
 		/// <summary>存储方式设置的 KV 空间与键。</summary>
 		public const string SettingsSpace = "App";
 		public const string StorageModeKey = "image_storage_mode";
+
+		/// <summary>上传处理模式及其参数的 KV 键（同一 KV 空间）。</summary>
+		public const string UploadProcessingModeKey = "image_upload_processing_mode";
+		public const string UploadPixelBudgetKey = "image_upload_pixel_budget";
+		public const string UploadCompressionKey = "image_upload_compression";
+		public const string UploadQualityKey = "image_upload_quality";
 
 		/// <summary>图像文件目录（同时由 Program.cs 以 /userimages 暴露为静态资源）。</summary>
 		public static readonly string UploadDirectory = Path.Combine(AppContext.BaseDirectory, "UserUploadImage");
@@ -62,9 +73,107 @@ namespace ShimmerChat.Singletons
 			}
 		}
 
+		/// <summary>
+		/// 当前生效的上传处理参数。原图模式（默认、配置非法或缺失）返回 null：
+		/// null 一律意味着「字节原样存储，不做处理」，与旧版行为一致。
+		/// </summary>
+		public ImageProcessingOptions? UploadProcessing
+		{
+			get
+			{
+				var raw = _kvData.Read(SettingsSpace, UploadProcessingModeKey);
+				if (string.IsNullOrWhiteSpace(raw))
+					return null;
+
+				if (!Enum.TryParse<ImageUploadProcessingMode>(raw, ignoreCase: true, out var mode)
+					|| !Enum.IsDefined(mode))
+				{
+					_logger.LogError(
+						"[ImageAttachmentService] Unknown upload processing mode '{Raw}' in KV {Space}/{Key}; " +
+						"falling back to Original (store bytes as-is).",
+						raw, SettingsSpace, UploadProcessingModeKey);
+					return null;
+				}
+
+				if (mode == ImageUploadProcessingMode.Original)
+					return null;
+
+				return new ImageProcessingOptions
+				{
+					PixelBudget = ReadPixelBudget(),
+					Algorithm = ReadCompressionAlgorithm(),
+					Quality = ReadCompressionQuality()
+				};
+			}
+		}
+
+		/// <summary>读取像素预算；非法或缺失时按默认收敛并记录错误。</summary>
+		private long ReadPixelBudget()
+		{
+			var raw = _kvData.Read(SettingsSpace, UploadPixelBudgetKey);
+			if (long.TryParse(raw, out var budget)
+				&& budget >= ImageAttachmentRules.MinPixelBudget
+				&& budget <= ImageAttachmentRules.MaxPixelBudget)
+			{
+				return budget;
+			}
+
+			_logger.LogError(
+				"[ImageAttachmentService] Invalid pixel budget '{Raw}' in KV {Space}/{Key}; using {Default}.",
+				raw, SettingsSpace, UploadPixelBudgetKey, ImageAttachmentRules.DefaultPixelBudget);
+			return ImageAttachmentRules.DefaultPixelBudget;
+		}
+
+		/// <summary>读取压缩算法；非法或缺失时按默认收敛并记录错误。</summary>
+		private ImageCompressionAlgorithm ReadCompressionAlgorithm()
+		{
+			var raw = _kvData.Read(SettingsSpace, UploadCompressionKey);
+			if (Enum.TryParse<ImageCompressionAlgorithm>(raw, ignoreCase: true, out var algorithm)
+				&& Enum.IsDefined(algorithm))
+			{
+				return algorithm;
+			}
+
+			_logger.LogError(
+				"[ImageAttachmentService] Unknown compression algorithm '{Raw}' in KV {Space}/{Key}; using {Default}.",
+				raw, SettingsSpace, UploadCompressionKey, ImageCompressionAlgorithm.WebP);
+			return ImageCompressionAlgorithm.WebP;
+		}
+
+		/// <summary>读取压缩质量；非法或超界时按默认收敛并记录错误。</summary>
+		private int ReadCompressionQuality()
+		{
+			var raw = _kvData.Read(SettingsSpace, UploadQualityKey);
+			if (int.TryParse(raw, out var quality)
+				&& quality >= ImageAttachmentRules.MinCompressionQuality
+				&& quality <= ImageAttachmentRules.MaxCompressionQuality)
+			{
+				return quality;
+			}
+
+			_logger.LogError(
+				"[ImageAttachmentService] Invalid compression quality '{Raw}' in KV {Space}/{Key}; using {Default}.",
+				raw, SettingsSpace, UploadQualityKey, ImageAttachmentRules.DefaultCompressionQuality);
+			return ImageAttachmentRules.DefaultCompressionQuality;
+		}
+
 		public async Task<MessageImage> SaveAsync(Stream content, string contentType)
 		{
 			var mimeType = ResolveMimeType(contentType);
+
+			// 处理模式：图像必须先读入内存才能按像素预算处理；超预算的图像在此被缩放压缩。
+			var processing = UploadProcessing;
+			if (processing != null)
+			{
+				using var buffer = new MemoryStream();
+				await content.CopyToAsync(buffer);
+				var bytes = buffer.ToArray();
+				if (bytes.Length == 0)
+					throw new InvalidDataException($"Uploaded image is empty ({contentType}).");
+
+				var result = ImageNormalizer.Process(bytes, mimeType, processing);
+				return await StoreAsync(result.Data, result.MimeType);
+			}
 
 			if (Mode == ImageStorageMode.MessageBase64)
 			{
@@ -81,6 +190,8 @@ namespace ShimmerChat.Singletons
 		/// <summary>
 		/// 生成结果始终落盘：工具返回的链接必须在消息之外也能被访问，
 		/// 因此不受 <see cref="Mode"/> 的 Base64 设置影响。
+		/// 生成图是用户明确要求的产品，同样不受「上传处理模式」影响——画质不能被悄悄压低；
+		/// 它进入下一轮请求的体积问题由加载对话消息节点的预算处理兜底。
 		/// </summary>
 		public async Task<MessageImage> SaveGeneratedAsync(
 			Stream content, string contentType, CancellationToken cancellationToken = default)
@@ -110,6 +221,16 @@ namespace ShimmerChat.Singletons
 			return MessageImage.FromFile(fileName, mimeType);
 		}
 
+		/// <summary>把已在内存中的图像字节按当前存储方式落盘 / 内联。</summary>
+		private async Task<MessageImage> StoreAsync(byte[] data, string mimeType)
+		{
+			if (Mode == ImageStorageMode.MessageBase64)
+				return MessageImage.FromBase64(Convert.ToBase64String(data), mimeType);
+
+			await using var stream = new MemoryStream(data);
+			return await SaveFileAsync(stream, mimeType, cancellationToken: default);
+		}
+
 		public async Task<ChatImage> ToChatImageAsync(MessageImage image, CancellationToken cancellationToken = default)
 		{
 			if (!string.IsNullOrEmpty(image.Base64))
@@ -127,6 +248,40 @@ namespace ShimmerChat.Singletons
 				throw new InvalidDataException($"Image file is empty: {filePath}");
 
 			return ChatImage.FromBase64(Convert.ToBase64String(bytes), image.MimeType);
+		}
+
+		/// <summary>
+		/// 解析图像附件为请求内容块，超像素预算时先缩放 / 重编码。
+		/// 处理只发生在内存副本上：消息里持久化的图像数据（文件或 Base64）不被修改。
+		/// </summary>
+		public async Task<ChatImage> ToChatImageAsync(
+			MessageImage image, ImageProcessingOptions? processing, CancellationToken cancellationToken = default)
+		{
+			if (processing == null)
+				return await ToChatImageAsync(image, cancellationToken);
+
+			byte[] data;
+			if (!string.IsNullOrEmpty(image.Base64))
+			{
+				data = Convert.FromBase64String(image.Base64);
+			}
+			else
+			{
+				var filePath = ResolveFilePath(image);
+
+				if (!File.Exists(filePath))
+					throw new FileNotFoundException(
+						$"Image file referenced by the message is missing: {filePath}. " +
+						"Restore the file in UserUploadImage or remove the image from the message.", filePath);
+
+				data = await File.ReadAllBytesAsync(filePath, cancellationToken);
+			}
+
+			if (data.Length == 0)
+				throw new InvalidDataException($"Image attachment is empty ({image.FileName ?? image.MimeType}).");
+
+			var result = ImageNormalizer.Process(data, image.MimeType, processing);
+			return ChatImage.FromBase64(Convert.ToBase64String(result.Data), result.MimeType);
 		}
 
 		public string? GetDisplayUrl(MessageImage image)

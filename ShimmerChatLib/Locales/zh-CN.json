@@ -46,6 +46,7 @@
   "node_editor.option_missing": "当前值不在可选项中：{0}",
   "node_editor.image_add": "添加图像",
   "node_editor.image_add_hint": "支持 PNG / JPEG / WebP / GIF，单张不超过 {0} MB。",
+  "node_editor.image_add_hint_processed": "处理模式开启：超过像素预算的图像会被缩放压缩（预算 {0} 像素）。",
   "node_editor.image_uploading": "正在保存图像…",
   "node_editor.image_empty": "尚未添加图像；上传后会随节点保存。",
   "node_editor.image_remove": "移除图像",
