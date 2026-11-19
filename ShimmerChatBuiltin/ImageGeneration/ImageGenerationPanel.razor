@@ -34,12 +34,6 @@
             OnTogglePin="TogglePin"
             OnRetry="Reload">
     <ToolbarExtras>
-        <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-btn"
-                disabled="@(Current == null || _probing)" @onclick="ProbeAsync"
-                title="@Loc["panel_imagegen.probe"]" aria-label="@Loc["panel_imagegen.probe"]">
-            <i class="bi @(_probing ? "bi-hourglass-split" : "bi-arrow-repeat")"></i>
-            <span class="cfg-btn-label">@(_probing ? Loc["panel_imagegen.probing"] : Loc["panel_imagegen.probe"])</span>
-        </button>
         <button type="button" class="su-btn su-btn-secondary su-btn-sm cfg-icon-btn"
                 @onclick="ResetToDefaults" title="@Loc["panel_imagegen.reset"]"
                 aria-label="@Loc["panel_imagegen.reset"]">
@@ -51,6 +45,9 @@
         {
             var descriptor = ImageApiProviderCatalog.Get(profile.Provider);
             var isComfy = profile.Provider == ImageApiProvider.ComfyUi;
+            // 自定义工作流完全由 JSON 模板与占位符参数驱动，「生成参数」组在该模式下不参与生成，
+            // 因此两个分组互斥显示，避免用户误以为生成参数会影响自定义工作流。
+            var useCustomWorkflow = isComfy && profile.WorkflowMode == ImageWorkflowMode.Custom;
 
             <section class="cfg-section">
                 <div class="cfg-section-head">
@@ -178,9 +175,19 @@
                             </p>
                         </div>
                     </div>
+                </section>
 
-                    @if (profile.WorkflowMode == ImageWorkflowMode.Custom)
-                    {
+                @if (useCustomWorkflow)
+                {
+                    <section class="cfg-section">
+                        <div class="cfg-section-head">
+                            <span class="cfg-section-icon"><i class="bi bi-braces"></i></span>
+                            <div class="cfg-section-title">
+                                <h3>@Loc["panel_imagegen.section_custom_workflow"]</h3>
+                                <p>@Loc["imagegen_config.custom_workflow_desc"]</p>
+                            </div>
+                        </div>
+
                         <div class="cfg-grid">
                             <div class="cfg-field cfg-span-12">
                                 <label class="su-label">@Loc["panel_imagegen.workflow_json"]</label>
@@ -271,8 +278,8 @@
                             <i class="bi bi-info-circle-fill"></i>
                             <span>@Loc["panel_imagegen.template_help"]</span>
                         </p>
-                    }
-                </section>
+                    </section>
+                }
             }
             else
             {
@@ -282,80 +289,91 @@
                 </div>
             }
 
-            <section class="cfg-section">
-                <div class="cfg-section-head">
-                    <span class="cfg-section-icon"><i class="bi bi-sliders2"></i></span>
-                    <div class="cfg-section-title">
-                        <h3>@Loc["panel_imagegen.section_generation"]</h3>
-                        <p>@Loc["panel_imagegen.generation_desc"]</p>
-                    </div>
-                </div>
-
-                <div class="cfg-grid">
-                    <div class="cfg-field cfg-span-6">
-                        <label class="su-label">@Loc["panel_imagegen.model"]</label>
-                        <input class="su-input" list="imagegen-model-options" @bind="profile.Model" />
-                        <datalist id="imagegen-model-options">
-                            @foreach (var model in _availableModels)
-                            {
-                                <option value="@model"></option>
-                            }
-                        </datalist>
-                        <p class="cfg-field-hint">
-                            @(isComfy
-                                ? Loc["panel_imagegen.model_hint_comfy"]
-                                : Loc["panel_imagegen.model_hint_a1111"])
-                        </p>
-                    </div>
-                    <div class="cfg-field cfg-span-3">
-                        <label class="su-label">@Loc["panel_imagegen.sampler"]</label>
-                        <input class="su-input" list="imagegen-sampler-options" @bind="profile.Sampler" />
-                        <datalist id="imagegen-sampler-options">
-                            @foreach (var sampler in _availableSamplers)
-                            {
-                                <option value="@sampler"></option>
-                            }
-                        </datalist>
-                    </div>
-                    <div class="cfg-field cfg-span-3">
-                        <label class="su-label">@Loc["panel_imagegen.scheduler"]</label>
-                        <input class="su-input" list="imagegen-scheduler-options" @bind="profile.Scheduler"
-                               disabled="@(!isComfy)" />
-                        <datalist id="imagegen-scheduler-options">
-                            @foreach (var scheduler in _availableSchedulers)
-                            {
-                                <option value="@scheduler"></option>
-                            }
-                        </datalist>
+            @if (!useCustomWorkflow)
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-sliders2"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["panel_imagegen.section_generation"]</h3>
+                            <p>@Loc["panel_imagegen.generation_desc"]</p>
+                        </div>
                     </div>
 
-                    <div class="cfg-field cfg-span-3">
-                        <label class="su-label">@Loc["panel_imagegen.width"]</label>
-                        <input class="su-input" inputmode="numeric" @bind="profile.Width" />
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["panel_imagegen.model"]</label>
+                            <div class="cfg-input-row">
+                                <input class="su-input" list="imagegen-model-options" @bind="profile.Model" />
+                                <button type="button" class="su-btn su-btn-outline su-btn-sm"
+                                        disabled="@_probing" @onclick="ProbeAsync"
+                                        title="@Loc["panel_imagegen.probe"]" aria-label="@Loc["panel_imagegen.probe"]">
+                                    <i class="bi @(_probing ? "bi-hourglass-split" : "bi-arrow-repeat")"></i>
+                                    <span class="cfg-btn-label">@(_probing ? Loc["panel_imagegen.probing"] : Loc["panel_imagegen.probe"])</span>
+                                </button>
+                            </div>
+                            <datalist id="imagegen-model-options">
+                                @foreach (var model in _availableModels)
+                                {
+                                    <option value="@model"></option>
+                                }
+                            </datalist>
+                            <p class="cfg-field-hint">
+                                @(isComfy
+                                    ? Loc["panel_imagegen.model_hint_comfy"]
+                                    : Loc["panel_imagegen.model_hint_a1111"])
+                            </p>
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.sampler"]</label>
+                            <input class="su-input" list="imagegen-sampler-options" @bind="profile.Sampler" />
+                            <datalist id="imagegen-sampler-options">
+                                @foreach (var sampler in _availableSamplers)
+                                {
+                                    <option value="@sampler"></option>
+                                }
+                            </datalist>
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.scheduler"]</label>
+                            <input class="su-input" list="imagegen-scheduler-options" @bind="profile.Scheduler"
+                                   disabled="@(!isComfy)" />
+                            <datalist id="imagegen-scheduler-options">
+                                @foreach (var scheduler in _availableSchedulers)
+                                {
+                                    <option value="@scheduler"></option>
+                                }
+                            </datalist>
+                        </div>
+
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.width"]</label>
+                            <input class="su-input" inputmode="numeric" @bind="profile.Width" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.height"]</label>
+                            <input class="su-input" inputmode="numeric" @bind="profile.Height" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.batch_size"]</label>
+                            <input class="su-input" inputmode="numeric" @bind="profile.BatchSize" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.steps"]</label>
+                            <input class="su-input" inputmode="numeric" @bind="profile.Steps" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["panel_imagegen.cfg"]</label>
+                            <input class="su-input" inputmode="decimal" @bind="profile.Cfg" />
+                        </div>
+                        <div class="cfg-field cfg-span-12">
+                            <label class="su-label">@Loc["panel_imagegen.negative_prompt"]</label>
+                            <textarea class="su-input" rows="2" @bind="profile.NegativePrompt"></textarea>
+                            <p class="cfg-field-hint">@Loc["panel_imagegen.negative_prompt_hint"]</p>
+                        </div>
                     </div>
-                    <div class="cfg-field cfg-span-3">
-                        <label class="su-label">@Loc["panel_imagegen.height"]</label>
-                        <input class="su-input" inputmode="numeric" @bind="profile.Height" />
-                    </div>
-                    <div class="cfg-field cfg-span-3">
-                        <label class="su-label">@Loc["panel_imagegen.batch_size"]</label>
-                        <input class="su-input" inputmode="numeric" @bind="profile.BatchSize" />
-                    </div>
-                    <div class="cfg-field cfg-span-3">
-                        <label class="su-label">@Loc["panel_imagegen.steps"]</label>
-                        <input class="su-input" inputmode="numeric" @bind="profile.Steps" />
-                    </div>
-                    <div class="cfg-field cfg-span-3">
-                        <label class="su-label">@Loc["panel_imagegen.cfg"]</label>
-                        <input class="su-input" inputmode="decimal" @bind="profile.Cfg" />
-                    </div>
-                    <div class="cfg-field cfg-span-12">
-                        <label class="su-label">@Loc["panel_imagegen.negative_prompt"]</label>
-                        <textarea class="su-input" rows="2" @bind="profile.NegativePrompt"></textarea>
-                        <p class="cfg-field-hint">@Loc["panel_imagegen.negative_prompt_hint"]</p>
-                    </div>
-                </div>
-            </section>
+                </section>
+            }
         }
     </Body>
 
