@@ -348,7 +348,7 @@
   "gen_manager.title": "Generation Manager",
   "gen_manager.editing_private_tree": "Editing private tree for agent: {0}",
   "gen_manager.editing_event_tree": "Editing Pre tree override of event \"{1}\" for agent {0}",
-  "gen_manager.back_to_agent": "← Back to Agent",
+  "gen_manager.back_to_agent": "Back to Agent",
   "gen_manager.preset_management": "Preset Management",
   "gen_manager.default_badge": "(default)",
   "gen_manager.label_id": "ID:",

@@ -349,7 +349,7 @@
   "gen_manager.title": "生成管理器",
   "gen_manager.editing_private_tree": "正在编辑智能体的私有树：{0}",
   "gen_manager.editing_event_tree": "正在编辑智能体 {0} 的生成事件「{1}」的 Pre 树覆盖",
-  "gen_manager.back_to_agent": "← 返回智能体",
+  "gen_manager.back_to_agent": "返回智能体",
   "gen_manager.preset_management": "预设管理",
   "gen_manager.default_badge": "(默认)",
   "gen_manager.label_id": "ID:",
