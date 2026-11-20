@@ -48,8 +48,11 @@ namespace ShimmerChatBuiltin.Misc.Node.PreGeneration
 
             selectedConfig ??= settings[0];
 
-            // 部分服务方（如 OpenCode Go）要求每个对话一个稳定会话标识：用对话 Guid
-            context.Env.Transient.API = selectedConfig.ToAPISetting(context.Env.Persistent.ChatGuid.ToString());
+            // 部分服务方（如 OpenCode Go）要求每个对话一个稳定会话标识：用对话 Guid。
+            // log 把 Gemini 客户端的可见降级事件（垫 dummy 签名、模板降级）落到调试面板。
+            context.Env.Transient.API = selectedConfig.ToAPISetting(
+                context.Env.Persistent.ChatGuid.ToString(),
+                log: message => context.Env.Persistent.DebugOutput.Write("ApiConfig", "Gemini", message));
 
             // 续写处理：检查 SharedState 中的 IsContinuation 标记
             if (context.Env.Transient.SharedState.TryGetValue("IsContinuation", out var isCont)

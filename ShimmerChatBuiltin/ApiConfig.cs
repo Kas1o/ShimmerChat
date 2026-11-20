@@ -87,6 +87,36 @@ namespace ShimmerChatBuiltin
 
 		#endregion
 
+		#region Gemini
+		/// <summary>Gemini 原生 REST 接口前缀（v1beta；区域受限用户可改指向自定义网关/代理）。</summary>
+		public const string GeminiDefaultUrl = "https://generativelanguage.googleapis.com/v1beta";
+
+		public string? GeminiUrl { get; set; } = GeminiDefaultUrl;
+		public string? GeminiApiKey { get; set; } = "";
+		public string? GeminiModel { get; set; } = "gemini-4-hydrogen";
+		public bool GeminiStream { get; set; } = true;
+		public int GeminiCtx { get; set; } = 16384;
+
+		/// <summary>
+		/// 思考档位，字面直译为 thinkingLevel；Default = 不发送 thinkingConfig（模型默认）。
+		/// 不做模型名探测：非法组合由 Gemini API 显式报错，恒显提示负责事先告知。
+		/// </summary>
+		public GeminiThinkingLevel GeminiThinking { get; set; } = GeminiThinkingLevel.Default;
+
+		/// <summary>
+		/// 是否随响应返回推理摘要（thinkingConfig.includeThoughts）。默认开：
+		/// Gemini 3/4 恒开思考，这只是摘要可见性开关，走与 DeepSeek reasoning_content 相同的展示链路。
+		/// </summary>
+		public bool GeminiIncludeThoughts { get; set; } = true;
+
+		/// <summary>对话中部 system 片段的替换模板（{0} = 原文），映射为 user turn；留空 = 构建请求时显式失败。</summary>
+		public string? GeminiMidSystemTemplate { get; set; } = null;
+
+		public string? GeminiCustomRequestBody { get; set; } = null;
+		public string? GeminiCustomHeaders { get; set; } = null;
+
+		#endregion Gemini
+
 		// Completion settings
 		public List<TextCompletionSetting>? TextCompletionSettings { get; set; } = new List<TextCompletionSetting>();
 		public int SelectedTextCompletionSettingIndex { get; set; } = 0;
@@ -97,6 +127,7 @@ namespace ShimmerChatBuiltin
 			ApiConfigType.OpenAI => OpenAIStream,
 			ApiConfigType.DeepSeek => DeepSeekStream,
 			ApiConfigType.OpenCodeGo => OpenCodeGoStream,
+			ApiConfigType.Gemini => GeminiStream,
 			_ => false
 		};
 
@@ -112,6 +143,7 @@ namespace ShimmerChatBuiltin
 			ApiConfigType.Ollama => OllamaModel ?? "",
 			ApiConfigType.OpenAIText => OpenAITextModel ?? "",
 			ApiConfigType.OpenCodeGo => OpenCodeGoModel ?? "",
+			ApiConfigType.Gemini => GeminiModel ?? "",
 			_ => ""
 		};
 
@@ -122,7 +154,11 @@ namespace ShimmerChatBuiltin
 		/// 当前对话的稳定标识。OpenCode Go 会把它作为 <c>x-opencode-session</c> 发出，
 		/// 供上游做会话路由与 prompt 缓存；为 null 时不发送该头。
 		/// </param>
-		public APISetting ToAPISetting(string? sessionId = null)
+		/// <param name="log">
+		/// 可选告警通道，透传给客户端（Gemini 垫 dummy 签名、模板降级等可见事件）。
+		/// 传 null 时这些事件只发生在客户端内部、不留痕。
+		/// </param>
+		public APISetting ToAPISetting(string? sessionId = null, Action<string>? log = null)
 		{
 			switch (Type)
 			{
@@ -151,6 +187,10 @@ namespace ShimmerChatBuiltin
 					{
 						ReasoningEchoMode = OpenAIReasoningEchoMode
 					};
+
+					// TODO(headers): OpenAIChatCompletionClient 已支持 CustomHeaders，但 OpenAI/DeepSeek
+					// 尚无用户可编辑的请求头字段与设置页入口；补齐时在此装配（DeepSeek 分支同），
+					// 非法头沿用 OpenAICustomRequestBody 的显式失败语义，不静默忽略。
 
 					if (!string.IsNullOrWhiteSpace(OpenAICustomRequestBody))
 					{
@@ -230,6 +270,9 @@ namespace ShimmerChatBuiltin
 						CustomHeaders = BuildOpenCodeGoHeaders(sessionId)
 					};
 
+					// TODO(modes): OpenCode Go 也需要思考/推理多模式切换（对照 DeepSeek 的
+					// DeepSeekReasoningEffort + thinking 开关）；补齐时在此装配 CustomRequestProperties。
+
 					return new APISetting
 					{
 						ChatClient = client,
@@ -260,6 +303,54 @@ namespace ShimmerChatBuiltin
 						SupportsToolCalling = false
 					};
 
+				case ApiConfigType.Gemini:
+				{
+					var client = new GeminiChatCompletionClient(
+						_url: string.IsNullOrWhiteSpace(GeminiUrl) ? GeminiDefaultUrl : GeminiUrl,
+						_apiKey: GeminiApiKey ?? "",
+						_model: string.IsNullOrWhiteSpace(GeminiModel) ? "gemini-4-hydrogen" : GeminiModel,
+						_maxTokens: GeminiCtx)
+					{
+						ThinkingLevel = GeminiThinking switch
+						{
+							GeminiThinkingLevel.Minimal => "minimal",
+							GeminiThinkingLevel.Low => "low",
+							GeminiThinkingLevel.Medium => "medium",
+							GeminiThinkingLevel.High => "high",
+							_ => null
+						},
+						MidSystemTemplate = string.IsNullOrWhiteSpace(GeminiMidSystemTemplate) ? null : GeminiMidSystemTemplate,
+						IncludeThoughts = GeminiIncludeThoughts,
+						Log = log
+					};
+
+					if (!string.IsNullOrWhiteSpace(GeminiCustomRequestBody))
+					{
+						Dictionary<string, object>? customProps;
+						try
+						{
+							customProps = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(GeminiCustomRequestBody);
+						}
+						catch (Newtonsoft.Json.JsonException ex)
+						{
+							throw new InvalidOperationException($"Gemini custom request body is not valid JSON: {ex.Message}", ex);
+						}
+
+						if (customProps != null && customProps.Count > 0)
+							client.CustomRequestProperties = customProps;
+					}
+
+					if (!string.IsNullOrWhiteSpace(GeminiCustomHeaders))
+						client.CustomHeaders = ParseHeaderLines(GeminiCustomHeaders);
+
+					return new APISetting
+					{
+						ChatClient = client,
+						SupportsStreaming = GeminiStream,
+						SupportsToolCalling = true
+					};
+				}
+
 				default:
 					throw new InvalidOperationException($"Unsupported API type: {Type}");
 			}
@@ -269,6 +360,37 @@ namespace ShimmerChatBuiltin
 		/// OpenCode Go 文档要求客户端用自有 User-Agent 标识身份，
 		/// 并用稳定的 <c>x-opencode-session</c> 标记每个对话（供上游路由与 prompt 缓存）。
 		/// </summary>
+		/// <summary>
+		/// 解析 "每行一个 Name: Value" 的自定义请求头文本。非法行显式失败而不是静默忽略，
+		/// 避免用户以为配置生效而实际请求缺头。
+		/// </summary>
+		private static Dictionary<string, string> ParseHeaderLines(string text)
+		{
+			var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+			foreach (var rawLine in text.Split('\n'))
+			{
+				var line = rawLine.Trim();
+				if (line.Length == 0)
+					continue;
+
+				var separator = line.IndexOf(':');
+				if (separator <= 0)
+					throw new InvalidOperationException($"Gemini custom header line is not in 'Name: Value' format: '{rawLine.TrimEnd()}'");
+
+				var name = line[..separator].Trim();
+				var value = line[(separator + 1)..].Trim();
+				if (string.IsNullOrWhiteSpace(name) || value.Length == 0)
+					throw new InvalidOperationException($"Gemini custom header line has an empty name or value: '{rawLine.TrimEnd()}'");
+
+				headers[name] = value;
+			}
+
+			if (headers.Count == 0)
+				throw new InvalidOperationException("Gemini custom headers text contains no 'Name: Value' lines.");
+
+			return headers;
+		}
+
 		private static Dictionary<string, string> BuildOpenCodeGoHeaders(string? sessionId)
 		{
 			var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -349,6 +471,17 @@ namespace ShimmerChatBuiltin
 				OpenAITextModel = OpenAITextModel,
 				OpenAITextCtx = OpenAITextCtx,
 
+				GeminiUrl = GeminiUrl,
+				GeminiApiKey = GeminiApiKey,
+				GeminiModel = GeminiModel,
+				GeminiStream = GeminiStream,
+				GeminiCtx = GeminiCtx,
+				GeminiThinking = GeminiThinking,
+				GeminiIncludeThoughts = GeminiIncludeThoughts,
+				GeminiMidSystemTemplate = GeminiMidSystemTemplate,
+				GeminiCustomRequestBody = GeminiCustomRequestBody,
+				GeminiCustomHeaders = GeminiCustomHeaders,
+
 				TextCompletionSettings = TextCompletionSettings?.Select(tcs => tcs.Clone()).ToList(),
 				SelectedTextCompletionSettingIndex = SelectedTextCompletionSettingIndex
 			};
@@ -364,6 +497,17 @@ namespace ShimmerChatBuiltin
 		OpenAIText,
 		Pseudo,
 		// 新增类型必须追加在末尾：已保存的 API 配置可能把枚举存成序号。
-		OpenCodeGo
+		OpenCodeGo,
+		Gemini
+	}
+
+	/// <summary>Gemini 思考档位。字面直译为 thinkingLevel；Default = 不发送 thinkingConfig（模型默认）。</summary>
+	public enum GeminiThinkingLevel
+	{
+		Default,
+		Minimal,
+		Low,
+		Medium,
+		High
 	}
 }

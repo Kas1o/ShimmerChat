@@ -57,6 +57,12 @@ public class ToolCallLoop
             acc.Body.thinking = (acc.Body.thinking ?? "") + chunk.Body.thinking;
         if (chunk.Body.id != null)
             acc.Body.id = chunk.Body.id;
+        if (chunk.Body.ProviderData != null)
+        {
+            acc.Body.ProviderData ??= new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var pair in chunk.Body.ProviderData)
+                acc.Body.ProviderData[pair.Key] = pair.Value;
+        }
 
         if (chunk.Body.toolCalls != null)
         {

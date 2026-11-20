@@ -634,6 +634,115 @@
                     </div>
                 </section>
             }
+            else if (config.Type == ApiConfigType.Gemini)
+            {
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-stars"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.connection"]</h3>
+                            <p>@Loc["api_settings.gemini.differences"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-8">
+                            <label class="su-label">@Loc["API URL"]</label>
+                            <input class="su-input" @bind="config.GeminiUrl" />
+                        </div>
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["API KEY"]</label>
+                            <input type="password" autocomplete="off" class="su-input" @bind="config.GeminiApiKey" />
+                        </div>
+                        <div class="cfg-field cfg-span-6">
+                            <label class="su-label">@Loc["API MODEL"]</label>
+                            <div class="cfg-input-row">
+                                <input class="su-input" list="api-model-options" @bind="config.GeminiModel"
+                                       placeholder="@Loc["api_settings.model_placeholder"]" />
+                                <button type="button" class="su-btn su-btn-outline su-btn-sm"
+                                        disabled="@_fetchingModels" @onclick="FetchModelsAsync">
+                                    <i class="bi @(_fetchingModels ? "bi-hourglass-split" : "bi-arrow-repeat")"></i>
+                                    @(_fetchingModels ? Loc["api_settings.fetching_models"] : Loc["api_settings.fetch_models"])
+                                </button>
+                            </div>
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["API GENERATION LENGTH"]</label>
+                            <input type="number" class="su-input" @bind="config.GeminiCtx" />
+                        </div>
+                        <div class="cfg-field cfg-span-3">
+                            <label class="su-label">@Loc["api_settings.gemini.thinking"]</label>
+                            <select class="su-select" @bind="config.GeminiThinking">
+                                <option value="@GeminiThinkingLevel.Default">@Loc["api_settings.gemini.thinking.default"]</option>
+                                <option value="@GeminiThinkingLevel.Minimal">@Loc["api_settings.gemini.thinking.minimal"]</option>
+                                <option value="@GeminiThinkingLevel.Low">@Loc["api_settings.gemini.thinking.low"]</option>
+                                <option value="@GeminiThinkingLevel.Medium">@Loc["api_settings.gemini.thinking.medium"]</option>
+                                <option value="@GeminiThinkingLevel.High">@Loc["api_settings.gemini.thinking.high"]</option>
+                            </select>
+                        </div>
+                        @if (_modelFetchError != null)
+                        {
+                            <p class="cfg-field-error cfg-span-12">@_modelFetchError</p>
+                        }
+                        else if (_availableModels.Count > 0)
+                        {
+                            <p class="cfg-field-hint cfg-span-12">@Loc.Format("api_settings.models_loaded", _availableModels.Count)</p>
+                        }
+                        <p class="cfg-field-hint cfg-span-12">@Loc["api_settings.gemini.thinking_hint"]</p>
+                        <p class="cfg-field-hint cfg-span-12">@Loc["api_settings.gemini.deprecated_warning"]</p>
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-toggles"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.generation"]</h3>
+                            <p>@Loc["api_settings.generation_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-toggle-row">
+                        <label class="cfg-toggle">
+                            <input type="checkbox" @bind="config.GeminiStream" />
+                            <span>@Loc["API ENABLE STREAM"]</span>
+                        </label>
+                        <label class="cfg-toggle">
+                            <input type="checkbox" @bind="config.GeminiIncludeThoughts" />
+                            <span>@Loc["api_settings.gemini.include_thoughts"]</span>
+                        </label>
+                    </div>
+                    <p class="cfg-field-hint">@Loc["api_settings.gemini.include_thoughts_hint"]</p>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-braces"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.advanced"]</h3>
+                            <p>@Loc["api_settings.advanced_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-12">
+                            <label class="su-label">@Loc["api_settings.gemini.mid_system"]</label>
+                            <textarea class="su-textarea" rows="2" @bind="config.GeminiMidSystemTemplate"
+                                      placeholder="@Loc["api_settings.gemini.mid_system_placeholder"]"></textarea>
+                            <p class="cfg-field-hint">@Loc["api_settings.gemini.mid_system_hint"]</p>
+                        </div>
+                        <div class="cfg-field cfg-span-12">
+                            <label class="su-label">@Loc["API CUSTOM REQUEST BODY"]</label>
+                            <textarea class="su-textarea cfg-code" rows="6"
+                                      @bind="config.GeminiCustomRequestBody"
+                                      placeholder="@Loc["api_settings.gemini.custom_body_placeholder"]"></textarea>
+                        </div>
+                        <div class="cfg-field cfg-span-12">
+                            <label class="su-label">@Loc["api_settings.gemini.custom_headers"]</label>
+                            <textarea class="su-textarea cfg-code" rows="3"
+                                      @bind="config.GeminiCustomHeaders"
+                                      placeholder="@Loc["api_settings.gemini.custom_headers_placeholder"]"></textarea>
+                        </div>
+                    </div>
+                </section>
+            }
             else if (config.Type == ApiConfigType.OpenAIText)
             {
                 <section class="cfg-section">
@@ -1429,8 +1538,12 @@
 
         try
         {
-            var client = BuildModelListClient(config);
-            var models = await client.GetModelNameList();
+            // Gemini 的模型列表是原生形状（/models），与 OpenAI 家族的 /v1/models 不同客户端
+            List<string> models;
+            if (config.Type == ApiConfigType.Gemini)
+                models = await BuildGeminiModelListClient(config).GetModelNameList();
+            else
+                models = await BuildModelListClient(config).GetModelNameList();
 
             // 请求期间可能已经切换到别的配置，旧结果不能覆盖当前配置的列表。
             if (!ReferenceEquals(Current, config))
@@ -1483,8 +1596,13 @@
         _ => throw new InvalidOperationException($"API type '{config.Type}' does not support model listing.")
     };
 
+    private static GeminiChatCompletionClient BuildGeminiModelListClient(ApiConfig config) => new(
+        _url: string.IsNullOrWhiteSpace(config.GeminiUrl) ? ApiConfig.GeminiDefaultUrl : config.GeminiUrl,
+        _apiKey: config.GeminiApiKey ?? "",
+        _model: string.IsNullOrWhiteSpace(config.GeminiModel) ? "gemini-4-hydrogen" : config.GeminiModel);
+
     private static bool SupportsModelFetch(ApiConfigType type) =>
-        type is ApiConfigType.OpenAI or ApiConfigType.DeepSeek or ApiConfigType.OpenCodeGo;
+        type is ApiConfigType.OpenAI or ApiConfigType.DeepSeek or ApiConfigType.OpenCodeGo or ApiConfigType.Gemini;
 
     private static bool SupportsTextCompletion(ApiConfigType type) =>
         type is ApiConfigType.Kobold or ApiConfigType.Ollama or ApiConfigType.OpenAIText;
@@ -1558,6 +1676,7 @@
         ApiConfigType.OpenAIText => Loc["api_settings.type_openai_text"],
         ApiConfigType.Pseudo => Loc["api_settings.type_pseudo"],
         ApiConfigType.OpenCodeGo => Loc["api_settings.type_opencode_go"],
+        ApiConfigType.Gemini => Loc["api_settings.type_gemini"],
         _ => type.ToString()
     };
 
@@ -1584,6 +1703,7 @@
         ApiConfigType.DeepSeek => config.DeepSeekUrl ?? "",
         ApiConfigType.OpenAIText => config.OpenAITextUrl ?? "",
         ApiConfigType.OpenCodeGo => config.OpenCodeGoUrl ?? "",
+        ApiConfigType.Gemini => config.GeminiUrl ?? "",
         _ => ""
     };
 

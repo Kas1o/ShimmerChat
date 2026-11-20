@@ -134,4 +134,47 @@ public class APISelectNodeTests : NodeTestBase
             .Should().BeOfType<SharperLLM.API.OpenAIChatCompletionClient>().Subject;
         client.CustomHeaders!["x-opencode-session"].Should().Be(chatGuid.ToString());
     }
+
+    [Fact]
+    public async Task IsContinuation_Gemini_Fails()
+    {
+        // Gemini 没有 assistant prefill：续写必须显式失败，不能静默跳过
+        var configs = new List<ApiConfig>
+        {
+            new() { Name = "Gemini", Type = ApiConfigType.Gemini, GeminiApiKey = "k" },
+        };
+        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting"))
+            .Returns(JsonConvert.SerializeObject(configs));
+        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIGuid")).Returns(configs[0].Id.ToString());
+        var node = new APISelectNode { APIGuid = null };
+        var env = new PreGenerationEnv(CreatePersistentEnv());
+        env.Transient.SharedState["IsContinuation"] = true;
+        var ctx = CreateContext(env);
+
+        var result = await node.ExecuteAsync(ctx);
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(NodeErrorCodes.ApiUnavailable);
+    }
+
+    [Fact]
+    public async Task Gemini_WiresDegradationLog()
+    {
+        // APISelectNode 把客户端的可见降级事件（垫 dummy 签名等）接到调试面板
+        var configs = new List<ApiConfig>
+        {
+            new() { Name = "Gemini", Type = ApiConfigType.Gemini, GeminiApiKey = "k" },
+        };
+        KvMock.Setup(k => k.Read("ApiSettings", "apiSetting"))
+            .Returns(JsonConvert.SerializeObject(configs));
+        KvMock.Setup(k => k.Read("ApiSettings", "selectedAPIGuid")).Returns(configs[0].Id.ToString());
+
+        var ctx = CreateContext();
+        var result = await new APISelectNode { APIGuid = null }.ExecuteAsync(ctx);
+
+        result.Success.Should().BeTrue();
+        var client = ctx.Env.Transient.API!.ChatClient
+            .Should().BeOfType<SharperLLM.API.GeminiChatCompletionClient>().Subject;
+        client.Log.Should().NotBeNull();
+    }
 }
