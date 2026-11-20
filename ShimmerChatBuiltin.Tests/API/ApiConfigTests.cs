@@ -5,8 +5,8 @@ using ShimmerChatBuiltin;
 namespace ShimmerChatBuiltin.Tests.API;
 
 /// <summary>
-/// OpenCode Go 走 OpenAI 兼容路径，但需要自带 User-Agent 与每对话稳定的
-/// x-opencode-session 头；模型列表接口与对话接口前缀不同。
+/// OpenCode Go 配置装配：OpenAI 兼容（默认）与 Gemini 原生两种模式共用
+/// User-Agent 与 x-opencode-session，Gemini 模式改走 Gemini 客户端并用 Bearer 鉴权。
 /// </summary>
 public class ApiConfigTests
 {
@@ -14,6 +14,12 @@ public class ApiConfigTests
     {
         var setting = config.ToAPISetting(sessionId);
         return setting.ChatClient.Should().BeOfType<OpenAIChatCompletionClient>().Subject;
+    }
+
+    private static GeminiChatCompletionClient ResolveGeminiClient(ApiConfig config, string? sessionId = null)
+    {
+        var setting = config.ToAPISetting(sessionId);
+        return setting.ChatClient.Should().BeOfType<GeminiChatCompletionClient>().Subject;
     }
 
     [Fact]
@@ -121,6 +127,230 @@ public class ApiConfigTests
 
         config.OpenCodeGoStream = true;
         config.EnableStream.Should().BeTrue();
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_BuildsGeminiClientWithBearerAndDefaults()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoModel = ""
+        };
+
+        var setting = config.ToAPISetting("chat-1");
+        var client = setting.ChatClient.Should().BeOfType<GeminiChatCompletionClient>().Subject;
+
+        client.url.Should().Be(ApiConfig.OpenCodeGoGeminiDefaultUrl);
+        client.apiKey.Should().Be("key");
+        client.model.Should().Be(ApiConfig.OpenCodeGoDefaultGeminiModel);
+        client.maxTokens.Should().Be(16384);
+        // OpenCode Go 的 Google 路径只接受 Bearer，不能发 x-goog-api-key
+        client.UseBearerAuth.Should().BeTrue();
+        client.ThinkingLevel.Should().BeNull();
+        client.IncludeThoughts.Should().BeTrue();
+        client.MidSystemTemplate.Should().BeNull();
+        setting.SupportsStreaming.Should().BeTrue();
+        setting.SupportsToolCalling.Should().BeTrue();
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_KeepsUserAgentAndSessionHeader()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = "key"
+        };
+
+        var client = ResolveGeminiClient(config, "chat-1");
+
+        client.CustomHeaders.Should().NotBeNull();
+        client.CustomHeaders!["User-Agent"].Should().Be(ApiConfig.OpenCodeGoUserAgent);
+        client.CustomHeaders!["x-opencode-session"].Should().Be("chat-1");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_KeepsExplicitModel()
+    {
+        // 模型值是用户数据：装配层不做“看起来像另一个模式默认值”的隐式替换，
+        // 模式切换时的默认模型调整只发生在设置页的可见交互里。
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoModel = "glm-5.3-flash"
+        };
+
+        ResolveGeminiClient(config).model.Should().Be("glm-5.3-flash");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_UsesCustomGeminiUrlWhenSet()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoGeminiUrl = "https://gateway.test/google/v1beta"
+        };
+
+        ResolveGeminiClient(config).url.Should().Be("https://gateway.test/google/v1beta");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_MapsThinkingAndThoughts()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoGeminiThinking = GeminiThinkingLevel.High,
+            OpenCodeGoGeminiIncludeThoughts = false,
+            OpenCodeGoGeminiMidSystemTemplate = "[note: {0}]"
+        };
+
+        var client = ResolveGeminiClient(config);
+
+        client.ThinkingLevel.Should().Be("high");
+        client.IncludeThoughts.Should().BeFalse();
+        client.MidSystemTemplate.Should().Be("[note: {0}]");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_CustomRequestBodyMergesIntoRoot()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoGeminiCustomRequestBody = "{\"safetySettings\": []}"
+        };
+
+        ResolveGeminiClient(config).CustomRequestProperties.Should().ContainKey("safetySettings");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_InvalidCustomRequestBodyFails()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoGeminiCustomRequestBody = "{ not json"
+        };
+
+        var act = () => config.ToAPISetting();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*OpenCode Go Gemini*not valid JSON*");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_RequiresApiKey()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = null
+        };
+
+        var act = () => config.ToAPISetting();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*API key*");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_FollowsStreamSetting()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoStream = false
+        };
+
+        config.ToAPISetting().SupportsStreaming.Should().BeFalse();
+    }
+
+    [Fact]
+    public void OpenCodeGo_CloneCopiesGeminiModeSettings()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoGeminiUrl = "https://gateway.test/google/v1beta",
+            OpenCodeGoGeminiThinking = GeminiThinkingLevel.Low,
+            OpenCodeGoGeminiIncludeThoughts = false,
+            OpenCodeGoGeminiMidSystemTemplate = "[note: {0}]",
+            OpenCodeGoGeminiCustomRequestBody = "{\"safetySettings\": []}"
+        };
+
+        var clone = config.Clone();
+
+        clone.OpenCodeGoMode.Should().Be(OpenCodeGoMode.Gemini);
+        clone.OpenCodeGoGeminiUrl.Should().Be(config.OpenCodeGoGeminiUrl);
+        clone.OpenCodeGoGeminiThinking.Should().Be(GeminiThinkingLevel.Low);
+        clone.OpenCodeGoGeminiIncludeThoughts.Should().BeFalse();
+        clone.OpenCodeGoGeminiMidSystemTemplate.Should().Be("[note: {0}]");
+        clone.OpenCodeGoGeminiCustomRequestBody.Should().Be("{\"safetySettings\": []}");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiModeSurvivesNewtonsoftRoundTrip()
+    {
+        var configs = new List<ApiConfig>
+        {
+            new()
+            {
+                Type = ApiConfigType.OpenCodeGo,
+                OpenCodeGoMode = OpenCodeGoMode.Gemini,
+                OpenCodeGoModel = "gemini-4-argon",
+                OpenCodeGoGeminiThinking = GeminiThinkingLevel.Medium
+            }
+        };
+
+        var restored = JsonConvert.DeserializeObject<List<ApiConfig>>(JsonConvert.SerializeObject(configs));
+
+        restored![0].OpenCodeGoMode.Should().Be(OpenCodeGoMode.Gemini);
+        restored[0].OpenCodeGoModel.Should().Be("gemini-4-argon");
+        restored[0].OpenCodeGoGeminiThinking.Should().Be(GeminiThinkingLevel.Medium);
+    }
+
+    [Fact]
+    public void OpenCodeGo_OldConfigWithoutMode_DefaultsToOpenAICompatible()
+    {
+        // 旧配置没有 OpenCodeGoMode：枚举序号 0 必须是 OpenAI 兼容，行为与旧版一致。
+        var restored = JsonConvert.DeserializeObject<List<ApiConfig>>("[{\"Type\":6,\"OpenCodeGoApiKey\":\"k\"}]");
+
+        var config = restored![0];
+        config.OpenCodeGoMode.Should().Be(OpenCodeGoMode.OpenAICompatible);
+        config.ToAPISetting("chat-1").ChatClient.Should().BeOfType<OpenAIChatCompletionClient>();
+    }
+
+    [Fact]
+    public void OpenCodeGo_UnknownMode_FailsExplicitly()
+    {
+        // 坏配置不能静默落到 OpenAI 路径：未知模式必须显式失败。
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoMode = (OpenCodeGoMode)42
+        };
+
+        var act = () => config.ToAPISetting();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Unsupported OpenCode Go mode*");
     }
 
     [Fact]

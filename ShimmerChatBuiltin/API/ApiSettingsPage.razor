@@ -571,23 +571,42 @@
                         <span class="cfg-section-icon"><i class="bi bi-plug"></i></span>
                         <div class="cfg-section-title">
                             <h3>@Loc["api_settings.connection"]</h3>
-                            <p>@Loc["api_settings.connection_desc"]</p>
+                            <p>@Loc["api_settings.opencode_go.connection_desc"]</p>
                         </div>
                     </div>
                     <div class="cfg-grid">
-                        <div class="cfg-field cfg-span-6">
+                        <div class="cfg-field cfg-span-4">
+                            <label class="su-label">@Loc["api_settings.opencode_go.mode"]</label>
+                            <select class="su-select" @bind="config.OpenCodeGoMode"
+                                    @bind:after="OnOpenCodeGoModeChanged">
+                                <option value="@OpenCodeGoMode.OpenAICompatible">@Loc["api_settings.opencode_go.mode_openai"]</option>
+                                <option value="@OpenCodeGoMode.Gemini">@Loc["api_settings.opencode_go.mode_gemini"]</option>
+                            </select>
+                            <p class="cfg-field-hint">@Loc["api_settings.opencode_go.mode_hint"]</p>
+                        </div>
+                        <div class="cfg-field cfg-span-8">
                             <label class="su-label">@Loc["API URL"]</label>
-                            <input class="su-input" @bind="config.OpenCodeGoUrl" />
+                            @if (config.OpenCodeGoMode == OpenCodeGoMode.Gemini)
+                            {
+                                <input class="su-input" @bind="config.OpenCodeGoGeminiUrl" />
+                                <p class="cfg-field-hint">@Loc["api_settings.opencode_go.gemini_url_hint"]</p>
+                            }
+                            else
+                            {
+                                <input class="su-input" @bind="config.OpenCodeGoUrl" />
+                                <p class="cfg-field-hint">@Loc["api_settings.opencode_go.openai_url_hint"]</p>
+                            }
                         </div>
                         <div class="cfg-field cfg-span-6">
                             <label class="su-label">@Loc["API MODELS URL"]</label>
                             <input class="su-input" @bind="config.OpenCodeGoModelsUrl" />
+                            <p class="cfg-field-hint">@Loc["api_settings.opencode_go.models_url_hint"]</p>
                         </div>
-                        <div class="cfg-field cfg-span-4">
+                        <div class="cfg-field cfg-span-6">
                             <label class="su-label">@Loc["API KEY"]</label>
                             <input type="password" autocomplete="off" class="su-input" @bind="config.OpenCodeGoApiKey" />
                         </div>
-                        <div class="cfg-field cfg-span-4">
+                        <div class="cfg-field cfg-span-6">
                             <label class="su-label">@Loc["API MODEL"]</label>
                             <div class="cfg-input-row">
                                 <input class="su-input" list="api-model-options" @bind="config.OpenCodeGoModel"
@@ -598,11 +617,25 @@
                                     @(_fetchingModels ? Loc["api_settings.fetching_models"] : Loc["api_settings.fetch_models"])
                                 </button>
                             </div>
+                            <p class="cfg-field-hint">@Loc["api_settings.opencode_go.model_hint"]</p>
                         </div>
-                        <div class="cfg-field cfg-span-4">
+                        <div class="cfg-field cfg-span-3">
                             <label class="su-label">@Loc["API GENERATION LENGTH"]</label>
                             <input type="number" class="su-input" @bind="config.OpenCodeGoCtx" />
                         </div>
+                        @if (config.OpenCodeGoMode == OpenCodeGoMode.Gemini)
+                        {
+                            <div class="cfg-field cfg-span-3">
+                                <label class="su-label">@Loc["api_settings.gemini.thinking"]</label>
+                                <select class="su-select" @bind="config.OpenCodeGoGeminiThinking">
+                                    <option value="@GeminiThinkingLevel.Default">@Loc["api_settings.gemini.thinking.default"]</option>
+                                    <option value="@GeminiThinkingLevel.Minimal">@Loc["api_settings.gemini.thinking.minimal"]</option>
+                                    <option value="@GeminiThinkingLevel.Low">@Loc["api_settings.gemini.thinking.low"]</option>
+                                    <option value="@GeminiThinkingLevel.Medium">@Loc["api_settings.gemini.thinking.medium"]</option>
+                                    <option value="@GeminiThinkingLevel.High">@Loc["api_settings.gemini.thinking.high"]</option>
+                                </select>
+                            </div>
+                        }
                         @if (_modelFetchError != null)
                         {
                             <p class="cfg-field-error cfg-span-12">@_modelFetchError</p>
@@ -610,6 +643,12 @@
                         else if (_availableModels.Count > 0)
                         {
                             <p class="cfg-field-hint cfg-span-12">@Loc.Format("api_settings.models_loaded", _availableModels.Count)</p>
+                        }
+                        @if (config.OpenCodeGoMode == OpenCodeGoMode.Gemini)
+                        {
+                            <p class="cfg-field-hint cfg-span-12">@Loc["api_settings.opencode_go.gemini_note"]</p>
+                            <p class="cfg-field-hint cfg-span-12">@Loc["api_settings.gemini.thinking_hint"]</p>
+                            <p class="cfg-field-hint cfg-span-12">@Loc["api_settings.gemini.deprecated_warning"]</p>
                         }
                     </div>
                 </section>
@@ -627,12 +666,59 @@
                             <input type="checkbox" @bind="config.OpenCodeGoStream" />
                             <span>@Loc["API ENABLE STREAM"]</span>
                         </label>
-                        <label class="cfg-toggle">
-                            <input type="checkbox" @bind="config.OpenCodeGoAsIs" />
-                            <span>@Loc["API ASIS"]</span>
-                        </label>
+                        @if (config.OpenCodeGoMode == OpenCodeGoMode.OpenAICompatible)
+                        {
+                            <label class="cfg-toggle">
+                                <input type="checkbox" @bind="config.OpenCodeGoAsIs" />
+                                <span>@Loc["API ASIS"]</span>
+                            </label>
+                        }
+                        else
+                        {
+                            <label class="cfg-toggle">
+                                <input type="checkbox" @bind="config.OpenCodeGoGeminiIncludeThoughts" />
+                                <span>@Loc["api_settings.gemini.include_thoughts"]</span>
+                            </label>
+                        }
                     </div>
+                    @if (config.OpenCodeGoMode == OpenCodeGoMode.OpenAICompatible)
+                    {
+                        <p class="cfg-field-hint">@Loc["api_settings.opencode_go.asis_hint"]</p>
+                    }
+                    else
+                    {
+                        <p class="cfg-field-hint">@Loc["api_settings.gemini.include_thoughts_hint"]</p>
+                        <p class="cfg-field-hint">@Loc["api_settings.opencode_go.asis_gemini_hint"]</p>
+                    }
                 </section>
+
+                @if (config.OpenCodeGoMode == OpenCodeGoMode.Gemini)
+                {
+                    <section class="cfg-section">
+                        <div class="cfg-section-head">
+                            <span class="cfg-section-icon"><i class="bi bi-braces"></i></span>
+                            <div class="cfg-section-title">
+                                <h3>@Loc["api_settings.advanced"]</h3>
+                                <p>@Loc["api_settings.advanced_desc"]</p>
+                            </div>
+                        </div>
+                        <div class="cfg-grid">
+                            <div class="cfg-field cfg-span-12">
+                                <label class="su-label">@Loc["api_settings.gemini.mid_system"]</label>
+                                <textarea class="su-textarea" rows="2" @bind="config.OpenCodeGoGeminiMidSystemTemplate"
+                                          placeholder="@Loc["api_settings.gemini.mid_system_placeholder"]"></textarea>
+                                <p class="cfg-field-hint">@Loc["api_settings.gemini.mid_system_hint"]</p>
+                            </div>
+                            <div class="cfg-field cfg-span-12">
+                                <label class="su-label">@Loc["API CUSTOM REQUEST BODY"]</label>
+                                <textarea class="su-textarea cfg-code" rows="6"
+                                          @bind="config.OpenCodeGoGeminiCustomRequestBody"
+                                          placeholder="@Loc["api_settings.gemini.custom_body_placeholder"]"></textarea>
+                                <p class="cfg-field-hint">@Loc["api_settings.opencode_go.custom_body_hint"]</p>
+                            </div>
+                        </div>
+                    </section>
+                }
             }
             else if (config.Type == ApiConfigType.Gemini)
             {
@@ -1276,6 +1362,27 @@
         _statusText = null;
     }
 
+    /// <summary>
+    /// 切换 OpenCode Go 接口模式：仅当模型仍是另一模式的默认值时换成当前模式的默认模型，
+    /// 避免“从未选过模型”却把 GLM 默认值发到 Gemini 路径；用户显式选过的模型一律保留。
+    /// </summary>
+    private void OnOpenCodeGoModeChanged()
+    {
+        if (Current is not { } config)
+            return;
+
+        if (config.OpenCodeGoMode == OpenCodeGoMode.Gemini
+            && string.Equals(config.OpenCodeGoModel, ApiConfig.OpenCodeGoDefaultModel, StringComparison.Ordinal))
+        {
+            config.OpenCodeGoModel = ApiConfig.OpenCodeGoDefaultGeminiModel;
+        }
+        else if (config.OpenCodeGoMode == OpenCodeGoMode.OpenAICompatible
+            && string.Equals(config.OpenCodeGoModel, ApiConfig.OpenCodeGoDefaultGeminiModel, StringComparison.Ordinal))
+        {
+            config.OpenCodeGoModel = ApiConfig.OpenCodeGoDefaultModel;
+        }
+    }
+
     private void CreateNewConfig()
     {
         var config = new ApiConfig
@@ -1538,7 +1645,9 @@
 
         try
         {
-            // Gemini 的模型列表是原生形状（/models），与 OpenAI 家族的 /v1/models 不同客户端
+            // Gemini 的模型列表是原生形状（/models），与 OpenAI 家族的 /v1/models 不同客户端。
+            // OpenCode Go 两种模式共用同一个 OpenAI 形状的模型列表端点（/inference/go/v1/models），
+            // 因此仍走 BuildModelListClient，不能按 Gemini 模式换成原生客户端。
             List<string> models;
             if (config.Type == ApiConfigType.Gemini)
                 models = await BuildGeminiModelListClient(config).GetModelNameList();
@@ -1586,7 +1695,7 @@
                 : config.OpenCodeGoUrl,
             _apiKey: config.OpenCodeGoApiKey ?? "",
             _model: string.IsNullOrWhiteSpace(config.OpenCodeGoModel)
-                ? "glm-5.3-flash"
+                ? ApiConfig.OpenCodeGoDefaultModel
                 : config.OpenCodeGoModel)
         {
             ModelsUrl = string.IsNullOrWhiteSpace(config.OpenCodeGoModelsUrl)
@@ -1702,7 +1811,9 @@
         ApiConfigType.OpenAI => config.OpenAIUrl ?? "",
         ApiConfigType.DeepSeek => config.DeepSeekUrl ?? "",
         ApiConfigType.OpenAIText => config.OpenAITextUrl ?? "",
-        ApiConfigType.OpenCodeGo => config.OpenCodeGoUrl ?? "",
+        ApiConfigType.OpenCodeGo => (config.OpenCodeGoMode == OpenCodeGoMode.Gemini
+            ? config.OpenCodeGoGeminiUrl
+            : config.OpenCodeGoUrl) ?? "",
         ApiConfigType.Gemini => config.GeminiUrl ?? "",
         _ => ""
     };

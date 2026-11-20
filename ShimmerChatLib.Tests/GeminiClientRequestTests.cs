@@ -598,4 +598,44 @@ public class GeminiClientRequestTests
         var unknown = () => GeminiChatCompletionClient.MapFinishReason("SOME_FUTURE_VALUE", false);
         unknown.Should().Throw<InvalidDataException>().WithMessage("*SOME_FUTURE_VALUE*");
     }
+
+    // ------------------------------------------------------------------
+    // 鉴权头
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void RequestHeaders_Default_UsesGoogleApiKeyHeader()
+    {
+        var request = Client().CreateRequest(
+            HttpMethod.Post, "http://localhost/v1beta/models/gemini-test:generateContent", null);
+
+        request.Headers.GetValues("x-goog-api-key").Should().ContainSingle().Which.Should().Be("key");
+        request.Headers.Authorization.Should().BeNull();
+    }
+
+    [Fact]
+    public void RequestHeaders_UseBearerAuth_ReplacesGoogleApiKeyHeader()
+    {
+        // Gemini 兼容网关（OpenCode Go 的 Google 路径）只接受 Authorization: Bearer；
+        // 不能同时发送 x-goog-api-key，否则网关会看到两种冲突的鉴权头。
+        var request = Client(c => c.UseBearerAuth = true).CreateRequest(
+            HttpMethod.Post, "http://localhost/v1beta/models/gemini-test:generateContent", null);
+
+        request.Headers.Authorization.Should().NotBeNull();
+        request.Headers.Authorization!.Scheme.Should().Be("Bearer");
+        request.Headers.Authorization.Parameter.Should().Be("key");
+        request.Headers.Contains("x-goog-api-key").Should().BeFalse();
+    }
+
+    [Fact]
+    public void RequestHeaders_CustomHeadersStillOverrideBearer()
+    {
+        var request = Client(c =>
+        {
+            c.UseBearerAuth = true;
+            c.CustomHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer proxy-token" };
+        }).CreateRequest(HttpMethod.Post, "http://localhost/v1beta/models/gemini-test:generateContent", null);
+
+        request.Headers.Authorization!.ToString().Should().Be("Bearer proxy-token");
+    }
 }

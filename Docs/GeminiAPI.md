@@ -7,6 +7,8 @@
 `SharperLLM.API.GeminiChatCompletionClient`（`generateContent` / `streamGenerateContent?alt=sse`），
 **不使用** Google 的 OpenAI 兼容层——该兼容层在流式工具调用上有上游缺陷（`finish_reason` 错误、
 delta 缺 `index`），且 `extra_content.google.thought_signature` 无法经现有 `ToolCall` 模型传递。
+OpenCode Go 的 **Gemini 模式**复用同一个客户端（鉴权改为 Bearer、端点与其会话头不同），
+见 [OpenCodeGo.md](OpenCodeGo.md)。
 
 ---
 
@@ -74,7 +76,11 @@ SSE 无 `[DONE]` 标记：以 finishReason 出现为终点。
 - 自定义请求体：JSON 根级**浅合并**（同键整对象替换），非法 JSON 显式失败。
 - 自定义请求头：每行 `Name: Value`，同名覆盖默认 `x-goog-api-key`（网关/代理场景），
   非法行显式失败。
+- 网关只接受 Bearer 时置 `UseBearerAuth = true`：改用
+  `Authorization: Bearer <apiKey>`，且不再发送 `x-goog-api-key`
+  （OpenCode Go Gemini 路径即此形态）；自定义头仍可随后覆盖。
 - 模型列表：`GET {url}/models`（原生形状），只保留支持 `generateContent` 的模型。
+  OpenCode Go Gemini 模式例外：其模型列表是 OpenAI 形状的 Go 目录端点，不走本客户端。
 
 ## 6. 续写
 
@@ -89,6 +95,8 @@ Gemini 没有 assistant prefill：`IsContinuation` 对 Gemini 类型显式返回
 - [ ] `CONTINUATION` finishReason 的 `continuation_token` 挂载位置与回传字段（v1 已映射 Length）
 - [ ] 流式 SSE 实测：空文本 part 携带签名、SAFETY 空内容、多候选防御
 - [ ] 区域可用性：Gemini API 不对中国大陆/香港提供服务，网关场景配合自定义 URL + 请求头
+- [ ] OpenCode Go Gemini 路径：Bearer 鉴权与 `?alt=sse` 在网关侧的实际接受度（详见
+      [OpenCodeGo.md](OpenCodeGo.md) 的实测清单）
 
 ## 8. 与 OpenAI 行为差异（对应设置页恒显提示）
 

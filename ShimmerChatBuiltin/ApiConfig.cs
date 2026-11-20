@@ -63,19 +63,50 @@ namespace ShimmerChatBuiltin
 		/// <summary>OpenCode Go 的 OpenAI 兼容对话接口前缀（官方文档给出的端点去掉 /chat/completions）。</summary>
 		public const string OpenCodeGoDefaultUrl = "https://opencode.ai/inference/go/openai/v1";
 
-		/// <summary>OpenCode Go 的模型列表接口（与对话接口不在同一路径前缀下）。</summary>
+		/// <summary>OpenCode Go 的 Gemini 原生接口前缀（官方文档给出的端点去掉 /models/&lt;model&gt;:generateContent）。</summary>
+		public const string OpenCodeGoGeminiDefaultUrl = "https://opencode.ai/inference/go/google/v1beta";
+
+		/// <summary>OpenCode Go 的模型列表接口（与对话接口不在同一路径前缀下；OpenAI 形状，两种模式共用）。</summary>
 		public const string OpenCodeGoDefaultModelsUrl = "https://opencode.ai/inference/go/v1/models";
 
 		/// <summary>OpenCode Go 要求客户端用自有 User-Agent 标识身份，而不是通用 HTTP 库名。</summary>
 		public const string OpenCodeGoUserAgent = "ShimmerChat/2.0";
 
+		/// <summary>OpenAI 兼容模式未填模型时使用的默认模型。</summary>
+		public const string OpenCodeGoDefaultModel = "glm-5.3-flash";
+
+		/// <summary>Gemini 模式未填模型时使用的默认模型（OpenCode Go 当前提供的 Gemini 模型）。</summary>
+		public const string OpenCodeGoDefaultGeminiModel = "gemini-4-argon";
+
 		public string? OpenCodeGoUrl { get; set; } = OpenCodeGoDefaultUrl;
 		public string? OpenCodeGoModelsUrl { get; set; } = OpenCodeGoDefaultModelsUrl;
 		public string? OpenCodeGoApiKey { get; set; } = "";
-		public string? OpenCodeGoModel { get; set; } = "glm-5.3-flash";
+		public string? OpenCodeGoModel { get; set; } = OpenCodeGoDefaultModel;
 		public bool OpenCodeGoStream { get; set; } = true;
 		public int OpenCodeGoCtx { get; set; } = 16384;
 		public bool OpenCodeGoAsIs { get; set; } = false;
+
+		/// <summary>
+		/// 接口模式：OpenAI 兼容（默认）或 Gemini 原生。两种模式走同一 API Key 与
+		/// 同一套 UA / x-opencode-session 头，只是请求形状与鉴权头不同。
+		/// 新模式必须追加在枚举末尾（旧配置按序号持久化）。
+		/// </summary>
+		public OpenCodeGoMode OpenCodeGoMode { get; set; } = OpenCodeGoMode.OpenAICompatible;
+
+		/// <summary>Gemini 模式的接口前缀；留空时回退到官方默认值。</summary>
+		public string? OpenCodeGoGeminiUrl { get; set; } = OpenCodeGoGeminiDefaultUrl;
+
+		/// <summary>Gemini 模式下的思考档位，字面直译为 thinkingLevel；Default = 不发送。</summary>
+		public GeminiThinkingLevel OpenCodeGoGeminiThinking { get; set; } = GeminiThinkingLevel.Default;
+
+		/// <summary>Gemini 模式下是否随响应返回推理摘要（thinkingConfig.includeThoughts），默认开。</summary>
+		public bool OpenCodeGoGeminiIncludeThoughts { get; set; } = true;
+
+		/// <summary>Gemini 模式下对话中部 system 片段的替换模板（{0} = 原文）；留空 = 构建请求时显式失败。</summary>
+		public string? OpenCodeGoGeminiMidSystemTemplate { get; set; } = null;
+
+		/// <summary>Gemini 模式下请求体根级别的自定义参数（JSON 对象，浅合并）；非法 JSON 显式失败。</summary>
+		public string? OpenCodeGoGeminiCustomRequestBody { get; set; } = null;
 
 		#endregion OpenCode Go
 
@@ -192,21 +223,9 @@ namespace ShimmerChatBuiltin
 					// 尚无用户可编辑的请求头字段与设置页入口；补齐时在此装配（DeepSeek 分支同），
 					// 非法头沿用 OpenAICustomRequestBody 的显式失败语义，不静默忽略。
 
-					if (!string.IsNullOrWhiteSpace(OpenAICustomRequestBody))
-					{
-						Dictionary<string, object>? customProps;
-						try
-						{
-							customProps = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(OpenAICustomRequestBody);
-						}
-						catch (Newtonsoft.Json.JsonException ex)
-						{
-							throw new InvalidOperationException($"OpenAI custom request body is not valid JSON: {ex.Message}", ex);
-						}
-
-						if (customProps != null && customProps.Count > 0)
-							client.CustomRequestProperties = customProps;
-					}
+					var customProps = ParseCustomRequestBody(OpenAICustomRequestBody, "OpenAI");
+					if (customProps != null)
+						client.CustomRequestProperties = customProps;
 
 					return new APISetting
 					{
@@ -257,11 +276,54 @@ namespace ShimmerChatBuiltin
 
 				case ApiConfigType.OpenCodeGo:
 				{
-					// OpenCode Go 走 OpenAI 兼容路径，仅额外要求 User-Agent 与会话头。
+					// 两种模式共用同一个 API Key 与 UA / 会话头，只是请求形状与鉴权头不同。
+					// 未知模式必须显式失败：静默落到 OpenAI 路径会把坏配置伪装成可用。
+					if (!Enum.IsDefined(OpenCodeGoMode))
+						throw new InvalidOperationException($"Unsupported OpenCode Go mode: {OpenCodeGoMode}.");
+
+					var apiKey = OpenCodeGoApiKey ?? throw new InvalidOperationException("OpenCode Go API key is required.");
+					var useGeminiMode = OpenCodeGoMode == OpenCodeGoMode.Gemini;
+					var model = string.IsNullOrWhiteSpace(OpenCodeGoModel)
+						? useGeminiMode ? OpenCodeGoDefaultGeminiModel : OpenCodeGoDefaultModel
+						: OpenCodeGoModel;
+
+					if (useGeminiMode)
+					{
+						// OpenCode Go 的 Gemini 路径用 Authorization: Bearer 鉴权（不是 Google 的
+						// x-goog-api-key），模型与 generateContent 方法仍按原生协议拼进 URL。
+						var geminiClient = new GeminiChatCompletionClient(
+							_url: string.IsNullOrWhiteSpace(OpenCodeGoGeminiUrl) ? OpenCodeGoGeminiDefaultUrl : OpenCodeGoGeminiUrl,
+							_apiKey: apiKey,
+							_model: model,
+							_maxTokens: OpenCodeGoCtx)
+						{
+							UseBearerAuth = true,
+							ThinkingLevel = MapThinkingLevel(OpenCodeGoGeminiThinking),
+							IncludeThoughts = OpenCodeGoGeminiIncludeThoughts,
+							MidSystemTemplate = string.IsNullOrWhiteSpace(OpenCodeGoGeminiMidSystemTemplate)
+								? null
+								: OpenCodeGoGeminiMidSystemTemplate,
+							CustomHeaders = BuildOpenCodeGoHeaders(sessionId),
+							Log = log
+						};
+
+						var customProps = ParseCustomRequestBody(OpenCodeGoGeminiCustomRequestBody, "OpenCode Go Gemini");
+						if (customProps != null)
+							geminiClient.CustomRequestProperties = customProps;
+
+						return new APISetting
+						{
+							ChatClient = geminiClient,
+							SupportsStreaming = OpenCodeGoStream,
+							SupportsToolCalling = true
+						};
+					}
+
+					// OpenAI 兼容模式：仅额外要求 User-Agent 与会话头。
 					var client = new OpenAIChatCompletionClient(
 						_url: string.IsNullOrWhiteSpace(OpenCodeGoUrl) ? OpenCodeGoDefaultUrl : OpenCodeGoUrl,
-						_apiKey: OpenCodeGoApiKey ?? throw new InvalidOperationException("OpenCode Go API key is required."),
-						_model: string.IsNullOrWhiteSpace(OpenCodeGoModel) ? "glm-5.3-flash" : OpenCodeGoModel,
+						_apiKey: apiKey,
+						_model: model,
 						_max_tokens: OpenCodeGoCtx,
 						_as_is: OpenCodeGoAsIs
 					)
@@ -270,8 +332,9 @@ namespace ShimmerChatBuiltin
 						CustomHeaders = BuildOpenCodeGoHeaders(sessionId)
 					};
 
-					// TODO(modes): OpenCode Go 也需要思考/推理多模式切换（对照 DeepSeek 的
+					// TODO(modes): OpenAI 兼容路径的思考/推理档位切换（对照 DeepSeek 的
 					// DeepSeekReasoningEffort + thinking 开关）；补齐时在此装配 CustomRequestProperties。
+					// Gemini 模式已通过 OpenCodeGoMode + 上面的 Gemini 分支支持。
 
 					return new APISetting
 					{
@@ -311,34 +374,15 @@ namespace ShimmerChatBuiltin
 						_model: string.IsNullOrWhiteSpace(GeminiModel) ? "gemini-4-hydrogen" : GeminiModel,
 						_maxTokens: GeminiCtx)
 					{
-						ThinkingLevel = GeminiThinking switch
-						{
-							GeminiThinkingLevel.Minimal => "minimal",
-							GeminiThinkingLevel.Low => "low",
-							GeminiThinkingLevel.Medium => "medium",
-							GeminiThinkingLevel.High => "high",
-							_ => null
-						},
+						ThinkingLevel = MapThinkingLevel(GeminiThinking),
 						MidSystemTemplate = string.IsNullOrWhiteSpace(GeminiMidSystemTemplate) ? null : GeminiMidSystemTemplate,
 						IncludeThoughts = GeminiIncludeThoughts,
 						Log = log
 					};
 
-					if (!string.IsNullOrWhiteSpace(GeminiCustomRequestBody))
-					{
-						Dictionary<string, object>? customProps;
-						try
-						{
-							customProps = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(GeminiCustomRequestBody);
-						}
-						catch (Newtonsoft.Json.JsonException ex)
-						{
-							throw new InvalidOperationException($"Gemini custom request body is not valid JSON: {ex.Message}", ex);
-						}
-
-						if (customProps != null && customProps.Count > 0)
-							client.CustomRequestProperties = customProps;
-					}
+					var customProps = ParseCustomRequestBody(GeminiCustomRequestBody, "Gemini");
+					if (customProps != null)
+						client.CustomRequestProperties = customProps;
 
 					if (!string.IsNullOrWhiteSpace(GeminiCustomHeaders))
 						client.CustomHeaders = ParseHeaderLines(GeminiCustomHeaders);
@@ -357,9 +401,37 @@ namespace ShimmerChatBuiltin
 		}
 
 		/// <summary>
-		/// OpenCode Go 文档要求客户端用自有 User-Agent 标识身份，
-		/// 并用稳定的 <c>x-opencode-session</c> 标记每个对话（供上游路由与 prompt 缓存）。
+		/// 思考档位字面直译为 thinkingLevel；Default = 不发送档位。不做模型名探测。
 		/// </summary>
+		private static string? MapThinkingLevel(GeminiThinkingLevel level) => level switch
+		{
+			GeminiThinkingLevel.Minimal => "minimal",
+			GeminiThinkingLevel.Low => "low",
+			GeminiThinkingLevel.Medium => "medium",
+			GeminiThinkingLevel.High => "high",
+			_ => null
+		};
+
+		/// <summary>
+		/// 解析自定义请求体（JSON 对象根级浅合并）。非法 JSON 显式失败，
+		/// 避免用户以为参数生效而实际请求没带上；空文本返回 null。
+		/// </summary>
+		private static Dictionary<string, object>? ParseCustomRequestBody(string? json, string label)
+		{
+			if (string.IsNullOrWhiteSpace(json))
+				return null;
+
+			try
+			{
+				var props = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+				return props is { Count: > 0 } ? props : null;
+			}
+			catch (Newtonsoft.Json.JsonException ex)
+			{
+				throw new InvalidOperationException($"{label} custom request body is not valid JSON: {ex.Message}", ex);
+			}
+		}
+
 		/// <summary>
 		/// 解析 "每行一个 Name: Value" 的自定义请求头文本。非法行显式失败而不是静默忽略，
 		/// 避免用户以为配置生效而实际请求缺头。
@@ -391,6 +463,11 @@ namespace ShimmerChatBuiltin
 			return headers;
 		}
 
+		/// <summary>
+		/// OpenCode Go 文档要求客户端用自有 User-Agent 标识身份，
+		/// 并用稳定的 <c>x-opencode-session</c> 标记每个对话（供上游路由与 prompt 缓存）。
+		/// OpenAI 兼容与 Gemini 两种模式共用这一份头。
+		/// </summary>
 		private static Dictionary<string, string> BuildOpenCodeGoHeaders(string? sessionId)
 		{
 			var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -465,6 +542,12 @@ namespace ShimmerChatBuiltin
 				OpenCodeGoStream = OpenCodeGoStream,
 				OpenCodeGoCtx = OpenCodeGoCtx,
 				OpenCodeGoAsIs = OpenCodeGoAsIs,
+				OpenCodeGoMode = OpenCodeGoMode,
+				OpenCodeGoGeminiUrl = OpenCodeGoGeminiUrl,
+				OpenCodeGoGeminiThinking = OpenCodeGoGeminiThinking,
+				OpenCodeGoGeminiIncludeThoughts = OpenCodeGoGeminiIncludeThoughts,
+				OpenCodeGoGeminiMidSystemTemplate = OpenCodeGoGeminiMidSystemTemplate,
+				OpenCodeGoGeminiCustomRequestBody = OpenCodeGoGeminiCustomRequestBody,
 
 				OpenAITextUrl = OpenAITextUrl,
 				OpenAITextApiKey = OpenAITextApiKey,
@@ -509,5 +592,17 @@ namespace ShimmerChatBuiltin
 		Low,
 		Medium,
 		High
+	}
+
+	/// <summary>
+	/// OpenCode Go 的接口模式。已保存配置按序号持久化，新模式只能追加在末尾。
+	/// </summary>
+	public enum OpenCodeGoMode
+	{
+		/// <summary>OpenAI 兼容路径（/openai/v1），Authorization: Bearer 鉴权。</summary>
+		OpenAICompatible,
+
+		/// <summary>Gemini 原生路径（/google/v1beta），Authorization: Bearer 鉴权。</summary>
+		Gemini
 	}
 }
