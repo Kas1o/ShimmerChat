@@ -1,49 +1,58 @@
 @page "/pluginpanel/{PanelName}"
+@using ShimmerChatLib.Interface
 @inject IPluginPanelService PluginPanelService
 @inject ILocService Loc
 
-<PageTitle>@(panelType != null ? Loc[PanelName] : Loc["plugin_panel.fallback_title"])</PageTitle>
+<PageTitle>@(panelInfo != null ? Loc[PanelName] : Loc["plugin_panel.fallback_title"])</PageTitle>
 
-<div class="plugin-panel-container">
-    @if (panelType != null)
-    {
+@if (panelInfo != null && panelInfo.Flush)
+{
+    @* ConfigShell 契约面板：自带 cfg-page-main 固定操作面板与标题，
+       宿主不渲染外层标题与卡片外壳，让操作栏无缝铺满内容区（同生成管理器）。 *@
+    <DynamicComponent Type="@panelInfo.PanelType" />
+}
+else if (panelInfo != null)
+{
+    <div class="plugin-panel-container">
         <div class="panel-header">
             <h1 class="panel-title">@Loc[PanelName]</h1>
         </div>
         <div class="panel-content">
-            <DynamicComponent Type="panelType" />
+            <DynamicComponent Type="@panelInfo.PanelType" />
         </div>
-    }
-    else
-    {
+    </div>
+}
+else
+{
+    <div class="plugin-panel-container">
         <div class="panel-not-found">
             <h1 class="panel-error-title">@Loc["plugin_panel.not_found"]</h1>
             <div class="panel-error-message">
                 <p>@Loc.Format("plugin_panel.not_found_msg", Loc[PanelName])</p>
             </div>
         </div>
-    }
-</div>
+    </div>
+}
 
 
 @code {
     [Parameter]
     public string PanelName { get; set; } = string.Empty;
 
-    private Type? panelType;
+    private PluginPanelInfo? panelInfo;
 
     protected override async Task OnParametersSetAsync()
     {
         // 确保插件面板服务已加载完成
         await Task.Delay(100); // 短暂延迟确保服务初始化
-        
-        panelType = PluginPanelService.GetPluginPanelType(PanelName);
-        // 如果面板类型为空，可能是插件尚未加载完成
-        if (panelType == null)
+
+        panelInfo = PluginPanelService.GetPluginPanel(PanelName);
+        // 如果面板不存在，可能是插件尚未加载完成
+        if (panelInfo == null)
         {
             // 尝试重新获取所有面板，确保服务已刷新
             PluginPanelService.RefreshPluginPanels();
-            panelType = PluginPanelService.GetPluginPanelType(PanelName);
+            panelInfo = PluginPanelService.GetPluginPanel(PanelName);
         }
     }
 }

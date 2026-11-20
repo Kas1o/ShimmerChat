@@ -494,6 +494,15 @@ public class MyModifier : IMessageRenderModifier
 </div>
 ```
 
+默认情况下，宿主页（`/pluginpanel/{name}`）会在面板外渲染标题与卡片外壳。
+如果面板自带 Config UI 固定操作面板（`ConfigShell Flush="true"` 或手写 `cfg-page-main` 根元素，
+契约见 `Docs/ConfigUI.md`），应声明 `Flush = true`，宿主将去掉外层标题与卡片，
+让面板操作栏无缝铺满内容区（同生成管理器），避免出现双标题：
+
+```razor
+@attribute [PluginPanelAttribute("panel.my_panel", "panel.my_panel.desc", Flush = true)]
+```
+
 ### Agent 级面板
 
 ```razor

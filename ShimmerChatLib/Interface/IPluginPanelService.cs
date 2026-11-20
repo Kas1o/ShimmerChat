@@ -23,6 +23,13 @@ namespace ShimmerChatLib.Interface
         Type? GetPluginPanelType(string panelName);
 
         /// <summary>
+        /// 根据名称获取插件面板完整信息（含 Flush 等宿主渲染所需标记）
+        /// </summary>
+        /// <param name="panelName">面板名称</param>
+        /// <returns>面板信息，如果不存在返回null</returns>
+        PluginPanelInfo? GetPluginPanel(string panelName);
+
+        /// <summary>
         /// 刷新插件面板列表
         /// </summary>
         void RefreshPluginPanels();
@@ -60,6 +67,12 @@ namespace ShimmerChatLib.Interface
 
 		public PanelDisplayPlace PanelDisplayPlace { get; set; }
 
+        /// <summary>
+        /// 面板自带 Config UI 固定操作面板，宿主不渲染外层标题与卡片外壳。
+        /// 见 <see cref="ShimmerChatLib.Panel.PluginPanelAttribute.Flush"/>。
+        /// </summary>
+        public bool Flush { get; set; }
+
 		/// <summary>
 		/// 构造函数
 		/// </summary>
@@ -76,6 +89,15 @@ namespace ShimmerChatLib.Interface
             Order = order;
             PanelType = panelType;
             PanelDisplayPlace = panelDisplayPlace;
+        }
+
+        /// <summary>
+        /// 构造函数（含 Flush 标记）
+        /// </summary>
+        public PluginPanelInfo(string nameKey, string descriptionKey, string? icon, int order, Type panelType, PanelDisplayPlace panelDisplayPlace, bool flush)
+            : this(nameKey, descriptionKey, icon, order, panelType, panelDisplayPlace)
+        {
+            Flush = flush;
         }
     }
 }

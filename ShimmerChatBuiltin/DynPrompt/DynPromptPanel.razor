@@ -1,4 +1,4 @@
-@attribute [PluginPanel("panel.dyn_prompt", "panel.dyn_prompt.desc")]
+@attribute [PluginPanel("panel.dyn_prompt", "panel.dyn_prompt.desc", Flush = true)]
 
 @using ShimmerChatBuiltin.DynPrompt
 @using ShimmerChatLib.Components
@@ -20,6 +20,7 @@
             Title="@Loc["panel_dynprompt.title"]"
             Description="@Loc["panel.dyn_prompt.desc"]"
             Icon="bi-magic"
+            Flush="true"
             IsDirty="IsDirty"
             LoadError="@_loadError"
             StatusMessage="@_statusText"

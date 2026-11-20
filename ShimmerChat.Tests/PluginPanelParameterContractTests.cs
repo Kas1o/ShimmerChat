@@ -123,6 +123,20 @@ public class PluginPanelParameterContractTests
     }
 
     [Fact]
+    public void FlushPanels_AreSettingsPlaceOnly()
+    {
+        // Flush 只有插件面板宿主页（Settings 位置）会消费：它去掉的是该宿主渲染的外层标题与卡片。
+        // Agent / Chat 位置没有这套外壳，声明 Flush 属于契约误用。
+        foreach (var panelType in DiscoverPanelTypes())
+        {
+            var attribute = panelType.GetCustomAttribute<PluginPanelAttribute>()!;
+            if (!attribute.Flush) continue;
+
+            Assert.Equal(PanelDisplayPlace.Settings, attribute.PanelDisplayPlace);
+        }
+    }
+
+    [Fact]
     public void AgentPanelContext_HierarchyExpressesHostDifferenceByType()
     {
         // 基类不应暴露 Agent 实体：只有真正持有 Agent 的宿主才提供 LiveAgentPanelContext。

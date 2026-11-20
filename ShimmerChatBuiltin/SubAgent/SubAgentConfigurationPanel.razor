@@ -1,4 +1,4 @@
-@attribute [PluginPanel("panel.sub_agent_config", "panel.sub_agent_config.desc", PanelDisplayPlace.Settings)]
+@attribute [PluginPanel("panel.sub_agent_config", "panel.sub_agent_config.desc", PanelDisplayPlace.Settings, Flush = true)]
 
 @using Newtonsoft.Json
 @using ShimmerChatBuiltin.NodeBasic.PostGeneration
@@ -30,6 +30,7 @@
             Title="@Loc["panel_subagent.title"]"
             Description="@Loc["panel_subagent.desc"]"
             Icon="bi-robot"
+            Flush="true"
             IsDirty="IsDirty"
             LoadError="@_loadError"
             StatusMessage="@_statusText"

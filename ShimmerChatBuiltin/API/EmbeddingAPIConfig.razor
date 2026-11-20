@@ -3,7 +3,7 @@
 @using ShimmerChatLib.Components
 @using ShimmerChatLib.Interface
 @using System.Text.Json
-@attribute [PluginPanel("panel.embedding_api_config", "panel.embedding_api_config.desc")]
+@attribute [PluginPanel("panel.embedding_api_config", "panel.embedding_api_config.desc", Flush = true)]
 @inject IKVDataService KVData
 @inject ILocService Loc
 @inject ILogger<EmbeddingAPIConfig> Logger
@@ -20,6 +20,7 @@
             Title="@Loc["panel.embedding_api_config"]"
             Description="@Loc["panel.embedding_api_config.desc"]"
             Icon="bi-vector-pen"
+            Flush="true"
             IsDirty="IsDirty"
             LoadError="@_loadError"
             StatusMessage="@_statusText"

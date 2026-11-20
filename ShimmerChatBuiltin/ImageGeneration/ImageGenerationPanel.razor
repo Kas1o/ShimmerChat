@@ -1,4 +1,4 @@
-@attribute [PluginPanelAttribute("panel.image_generation", "panel.image_generation.desc", PanelDisplayPlace.Settings, Order = 5)]
+@attribute [PluginPanelAttribute("panel.image_generation", "panel.image_generation.desc", PanelDisplayPlace.Settings, Order = 5, Flush = true)]
 
 @using System.Globalization
 @using Microsoft.Extensions.Logging
@@ -21,6 +21,7 @@
             Title="@Loc["panel_imagegen.title"]"
             Description="@Loc["panel_imagegen.desc"]"
             Icon="bi-image"
+            Flush="true"
             IsDirty="IsDirty"
             LoadError="@_loadError"
             StatusMessage="@_statusText"

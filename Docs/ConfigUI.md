@@ -59,7 +59,10 @@
 ### 2.1 布局
 
 - 使用 `position: sticky; top: 0`，`z-index: 30`。
-- 面板必须铺满父级 `panel-content` 的内边距（负外边距 + 内边距补偿），滚动时不能露出缝隙。
+- 页面根为 `.cfg-page.cfg-page-main`（`ConfigShell Flush="true"`，或 API 设置这类手写页面的等价类）。
+  经插件面板路由托管的页面必须在 `[PluginPanel(..., Flush = true)]` 上声明同一标记：
+  宿主（`PluginPanelPage`）据此**不渲染外层标题与卡片外壳**，操作面板用负外边距直接铺满
+  `.shimmer-content` 的内边距，与主项目页面（如生成管理器）完全一致，滚动时不能露出缝隙。
 - 滚动容器 `.shimmer-content` 自带内边距，sticky 的 `top` 必须同步抵消同一段距离（`--cfg-content-gutter`，由
   `MainLayout` 在 padding 变化时同步维护），否则滚动后操作栏会停在视口下方，顶部露出一条内边距高度的空隙。
   铺满整页的操作栏顶部不再保留圆角，避免圆角处透出底色。
@@ -277,12 +280,14 @@
 1. 阅读目标页面现有存储键与数据模型，确认 `Id` / `Name` / `Pinned` 是否齐备。
 2. 给模型补充 `Pinned`（或等价的收藏字段）与克隆语义，补序列化兼容测试。
 3. 将旧操作区（下拉框、按钮、页脚保存）移除，替换为 `.cfg-topbar` 骨架。
-4. 把正文拆成 `.cfg-section`，字段统一改用 `.su-label` + `.su-input` + `.cfg-field`。
-5. 接入 `configPageShortcuts`，实现 `[JSInvokable] SaveFromShortcut`。
-6. 实现检索弹窗、重命名弹窗、删除确认弹窗。
-7. 统一脏状态与保存反馈；移除保存后的整页刷新。
-8. 失败路径补日志与用户可见错误；补测试。
-9. 在 `Docs/` 更新该页面的配置存储/行为说明（如有变化）。
+4. 插件面板托管的页面在 `[PluginPanel]` 特性上声明 `Flush = true`，并给 `ConfigShell` 传 `Flush="true"`
+   （手写页面则给根元素加 `cfg-page-main` 类），宿主才会去掉外层标题与卡片外壳。
+5. 把正文拆成 `.cfg-section`，字段统一改用 `.su-label` + `.su-input` + `.cfg-field`。
+6. 接入 `configPageShortcuts`，实现 `[JSInvokable] SaveFromShortcut`。
+7. 实现检索弹窗、重命名弹窗、删除确认弹窗。
+8. 统一脏状态与保存反馈；移除保存后的整页刷新。
+9. 失败路径补日志与用户可见错误；补测试。
+10. 在 `Docs/` 更新该页面的配置存储/行为说明（如有变化）。
 
 ### 8.1 Razor 骨架
 

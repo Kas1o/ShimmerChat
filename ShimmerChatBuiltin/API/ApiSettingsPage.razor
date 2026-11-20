@@ -1,14 +1,14 @@
 @using ShimmerChatLib
 @using SharperLLM.API
 @using ShimmerChatLib.Panel
-@attribute [PluginPanelAttribute("panel.api_settings", "panel.api_settings.desc", PanelDisplayPlace.Settings, Order = 1)]
+@attribute [PluginPanelAttribute("panel.api_settings", "panel.api_settings.desc", PanelDisplayPlace.Settings, Order = 1, Flush = true)]
 @inject IKVDataService KVData
 @inject ILocService Loc
 @inject IJSRuntime JS
 @inject ILogger<ApiSettingsPage> Logger
 @implements IAsyncDisposable
 
-<div class="cfg-page" @onkeydown="OnPageKeyDown">
+<div class="cfg-page cfg-page-main" @onkeydown="OnPageKeyDown">
     <!-- 固定操作面板：页面滚动时保持可见 -->
     <header class="cfg-topbar">
         <div class="cfg-topbar-main">

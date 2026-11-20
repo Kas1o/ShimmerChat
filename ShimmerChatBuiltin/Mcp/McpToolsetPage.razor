@@ -9,7 +9,7 @@
 @inject ILoggerFactory LoggerFactory
 @inject IJSRuntime JS
 
-@attribute [PluginPanelAttribute("panel.mcp_toolset", "panel.mcp_toolset.desc", PanelDisplayPlace.Settings, Order = 30)]
+@attribute [PluginPanelAttribute("panel.mcp_toolset", "panel.mcp_toolset.desc", PanelDisplayPlace.Settings, Order = 30, Flush = true)]
 
 <ConfigShell T="EditorModel"
             Items="_endpoints"
@@ -23,6 +23,7 @@
             Title="@Loc["panel_mcp.title"]"
             Description="@Loc["panel_mcp.desc"]"
             Icon="bi-plug"
+            Flush="true"
             IsDirty="IsDirty"
             LoadError="@_loadError"
             StatusMessage="@_statusText"

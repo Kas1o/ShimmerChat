@@ -70,7 +70,8 @@ namespace ShimmerChat.Singletons
                             attribute.Icon,
                             attribute.Order,
                             panelType,
-                            attribute.PanelDisplayPlace
+                            attribute.PanelDisplayPlace,
+                            attribute.Flush
                         ));
                     }
                 }
@@ -95,7 +96,13 @@ namespace ShimmerChat.Singletons
         public Type? GetPluginPanelType(string panelName)
         {
             EnsurePanelsLoaded();
-            return _pluginPanels.FirstOrDefault(p => p.NameKey.Equals(panelName, StringComparison.OrdinalIgnoreCase))?.PanelType;
+            return GetPluginPanel(panelName)?.PanelType;
+        }
+
+        public PluginPanelInfo? GetPluginPanel(string panelName)
+        {
+            EnsurePanelsLoaded();
+            return _pluginPanels.FirstOrDefault(p => p.NameKey.Equals(panelName, StringComparison.OrdinalIgnoreCase));
         }
 
         public void RefreshPluginPanels()

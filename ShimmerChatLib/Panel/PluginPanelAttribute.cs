@@ -32,6 +32,13 @@ namespace ShimmerChatLib.Panel
 		public PanelDisplayPlace PanelDisplayPlace { get; set; }
 
 		/// <summary>
+		/// 面板自带 Config UI 固定操作面板（cfg-page-main 契约，见 Docs/ConfigUI.md）。
+		/// 为 true 时宿主不再渲染外层标题与卡片外壳，面板操作栏直接无缝铺满内容区，
+		/// 与主项目页面（如生成管理器）保持同一视觉。仅对 Settings 位置有意义。
+		/// </summary>
+		public bool Flush { get; set; }
+
+		/// <summary>
 		/// 构造函数
 		/// </summary>
 		/// <param name="nameKey">面板名称本地化 Key</param>

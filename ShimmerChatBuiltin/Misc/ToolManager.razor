@@ -4,7 +4,7 @@
 @using ShimmerChatLib.Generation
 @using ShimmerChatLib.Panel
 @using System.Text.Json
-@attribute [PluginPanelAttribute("panel.tool_manager", "panel.tool_manager.desc", PanelDisplayPlace.Settings, Order = 2)]
+@attribute [PluginPanelAttribute("panel.tool_manager", "panel.tool_manager.desc", PanelDisplayPlace.Settings, Order = 2, Flush = true)]
 
 @inject IKVDataService KVData
 @inject IToolRegistry ToolRegistry
