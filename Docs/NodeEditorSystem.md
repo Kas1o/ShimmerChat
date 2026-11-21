@@ -97,7 +97,7 @@ public class NodeInfoAttribute : Attribute
 | `var(--node-flow)` | 流程控制 | SequenceNode |
 | `var(--node-branch)` | 分支/条件 | IfNode |
 | `var(--node-fragment)` | 内容片段 | FragmentNode |
-| `var(--node-prompt)` | 提示词 | DynPromptNode |
+| `var(--node-prompt)` | 提示词 | DynPromptNode / DynPromptSlotNode |
 | `var(--node-tool)` | 工具 | ToolInstantiateNode |
 | `var(--node-link)` | 链接/引用 | CallNode |
 | `var(--node-config)` | 配置/API | APISelectNode |

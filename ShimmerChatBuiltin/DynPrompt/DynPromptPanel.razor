@@ -183,11 +183,12 @@
                     <div class="cfg-field cfg-span-6">
                         <label class="su-label">@Loc["panel_dynprompt.label_inject_mode"]</label>
                         <select class="su-select" @bind="_termDraft.InjectionMode">
-                            @foreach (var mode in Enum.GetValues<DynPromptTermInjectionMode>())
+                            @foreach (var mode in InjectionModes)
                             {
                                 <option value="@mode">@ModeLabel(mode)</option>
                             }
                         </select>
+                        <p class="cfg-field-hint">@Loc["dynprompt_config.injection_mode_hint"]</p>
                     </div>
                     <div class="cfg-field cfg-span-12">
                         <label class="su-label">@Loc["panel_dynprompt.label_content"]</label>
@@ -273,6 +274,18 @@
 @code {
     private const string Space = "DynPrompt";
     private const string Key = "DynPromptSets";
+
+    /// <summary>
+    /// 下拉框的展示顺序与枚举顺序解耦：枚举数值是持久化契约（旧数据按数值反序列化），
+    /// 不能为了 UI 排序去调整枚举；这里把推荐的注入槽排在最前。
+    /// </summary>
+    private static readonly DynPromptTermInjectionMode[] InjectionModes =
+    [
+        DynPromptTermInjectionMode.InjectionSlot,
+        DynPromptTermInjectionMode.AtDepth,
+        DynPromptTermInjectionMode.BeforeSystem,
+        DynPromptTermInjectionMode.AfterSystem
+    ];
 
     private List<DynPromptSet> _sets = [];
     private string? _selectedSetId;
@@ -584,6 +597,7 @@
 
     private string ModeLabel(DynPromptTermInjectionMode mode) => mode switch
     {
+        DynPromptTermInjectionMode.InjectionSlot => Loc["dynprompt_config.mode_injection_slot"],
         DynPromptTermInjectionMode.AtDepth => Loc["dynprompt_config.mode_at_depth"],
         DynPromptTermInjectionMode.AfterSystem => Loc["dynprompt_config.mode_after_system"],
         _ => Loc["dynprompt_config.mode_before_system"]
@@ -599,7 +613,8 @@
     {
         Name = string.Empty,
         Content = string.Empty,
-        InjectionMode = DynPromptTermInjectionMode.BeforeSystem,
+        // 新建词条默认使用推荐的注入槽；旧数据缺失字段时仍由模型默认值保持 BeforeSystem。
+        InjectionMode = DynPromptTermInjectionMode.InjectionSlot,
         InjectionDepth = 4,
         TriggerRule = string.Empty,
         AllowBeTriggeredByRecursive = false

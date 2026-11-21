@@ -83,5 +83,11 @@ namespace ShimmerChatLib.Generation
 
         /// <summary> 包装器缺少业务节点负载（反序列化失败或数据损坏） </summary>
         public const string PayloadMissing = "NODE_PAYLOAD_MISSING";
+
+        /// <summary> 需要注入槽的节点找不到带标记的注入槽 </summary>
+        public const string InjectionSlotMissing = "INJECTION_SLOT_MISSING";
+
+        /// <summary> 找到多个带标记的注入槽，注入位置不唯一 </summary>
+        public const string InjectionSlotAmbiguous = "INJECTION_SLOT_AMBIGUOUS";
     }
 }

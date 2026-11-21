@@ -48,7 +48,17 @@ namespace ShimmerChatBuiltin.DynPrompt
 	public enum DynPromptTermInjectionMode
 	{
 		AtDepth,
+
+		/// <summary>合并到第一个 system 片段。依赖上下文里已有 system 片段，位置不灵活，不推荐。</summary>
 		BeforeSystem,
+
+		/// <summary>合并到第一个 system 片段。依赖上下文里已有 system 片段，位置不灵活，不推荐。</summary>
 		AfterSystem,
+
+		/// <summary>
+		/// 注入到 <see cref="DynPromptSlotNode"/> 标记的唯一槽位；位置显式、唯一，推荐使用。
+		/// 新增值只能追加在末尾：旧数据按枚举数值序列化，插入中间会改变既有词条的含义。
+		/// </summary>
+		InjectionSlot,
 	}
 }

@@ -143,6 +143,7 @@ public class PreGenerationPreset
 | `IfNode` / `AdvancedIfNode` | 条件分支 |
 | `SubAgentNode` | 嵌套子代理调用 |
 | `DynPromptNode` | 动态模板提示 |
+| `DynPromptSlotNode` | 预留 DynPrompt 注入槽（空消息 + 元数据标记） |
 
 ### 复杂角色片段 `AdvancedFragmentNode`
 
@@ -194,6 +195,21 @@ OpenAI Chat Completions 规范中只有 `user` 消息允许 `image_url`；`syste
 旧节点树反序列化后 `ImageProcessing` 落到默认值 `AsStored`，行为与旧版完全一致；实现 `IImageAttachmentService` 的旧插件通过接口默认实现自动忽略预算参数（原样解析）。
 
 
+### DynPrompt 注入槽 `DynPromptSlotNode`
+
+`DynPromptSlotNode` 在 Fragments 中插入一条**空内容消息**，并写入元数据标记
+`Metadata["dynprompt_slot"] = true`；消息角色由节点的 `From` 属性选择（`tool_result` 会被显式拒绝，
+因为没有可回答的工具调用 id）。节点只负责标出位置，不提供文本。
+
+- 必须排在 `DynPromptNode` 之前：`DynPromptTermInjectionMode.InjectionSlot` 的词条匹配后，
+  会寻找带标记的片段并把内容追加进去（多个词条按匹配顺序以换行连接），角色沿用注入槽节点。
+- 整棵前生成树只能有一个注入槽：找不到返回 `INJECTION_SLOT_MISSING`，找到多个返回
+  `INJECTION_SLOT_AMBIGUOUS`；校验发生在写入任何词条之前，不会静默选择其中一个位置。
+- `BeforeSystem` / `AfterSystem` 依赖“第一个 system 片段”或固定插入位置，位置不够灵活，
+  仅为兼容旧配置保留，不推荐使用；配置面板会提示新词条默认使用注入槽。
+- 若没有任何注入槽词条匹配，注入槽仍是一条空内容消息；只在确实配置了注入槽词条时使用该节点。
+
+
 ### 子智能体工具 `subagent_call` 的会话
 
 `SubAgentToolNode` 把子智能体配置注册进 `subagent_call` 工具。与 `SubAgentNode`
@@ -239,6 +255,13 @@ public static class NodeErrorCodes
     public const string ServiceError    = "SERVICE_ERROR";
     public const string ConfigNotFound  = "CONFIG_NOT_FOUND";
     public const string Cancelled       = "CANCELLED";
+    public const string ParameterError  = "PARAM_ERROR";
+
+    /// <summary>需要注入槽的节点找不到带标记的注入槽。</summary>
+    public const string InjectionSlotMissing   = "INJECTION_SLOT_MISSING";
+
+    /// <summary>找到多个带标记的注入槽，注入位置不唯一。</summary>
+    public const string InjectionSlotAmbiguous = "INJECTION_SLOT_AMBIGUOUS";
 }
 ```
 

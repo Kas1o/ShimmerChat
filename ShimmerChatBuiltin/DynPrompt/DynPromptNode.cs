@@ -92,6 +92,34 @@ namespace ShimmerChatBuiltin.DynPrompt
             if (matchedTerms.Count == 0)
                 return Task.FromResult(NodeResult.SuccessResult());
 
+            // 注入槽模式要求“有且仅有一个”槽位：先做结构校验再写入，
+            // 避免前面的词条已经改动上下文后才发现槽位缺失/重复。
+            ContextSegment? slot = null;
+            var slotTerm = matchedTerms.FirstOrDefault(t => t.InjectionMode == DynPromptTermInjectionMode.InjectionSlot);
+            if (slotTerm != null)
+            {
+                var slots = fragments.Where(DynPromptSlot.IsSlot).ToList();
+                if (slots.Count == 0)
+                {
+                    return Task.FromResult(NodeResult.Failure(
+                        NodeErrorCodes.InjectionSlotMissing,
+                        loc.Format("node_err.dynprompt_slot_missing", slotTerm.Name),
+                        details: $"Term '{slotTerm.Name}' uses InjectionSlot, but no fragment carries " +
+                                 $"Metadata['{DynPromptSlot.MetadataKey}']."));
+                }
+
+                if (slots.Count > 1)
+                {
+                    return Task.FromResult(NodeResult.Failure(
+                        NodeErrorCodes.InjectionSlotAmbiguous,
+                        loc.Format("node_err.dynprompt_slot_ambiguous", slotTerm.Name, slots.Count),
+                        details: $"{slots.Count} fragments carry Metadata['{DynPromptSlot.MetadataKey}']; " +
+                                 "an injection slot must be unique."));
+                }
+
+                slot = slots[0];
+            }
+
             // 按注入模式处理：BeforeSystem/AfterSystem 合并到已有 system fragment 内容中，AtDepth 追加到末尾
             foreach (var term in matchedTerms)
             {
@@ -118,6 +146,11 @@ namespace ShimmerChatBuiltin.DynPrompt
                             else
                                 fragments.Insert(term.InjectionDepth, segment);
                         }
+                        break;
+
+                    case DynPromptTermInjectionMode.InjectionSlot:
+                        // 槽位已在上面校验为唯一；角色沿用槽位节点，不在这里改 From。
+                        DynPromptSlot.AppendContent(slot!, term.Content);
                         break;
                 }
             }
