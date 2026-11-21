@@ -181,14 +181,40 @@ ShimmerChat/
 
 ## 📄 Third-Party Licenses
 
-- [KaTeX](https://github.com/KaTeX/KaTeX) — MIT (CSS and fonts under `ShimmerChat/wwwroot/katex`)
-- [KStyleMath](https://github.com/Kas1o/KStyleMath) — MIT
+The following third-party components are direct dependencies or are distributed with the app. Transitive NuGet / Cargo dependencies remain under their own licenses. Exact versions are defined in the project files (`*.csproj`, `src-tauri/Cargo.lock`).
+
+**Runtime and .NET libraries**
+
+- [.NET 10 / ASP.NET Core](https://github.com/dotnet/aspnetcore) — MIT
+- [SharperLLM](https://github.com/Kas1o/SharperLLM) — MIT
+- [KStyleMath](https://github.com/Kas1o/KStyleMath) — MIT (C# port of KaTeX 0.19.1)
 - [LiteDB](https://github.com/mbdavid/LiteDB) — MIT
 - [Markdig](https://github.com/xoofx/markdig) — BSD-2-Clause
 - [Meziantou.Framework.SyntaxHighlighting](https://github.com/meziantou/Meziantou.Framework) — MIT
-- [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) — MIT
 - [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) — MIT
-- [qdrant-dotnet](https://github.com/qdrant/qdrant-dotnet) — Apache-2.0
-- [SharperLLM](https://github.com/Kas1o/SharperLLM) — MIT
-- [Tokenizers.HuggingFace.DotNet](https://github.com/IgnaciodelaTorreArias/Tokenizers.HuggingFace.DotNet) — Apache-2.0
-- [Bootstrap Icons](https://github.com/uiwjs/bootstrap-icons) — MIT
+- [Microsoft.CodeAnalysis.CSharp / Microsoft.CodeAnalysis.CSharp.Scripting](https://github.com/dotnet/roslyn) — MIT
+- [ModelContextProtocol](https://github.com/modelcontextprotocol/csharp-sdk) (including `ModelContextProtocol.Core`) — Apache-2.0
+- [Tokenizers.HuggingFace](https://github.com/IgnaciodelaTorreArias/Tokenizers.HuggingFace.DotNet) — Apache-2.0 (transitive Google.Protobuf is BSD-3-Clause)
+- [SkiaSharp](https://github.com/mono/SkiaSharp) (including `SkiaSharp.NativeAssets.Linux.NoDependencies`) — MIT (native Skia is BSD-3-Clause)
+
+**Desktop shell (Tauri / Rust)**
+
+- [Tauri](https://github.com/tauri-apps/tauri), `tauri-plugin-shell`, `tauri-build` — MIT or Apache-2.0
+- [`serde`](https://github.com/serde-rs/serde), `serde_json` — MIT or Apache-2.0
+- [`tokio`](https://github.com/tokio-rs/tokio) — MIT
+
+**Front-end static assets**
+
+- [KaTeX](https://github.com/KaTeX/KaTeX) (`ShimmerChat/wwwroot/katex`) — code and CSS under MIT; fonts under `fonts/` are SIL OFL 1.1
+- [Bootstrap Icons](https://github.com/twbs/icons) (`ShimmerChat/wwwroot/lib/bootstrap-icons`) — MIT
+
+**Build and test tooling (not distributed with the app)**
+
+- [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) — MIT
+- [xunit](https://github.com/xunit/xunit) / `xunit.runner.visualstudio` — Apache-2.0
+- [Moq](https://github.com/moq/moq) — BSD-3-Clause
+- [FluentAssertions](https://github.com/fluentassertions/fluentassertions) (6.x) — Apache-2.0
+- [bUnit](https://github.com/bUnit-dev/bUnit) — MIT
+- [Microsoft.NET.Test.Sdk](https://github.com/microsoft/vstest) — MIT
+
+> KaTeX's MIT license covers only its code and CSS; the fonts are distributed under the SIL Open Font License 1.1. Full license texts are available from the linked repositories or the NuGet / crates.io packages.

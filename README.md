@@ -181,14 +181,40 @@ ShimmerChat/
 
 ## 📄 第三方许可
 
-- [KaTeX](https://github.com/KaTeX/KaTeX) — MIT（`ShimmerChat/wwwroot/katex` 下的 CSS 与字体）
-- [KStyleMath](https://github.com/Kas1o/KStyleMath) — MIT
+以下为项目直接依赖或随发布物分发的第三方组件；NuGet / Cargo 的传递依赖遵循各自许可证。具体版本见各项目文件（`*.csproj`、`src-tauri/Cargo.lock`）。
+
+**运行时与 .NET 库**
+
+- [.NET 10 / ASP.NET Core](https://github.com/dotnet/aspnetcore) — MIT
+- [SharperLLM](https://github.com/Kas1o/SharperLLM) — MIT
+- [KStyleMath](https://github.com/Kas1o/KStyleMath) — MIT（KaTeX 0.19.1 的 C# 移植）
 - [LiteDB](https://github.com/mbdavid/LiteDB) — MIT
 - [Markdig](https://github.com/xoofx/markdig) — BSD-2-Clause
 - [Meziantou.Framework.SyntaxHighlighting](https://github.com/meziantou/Meziantou.Framework) — MIT
-- [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) — MIT
 - [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) — MIT
-- [qdrant-dotnet](https://github.com/qdrant/qdrant-dotnet) — Apache-2.0
-- [SharperLLM](https://github.com/Kas1o/SharperLLM) — MIT
-- [Tokenizers.HuggingFace.DotNet](https://github.com/IgnaciodelaTorreArias/Tokenizers.HuggingFace.DotNet) — Apache-2.0
-- [Bootstrap Icons](https://github.com/uiwjs/bootstrap-icons) — MIT
+- [Microsoft.CodeAnalysis.CSharp / Microsoft.CodeAnalysis.CSharp.Scripting](https://github.com/dotnet/roslyn) — MIT
+- [ModelContextProtocol](https://github.com/modelcontextprotocol/csharp-sdk)（含 `ModelContextProtocol.Core`）— Apache-2.0
+- [Tokenizers.HuggingFace](https://github.com/IgnaciodelaTorreArias/Tokenizers.HuggingFace.DotNet) — Apache-2.0（传递依赖 Google.Protobuf 为 BSD-3-Clause）
+- [SkiaSharp](https://github.com/mono/SkiaSharp)（含 `SkiaSharp.NativeAssets.Linux.NoDependencies`）— MIT（原生 Skia 为 BSD-3-Clause）
+
+**桌面壳（Tauri / Rust）**
+
+- [Tauri](https://github.com/tauri-apps/tauri)、`tauri-plugin-shell`、`tauri-build` — MIT 或 Apache-2.0
+- [`serde`](https://github.com/serde-rs/serde)、`serde_json` — MIT 或 Apache-2.0
+- [`tokio`](https://github.com/tokio-rs/tokio) — MIT
+
+**前端静态资源**
+
+- [KaTeX](https://github.com/KaTeX/KaTeX)（`ShimmerChat/wwwroot/katex`）— 代码与 CSS 为 MIT，`fonts/` 下字体为 SIL OFL 1.1
+- [Bootstrap Icons](https://github.com/twbs/icons)（`ShimmerChat/wwwroot/lib/bootstrap-icons`）— MIT
+
+**构建与测试工具（不随应用分发）**
+
+- [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) — MIT
+- [xunit](https://github.com/xunit/xunit) / `xunit.runner.visualstudio` — Apache-2.0
+- [Moq](https://github.com/moq/moq) — BSD-3-Clause
+- [FluentAssertions](https://github.com/fluentassertions/fluentassertions)（6.x）— Apache-2.0
+- [bUnit](https://github.com/bUnit-dev/bUnit) — MIT
+- [Microsoft.NET.Test.Sdk](https://github.com/microsoft/vstest) — MIT
+
+> KaTeX 的 MIT 许可证仅覆盖代码与 CSS；字体按 SIL Open Font License 1.1 分发。完整许可证文本可从上述项目仓库或 NuGet / crates.io 包中获取。
