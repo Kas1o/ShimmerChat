@@ -554,7 +554,7 @@
 					disabled="@ViewContext.IsGenerating()" />
 			</label>
 			<textarea @ref="inputArea"
-				value="@inputText" @oninput="OnInputResize"
+				value="@inputText" @oninput="OnInputResizeAsync"
 				@onkeydown="@(e => CheckEnter(e))"
 				placeholder="@Loc["chat.input_placeholder"]"
 				rows="1"></textarea>
@@ -616,6 +616,12 @@
 	bool isUserAtBottom = true;
 	bool _hasRendered;
 	bool _skipNextInput;
+
+	/// <summary>
+	/// 文本由代码改写（发送后清空 / 插件写入）时，高度必须在渲染把新值写进 DOM 之后再算；
+	/// 渲染前调用 JS 只会量到旧文本，输入框也就不会缩回或撑开。
+	/// </summary>
+	bool inputResizePending;
 
 	/// <summary>是否正在就地编辑对话标题。</summary>
 	bool editingTitle;
@@ -724,6 +730,12 @@
 				// 用户仍可手动点击编辑框继续重命名。
 				Logger.LogError(ex, "[ChatViewShell] Failed to focus the chat title editor.");
 			}
+		}
+
+		if (inputResizePending)
+		{
+			inputResizePending = false;
+			await ResizeInputAsync();
 		}
 
 		if (_hasRendered && autoScrollDown)
@@ -843,11 +855,26 @@
 		}
 	}
 
-	private async void OnInputResize(ChangeEventArgs e)
+	/// <summary>用户输入：DOM 里已经是新文本，直接按内容重算高度即可。</summary>
+	private async Task OnInputResizeAsync(ChangeEventArgs e)
 	{
 		if (_skipNextInput) { _skipNextInput = false; return; }
 		inputText = e.Value?.ToString() ?? string.Empty;
-		await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
+		await ResizeInputAsync();
+	}
+
+	/// <summary>按输入框当前内容重算高度。必须在渲染已把文本写进 DOM 之后调用。</summary>
+	private async Task ResizeInputAsync()
+	{
+		try
+		{
+			await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
+		}
+		catch (Exception ex)
+		{
+			// JS 属于边界层：高度失准只影响观感，输入与发送不受影响。
+			Logger.LogError(ex, "[ChatViewShell] Failed to resize the chat input.");
+		}
 	}
 
 	private async Task CheckEnter(KeyboardEventArgs e)
@@ -866,6 +893,9 @@
 		var images = pendingImages.ToList();
 		inputText = "";
 		pendingImages.Clear();
+
+		// 文本被清空但高度还是上一版的多行高度：渲染后重算一次，输入框才会缩回单行
+		if (text.Length > 0) inputResizePending = true;
 
 		if (images.Count > 0)
 			await ViewContext.SendWithImagesAsync(text, images);
@@ -1016,16 +1046,13 @@
 		else
 			inputText = inputText.TrimEnd() + "\n" + text;
 
-		await InvokeAsync(StateHasChanged);
-
-		try
+		// 面板可能从任意线程调用：标记与渲染都切回渲染上下文，
+		// 高度等 DOM 拿到新文本之后由 OnAfterRenderAsync 统一重算。
+		await InvokeAsync(() =>
 		{
-			await JS.InvokeVoidAsync("autoResizeTextarea", inputArea);
-		}
-		catch (Exception)
-		{
-			// 输入框尚未渲染或电路已断开：文本已写入状态，无需额外处理
-		}
+			inputResizePending = true;
+			StateHasChanged();
+		});
 
 		return true;
 	}

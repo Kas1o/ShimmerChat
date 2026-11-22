@@ -299,10 +299,32 @@ window.isScrolledToTop = function (element, threshold) {
 };
 
 // textarea 自适应高度
-window.autoResizeTextarea = function (el) {
+//
+// 不能把 scrollHeight 直接当成 height：全局 box-sizing 为 border-box，
+// 而 scrollHeight 只含内容 + 内边距，漏掉上下边框会让内容溢出 2px ——
+// 表现就是空白输入框也留着微小的滚动范围。这里按盒模型换算外框高度，
+// 并在小数行高的舍入残差仍导致溢出时补足差值。
+window.autoResizeTextarea = function (el, maxHeight) {
     if (!el) return;
+
+    var MAX = typeof maxHeight === 'number' ? maxHeight : 200;
+    var style = window.getComputedStyle(el);
+    var pad = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+    var border = (parseFloat(style.borderTopWidth) || 0) + (parseFloat(style.borderBottomWidth) || 0);
+
+    // 先归零，scrollHeight 才反映内容本身的高度
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+    var content = el.scrollHeight - pad;
+    if (content <= 0) return; // 元素不可见（display:none）时量不到内容，保持 auto
+
+    var target = style.boxSizing === 'border-box' ? content + pad + border : content;
+    el.style.height = Math.min(target, MAX) + 'px';
+
+    // scrollHeight / clientHeight 都是整数：小数行高可能仍差 1px，
+    // 不补这段差值输入框依旧能滚动一点点。
+    var overflow = el.scrollHeight - el.clientHeight;
+    if (overflow > 0 && target < MAX)
+        el.style.height = Math.min(target + overflow, MAX) + 'px';
 };
 
 // ─── Chat image attachments: drop & paste ─────────
