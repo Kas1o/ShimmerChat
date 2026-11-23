@@ -1,6 +1,6 @@
 # Pre-Generation 管线
 
-Pre-Generation 管线在 LLM 调用之前执行，负责构建 `GenerationEnv`：收集 System Prompt、注入聊天历史、选择 API、注册工具等。
+Pre-Generation 管线在 LLM 调用之前执行，负责构建 `PreGenerationEnv`：收集 System Prompt、注入聊天历史、选择 API、注册工具等。
 
 ---
 
@@ -89,8 +89,8 @@ public class PreGenerationEnv
 | `LocService` | `ILocService` | 本地化服务 |
 | `DebugOutput` | `IDebugOutputService` | 调试输出 |
 | `PostGenerationManager` | `IPostGenerationManagerService?` | 后生成管线管理器 |
-| `GetChat()` | `Chat` | 按需加载当前对话对象 |
-| `GetAgent()` | `Agent` | 按需加载当前 Agent 对象 |
+| `Chat` | `Chat` | 当前对话对象（必填属性，与 UI 共享实例） |
+| `Agent` | `Agent` | 当前 Agent 对象（必填属性） |
 
 ---
 
@@ -102,7 +102,7 @@ Agent.PreGenerationTreeJson
   → rootNode.ExecuteAsync(context)（GenerationManagerV2.BuildEnvironment 直接调用）
       → 逐节点执行，修改 TransientEnv
       → 返回填充好的 PreGenerationEnv
-  → ToolCallLoop (LLM 调用 + 工具执行循环)
+  → ToolCallLoop (LLM 流式调用与轮次上限；工具由后处理树的 PostToolCallNode 执行)
 ```
 
 节点的 `ExecuteAsync` 在 `ToolCallLoop` **之前**运行，用于准备环境。
@@ -137,7 +137,7 @@ public class PreGenerationPreset
 | `CallNode` | 通过 PresetId 引用预设 |
 | `AppendChatMessagesNode` | 加载聊天历史并注入 Fragments；图像附件解析点，可选预算处理 |
 | `APISelectNode` | 选择 API 配置 |
-| `ToolPresetNode` | 按预设名加载工具列表 |
+| `ToolPresetNode` | 按 `PresetId` 加载预设中的工具列表（留空时用 `IsDefault` 的预设） |
 | `ToolInstantiateNode` | 实例化单个工具 |
 | `CodeActNode` | 加入 CodeAct C# 工具，脚本可调用本轮全部工具（见 [CodeAct.md](CodeAct.md)） |
 | `IfNode` / `AdvancedIfNode` | 条件分支 |
@@ -256,6 +256,12 @@ public static class NodeErrorCodes
     public const string ConfigNotFound  = "CONFIG_NOT_FOUND";
     public const string Cancelled       = "CANCELLED";
     public const string ParameterError  = "PARAM_ERROR";
+
+    /// <summary>通用错误。</summary>
+    public const string CommonError     = "COMMON_ERROR";
+
+    /// <summary>包装器缺少业务节点负载（反序列化失败或数据损坏）。</summary>
+    public const string PayloadMissing  = "NODE_PAYLOAD_MISSING";
 
     /// <summary>需要注入槽的节点找不到带标记的注入槽。</summary>
     public const string InjectionSlotMissing   = "INJECTION_SLOT_MISSING";

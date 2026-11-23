@@ -128,7 +128,7 @@ Images.Add(result);              // 等价于 Images.Add(result.Images)
 - **取消是协作式的**：Roslyn 无法中断用户代码里的同步死循环。脚本若进行长时间计算，
   必须自行检查 `Ct`。这是代码执行的固有边界，工具描述中也已告知模型。
 - 未捕获的脚本异常、编译错误都会变成结构化 `ToolResult.Fail`（见下节），由后处理节点按
-  `continueOnToolError` 决定是否继续循环。
+  `ContinueOnError` 决定是否继续循环。
 
 | 错误码 | 含义 |
 |--------|------|
@@ -182,6 +182,6 @@ search.Length
 }
 ```
 
-`using` 可省略；默认已导入 `System`、`System.IO`、`System.Linq`、`System.Text`、
+`using` 可省略；默认已导入 `System`、`System.Collections.Generic`、`System.IO`、`System.Linq`、`System.Text`、
 `System.Threading`、`System.Threading.Tasks`、`Newtonsoft.Json`、`ShimmerChatLib`、
 `ShimmerChatLib.Generation`、`ShimmerChatLib.Interface` 与 `ShimmerChatBuiltin.CodeAct`。

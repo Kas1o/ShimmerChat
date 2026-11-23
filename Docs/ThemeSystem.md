@@ -181,16 +181,6 @@
 - 当前选择的主题 ID 存在 `shimmerchat_current_theme_id` 键下
 - 用户主题与内置主题合并存储
 
-### 主题切换机制
-
-当 `SetTheme` 或 `UpdateTheme` 被调用时：
-
-1. 触发 `OnThemeChanged` 事件
-2. `ThemeCss.razor` 组件接收事件，通过 Blazor 服务端渲染将 `CurrentTheme` 的所有属性值写入内联 `<style>` 标签的 `:root { ... }` 块
-3. 所有 CSS 引用这些变量，立即生效无需刷新
-
-**注意**：`theme.css` 只提供初始后备值，运行时由 `ThemeCss.razor` 渲染的内联样式覆盖。
-
 ---
 
 ## theme.css — 默认 Token 定义
@@ -206,14 +196,14 @@
 }
 
 [data-theme="dark"] {
-  /* 暗色覆盖 */
+  /* 暗色覆盖，页面不设置 data-theme 时不生效 */
   --su-surface-0: #0d0d0d;
   --su-surface-1: #1a1a1a;
   /* ... 等 */
 }
 ```
 
-这些值与 `Theme.cs` 中 `GetBuiltInThemes()` 的两个内置主题完全一致。`theme.css` 只提供**后备**，运行时由 `ThemeCss.razor` 渲染的内联样式覆盖。
+这些值与 `ThemeServiceV2.GetBuiltInThemes()` 的两个内置主题一致。运行时实际生效的是 `ThemeCss.razor` 内联输出的 `:root` 变量；`theme.css` 只提供**后备**，页面不设置 `data-theme` 属性，其中的暗色块不会命中。
 
 ---
 
@@ -391,7 +381,7 @@
 
 `ShimmerChat/wwwroot/node-editor.css` 是节点编辑器的全局样式（非 scoped CSS，因为 `GenericNodeEditor` 使用 `RenderTreeBuilder` 无法发出 scoped 属性）。
 
-所有颜色都引用 `--su-*` 或 `--node-*` 变量：
+主色、边框与文字走 `--su-*` / `--node-*` 变量；部分交互高亮仍使用硬编码色值，不随主题变化：
 
 | 组件                    | 前缀        | 主要变量                                                                |
 | ----------------------- | ----------- | ----------------------------------------------------------------------- |
@@ -399,8 +389,6 @@
 | Node buttons            | `.tn-btn-*` | `--su-success/soft`, `--su-accent/soft`, `--su-danger/soft`             |
 | Add menu                | `.tn-add-*` | `--su-surface-1/3`, `--su-border-0/1`, `--su-accent`, `--su-text-0/1/2` |
 | Generic editor fields   | `.ge-*`     | `--su-surface-3`, `--su-border-1`, `--su-text-0/1`                      |
-| Tool instantiate editor | `.ti-*`     | `--su-surface-3`, `--su-border-1`, `--su-text-0/1/2`                    |
-| Call node editor        | `.call-*`   | `--su-surface-3`, `--su-border-0/1`, `--su-text-0/1/2`                  |
 
 ---
 

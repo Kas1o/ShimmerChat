@@ -39,7 +39,7 @@ Pre-Generation Tree ──→ 构建 PreGenerationEnv（含 Transient.Fragments�
 Render Modifier Tree ──→ GetContent/UpdateContent 链式处理 ──→ 最终 HTML
 ```
 
-后处理树负责回合控制**：工具调用处理与循环继续/停止都在里面完成，
+后处理树负责回合控制：工具调用处理与循环继续/停止都在里面完成，
 因此"按工具名停止""注入提醒再续轮""压缩历史后继续"这类规则可以用节点表达。
 
 ---

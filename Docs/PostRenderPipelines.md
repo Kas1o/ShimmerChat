@@ -142,9 +142,8 @@ PostChat.Remove(env, target);
 
 存储在 KVData `"PostGenerationManager"` / `"post_generation_presets"`，类型为 `PostGenerationPreset`。
 
-> **破坏性变更（2.2）**：工具调用处理从 `ToolCallLoop` 下沉到 `PostToolCallNode`。
-> 旧的 Agent 若自定义了后处理树且其中没有工具节点，工具调用将不再执行（宿主会告警并停止循环）。
-> 默认预设已包含该节点，未自定义后处理树的 Agent 不受影响。
+> **行为约束**：工具调用由后处理树中的 `PostToolCallNode` 执行。若 Agent 自定义了后处理树且其中没有工具节点，
+> 工具调用不会执行（宿主会告警并停止循环）；默认预设已包含该节点。
 
 
 ---
@@ -312,8 +311,5 @@ public class MyRenderNode : IRenderModifierNode
 
 ## 与旧系统的关系
 
-Render Modifier 管线取代了旧的 `IMessageRenderModifier` 系统：
-- 旧的 `MessageDisplayServiceV1.ActivatedModifiers` 列表不再用于渲染
-- 旧的 `RegexRenderModifier` 功能由 `RegexReplaceNode` 继承
-- 旧的 `AddMessageRenderModifierPopup` / `EditMessageRenderModifierPopup` 已被移除
-- 变更记录始终收集，失败时通过 `BuildErrorHtml` 展示完整变更链
+Render Modifier 管线取代了旧的 `IMessageRenderModifier` 系统（该接口已标记 `[Obsolete]`）：
+旧 `RegexRenderModifier` 的能力由 `RegexReplaceNode` 提供，其余旧实现不再被执行。

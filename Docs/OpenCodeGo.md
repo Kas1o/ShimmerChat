@@ -112,19 +112,7 @@ OpenAI 兼容模式的自定义请求体同样是根级浅合并，语义见
 | 前缀续写 | `APISelectNode` 对 OpenCode Go 返回 `node_err.api_no_continuation`；Gemini 原生没有 assistant prefill。 |
 | 旧配置没有 `OpenCodeGoMode` | 反序列化为 `OpenAICompatible`（枚举序号 0），行为与旧版一致。 |
 
-## 6. 接入实测清单（代码之外）
-
-首次接入真实 OpenCode Go 时验证以下项，未验证前保持当前默认行为：
-
-- [ ] Gemini 模式：`Authorization: Bearer` 与 `streamGenerateContent?alt=sse`
-      在 `/inference/go/google/v1beta` 的实际接受度。
-- [ ] `x-opencode-session` 在 Gemini 路径是否与 OpenAI 路径一样被识别并用于路由 / 缓存。
-- [ ] 工具调用多轮：`thoughtSignature` 经 `ProviderData` 回传后是否被网关原样保留。
-- [ ] 非 Gemini 模型经 Gemini 路径翻译时，`finishReason` 与 functionCall 形状是否仍符合
-      Gemini 原生协议（翻译层的边界行为）。
-- [ ] 思考档位 `minimal` 等值在 Go 的 Gemini 模型上是否合法（不合法应显式报错，不静默降级）。
-
-## 7. 代码位置
+## 6. 代码位置
 
 | 职责 | 文件 |
 |---|---|

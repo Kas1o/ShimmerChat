@@ -54,9 +54,8 @@
 - 单文件上限：`ImageAttachmentRules.MaxBytes`（20 MiB），与聊天上传、生成图像使用同一份上限。
 - 格式按**文件头**识别（PNG/JPEG/GIF/WebP 魔数），不信任扩展名；扩展名是 `.png` 的文本文件会明确报错。
   识别逻辑由 `ImageMimeDetector` 统一提供，MCP、CodeAct 等其它图像入口共用同一份实现。
-- 图像**落盘**到 `UserUploadImage` 并以文件引用进入消息，与生成图 / MCP 图像同一条路径
-  （旧版直接内联 Base64，大图会把消息存储与每轮请求撑爆）。工具结果同时给出稳定的
-  `/userimages/...` 链接。用户磁盘上的原文件永远不被修改。
+- 图像**落盘**到 `UserUploadImage` 并以文件引用进入消息，与生成图 / MCP 图像同一条路径；
+  工具结果同时给出稳定的 `/userimages/...` 链接。用户磁盘上的原文件永远不被修改。
 - 落盘前的处理由工具参数 `image_processing` 决定：`auto`（默认）跟随全局上传处理设置、
   `original` 原样落盘、`budget` 用 `pixel_budget` 参数（默认 `ImageAttachmentRules.DefaultPixelBudget`）
   作为像素预算，算法与质量沿用全局设置。非法取值显式返回 `TOOL_INVALID_ARGUMENTS`，不猜测修正。

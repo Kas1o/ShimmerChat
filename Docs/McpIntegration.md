@@ -18,8 +18,6 @@ MCP 规范仍在快速演进（已发布 `2024-11-05` / `2025-03-26` / `2025-06-
 官方 SDK 内部实现了**双时代（dual-era）探测**与版本协商，并同时提供 STDIO 与 HTTP 两种传输，
 因此本项目把协议层与传输层完全交给 SDK，自己只实现「配置 / 暴露策略 / UI / 节点」。
 
-> 版本说明与逐版本字段差异见 `Docs/Research/MCP-Client-Reference.md`（调研归档，非产品文档）。
-
 ---
 
 ## 2. 传输模式
@@ -48,14 +46,14 @@ stderr 仅作为日志通道（转发到 `ILogger`，绝不会被当作协议消
 D:\data
 ```
 
-### 2.3 协议版本：`ProtocolMode`
+### 2.2 协议版本：`ProtocolMode`
 
 SDK 在 `ProtocolVersion` 为 null（默认）时会先向服务端发 `server/discover` 探测 `2026-07-28`（无握手时代），
 不支持时才回退到 `initialize` 握手。很多现有服务端不识别该方法且**不回响应**，于是客户端会一直等到探测超时，
 日志里出现一条 `Client (ShimmerChat …) client initialization error … TaskCanceledException`，然后才回退——
 功能正常，但会白等一次超时并刷错误日志。
 
-因此端点新增 `ProtocolMode`：
+因此端点提供 `ProtocolMode`：
 
 | `ProtocolMode` | SDK `ProtocolVersion` | 行为 |
 |----------------|----------------------|------|
@@ -65,7 +63,7 @@ SDK 在 `ProtocolVersion` 为 null（默认）时会先向服务端发 `server/d
 
 `ProtocolMode` 属于连接指纹的一部分：切换它会丢弃旧连接重建。
 
-### 2.2 Streamable HTTP（首选）→ SSE（回退）
+### 2.3 Streamable HTTP（首选）→ SSE（回退）
 
 使用 SDK `HttpClientTransport`，`HttpMode` 映射到 `HttpTransportMode`：
 
@@ -168,7 +166,7 @@ MCP 连接由 **`McpRegistry`（进程级静态单例，完全位于内置插件
 
 `McpChatPanel` 是 `PanelDisplayPlace.Chat` 面板，出现在聊天页侧栏（与变量面板同级）。
 
-- **不阻容渲染**：面板挂载/切对话时，生命周期方法**立即返回**，连接在后台进行。
+- **不阻塞渲染**：面板挂载/切对话时，生命周期方法**立即返回**，连接在后台进行。
   MCP 握手（含失败的端点要等满超时）若在 `OnParametersSetAsync` 中 await，会让整个对话界面在连接完成前不可交互。
 - **并行连接**：全部端点先以「连接中」列出，再**并行**取租约（不同端点互不阻塞；同一端点并发取用会合并）。
   串行会让总耗时随端点数线性叠加（N × 握手超时）。

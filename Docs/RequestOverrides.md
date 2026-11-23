@@ -9,9 +9,9 @@
 |---|---|---|---|
 | `OpenAI` | `OpenAICustomRequestBody` | `OpenAICustomHeaders` | 请求头 `Authorization: Bearer <key>`；请求体 `model` / `messages` / `temperature` / `max_tokens` / `stream` / `tools` |
 | `DeepSeek` | `DeepSeekCustomRequestBody` | `DeepSeekCustomHeaders` | 同上，另有请求体 `thinking`，以及选择推理档位时的 `reasoning_effort` |
-| `OpenCode Go`（OpenAI 兼容） | `OpenCodeGoCustomRequestBody` | `OpenCodeGoCustomHeaders` | 请求头 `User-Agent` 与 `x-opencode-session`；请求体同 OpenAI |
-| `OpenCode Go`（Gemini 原生） | `OpenCodeGoGeminiCustomRequestBody` | `OpenCodeGoGeminiCustomHeaders` | 请求头 `Authorization: Bearer <key>`、`User-Agent`、`x-opencode-session`；请求体 `model` / `contents` / `generationConfig` 等 |
-| `Gemini` | `GeminiCustomRequestBody` | `GeminiCustomHeaders` | 请求头 `x-goog-api-key`（Bearer 模式改为 `Authorization`）；请求体 `contents` / `generationConfig` / `safetySettings` 等 |
+| `OpenCode Go`（OpenAI 兼容） | `OpenCodeGoCustomRequestBody` | `OpenCodeGoCustomHeaders` | 请求头 `Authorization: Bearer <key>`、`User-Agent` 与 `x-opencode-session`；请求体同 OpenAI |
+| `OpenCode Go`（Gemini 原生） | `OpenCodeGoGeminiCustomRequestBody` | `OpenCodeGoGeminiCustomHeaders` | 请求头 `Authorization: Bearer <key>`、`User-Agent`、`x-opencode-session`；请求体 `contents` / `systemInstruction` / `tools` / `generationConfig` 等 |
+| `Gemini` | `GeminiCustomRequestBody` | `GeminiCustomHeaders` | 请求头 `x-goog-api-key`（Bearer 模式改为 `Authorization`）；请求体 `contents` / `systemInstruction` / `tools` / `generationConfig` 等 |
 
 两种配置文本按配置分别保存：切换 OpenCode Go 的接口模式不会互相覆盖。
 
@@ -38,16 +38,8 @@
 
 ## 4. OpenCode Go 的强制身份头
 
-OpenCode Go 要求每个请求标明「哪个应用、哪个对话」：
-
-| 头 | 值 | 说明 |
-|---|---|---|
-| `User-Agent` | `ShimmerChat/2.0`（`ApiConfig.OpenCodeGoUserAgent`） | 客户端身份，不能用通用 HTTP 库名 |
-| `x-opencode-session` | 当前对话 Guid | 会话路由与 prompt 缓存；无对话上下文（如模型列表）时省略 |
-
-这两项由宿主预写入，用户不需要也不应该手工填写。自定义请求头里出现同名头时
-**会覆盖**预写入值：这是显式能力（例如代理要求改写应用标识），覆盖后由用户
-自行保证网关仍能识别应用与对话。设置页在 OpenCode Go 的「高级」区块恒显此提示。
+`User-Agent` 与 `x-opencode-session` 的取值、预写入与同名覆盖规则见
+[OpenCodeGo.md](OpenCodeGo.md) 的「端点与鉴权」。
 
 ## 5. 代码位置
 

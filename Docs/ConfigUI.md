@@ -1,23 +1,14 @@
 # 配置管理界面统一设计（Config UI）
 
-本文是「预设管理 + 配置界面」类页面的统一设计契约。后续迁移页面必须按本文实现，避免每页各自拼装操作栏、弹窗和保存逻辑。
+本文是「预设管理 + 配置界面」类页面的统一设计契约：共享外壳、操作语义、状态反馈与存储约定，避免每页各自拼装操作栏、弹窗和保存逻辑。
 
-首个落地页面：**API 设置**（`ShimmerChatBuiltin/API/ApiSettingsPage.razor`）。
+参考实现：**API 设置**（`ShimmerChatBuiltin/API/ApiSettingsPage.razor`）。
 
 ---
 
-## 1. 目标与范围
+## 1. 统一后的页面模型
 
-### 1.1 解决的问题
-
-现有配置页面存在四类不一致：
-
-1. 顶部操作（新建 / 保存 / 切换 / 克隆 / 删除 / 重命名 / 收藏）位置和样式各异；
-2. 有的页面保存后强制刷新整页，丢失上下文与反馈；
-3. 配置一多就难以切换和定位，没有检索；
-4. 表单密度、分区方式和错误呈现不统一。
-
-### 1.2 统一后的页面模型
+### 1.1 骨架
 
 所有页面共享同一个骨架：
 
@@ -35,20 +26,20 @@
 └──────────────────────────────────────────────────────────┘
 ```
 
-### 1.3 纳入迁移的页面
+### 1.2 已实现的页面
 
-| 页面 | 当前入口 | 配置单元 | 备注 |
+| 页面 | 入口 | 配置单元 | 说明 |
 | --- | --- | --- | --- |
-| API 设置 | `panel.api_settings` | `ApiConfig` | ✅ 已完成（本文范本） |
-| 文生图 | `panel.image_generation` | `ImageGenerationProfile` | ✅ 已完成 |
-| Embedding API 配置 | `panel.embedding_api_config` | `EmbeddingProfile` | ✅ 已完成；「当前使用」独立于收藏 |
-| DynPrompt | `panel.dyn_prompt` | 规则集 / 规则 | ✅ 已完成（集合 + 词条两级） |
-| 子智能体 | `panel.sub_agent_config` | 子代理配置 | ✅ 已完成；保留会话入口与插件面板 |
-| 工具管理 | `panel.tool_manager` | 工具预设 | ✅ 已完成 |
-| MCP 工具集 | `panel.mcp_toolset` | MCP 服务配置 | ✅ 已完成；探测/复制节点 ID 在工具栏 |
-| 消息渲染 | `/messagerender` | 渲染预设（节点树） | ✅ 已完成 |
-| 前生成预设 | `/generationmanager` | 预设（节点树） | ✅ 已完成 |
-| 后生成预设 | `/postgeneration` | 预设（节点树） | ✅ 已完成 |
+| API 设置 | `panel.api_settings` | `ApiConfig` | 参考实现 |
+| 文生图 | `panel.image_generation` | `ImageGenerationProfile` | |
+| Embedding API 配置 | `panel.embedding_api_config` | `EmbeddingProfile` | 「当前使用」独立于收藏 |
+| DynPrompt | `panel.dyn_prompt` | 规则集 / 规则 | 集合 + 词条两级 |
+| 子智能体 | `panel.sub_agent_config` | 子代理配置 | 保留会话入口与插件面板 |
+| 工具管理 | `panel.tool_manager` | 工具预设 | |
+| MCP 工具集 | `panel.mcp_toolset` | MCP 服务配置 | 探测 / 复制节点 ID 在工具栏 |
+| 消息渲染 | `/messagerender` | 渲染预设（节点树） | |
+| 前生成预设 | `/generationmanager` | 预设（节点树） | |
+| 后生成预设 | `/postgeneration` | 预设（节点树） | |
 
 > 树编辑器、工具列表等复杂正文继续由页面自己渲染；统一的是外壳、操作语义和反馈，不是把所有正文做成同一种表单。
 
@@ -81,10 +72,10 @@
 | 删除配置 | 同上，危险色 | 二次确认；删除后选中相邻项；保存后生效 |
 | 重命名 | 同上 | 弹窗输入；空名称必须报错，不静默回退 |
 | 收藏 / 置顶 | 同上，星标 | 切换 `Pinned`；只影响选择器/检索排序，不改持久化顺序 |
-| 配置 ID | 同上，剪贴板图标 | 复制稳定 ID；失败必须提示并记录日志 |
+| 配置 ID | 同上，剪贴板图标 | 复制稳定 ID；失败必须提示用户，不静默失败 |
 | 检索 | 同上，放大镜 | 打开高级选择弹窗，支持名称/类型/模型/URL/ID 搜索 |
 
-配置级独特操作（如 MCP 的连接测试、文生图的探测、Embedding 的「设为当前」）放在**同一工具栏**内，使用 `.su-btn-secondary` 或图标按钮，不要挤进正文底部。
+配置级独特操作（如 MCP 的连接测试、文生图的探测、Embedding 的连通性测试）放在**同一工具栏**内，使用 `.su-btn-secondary` 或图标按钮，不要挤进正文底部；与当前配置字段绑定的操作（如 Embedding 的「设为当前」）仍属于正文分区。
 
 ### 2.3 状态区
 
@@ -202,7 +193,7 @@
   纯预设管理页面（节点树、DynPrompt、工具预设、MCP）没有全局 active 语义，选中项属于视图状态，
   不写入存储；Embedding 与 API 这类存在「当前使用」的页面必须持久化选中 ID。
 
-### 5.1 已迁移页面的存储与兼容
+### 5.1 各页面的存储与兼容
 
 | 页面 | 存储位置 | 收藏字段 | 兼容说明 |
 | --- | --- | --- | --- |
@@ -262,34 +253,7 @@
 - 正文中的复杂编辑器（节点树、工具列表、CodeMirror 等）保持原组件，只套用 `.cfg-section` 外壳。
 - 修改外壳时不得改变本文的 DOM 类名与交互契约；所有页面共享同一份行为。
 
----
-
-## 7. 本地化与可访问性
-
-- 所有新增文案必须同时补齐 `zh-CN` 与 `en-US`。
-- 共享文案使用 `config_ui.*` 命名空间；页面专属文案使用 `api_settings.*` 这类页面前缀。
-- 图标按钮必须有 `title` 与 `aria-label`；状态提示使用 `role="status"`。
-- 弹窗必须有 `role="dialog"`、`aria-modal="true"`。
-- 所有交互可用键盘完成：Tab 可达、Enter 确认、Esc 取消。
-- 窄屏不依赖 hover；图标按钮至少 28×28px。
-
----
-
-## 8. 迁移步骤
-
-1. 阅读目标页面现有存储键与数据模型，确认 `Id` / `Name` / `Pinned` 是否齐备。
-2. 给模型补充 `Pinned`（或等价的收藏字段）与克隆语义，补序列化兼容测试。
-3. 将旧操作区（下拉框、按钮、页脚保存）移除，替换为 `.cfg-topbar` 骨架。
-4. 插件面板托管的页面在 `[PluginPanel]` 特性上声明 `Flush = true`，并给 `ConfigShell` 传 `Flush="true"`
-   （手写页面则给根元素加 `cfg-page-main` 类），宿主才会去掉外层标题与卡片外壳。
-5. 把正文拆成 `.cfg-section`，字段统一改用 `.su-label` + `.su-input` + `.cfg-field`。
-6. 接入 `configPageShortcuts`，实现 `[JSInvokable] SaveFromShortcut`。
-7. 实现检索弹窗、重命名弹窗、删除确认弹窗。
-8. 统一脏状态与保存反馈；移除保存后的整页刷新。
-9. 失败路径补日志与用户可见错误；补测试。
-10. 在 `Docs/` 更新该页面的配置存储/行为说明（如有变化）。
-
-### 8.1 Razor 骨架
+#### 调用示例
 
 统一外壳的调用方式（以 Embedding 页面为例）：
 
@@ -301,6 +265,7 @@
             NameSelector="@(p => p.Name)"
             PinSelector="@(p => p.Pinned)"
             Title="@Loc["panel.embedding_api_config"]"
+            Flush="true"
             IsDirty="IsDirty"
             LoadError="@_loadError"
             StatusMessage="@_statusText"
@@ -322,16 +287,11 @@
 
 ---
 
-## 9. 验收清单
+## 7. 本地化与可访问性
 
-- [ ] 顶部操作面板滚动时固定，宽度铺满内容区，无缝隙。
-- [ ] 新建 / 保存 / 切换 / 克隆 / 删除 / 重命名 / 收藏 / 复制 ID / 检索全部可用。
-- [ ] Ctrl+S 与保存按钮走同一路径，成功有状态 + toast，失败有错误提示与日志。
-- [ ] 未保存修改有明确标识；切换配置不丢失草稿。
-- [ ] 收藏项在选择器与检索弹窗中置顶，取消收藏恢复原顺序。
-- [ ] 检索支持名称/类型/模型/URL/ID，空结果有提示，Enter/Esc 可用。
-- [ ] 删除有二次确认，重命名空值有字段错误。
-- [ ] 旧数据可读，新增字段有默认值；克隆生成新 ID。
-- [ ] 所有新增文案已补 `zh-CN` 与 `en-US`。
-- [ ] 窄屏下操作可用，正文字段折叠为单列。
-- [ ] 失败路径不会被静默吞掉，日志包含配置 ID 与操作上下文。
+- 所有新增文案必须同时补齐 `zh-CN` 与 `en-US`。
+- 共享文案使用 `config_ui.*` 命名空间；页面专属文案使用 `api_settings.*` 这类页面前缀。
+- 图标按钮必须有 `title` 与 `aria-label`；状态提示使用 `role="status"`。
+- 弹窗必须有 `role="dialog"`、`aria-modal="true"`。
+- 所有交互可用键盘完成：Tab 可达、Enter 确认、Esc 取消。
+- 窄屏不依赖 hover；图标按钮至少 28×28px。

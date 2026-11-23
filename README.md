@@ -174,7 +174,7 @@ ShimmerChat/
 ├── ShimmerChat/          # 主项目：Blazor Server 宿主、服务实现、UI
 ├── ShimmerChatBuiltin/   # 内置插件：默认节点、工具、面板
 ├── src-tauri/            # Tauri 桌面发布项目
-└── Docs/                 # 开发文档
+└── Docs/                 # 开发文档与使用方法
 ```
 
 ---

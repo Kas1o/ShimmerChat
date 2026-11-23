@@ -48,10 +48,10 @@
       "DefaultWorkflow": { "Model": "", "Width": 512, "Height": 512, "...": "..." },
       "CustomWorkflowJson": "",
       "CustomWorkflowParameters": [],
-      "OutputImageProcessing": {      // 生成结果落盘前的输出处理（新增；缺省按 FollowGlobal）
-        "Mode": "FollowGlobal",        // 或 "Original" / "Custom"
+      "OutputImageProcessing": {      // 生成结果落盘前的输出处理（缺省按 FollowGlobal）
+        "Mode": 0,                     // 0=FollowGlobal / 1=Original / 2=Custom
         "PixelBudget": 4194304,        // Custom 模式的像素预算（宽×高乘积）
-        "Algorithm": "WebP",           // Custom 模式的压缩算法：WebP / Jpeg / None
+        "Algorithm": 1,                // 0=None / 1=WebP / 2=Jpeg（枚举以数字持久化）
         "Quality": 85
       }
     }
@@ -160,10 +160,6 @@
 Id = default       → generate_image
 其它 Id            → generate_image_{Id}
 ```
-
-> 迁移说明：旧版工具集节点的 `EnableDefaultWorkflow` / `EnableCustomWorkflows` / `CustomWorkflowId`
-> 属性不再读取。旧节点仍可正常反序列化，升级后默认按「全部已启用的配置」工作；
-> 需要限制工具集合时，请在节点上重新选择 `ConfigurationId`（或在设置面板停用不需要的配置）。
 
 ---
 

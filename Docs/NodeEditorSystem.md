@@ -267,8 +267,6 @@ TreeEditor
 - 需要访问注入服务（IKVDataService 等）
 
 > 仅仅是「从已有列表里选一个」不再需要自定义编辑器：用 `OptionsKey` 即可（见上节）。
-> 内置节点里已有 7 个自定义编辑器因此被删除（CallNode / PostCallNode / RenderCallNode 预设选择、
-> ToolPresetNode、ToolInstantiateNode、APISelectNode、三个 SubAgent 节点的配置选择）。
 
 ### 实现步骤
 

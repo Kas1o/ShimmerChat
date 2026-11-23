@@ -28,6 +28,7 @@ ShimmerChat 支持通过外部 DLL 扩展功能。插件放在 `Plugins/` 目录
 | `Newtonsoft.Json` | JSON 序列化 |
 | `System.*` | .NET 运行时 |
 | `Microsoft.*` | ASP.NET Core |
+| `netstandard` | 共享契约程序集 |
 
 ### 插件私有依赖
 
@@ -41,7 +42,7 @@ ShimmerChat 支持通过外部 DLL 扩展功能。插件放在 `Plugins/` 目录
      → 按 manifest 的 `assembly` 字段 LoadFromAssemblyPath
      → 依赖解析时：共享程序集 → null（回退默认 ALC）
                     私有依赖 → 从插件目录加载
-     → 卸载时 Dispose ALC → 该插件所有程序集释放
+     → 加载后保持存活：当前版本不卸载插件，也不支持热重载
 ```
 
 ---
@@ -232,8 +233,10 @@ public class MyPluginInitializer : IPluginInitializer
 初始化在 `app.Build()` 之后、`app.Run()` 之前执行：
 
 ```
-启动 → 程序集加载 → DI 容器构建 → 迁移 → 插件初始化 → 中间件配置 → 开始监听请求
+启动 → DI 容器构建 → 数据迁移 → 插件加载与初始化 → 中间件配置 → 开始监听请求
 ```
+
+插件程序集在首次解析 `IPluginLoaderService` 时加载，因此加载与初始化都发生在 `app.Build()` 之后、`app.Run()` 之前。
 
 此时所有单例服务（`IKVDataService`、`IToolRegistry` 等）已可用，但尚未处理任何 HTTP 请求。
 
@@ -280,7 +283,8 @@ public class MyPluginInitializer : IPluginInitializer
 
 ### 方式 A：自动创建工具（IAutoCreateToolV2）
 
-推荐用于无外部构造依赖的工具。实现后由 `ToolRegistry` 自动扫描注册，无需在 Agent 树中配置。
+推荐用于无外部构造依赖的工具。实现后会自动出现在工具类型选择器中（元数据由 `ToolRegistry` 扫描）；
+仍需由工具节点（如 `ToolInstantiateNode`、工具预设节点）把实例加入本轮 `Transient.Tools`。
 
 ```csharp
 using ShimmerChatLib.Generation;
@@ -410,14 +414,10 @@ public class MyFragmentNode : IPreGenerationNode
 
 ### 核心概念速览
 
-> **迁移提示（节点包装器）**：业务节点不再声明 `Id` / `Name`；容器节点的子节点属性改为
-> `PreGenerationNodeWrapper` / `PostGenerationNodeWrapper` / `RenderModifierNodeWrapper`。
-> 旧格式树 JSON 在读取时自动迁移，插件不需要手动改数据；但插件源码必须按新接口重新编译。
-> 详细格式见 [节点编辑器系统 § 包装器与序列化](NodeEditorSystem.md#7-序列化)。
-
 | 概念 | 说明 |
 |------|------|
-| `IPreGenerationNode` | 业务节点接口：`ExecuteAsync`（Id/名称/展开状态由包装器持有） || `[NodeInfo]` | 类级元数据：标签 Key、图标、颜色、分类 |
+| `IPreGenerationNode` | 业务节点接口：`ExecuteAsync`（Id/名称/展开状态由包装器持有） |
+| `[NodeInfo]` | 类级元数据：标签 Key、图标、颜色、分类 |
 | `[NodeProperty]` | 属性级元数据：标签 Key、提示、排序。支持 string / int / long / float / double / bool / enum；其余类型在表单中显式只读展示 |
 | `[NodeEditor(typeof(...))]` | 指定自定义 Blazor 编辑器组件 |
 | `List<PreGenerationNodeWrapper>` | 标记 `[NodeProperty]` 后生成子节点列表 UI，支持拖拽排序 |
@@ -446,36 +446,7 @@ SharedState   // Dictionary<string, object>  跨节点共享状态
 
 ## 6. 自定义消息渲染修改器（已废弃）
 
-> **⚠️ 已废弃**：`IMessageRenderModifier` 已被标记为 `[Obsolete("Replaced by IRenderModifierNode pipeline")]`。新项目应使用 Render Modifier 管线（`IRenderModifierNode` + `RenderSequenceNode`）替代。详见 [Post-Generation & Render Modifier 管线](PostRenderPipelines.md)。
-
-以下内容仅供参考：
-
-修改器在消息发送到 UI 渲染前对内容做后处理。所有插件中的修改器由 `MessageDisplayServiceV1` 自动发现。
-
-```csharp
-using ShimmerChatLib.Interface;
-
-public class MyModifier : IMessageRenderModifier
-{
-    public MessageRenderModifierInfo Info => new()
-    {
-        Name = "My Modifier",
-        Description = "对消息内容做自定义处理"
-    };
-
-    public string Modify(string content, string input, Chat? chat, Agent? agent)
-    {
-        // content: 原始消息内容
-        // input:   用户在 UI 中配置的参数（自定义语义）
-        // chat:    当前对话（可能为 null）
-        // agent:   当前 Agent（可能为 null）
-        return content.Replace("foo", "bar");
-    }
-}
-```
-
-- 实现 `IMessageRenderModifier` 即可，无需额外注册。
-- 用户在设置界面选择并激活修改器，可配置 `input` 参数。
+> **⚠️ 已废弃**：`IMessageRenderModifier` 已被标记为 `[Obsolete("Replaced by IRenderModifierNode pipeline")]`，宿主不再发现或执行这类修改器。新项目应使用 Render Modifier 管线（`IRenderModifierNode` + `RenderSequenceNode`）替代。详见 [Post-Generation & Render Modifier 管线](PostRenderPipelines.md)。
 
 ---
 

@@ -159,9 +159,6 @@ using SharperLLM.Util;
     CategoryKeys = ["category.config"])]
 public class MyApiSelectNode : IPreGenerationNode
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; } = "My API";
-
     [NodeProperty("prop.my_api.url", Order = 0)]
     public string Url { get; set; } = "http://localhost:8080";
 
@@ -198,7 +195,7 @@ public class MyApiSelectNode : IPreGenerationNode
 如果希望用户通过设置面板（而非节点属性）来配置 API 参数：
 
 ```csharp
-public Task<NodeResult> ExecuteAsync(NodeExecutionContext context)
+public Task<NodeResult> ExecuteAsync(PreNodeExecutionContext context)
 {
     var kvData = context.Env.Persistent.KVData;
     var url = kvData.Read("MyPlugin", "url") ?? "http://localhost:8080";
@@ -304,7 +301,7 @@ public class MyPluginInitializer : IPluginInitializer
 ```csharp
 if (context.Env.Transient.SharedState.TryGetValue("IsContinuation", out var v) && v is true)
 {
-x    var msgs = context.Env.Persistent.Chat.Messages;
+    var msgs = context.Env.Persistent.Chat.Messages;
     var lastAi = msgs.LastOrDefault(m => m.sender == Sender.AI);
     if (lastAi != null)
     {
@@ -321,21 +318,6 @@ if (context.Env.Transient.SharedState.TryGetValue("IsContinuation", out var v) &
 {
     return Task.FromResult(NodeResult.Failure(
         NodeErrorCodes.ApiUnavailable,
-        "MyApiSelect: Continuation is not supported by this API.",
-        nodeId: Id, nodeName: Name));
+        "MyApiSelect: Continuation is not supported by this API."));
 }
 ```
-
----
-
-## 检查清单
-
-- [ ] 已阅读 [插件开发指南](PluginDevelopment.md)
-- [ ] 实现了 `IChatCompletionClient` 或 `ITextCompletionClient`
-- [ ] 流式方法的 `CancellationToken` 加了 `[EnumeratorCancellation]`
-- [ ] `FinishReason` 在流式输出末尾正确设置为 `Stop`
-- [ ] 创建了自定义 `IPreGenerationNode`，在 `ExecuteAsync` 中设置 `TransientEnv.API`
-- [ ] 能力标记如实设置（`SupportsStreaming`、`SupportsToolCalling`）
-- [ ] 如果用了 `ITextCompletionClient`，用 `TextToChatAdapter` 包装并选择合适的消息模板
-- [ ] 可选：添加了 `PluginPanel` 供用户配置 API 参数
-- [ ] 可选：添加了 `IPluginInitializer` 写入默认 KVData 配置

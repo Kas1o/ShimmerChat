@@ -45,7 +45,7 @@ SharperLLM（只处理 Base64 内容块，不接触文件系统）
 
 ## 3. 上传处理方式（`App/image_upload_processing_mode`）
 
-控制**进入存储前**是否对上传图像做处理，四份 KV 键（`App` 空间）：
+控制**进入存储前**是否对上传图像做处理，五份 KV 键（`App` 空间）：
 
 | 键 | 取值 | 默认 |
 |----|------|------|
@@ -65,15 +65,12 @@ SharperLLM（只处理 Base64 内容块，不接触文件系统）
 
 ### 3.1 处理器语义（`ImageNormalizer`）
 
-基于 SkiaSharp（Chrome / Android 同源的解码器：libpng-turbo / libjpeg-turbo / libwebp）。
+基于 SkiaSharp（Chrome / Android 同源的解码器：libpng / libjpeg-turbo / libwebp）。
 未选 ImageSharp：3.1.x 挂 6 条安全公告（均不在本项目使用路径上，但警告常驻）；
 4.x 的 Split License 在 Release 构建强制 license key，对开源仓库分发不友好。
 
-**平台支持**：native 库随 RID 发布自动携带，已验证 `win-x64`（`libSkiaSharp.dll`）、
-`linux-x64`（`libSkiaSharp.so`，经 `SkiaSharp.NativeAssets.Linux.NoDependencies` 静态链接、
-不依赖系统库）、`osx-x64`（`libSkiaSharp.dylib`）；macOS 包为 universal（x64 + arm64），
-Linux 另有 arm / arm64 / musl 等变体。native 缺失时异常（`DllNotFoundException` 等）原样向上抛出，
-不伪装成图像数据错误。约 80MB 的原生符号文件已在发布产物中移除（`RemoveNativeSymbolFilesFromPublish`）。
+native 库随 RID 发布自动携带；macOS 包为 universal（x64 + arm64），Linux 另有 arm / arm64 / musl 等变体。
+native 缺失时异常（`DllNotFoundException` 等）原样向上抛出，不伪装成图像数据错误。
 
 1. **GIF 永远跳过**：重编码只保留第一帧，等于悄悄丢动画，因此原样返回。
    多帧动画 WebP 同理（探测阶段 `FrameCount > 1` 即跳过）。「总是重编码」也不能越过该例外。
@@ -90,7 +87,7 @@ Linux 另有 arm / arm64 / musl 等变体。native 缺失时异常（`DllNotFoun
 
 ### 3.2 工具 / 端点产生的图像（配置级输出处理）
 
-工具产物不再与全局上传设置无关：**文生图 Profile、MCP 端点、`read_image` 工具**都有各自的输出处理配置，默认**跟随全局**（全局原图模式 = 不处理），可按需改为**原图**或**自定义预算**（自定义参数含「总是重编码」开关）。折算入口是 `ImageProcessingConfig.ResolveOutput`，落盘统一走 `IImageAttachmentService.SaveGeneratedAsync(stream, mime, processing, ct)`（旧实现经接口默认实现退化为原样落盘）。
+工具产物不再与全局上传设置无关：**文生图 Profile、MCP 端点、`read_image` 工具**都有各自的输出处理配置，默认**跟随全局**（全局原图模式 = 不处理），可按需改为**原图**或**自定义预算**（自定义参数含「总是重编码」开关）。折算入口是 `ImageProcessingConfig.ResolveOutput`，落盘统一走 `IImageAttachmentService.SaveGeneratedAsync(stream, mime, processing, ct)`（旧实现经接口默认实现委托给 `SaveAsync`，遵循其存储与处理设置）。
 
 | 入口 | 配置位置 | 默认 |
 |------|----------|------|
@@ -155,4 +152,4 @@ Linux 另有 arm / arm64 / musl 等变体。native 缺失时异常（`DllNotFoun
 | `ShimmerChat/Singletons/ImageNormalizer.cs` | 唯一的像素级处理实现 |
 | `ShimmerChatBuiltin/Misc/Node/PreGeneration/AppendChatMessagesNode.cs` | 请求侧预算处理策略的配置点 |
 | `ShimmerChat/Components/Pages/MiscSettingsPage.razor` | 设置界面（图像设置组） |
-| `ShimmerChat.Tests/ImageNormalizerTests.cs` 等三处 | 成功路径与失败路径测试 |
+| `ShimmerChat.Tests/ImageAttachmentServiceTests.cs`、`ImageNormalizerTests.cs` | 成功路径与失败路径测试 |

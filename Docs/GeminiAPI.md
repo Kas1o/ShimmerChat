@@ -88,18 +88,7 @@ SSE 无 `[DONE]` 标记：以 finishReason 出现为终点。
 Gemini 没有 assistant prefill：`IsContinuation` 对 Gemini 类型显式返回
 `NodeResult.Failure`（`node_err.api_no_continuation`），不静默跳过。
 
-## 7. 接入实测清单（代码之外）
-
-首次接入 Gemini 真实端点时验证以下项，未验证前保持默认行为：
-
-- [ ] `functionResponse.parts` 的 inline_data 在 v1beta 的实际接受度（含 `response` 并存）
-- [ ] `CONTINUATION` finishReason 的 `continuation_token` 挂载位置与回传字段（v1 已映射 Length）
-- [ ] 流式 SSE 实测：空文本 part 携带签名、SAFETY 空内容、多候选防御
-- [ ] 区域可用性：Gemini API 不对中国大陆/香港提供服务，网关场景配合自定义 URL + 请求头
-- [ ] OpenCode Go Gemini 路径：Bearer 鉴权与 `?alt=sse` 在网关侧的实际接受度（详见
-      [OpenCodeGo.md](OpenCodeGo.md) 的实测清单）
-
-## 8. 与 OpenAI 行为差异（对应设置页恒显提示）
+## 7. 与 OpenAI 行为差异（对应设置页恒显提示）
 
 | 差异 | 说明 |
 |---|---|
@@ -109,7 +98,7 @@ Gemini 没有 assistant prefill：`IsContinuation` 对 Gemini 类型显式返回
 | 无前缀续写 | IsContinuation 显式失败 |
 | 签名回传 | 工具循环历史必须携带 thoughtSignature（缺失自动垫 dummy 并留痕） |
 
-## 9. 已知隐患（待研究）
+## 8. 已知隐患
 
 **thinking 字段无来源标记**：Gemini 思维链摘要与 DeepSeek `reasoning_content` 共用
 `ChatMessage.thinking` 存储。对话中途切换到 OpenAI / DeepSeek 类配置后，
