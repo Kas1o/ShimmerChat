@@ -143,6 +143,23 @@ public class GeminiApiConfigTests
     }
 
     [Fact]
+    public void Gemini_CreateModelListClient_ReusesCustomHeaders()
+    {
+        // 「获取模型」与对话请求共用自定义头：网关鉴权头必须同样带得上。
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.Gemini,
+            GeminiApiKey = "key",
+            GeminiCustomHeaders = "X-Tenant: main"
+        };
+
+        var client = config.CreateGeminiModelListClient();
+
+        client.CustomHeaders!.Should().ContainKey("x-tenant");
+        client.CustomHeaders!["X-Tenant"].Should().Be("main");
+    }
+
+    [Fact]
     public void Gemini_Log_IsWiredThrough()
     {
         var config = new ApiConfig { Type = ApiConfigType.Gemini, GeminiApiKey = "key" };

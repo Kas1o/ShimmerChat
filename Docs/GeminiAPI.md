@@ -75,7 +75,8 @@ SSE 无 `[DONE]` 标记：以 finishReason 出现为终点。
   档位默认且摘要关闭时 thinkingConfig 整体不发送。
 - 自定义请求体：JSON 根级**浅合并**（同键整对象替换），非法 JSON 显式失败。
 - 自定义请求头：每行 `Name: Value`，同名覆盖默认 `x-goog-api-key`（网关/代理场景），
-  非法行显式失败。
+  非法行显式失败。自定义请求体 / 请求头的完整覆盖契约见
+  [RequestOverrides.md](RequestOverrides.md)。
 - 网关只接受 Bearer 时置 `UseBearerAuth = true`：改用
   `Authorization: Bearer <apiKey>`，且不再发送 `x-goog-api-key`
   （OpenCode Go Gemini 路径即此形态）；自定义头仍可随后覆盖。

@@ -60,7 +60,7 @@
   "OpenAIText Warning Title": "注意：OpenAI 文本补全（/completions）",
   "OpenAIText Warning Description": "大部分 OpenAI 兼容端点已废弃 /completions 接口。如果此模式无法正常工作，请改用 OpenAI（chat）类型。仅当你的 API 明确支持 /completions 端点时才应使用此选项。",
   "OpenCodeGo Info Title": "OpenCode Go（OpenAI 兼容 / Gemini）",
-  "OpenCodeGo Info Description": "订阅 OpenCode Go 后，在 OpenCode Console 复制 API Key 填入下方即可。接口模式二选一：OpenAI 兼容走 /openai/v1/chat/completions，Gemini 原生走 /google/v1beta/models/<model>:generateContent。两种模式都会附带 User-Agent 与 x-opencode-session（当前对话 Guid）请求头；Gemini 模式额外支持思考档位、推理摘要与思考签名回传。",
+  "OpenCodeGo Info Description": "订阅 OpenCode Go 后，在 OpenCode Console 复制 API Key 填入下方即可。接口模式二选一：OpenAI 兼容走 /openai/v1/chat/completions，Gemini 原生走 /google/v1beta/models/<model>:generateContent。两种模式都会附带 User-Agent 与 x-opencode-session（当前对话 Guid）请求头；这两项是 OpenCode Go 对应用与对话身份的强制要求，宿主已预先写入，可在「高级 → 自定义请求头」里同名覆盖，也可用「自定义请求体」覆盖预写入的请求参数。Gemini 模式额外支持思考档位、推理摘要与思考签名回传。",
   "API MODELS URL": "模型列表地址",
   "Text Completion Settings:": "文本补全设置：",
   "Create New Text Completion Setting Profile": "创建新文本补全设置",

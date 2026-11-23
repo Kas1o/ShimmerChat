@@ -38,7 +38,11 @@ namespace ShimmerChatBuiltin
 		/// </summary>
 		public ReasoningEchoMode OpenAIReasoningEchoMode { get; set; } = ReasoningEchoMode.Full;
 
+		/// <summary>请求体根级别自定义参数（JSON 对象，浅合并）；同键覆盖客户端预写入的字段。</summary>
 		public string? OpenAICustomRequestBody { get; set; } = null;
+
+		/// <summary>自定义请求头（每行 Name: Value）；同名头覆盖默认 Authorization。</summary>
+		public string? OpenAICustomHeaders { get; set; } = null;
 
 		#endregion OpenAI
 
@@ -50,6 +54,15 @@ namespace ShimmerChatBuiltin
 		public int DeepSeekCtx { get; set; } = 8192;
 		public bool DeepSeekAsIs { get; set; } = false;
 		public string? DeepSeekReasoningEffort { get; set; } = null;
+
+		/// <summary>
+		/// 请求体根级别自定义参数（JSON 对象，浅合并）。DeepSeek 会预写入
+		/// <c>thinking</c>（填写档位时还有 <c>reasoning_effort</c>），这里的同名键覆盖预写入值。
+		/// </summary>
+		public string? DeepSeekCustomRequestBody { get; set; } = null;
+
+		/// <summary>自定义请求头（每行 Name: Value）；同名头覆盖默认 Authorization。</summary>
+		public string? DeepSeekCustomHeaders { get; set; } = null;
 
 		#endregion DeepSeek
 
@@ -87,6 +100,20 @@ namespace ShimmerChatBuiltin
 		public bool OpenCodeGoAsIs { get; set; } = false;
 
 		/// <summary>
+		/// OpenAI 兼容模式的请求体根级别自定义参数（JSON 对象，浅合并）；同键覆盖
+		/// 客户端预写入的 model / max_tokens / stream 等字段。该模式没有思考档位开关，
+		/// 需要精调时用这里覆盖 thinking / reasoning_effort 之类字段。
+		/// </summary>
+		public string? OpenCodeGoCustomRequestBody { get; set; } = null;
+
+		/// <summary>
+		/// OpenAI 兼容模式的自定义请求头（每行 Name: Value）。OpenCode Go 强制要求
+		/// 应用标识（User-Agent）与对话标识（x-opencode-session），二者由宿主预写入；
+		/// 同名头会覆盖预写入值。
+		/// </summary>
+		public string? OpenCodeGoCustomHeaders { get; set; } = null;
+
+		/// <summary>
 		/// 接口模式：OpenAI 兼容（默认）或 Gemini 原生。两种模式走同一 API Key 与
 		/// 同一套 UA / x-opencode-session 头，只是请求形状与鉴权头不同。
 		/// 新模式必须追加在枚举末尾（旧配置按序号持久化）。
@@ -107,6 +134,12 @@ namespace ShimmerChatBuiltin
 
 		/// <summary>Gemini 模式下请求体根级别的自定义参数（JSON 对象，浅合并）；非法 JSON 显式失败。</summary>
 		public string? OpenCodeGoGeminiCustomRequestBody { get; set; } = null;
+
+		/// <summary>
+		/// Gemini 模式的自定义请求头（每行 Name: Value）。与 OpenAI 兼容模式相同：
+		/// 宿主预写入的 User-Agent / x-opencode-session 会被同名头覆盖。
+		/// </summary>
+		public string? OpenCodeGoGeminiCustomHeaders { get; set; } = null;
 
 		#endregion OpenCode Go
 
@@ -219,13 +252,13 @@ namespace ShimmerChatBuiltin
 						ReasoningEchoMode = OpenAIReasoningEchoMode
 					};
 
-					// TODO(headers): OpenAIChatCompletionClient 已支持 CustomHeaders，但 OpenAI/DeepSeek
-					// 尚无用户可编辑的请求头字段与设置页入口；补齐时在此装配（DeepSeek 分支同），
-					// 非法头沿用 OpenAICustomRequestBody 的显式失败语义，不静默忽略。
-
 					var customProps = ParseCustomRequestBody(OpenAICustomRequestBody, "OpenAI");
 					if (customProps != null)
 						client.CustomRequestProperties = customProps;
+
+					var customHeaders = ParseCustomHeaders(OpenAICustomHeaders, "OpenAI");
+					if (customHeaders != null)
+						client.CustomHeaders = customHeaders;
 
 					return new APISetting
 					{
@@ -237,6 +270,27 @@ namespace ShimmerChatBuiltin
 
 				case ApiConfigType.DeepSeek:
 				{
+					// DeepSeek 固定完整回传：其推理 + 工具调用链需要完整 reasoning_content。
+					// thinking / reasoning_effort 属于客户端预写入项：自定义请求体最后合并，
+					// 同键覆盖它们（提示已告知用户该语义）。
+					var reasoningProperties = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+					{
+						["thinking"] = new { type = "disabled" }
+					};
+
+					if (!string.IsNullOrEmpty(DeepSeekReasoningEffort))
+					{
+						reasoningProperties["reasoning_effort"] = DeepSeekReasoningEffort;
+						reasoningProperties["thinking"] = new { type = "enabled" };
+					}
+
+					var customProps = ParseCustomRequestBody(DeepSeekCustomRequestBody, "DeepSeek");
+					if (customProps != null)
+					{
+						foreach (var (key, value) in customProps)
+							reasoningProperties[key] = value;
+					}
+
 					var client = new OpenAIChatCompletionClient(
 						_url: DeepSeekUrl ?? "https://api.deepseek.com/v1",
 						_apiKey: DeepSeekApiKey ?? throw new InvalidOperationException("DeepSeek API key is required."),
@@ -245,15 +299,9 @@ namespace ShimmerChatBuiltin
 						_as_is: DeepSeekAsIs
 					)
 					{
-						// DeepSeek 固定完整回传：其推理 + 工具调用链需要完整 reasoning_content。
 						ReasoningEchoMode = ReasoningEchoMode.Full,
-						CustomRequestProperties = !string.IsNullOrEmpty(DeepSeekReasoningEffort)
-							? new Dictionary<string, object>
-							{
-								["reasoning_effort"] = DeepSeekReasoningEffort,
-								["thinking"] = new { type = "enabled" }
-							}
-							: new Dictionary<string, object> { ["thinking"] = new { type = "disabled" } }
+						CustomRequestProperties = reasoningProperties,
+						CustomHeaders = ParseCustomHeaders(DeepSeekCustomHeaders, "DeepSeek")
 					};
 
 					return new APISetting
@@ -303,7 +351,8 @@ namespace ShimmerChatBuiltin
 							MidSystemTemplate = string.IsNullOrWhiteSpace(OpenCodeGoGeminiMidSystemTemplate)
 								? null
 								: OpenCodeGoGeminiMidSystemTemplate,
-							CustomHeaders = BuildOpenCodeGoHeaders(sessionId),
+							CustomHeaders = BuildOpenCodeGoHeaders(
+								sessionId, OpenCodeGoGeminiCustomHeaders, "OpenCode Go Gemini"),
 							Log = log
 						};
 
@@ -319,7 +368,7 @@ namespace ShimmerChatBuiltin
 						};
 					}
 
-					// OpenAI 兼容模式：仅额外要求 User-Agent 与会话头。
+					// OpenAI 兼容模式：仅额外要求 User-Agent 与会话头（自定义头可覆盖）。
 					var client = new OpenAIChatCompletionClient(
 						_url: string.IsNullOrWhiteSpace(OpenCodeGoUrl) ? OpenCodeGoDefaultUrl : OpenCodeGoUrl,
 						_apiKey: apiKey,
@@ -329,12 +378,13 @@ namespace ShimmerChatBuiltin
 					)
 					{
 						ModelsUrl = string.IsNullOrWhiteSpace(OpenCodeGoModelsUrl) ? null : OpenCodeGoModelsUrl,
-						CustomHeaders = BuildOpenCodeGoHeaders(sessionId)
+						CustomHeaders = BuildOpenCodeGoHeaders(sessionId, OpenCodeGoCustomHeaders, "OpenCode Go"),
+						CustomRequestProperties = ParseCustomRequestBody(OpenCodeGoCustomRequestBody, "OpenCode Go")
 					};
 
-					// TODO(modes): OpenAI 兼容路径的思考/推理档位切换（对照 DeepSeek 的
-					// DeepSeekReasoningEffort + thinking 开关）；补齐时在此装配 CustomRequestProperties。
-					// Gemini 模式已通过 OpenCodeGoMode + 上面的 Gemini 分支支持。
+					// TODO(modes): OpenAI 兼容路径没有独立的思考/推理档位开关（对照 DeepSeek 的
+					// DeepSeekReasoningEffort）；需要时由 OpenCodeGoCustomRequestBody 覆盖
+					// thinking / reasoning_effort 等字段。Gemini 模式已通过 OpenCodeGoMode 支持。
 
 					return new APISetting
 					{
@@ -384,8 +434,9 @@ namespace ShimmerChatBuiltin
 					if (customProps != null)
 						client.CustomRequestProperties = customProps;
 
-					if (!string.IsNullOrWhiteSpace(GeminiCustomHeaders))
-						client.CustomHeaders = ParseHeaderLines(GeminiCustomHeaders);
+					var customHeaders = ParseCustomHeaders(GeminiCustomHeaders, "Gemini");
+					if (customHeaders != null)
+						client.CustomHeaders = customHeaders;
 
 					return new APISetting
 					{
@@ -433,11 +484,15 @@ namespace ShimmerChatBuiltin
 		}
 
 		/// <summary>
-		/// 解析 "每行一个 Name: Value" 的自定义请求头文本。非法行显式失败而不是静默忽略，
-		/// 避免用户以为配置生效而实际请求缺头。
+		/// 解析 "每行一个 Name: Value" 的自定义请求头文本；空文本返回 null（调用方保持默认头）。
+		/// 非法行显式失败而不是静默忽略，避免用户以为配置生效而实际请求缺头。
+		/// <paramref name="label"/> 用于指出是哪一类配置出错（同一份解析供对话与模型列表装配共用）。
 		/// </summary>
-		private static Dictionary<string, string> ParseHeaderLines(string text)
+		private static Dictionary<string, string>? ParseCustomHeaders(string? text, string label)
 		{
+			if (string.IsNullOrWhiteSpace(text))
+				return null;
+
 			var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var rawLine in text.Split('\n'))
 			{
@@ -447,18 +502,18 @@ namespace ShimmerChatBuiltin
 
 				var separator = line.IndexOf(':');
 				if (separator <= 0)
-					throw new InvalidOperationException($"Gemini custom header line is not in 'Name: Value' format: '{rawLine.TrimEnd()}'");
+					throw new InvalidOperationException($"{label} custom header line is not in 'Name: Value' format: '{rawLine.TrimEnd()}'");
 
 				var name = line[..separator].Trim();
 				var value = line[(separator + 1)..].Trim();
 				if (string.IsNullOrWhiteSpace(name) || value.Length == 0)
-					throw new InvalidOperationException($"Gemini custom header line has an empty name or value: '{rawLine.TrimEnd()}'");
+					throw new InvalidOperationException($"{label} custom header line has an empty name or value: '{rawLine.TrimEnd()}'");
 
 				headers[name] = value;
 			}
 
 			if (headers.Count == 0)
-				throw new InvalidOperationException("Gemini custom headers text contains no 'Name: Value' lines.");
+				throw new InvalidOperationException($"{label} custom headers text contains no 'Name: Value' lines.");
 
 			return headers;
 		}
@@ -466,9 +521,11 @@ namespace ShimmerChatBuiltin
 		/// <summary>
 		/// OpenCode Go 文档要求客户端用自有 User-Agent 标识身份，
 		/// 并用稳定的 <c>x-opencode-session</c> 标记每个对话（供上游路由与 prompt 缓存）。
-		/// OpenAI 兼容与 Gemini 两种模式共用这一份头。
+		/// OpenAI 兼容与 Gemini 两种模式共用这一份头；用户自定义头最后合并，
+		/// 同名头覆盖预写入的应用 / 对话标识（设置页提示已告知该语义）。
 		/// </summary>
-		private static Dictionary<string, string> BuildOpenCodeGoHeaders(string? sessionId)
+		private static Dictionary<string, string> BuildOpenCodeGoHeaders(
+			string? sessionId, string? customHeadersText, string label)
 		{
 			var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
 			{
@@ -478,8 +535,76 @@ namespace ShimmerChatBuiltin
 			if (!string.IsNullOrWhiteSpace(sessionId))
 				headers["x-opencode-session"] = sessionId;
 
+			var customHeaders = ParseCustomHeaders(customHeadersText, label);
+			if (customHeaders != null)
+			{
+				foreach (var (name, value) in customHeaders)
+					headers[name] = value;
+			}
+
 			return headers;
 		}
+
+		/// <summary>
+		/// 模型列表（OpenAI 形状）请求用的客户端，供 OpenAI / DeepSeek / OpenCode Go 共用。
+		/// 与对话请求共用同一份地址、密钥与自定义头：用户配了网关鉴权头后，「获取模型」
+		/// 不能因为走另一套装配而失败。
+		/// </summary>
+		/// <param name="sessionId">OpenCode Go 的会话标识；获取模型时通常没有对话上下文，传 null。</param>
+		public OpenAIChatCompletionClient CreateModelListClient(string? sessionId = null)
+		{
+			switch (Type)
+			{
+				case ApiConfigType.OpenAI:
+					return new OpenAIChatCompletionClient(
+						_url: OpenAIUrl ?? "https://api.openai.com/v1",
+						_apiKey: OpenAIApiKey ?? "",
+						_model: OpenAIModel ?? "gpt-4o")
+					{
+						CustomHeaders = ParseCustomHeaders(OpenAICustomHeaders, "OpenAI")
+					};
+
+				case ApiConfigType.DeepSeek:
+					return new OpenAIChatCompletionClient(
+						_url: DeepSeekUrl ?? "https://api.deepseek.com/v1",
+						_apiKey: DeepSeekApiKey ?? "",
+						_model: DeepSeekModel ?? "deepseek-v4-flash")
+					{
+						CustomHeaders = ParseCustomHeaders(DeepSeekCustomHeaders, "DeepSeek")
+					};
+
+				case ApiConfigType.OpenCodeGo:
+				{
+					// 两种模式的请求头规则不同（各有自己的自定义头字段），错误标签也要可区分。
+					var geminiMode = OpenCodeGoMode == OpenCodeGoMode.Gemini;
+					return new OpenAIChatCompletionClient(
+						_url: string.IsNullOrWhiteSpace(OpenCodeGoUrl) ? OpenCodeGoDefaultUrl : OpenCodeGoUrl,
+						_apiKey: OpenCodeGoApiKey ?? "",
+						_model: string.IsNullOrWhiteSpace(OpenCodeGoModel) ? OpenCodeGoDefaultModel : OpenCodeGoModel)
+					{
+						ModelsUrl = string.IsNullOrWhiteSpace(OpenCodeGoModelsUrl) ? null : OpenCodeGoModelsUrl,
+						CustomHeaders = BuildOpenCodeGoHeaders(
+							sessionId,
+							geminiMode ? OpenCodeGoGeminiCustomHeaders : OpenCodeGoCustomHeaders,
+							geminiMode ? "OpenCode Go Gemini" : "OpenCode Go")
+					};
+				}
+
+				default:
+					throw new InvalidOperationException($"API type '{Type}' does not support model listing.");
+			}
+		}
+
+		/// <summary>
+		/// Gemini 原生模型列表请求用的客户端（/models 原生形状）；自定义头同样生效。
+		/// </summary>
+		public GeminiChatCompletionClient CreateGeminiModelListClient() => new(
+			_url: string.IsNullOrWhiteSpace(GeminiUrl) ? GeminiDefaultUrl : GeminiUrl,
+			_apiKey: GeminiApiKey ?? "",
+			_model: string.IsNullOrWhiteSpace(GeminiModel) ? "gemini-4-hydrogen" : GeminiModel)
+		{
+			CustomHeaders = ParseCustomHeaders(GeminiCustomHeaders, "Gemini")
+		};
 
 		private SharperLLM.Util.PromptBuilder GetPromptTemplate()
 		{
@@ -523,6 +648,7 @@ namespace ShimmerChatBuiltin
 				OpenAIAsIs = OpenAIAsIs,
 				OpenAIReasoningEchoMode = OpenAIReasoningEchoMode,
 				OpenAICustomRequestBody = OpenAICustomRequestBody,
+				OpenAICustomHeaders = OpenAICustomHeaders,
 
 				DeepSeekUrl = DeepSeekUrl,
 				DeepSeekApiKey = DeepSeekApiKey,
@@ -531,6 +657,8 @@ namespace ShimmerChatBuiltin
 				DeepSeekCtx = DeepSeekCtx,
 				DeepSeekAsIs = DeepSeekAsIs,
 				DeepSeekReasoningEffort = DeepSeekReasoningEffort,
+				DeepSeekCustomRequestBody = DeepSeekCustomRequestBody,
+				DeepSeekCustomHeaders = DeepSeekCustomHeaders,
 
 				OllamaUrl = OllamaUrl,
 				OllamaModel = OllamaModel,
@@ -542,12 +670,15 @@ namespace ShimmerChatBuiltin
 				OpenCodeGoStream = OpenCodeGoStream,
 				OpenCodeGoCtx = OpenCodeGoCtx,
 				OpenCodeGoAsIs = OpenCodeGoAsIs,
+				OpenCodeGoCustomRequestBody = OpenCodeGoCustomRequestBody,
+				OpenCodeGoCustomHeaders = OpenCodeGoCustomHeaders,
 				OpenCodeGoMode = OpenCodeGoMode,
 				OpenCodeGoGeminiUrl = OpenCodeGoGeminiUrl,
 				OpenCodeGoGeminiThinking = OpenCodeGoGeminiThinking,
 				OpenCodeGoGeminiIncludeThoughts = OpenCodeGoGeminiIncludeThoughts,
 				OpenCodeGoGeminiMidSystemTemplate = OpenCodeGoGeminiMidSystemTemplate,
 				OpenCodeGoGeminiCustomRequestBody = OpenCodeGoGeminiCustomRequestBody,
+				OpenCodeGoGeminiCustomHeaders = OpenCodeGoGeminiCustomHeaders,
 
 				OpenAITextUrl = OpenAITextUrl,
 				OpenAITextApiKey = OpenAITextApiKey,

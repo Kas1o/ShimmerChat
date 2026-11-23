@@ -485,6 +485,14 @@
                             <textarea class="su-textarea cfg-code" rows="6"
                                       @bind="config.OpenAICustomRequestBody"
                                       placeholder="@Loc["API CUSTOM REQUEST BODY PLACEHOLDER"]"></textarea>
+                            <p class="cfg-field-hint">@Loc["api_settings.custom_body_hint"]</p>
+                        </div>
+                        <div class="cfg-field cfg-span-12">
+                            <label class="su-label">@Loc["api_settings.custom_headers"]</label>
+                            <textarea class="su-textarea cfg-code" rows="3"
+                                      @bind="config.OpenAICustomHeaders"
+                                      placeholder="@Loc["api_settings.custom_headers_placeholder"]"></textarea>
+                            <p class="cfg-field-hint">@Loc["api_settings.custom_headers_hint"]</p>
                         </div>
                     </div>
                 </section>
@@ -561,6 +569,32 @@
                             <input type="checkbox" @bind="config.DeepSeekAsIs" />
                             <span>@Loc["API ASIS"]</span>
                         </label>
+                    </div>
+                </section>
+
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-braces"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.advanced"]</h3>
+                            <p>@Loc["api_settings.deepseek.advanced_desc"]</p>
+                        </div>
+                    </div>
+                    <div class="cfg-grid">
+                        <div class="cfg-field cfg-span-12">
+                            <label class="su-label">@Loc["API CUSTOM REQUEST BODY"]</label>
+                            <textarea class="su-textarea cfg-code" rows="6"
+                                      @bind="config.DeepSeekCustomRequestBody"
+                                      placeholder="@Loc["api_settings.deepseek.custom_body_placeholder"]"></textarea>
+                            <p class="cfg-field-hint">@Loc["api_settings.deepseek.custom_body_hint"]</p>
+                        </div>
+                        <div class="cfg-field cfg-span-12">
+                            <label class="su-label">@Loc["api_settings.custom_headers"]</label>
+                            <textarea class="su-textarea cfg-code" rows="3"
+                                      @bind="config.DeepSeekCustomHeaders"
+                                      placeholder="@Loc["api_settings.custom_headers_placeholder"]"></textarea>
+                            <p class="cfg-field-hint">@Loc["api_settings.deepseek.custom_headers_hint"]</p>
+                        </div>
                     </div>
                 </section>
             }
@@ -692,17 +726,17 @@
                     }
                 </section>
 
-                @if (config.OpenCodeGoMode == OpenCodeGoMode.Gemini)
-                {
-                    <section class="cfg-section">
-                        <div class="cfg-section-head">
-                            <span class="cfg-section-icon"><i class="bi bi-braces"></i></span>
-                            <div class="cfg-section-title">
-                                <h3>@Loc["api_settings.advanced"]</h3>
-                                <p>@Loc["api_settings.advanced_desc"]</p>
-                            </div>
+                <section class="cfg-section">
+                    <div class="cfg-section-head">
+                        <span class="cfg-section-icon"><i class="bi bi-braces"></i></span>
+                        <div class="cfg-section-title">
+                            <h3>@Loc["api_settings.advanced"]</h3>
+                            <p>@Loc["api_settings.opencode_go.advanced_desc"]</p>
                         </div>
-                        <div class="cfg-grid">
+                    </div>
+                    <div class="cfg-grid">
+                        @if (config.OpenCodeGoMode == OpenCodeGoMode.Gemini)
+                        {
                             <div class="cfg-field cfg-span-12">
                                 <label class="su-label">@Loc["api_settings.gemini.mid_system"]</label>
                                 <textarea class="su-textarea" rows="2" @bind="config.OpenCodeGoGeminiMidSystemTemplate"
@@ -716,9 +750,33 @@
                                           placeholder="@Loc["api_settings.gemini.custom_body_placeholder"]"></textarea>
                                 <p class="cfg-field-hint">@Loc["api_settings.opencode_go.custom_body_hint"]</p>
                             </div>
-                        </div>
-                    </section>
-                }
+                            <div class="cfg-field cfg-span-12">
+                                <label class="su-label">@Loc["api_settings.custom_headers"]</label>
+                                <textarea class="su-textarea cfg-code" rows="3"
+                                          @bind="config.OpenCodeGoGeminiCustomHeaders"
+                                          placeholder="@Loc["api_settings.custom_headers_placeholder"]"></textarea>
+                                <p class="cfg-field-hint">@Loc["api_settings.opencode_go.custom_headers_hint"]</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="cfg-field cfg-span-12">
+                                <label class="su-label">@Loc["API CUSTOM REQUEST BODY"]</label>
+                                <textarea class="su-textarea cfg-code" rows="6"
+                                          @bind="config.OpenCodeGoCustomRequestBody"
+                                          placeholder="@Loc["API CUSTOM REQUEST BODY PLACEHOLDER"]"></textarea>
+                                <p class="cfg-field-hint">@Loc["api_settings.opencode_go.openai_custom_body_hint"]</p>
+                            </div>
+                            <div class="cfg-field cfg-span-12">
+                                <label class="su-label">@Loc["api_settings.custom_headers"]</label>
+                                <textarea class="su-textarea cfg-code" rows="3"
+                                          @bind="config.OpenCodeGoCustomHeaders"
+                                          placeholder="@Loc["api_settings.custom_headers_placeholder"]"></textarea>
+                                <p class="cfg-field-hint">@Loc["api_settings.opencode_go.custom_headers_hint"]</p>
+                            </div>
+                        }
+                    </div>
+                </section>
             }
             else if (config.Type == ApiConfigType.Gemini)
             {
@@ -819,12 +877,14 @@
                             <textarea class="su-textarea cfg-code" rows="6"
                                       @bind="config.GeminiCustomRequestBody"
                                       placeholder="@Loc["api_settings.gemini.custom_body_placeholder"]"></textarea>
+                            <p class="cfg-field-hint">@Loc["api_settings.custom_body_hint"]</p>
                         </div>
                         <div class="cfg-field cfg-span-12">
-                            <label class="su-label">@Loc["api_settings.gemini.custom_headers"]</label>
+                            <label class="su-label">@Loc["api_settings.custom_headers"]</label>
                             <textarea class="su-textarea cfg-code" rows="3"
                                       @bind="config.GeminiCustomHeaders"
-                                      placeholder="@Loc["api_settings.gemini.custom_headers_placeholder"]"></textarea>
+                                      placeholder="@Loc["api_settings.custom_headers_placeholder"]"></textarea>
+                            <p class="cfg-field-hint">@Loc["api_settings.gemini.custom_headers_hint"]</p>
                         </div>
                     </div>
                 </section>
@@ -1647,12 +1707,13 @@
         {
             // Gemini 的模型列表是原生形状（/models），与 OpenAI 家族的 /v1/models 不同客户端。
             // OpenCode Go 两种模式共用同一个 OpenAI 形状的模型列表端点（/inference/go/v1/models），
-            // 因此仍走 BuildModelListClient，不能按 Gemini 模式换成原生客户端。
+            // 因此仍走 CreateModelListClient，不能按 Gemini 模式换成原生客户端。
+            // 客户端统一由 ApiConfig 装配：自定义请求头对「获取模型」同样生效。
             List<string> models;
             if (config.Type == ApiConfigType.Gemini)
-                models = await BuildGeminiModelListClient(config).GetModelNameList();
+                models = await config.CreateGeminiModelListClient().GetModelNameList();
             else
-                models = await BuildModelListClient(config).GetModelNameList();
+                models = await config.CreateModelListClient().GetModelNameList();
 
             // 请求期间可能已经切换到别的配置，旧结果不能覆盖当前配置的列表。
             if (!ReferenceEquals(Current, config))
@@ -1678,37 +1739,6 @@
             _fetchingModels = false;
         }
     }
-
-    private static OpenAIChatCompletionClient BuildModelListClient(ApiConfig config) => config.Type switch
-    {
-        ApiConfigType.OpenAI => new OpenAIChatCompletionClient(
-            _url: config.OpenAIUrl ?? "https://api.openai.com/v1",
-            _apiKey: config.OpenAIApiKey ?? "",
-            _model: config.OpenAIModel ?? "gpt-4o"),
-        ApiConfigType.DeepSeek => new OpenAIChatCompletionClient(
-            _url: config.DeepSeekUrl ?? "https://api.deepseek.com/v1",
-            _apiKey: config.DeepSeekApiKey ?? "",
-            _model: config.DeepSeekModel ?? "deepseek-v4-flash"),
-        ApiConfigType.OpenCodeGo => new OpenAIChatCompletionClient(
-            _url: string.IsNullOrWhiteSpace(config.OpenCodeGoUrl)
-                ? ApiConfig.OpenCodeGoDefaultUrl
-                : config.OpenCodeGoUrl,
-            _apiKey: config.OpenCodeGoApiKey ?? "",
-            _model: string.IsNullOrWhiteSpace(config.OpenCodeGoModel)
-                ? ApiConfig.OpenCodeGoDefaultModel
-                : config.OpenCodeGoModel)
-        {
-            ModelsUrl = string.IsNullOrWhiteSpace(config.OpenCodeGoModelsUrl)
-                ? null
-                : config.OpenCodeGoModelsUrl
-        },
-        _ => throw new InvalidOperationException($"API type '{config.Type}' does not support model listing.")
-    };
-
-    private static GeminiChatCompletionClient BuildGeminiModelListClient(ApiConfig config) => new(
-        _url: string.IsNullOrWhiteSpace(config.GeminiUrl) ? ApiConfig.GeminiDefaultUrl : config.GeminiUrl,
-        _apiKey: config.GeminiApiKey ?? "",
-        _model: string.IsNullOrWhiteSpace(config.GeminiModel) ? "gemini-4-hydrogen" : config.GeminiModel);
 
     private static bool SupportsModelFetch(ApiConfigType type) =>
         type is ApiConfigType.OpenAI or ApiConfigType.DeepSeek or ApiConfigType.OpenCodeGo or ApiConfigType.Gemini;

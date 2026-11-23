@@ -60,7 +60,7 @@
   "OpenAIText Warning Title": "Note: OpenAI Text Completion (/completions)",
   "OpenAIText Warning Description": "Most OpenAI-compatible endpoints have deprecated the /completions API. If this mode doesn't work, switch to OpenAI (chat) type instead. Only use this if your API explicitly supports the /completions endpoint.",
   "OpenCodeGo Info Title": "OpenCode Go (OpenAI-compatible / Gemini)",
-  "OpenCodeGo Info Description": "Subscribe to OpenCode Go, then paste the API key from the OpenCode Console below. Pick one protocol: OpenAI-compatible uses /openai/v1/chat/completions, native Gemini uses /google/v1beta/models/<model>:generateContent. Both carry a User-Agent plus an x-opencode-session header (the current chat GUID); Gemini mode additionally supports thinking levels, thought summaries, and thought-signature replay.",
+  "OpenCodeGo Info Description": "Subscribe to OpenCode Go, then paste the API key from the OpenCode Console below. Pick one protocol: OpenAI-compatible uses /openai/v1/chat/completions, native Gemini uses /google/v1beta/models/<model>:generateContent. Both carry a User-Agent plus an x-opencode-session header (the current chat GUID); OpenCode Go requires them to identify the app and the chat, so the host pre-writes them. Override them under Advanced → Custom headers (same header name), and use Custom request body to override pre-written request parameters. Gemini mode additionally supports thinking levels, thought summaries, and thought-signature replay.",
   "API MODELS URL": "API Models URL",
   "Text Completion Settings:": "Text Completion Settings:",
   "Create New Text Completion Setting Profile": "Create New Text Completion Setting Profile",

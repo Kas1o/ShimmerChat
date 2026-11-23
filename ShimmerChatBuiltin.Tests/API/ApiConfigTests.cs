@@ -441,4 +441,253 @@ public class ApiConfigTests
 
         config.Clone().Pinned.Should().BeTrue();
     }
+
+    [Fact]
+    public void OpenAI_CustomRequestBodyAndHeaders_AreApplied()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenAI,
+            OpenAIApiKey = "key",
+            OpenAICustomRequestBody = "{\"top_k\": 5}",
+            OpenAICustomHeaders = "X-Tenant: main"
+        };
+
+        var client = ResolveClient(config, null);
+
+        client.CustomRequestProperties.Should().ContainKey("top_k");
+        client.CustomHeaders.Should().NotBeNull();
+        client.CustomHeaders!["x-tenant"].Should().Be("main");
+    }
+
+    [Fact]
+    public void OpenAI_InvalidCustomHeaders_FailExplicitly()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenAI,
+            OpenAIApiKey = "key",
+            OpenAICustomHeaders = "garbage line without separator"
+        };
+
+        var act = () => config.ToAPISetting();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*OpenAI*Name: Value*");
+    }
+
+    [Fact]
+    public void DeepSeek_PreWritesThinkingAndReasoningEffort()
+    {
+        var plain = new ApiConfig { Type = ApiConfigType.DeepSeek, DeepSeekApiKey = "key" };
+        var props = ResolveClient(plain, null).CustomRequestProperties!;
+        props.Should().ContainKey("thinking");
+        JsonConvert.SerializeObject(props["thinking"]).Should().Contain("disabled");
+        props.Should().NotContainKey("reasoning_effort");
+
+        var effort = new ApiConfig
+        {
+            Type = ApiConfigType.DeepSeek,
+            DeepSeekApiKey = "key",
+            DeepSeekReasoningEffort = "high"
+        };
+        var effortProps = ResolveClient(effort, null).CustomRequestProperties!;
+        effortProps["reasoning_effort"].Should().Be("high");
+        JsonConvert.SerializeObject(effortProps["thinking"]).Should().Contain("enabled");
+    }
+
+    [Fact]
+    public void DeepSeek_CustomRequestBody_OverridesPreWrittenThinking()
+    {
+        // 自定义参数最后合并：同键覆盖预写入的 thinking / reasoning_effort（设置页提示已告知）。
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.DeepSeek,
+            DeepSeekApiKey = "key",
+            DeepSeekReasoningEffort = "high",
+            DeepSeekCustomRequestBody = "{\"thinking\":{\"type\":\"disabled\"},\"reasoning_effort\":\"max\",\"top_p\":0.5}"
+        };
+
+        var props = ResolveClient(config, null).CustomRequestProperties!;
+
+        JsonConvert.SerializeObject(props["thinking"]).Should().Contain("disabled");
+        props["reasoning_effort"].Should().Be("max");
+        props.Should().ContainKey("top_p");
+    }
+
+    [Fact]
+    public void DeepSeek_CustomHeaders_AreApplied()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.DeepSeek,
+            DeepSeekApiKey = "key",
+            DeepSeekCustomHeaders = "Authorization: Bearer gateway-token"
+        };
+
+        var client = ResolveClient(config, null);
+
+        client.CustomHeaders!["authorization"].Should().Be("Bearer gateway-token");
+    }
+
+    [Fact]
+    public void DeepSeek_InvalidCustomRequestBody_FailsExplicitly()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.DeepSeek,
+            DeepSeekApiKey = "key",
+            DeepSeekCustomRequestBody = "{ not json"
+        };
+
+        var act = () => config.ToAPISetting();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*DeepSeek*not valid JSON*");
+    }
+
+    [Fact]
+    public void OpenCodeGo_OpenAIMode_CustomBodyAndHeaders_OverridePreWritten()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoCustomRequestBody = "{\"thinking\":{\"type\":\"disabled\"}}",
+            OpenCodeGoCustomHeaders = "User-Agent: my-app/9.9\nx-opencode-session: chat-9\nX-Tenant: main"
+        };
+
+        var client = ResolveClient(config, "chat-1");
+
+        client.CustomRequestProperties.Should().ContainKey("thinking");
+        client.CustomHeaders.Should().NotBeNull();
+        // 自定义头忽略大小写覆盖预写入的应用 / 对话标识
+        client.CustomHeaders!["User-Agent"].Should().Be("my-app/9.9");
+        client.CustomHeaders!["x-opencode-session"].Should().Be("chat-9");
+        client.CustomHeaders!["x-tenant"].Should().Be("main");
+    }
+
+    [Fact]
+    public void OpenCodeGo_OpenAIMode_InvalidCustomRequestBody_FailsExplicitly()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoCustomRequestBody = "{ not json"
+        };
+
+        var act = () => config.ToAPISetting("chat-1");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*OpenCode Go*not valid JSON*");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_CustomHeaders_OverridePreWritten()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoGeminiCustomHeaders = "User-Agent: my-app/9.9\nAuthorization: Bearer proxy"
+        };
+
+        var client = ResolveGeminiClient(config, "chat-1");
+
+        client.CustomHeaders!["User-Agent"].Should().Be("my-app/9.9");
+        client.CustomHeaders!["Authorization"].Should().Be("Bearer proxy");
+        // 未被覆盖的预写入头仍然保留
+        client.CustomHeaders!["x-opencode-session"].Should().Be("chat-1");
+    }
+
+    [Fact]
+    public void OpenCodeGo_GeminiMode_InvalidCustomHeaders_FailExplicitly()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenCodeGoMode = OpenCodeGoMode.Gemini,
+            OpenCodeGoApiKey = "key",
+            OpenCodeGoGeminiCustomHeaders = "no separator"
+        };
+
+        var act = () => config.ToAPISetting("chat-1");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*OpenCode Go Gemini*Name: Value*");
+    }
+
+    [Fact]
+    public void CreateModelListClient_ReusesCustomHeaders()
+    {
+        // 「获取模型」与对话请求共用自定义头：配了网关鉴权头后模型列表请求也要带得上。
+        var openAi = new ApiConfig
+        {
+            Type = ApiConfigType.OpenAI,
+            OpenAIApiKey = "key",
+            OpenAICustomHeaders = "X-Tenant: main"
+        };
+        openAi.CreateModelListClient().CustomHeaders!["x-tenant"].Should().Be("main");
+
+        var deepSeek = new ApiConfig
+        {
+            Type = ApiConfigType.DeepSeek,
+            DeepSeekApiKey = "key",
+            DeepSeekCustomHeaders = "X-Tenant: main"
+        };
+        deepSeek.CreateModelListClient().CustomHeaders!["x-tenant"].Should().Be("main");
+    }
+
+    [Fact]
+    public void CreateModelListClient_OpenCodeGo_CarriesIdentityHeaders()
+    {
+        var config = new ApiConfig { Type = ApiConfigType.OpenCodeGo, OpenCodeGoApiKey = "key" };
+
+        var client = config.CreateModelListClient();
+
+        client.ModelsUrl.Should().Be(ApiConfig.OpenCodeGoDefaultModelsUrl);
+        client.CustomHeaders!["User-Agent"].Should().Be(ApiConfig.OpenCodeGoUserAgent);
+        // 获取模型时没有对话上下文：不发送会话头
+        client.CustomHeaders!.Should().NotContainKey("x-opencode-session");
+    }
+
+    [Fact]
+    public void CreateModelListClient_UnsupportedType_FailsExplicitly()
+    {
+        var config = new ApiConfig { Type = ApiConfigType.Ollama };
+
+        var act = () => config.CreateModelListClient();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*does not support model listing*");
+    }
+
+    [Fact]
+    public void CloneAndRoundTrip_CopyCustomOverrideFields()
+    {
+        var config = new ApiConfig
+        {
+            Type = ApiConfigType.OpenCodeGo,
+            OpenAICustomHeaders = "X-A: 1",
+            DeepSeekCustomRequestBody = "{\"a\":1}",
+            DeepSeekCustomHeaders = "X-B: 2",
+            OpenCodeGoCustomRequestBody = "{\"b\":2}",
+            OpenCodeGoCustomHeaders = "X-C: 3",
+            OpenCodeGoGeminiCustomHeaders = "X-D: 4"
+        };
+
+        var clone = config.Clone();
+        clone.OpenAICustomHeaders.Should().Be("X-A: 1");
+        clone.DeepSeekCustomRequestBody.Should().Be("{\"a\":1}");
+        clone.DeepSeekCustomHeaders.Should().Be("X-B: 2");
+        clone.OpenCodeGoCustomRequestBody.Should().Be("{\"b\":2}");
+        clone.OpenCodeGoCustomHeaders.Should().Be("X-C: 3");
+        clone.OpenCodeGoGeminiCustomHeaders.Should().Be("X-D: 4");
+
+        var restored = JsonConvert.DeserializeObject<List<ApiConfig>>(
+            JsonConvert.SerializeObject(new List<ApiConfig> { config }))![0];
+        restored.OpenAICustomHeaders.Should().Be("X-A: 1");
+        restored.DeepSeekCustomRequestBody.Should().Be("{\"a\":1}");
+        restored.DeepSeekCustomHeaders.Should().Be("X-B: 2");
+        restored.OpenCodeGoCustomRequestBody.Should().Be("{\"b\":2}");
+        restored.OpenCodeGoCustomHeaders.Should().Be("X-C: 3");
+        restored.OpenCodeGoGeminiCustomHeaders.Should().Be("X-D: 4");
+    }
 }
