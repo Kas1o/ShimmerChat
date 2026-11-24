@@ -14,7 +14,7 @@
 IImageAttachmentService.SaveAsync ── 上传处理方式（原图模式 / 处理模式）
    │                                    └─ 处理模式：ImageNormalizer 按像素预算缩放 + 重编码
    ▼
-MessageImage（UserUploadImage 文件引用 / 消息内联 Base64）
+MessageImage（Data/UserUploadImage 文件引用 / 消息内联 Base64）
    │
    ▼
 AppendChatMessagesNode（Pre 管线）── 解析为 ChatImage；Budgeted 策略下超预算图像再次经过 ImageNormalizer
@@ -37,7 +37,7 @@ SharperLLM（只处理 Base64 内容块，不接触文件系统）
 
 | 方式 | 说明 |
 |------|------|
-| `UserUploadImage`（默认） | 图像写入 `UserUploadImage` 目录，消息里只保存文件名引用 |
+| `UserUploadImage`（默认） | 图像写入 `Data/UserUploadImage` 目录，消息里只保存文件名引用 |
 | `MessageBase64` | Base64 直接内联进消息，随对话一起导出 / 迁移，消息体积更大 |
 
 设置每次读取，切换后立即对**新的上传**生效；目录同时由 Program.cs 以 `/userimages/` 暴露为静态资源。
@@ -114,7 +114,7 @@ native 缺失时异常（`DllNotFoundException` 等）原样向上抛出，不�
 | `ImageCompression` | `WebP`（默认）/ `Jpeg` / `None` |
 | `ImageQuality` | 1-100，默认 85 |
 
-- 处理只发生在**本次请求的内存副本**上：消息持久化数据、`UserUploadImage` 文件都不被修改，
+- 处理只发生在**本次请求的内存副本**上：消息持久化数据、`Data/UserUploadImage` 文件都不被修改，
   每一轮按当时的节点配置重新处理。
 - 越界的节点属性值（手改 JSON）在消费前收敛到合法区间，收敛动作写入 DebugOutput。
 - 旧节点树反序列化后落到 `AsStored`，行为与旧版一致。

@@ -1,13 +1,14 @@
 using Microsoft.Extensions.Logging;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
+using ShimmerChatLib.Storage;
 using System.Text.Json;
 
 namespace ShimmerChat.Singletons
 {
     /// <summary>
-    /// 本地文件存储的调试输出服务：每条输出持久化为 DebugOutput/{EntryId:N}.json 文件。
-    /// 与 LiteDBDebugOutputService 行为等价，通过 KVDataStorage 配置选择使用。
+    /// 本地文件存储的调试输出服务：每条输出持久化为 Data/LocalFileStorage/debug_output/{EntryId:N}.json。
+    /// 与 LiteDBDebugOutputService 行为等价，通过 storage_settings.json 按仓库选择使用。
     /// </summary>
     public class FileSystemDebugOutputService : IDebugOutputService
     {
@@ -24,9 +25,11 @@ namespace ShimmerChat.Singletons
         /// <summary>
         /// 初始化 FileSystemDebugOutputService 实例
         /// </summary>
-        public FileSystemDebugOutputService(ILogger<FileSystemDebugOutputService> logger)
+        /// <param name="logger">日志记录器</param>
+        /// <param name="rootPath">可选根目录（测试用），默认使用 Data/LocalFileStorage/debug_output</param>
+        public FileSystemDebugOutputService(ILogger<FileSystemDebugOutputService> logger, string? rootPath = null)
         {
-            root = Path.Combine(AppContext.BaseDirectory, "DebugOutput");
+            root = rootPath ?? DataPaths.Current.LocalDebugOutputDirectory;
             if (!Directory.Exists(root))
             {
                 Directory.CreateDirectory(root);
@@ -98,6 +101,34 @@ namespace ShimmerChat.Singletons
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to write debug output entry: {Message}", ex.Message);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 迁移用：导出全部条目。
+        /// </summary>
+        public IReadOnlyList<DebugOutputEntry> ReadAll()
+        {
+            return ReadAllEntries()
+                .OrderByDescending(e => e.Timestamp)
+                .ToList();
+        }
+
+        /// <summary>
+        /// 迁移用：按原 EntryId 与时间戳原样写入，不重新生成 Id。
+        /// </summary>
+        public void Import(DebugOutputEntry entry)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+
+            try
+            {
+                File.WriteAllText(GetEntryFilePath(entry.Id), JsonSerializer.Serialize(entry, JsonOptions));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to import debug output entry {Id}: {Message}", entry.Id, ex.Message);
                 throw;
             }
         }

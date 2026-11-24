@@ -1,31 +1,36 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
+using ShimmerChatLib.Storage;
 
 namespace ShimmerChat.Singletons.VectorStore
 {
     /// <summary>
-    /// 向量存储的 DI 注册。provider 由 appsettings 的 VectorStore 节决定，
+    /// 向量存储的 DI 注册。provider 由 Data/storage_settings.json 的 VectorStore 节决定，
     /// 未知取值在启动阶段直接失败，不静默回落到默认实现。
     /// </summary>
     public static class VectorStoreServiceCollectionExtensions
     {
         public static IServiceCollection AddShimmerVectorStore(
             this IServiceCollection services,
-            IConfiguration configuration)
+            VectorStoreConfig config,
+            DataPaths paths)
         {
-            var config = configuration.GetSection("VectorStore").Get<VectorStoreConfig>() ?? new VectorStoreConfig();
+            ArgumentNullException.ThrowIfNull(config);
+            ArgumentNullException.ThrowIfNull(paths);
 
             var provider = config.GetProvider();
-            _ = config.IsPerCollectionScope();
 
             services.AddSingleton(config);
+            services.AddSingleton(paths);
 
             switch (provider)
             {
                 case VectorStoreProvider.LiteDb:
                     services.AddSingleton<IVectorStoreService, LiteDbVectorStore>();
+                    break;
+                case VectorStoreProvider.File:
+                    services.AddSingleton<IVectorStoreService, FileVectorStore>();
                     break;
                 case VectorStoreProvider.InMemory:
                     services.AddSingleton<IVectorStoreService, InMemoryVectorStore>();

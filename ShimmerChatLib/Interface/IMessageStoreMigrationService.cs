@@ -5,8 +5,8 @@ namespace ShimmerChatLib.Interface
     /// </summary>
     public interface IMessageStoreMigrationService
     {
-        int MigrateFileToLite();
-        int MigrateLiteToFile();
+        int MigrateFileToLite(bool clearSource = false);
+        int MigrateLiteToFile(bool clearSource = false);
         int GetFileStoreCount();
         int GetLiteStoreCount();
     }

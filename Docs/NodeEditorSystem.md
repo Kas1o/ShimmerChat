@@ -204,14 +204,14 @@ public sealed record NodePropertyOption(
 
 | 行为 | 说明 |
 |------|------|
-| 上传 | `InputFile` → `IImageAttachmentService.SaveAsync`，按全局图像存储设置落盘（默认 `UserUploadImage`）或内联 Base64 |
+| 上传 | `InputFile` → `IImageAttachmentService.SaveAsync`，按全局图像存储设置落盘（默认 `Data/UserUploadImage`）或内联 Base64 |
 | 值形态 | 仍是 `string` 属性里的 JSON 数组，元素为 `{ "mimeType": ..., "base64": ... }` 或 `{ "mimeType": ..., "fileName": ... }`；节点树序列化白名单不需要认识图像类型 |
 | 预览 | 复用 `IImageAttachmentService.GetDisplayUrl`；文件缺失显示可见提示，不渲染破图 |
 | 编辑 | 删除 / 前移 / 后移立即通过 `ValueChanged` 写回节点 |
 | 坏 JSON | 显示错误并自动打开「编辑 JSON」源码视图，绝不静默清空为 `[]` |
 | 共享约束 | MIME 列表、单张大小上限、`data:` URL 解析统一来自 `ImageAttachmentRules`，聊天上传与节点编辑读同一份 |
 
-需要把图像随节点配置一起分发时，可以继续用 JSON 源码模式直接粘贴 Base64；文件模式则依赖 `UserUploadImage` 中的文件仍然存在。
+需要把图像随节点配置一起分发时，可以继续用 JSON 源码模式直接粘贴 Base64；文件模式则依赖 `Data/UserUploadImage` 中的文件仍然存在。
 
 ---
 

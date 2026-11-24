@@ -35,8 +35,14 @@ namespace ShimmerChatLib.Interface
     /// </summary>
     public enum VectorStoreProvider
     {
+        /// <summary>LiteDB 单文件（Data/LiteDB/vector.db）。</summary>
         LiteDb = 0,
-        InMemory = 1
+
+        /// <summary>纯内存，进程退出即丢失。</summary>
+        InMemory = 1,
+
+        /// <summary>文件存储（Data/LocalFileStorage/vector/，每个集合一个 JSON 文件）。</summary>
+        File = 2
     }
 
     /// <summary>

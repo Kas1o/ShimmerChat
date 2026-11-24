@@ -14,7 +14,7 @@
 | A1111 工作流 | 标准 txt2img 参数，不支持自定义工作流 |
 | 工具暴露 | 每份配置暴露为独立工具 `generate_image_{id}`；Id 为 `default` 时为 `generate_image` |
 | 节点选择 | 工具集节点用 `image_generation_configs` 下拉选项选择某一分配置；留空表示全部启用的配置 |
-| 图像存储 | 生成结果始终写入 `UserUploadImage` 目录，不受「上传图像存储方式」的 Base64 设置影响 |
+| 图像存储 | 生成结果始终写入 `Data/UserUploadImage` 目录，不受「上传图像存储方式」的 Base64 设置影响 |
 | 返回格式 | 工具返回 `/userimages/...` 的 Markdown 图片语法与裸 URL；同时把生成图附加到 tool_result 消息，让模型在下一轮真正“看到”图像 |
 | 取消与失败 | 所有 HTTP 请求响应取消令牌；超时、服务错误、节点校验错误、落盘失败都返回明确错误码 |
 
@@ -165,7 +165,7 @@ Id = default       → generate_image
 
 ## 5. 工具参数
 
-所有工具都会把生成结果保存到 UserUploadImage，并返回 `/userimages/...` 链接与 `ToolResult.Images`。
+所有工具都会把生成结果保存到 `Data/UserUploadImage`，并返回 `/userimages/...` 链接与 `ToolResult.Images`。
 
 ### 5.1 ComfyUI 默认工作流 / A1111
 
@@ -276,7 +276,7 @@ GET /sdapi/v1/samplers    → name 作为采样器候选
 
 生成结果通过 `IImageAttachmentService.SaveGeneratedAsync` 保存：
 
-- 无论上传图像存储方式是什么，都写入 `UserUploadImage` 目录，并返回只含文件名的 `MessageImage`。
+- 无论上传图像存储方式是什么，都写入 `Data/UserUploadImage` 目录，并返回只含文件名的 `MessageImage`。
 - 文件名为新 Guid + 按 MIME 决定的扩展名。
 - **落盘前按该 Profile 的 `OutputImageProcessing` 处理**（每次执行时折算，全局设置热切换立即生效）：
   `FollowGlobal`（默认）跟随设置 → 杂项 → 图像设置中的「上传图像处理方式」；`Original` 原样落盘；

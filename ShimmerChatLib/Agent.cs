@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
+using ShimmerChatLib.Storage;
 
 namespace ShimmerChatLib
 {
@@ -113,8 +114,8 @@ namespace ShimmerChatLib
 
             string? avatar = null;
             string? background = null;
-			string avatarPath = $"{AppContext.BaseDirectory}/UserUploadImage/{this.AvatarGuid}.png";
-			string backgroundPath = $"{AppContext.BaseDirectory}/UserUploadImage/{this.BackgroundGuid}.png";
+			string avatarPath = Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{this.AvatarGuid}.png");
+			string backgroundPath = Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{this.BackgroundGuid}.png");
 
 			if (AvatarGuid != null)
             if (File.Exists(avatarPath))
@@ -166,7 +167,7 @@ namespace ShimmerChatLib
             {
                 var avatarBytes = Convert.FromBase64String(importStructure.AvatarBase64);
                 var avatarGuid = Guid.NewGuid();
-                var avatarPath = $"{AppContext.BaseDirectory}/UserUploadImage/{avatarGuid}.png";
+                var avatarPath = Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{avatarGuid}.png");
                 File.WriteAllBytes(avatarPath, avatarBytes);
                 agent.AvatarGuid = avatarGuid;
             }
@@ -174,7 +175,7 @@ namespace ShimmerChatLib
             {
                 var backgroundBytes = Convert.FromBase64String(importStructure.BackgroundBase64);
                 var backgroundGuid = Guid.NewGuid();
-                var backgroundPath = $"{AppContext.BaseDirectory}/UserUploadImage/{backgroundGuid}.png";
+                var backgroundPath = Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{backgroundGuid}.png");
                 File.WriteAllBytes(backgroundPath, backgroundBytes);
                 agent.BackgroundGuid = backgroundGuid;
             }

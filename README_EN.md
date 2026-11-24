@@ -39,7 +39,7 @@ Pre-Generation Tree ──→ LLM Generation ──→ Post-Generation Tree ─�
 | 🧠 **SubAgent** | Nest other Agents within a node tree, building complex collaboration workflows |
 | 📐 **Math Formulas** | Renders LaTeX in messages (`$...$`, `$$...$$`, `\(...\)`, `\[...\]`), MathML by default, KaTeX markup optional |
 | 🎨 **Theme System** | Full theme CRUD + import/export, CSS variable driven |
-| 💾 **Persistent Storage** | LiteDB embedded database / JSON file dual-mode, automatic migration |
+| 💾 **Persistent Storage** | Everything lives under `Data/`; KV, messages, debug output and vectors each pick LiteDB or JSON files, with automatic migration |
 | 🔌 **Plugin System** | Dynamic assembly loading, nodes/tools/panels all plugin-based, equal status with built-in features |
 | 🌐 **Multi-language** | zh-CN / en-US localization, instant switching |
 | 🖥️ **Desktop App** | Tauri v2 desktop shell, one-click packaging as native desktop application |

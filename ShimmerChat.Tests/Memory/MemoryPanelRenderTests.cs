@@ -2,8 +2,6 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
 using ShimmerChat.Singletons.VectorStore;
@@ -11,6 +9,7 @@ using ShimmerChatBuiltin.Memory;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
 using ShimmerChatLib.Panel;
+using ShimmerChatLib.Storage;
 
 namespace ShimmerChat.Tests.Memory;
 
@@ -137,18 +136,14 @@ public sealed class MemoryPanelRenderTests : IDisposable
     [Fact]
     public async Task BackendSection_ShowsConfigFileAndSnippetInsteadOfEditableFields()
     {
-        var contentRoot = Path.Combine(_root, "content");
-        Directory.CreateDirectory(contentRoot);
-        File.WriteAllText(Path.Combine(contentRoot, "appsettings.json"), "{}");
-
-        await using var services = BuildBackendServices(contentRoot, new VectorStoreConfig());
+        await using var services = BuildBackendServices(new VectorStoreConfig());
         var html = await RenderAsync<MemoryBackendSection>(services, new Dictionary<string, object?>());
 
-        html.Should().Contain("appsettings.json");
+        html.Should().Contain(DataPaths.StorageSettingsFileName);
         html.Should().Contain("su-pre");
         // 配置值以代码块呈现，而不是看起来能改的输入框
         html.Should().Contain("LiteDb");
-        html.Should().Contain("RootPath");
+        html.Should().NotContain("RootPath");
         html.Should().NotContain("<input");
         // 修改方法必须写清楚
         html.Should().Contain("panel.memory.backend_step_edit");
@@ -160,11 +155,7 @@ public sealed class MemoryPanelRenderTests : IDisposable
     [Fact]
     public async Task BackendSection_InMemory_ExplainsNothingIsWrittenToDisk()
     {
-        var contentRoot = Path.Combine(_root, "content-memory");
-        Directory.CreateDirectory(contentRoot);
-
         await using var services = BuildBackendServices(
-            contentRoot,
             new VectorStoreConfig { Provider = "InMemory" });
         var html = await RenderAsync<MemoryBackendSection>(services, new Dictionary<string, object?>());
 
@@ -172,12 +163,12 @@ public sealed class MemoryPanelRenderTests : IDisposable
         html.Should().NotContain("panel.memory.backend_data_root");
     }
 
-    private ServiceProvider BuildBackendServices(string contentRoot, VectorStoreConfig config)
+    private ServiceProvider BuildBackendServices(VectorStoreConfig config)
     {
         var services = new ServiceCollection();
         services.AddSingleton<ILocService>(new FakeLoc());
         services.AddSingleton(config);
-        services.AddSingleton<IHostEnvironment>(new FakeHost { ContentRootPath = contentRoot });
+        services.AddSingleton(new DataPaths(Path.Combine(_root, "content", "Data")));
         services.AddSingleton<IJSRuntime>(new FakeJs());
         services.AddLogging();
         return services.BuildServiceProvider();
@@ -209,14 +200,6 @@ public sealed class MemoryPanelRenderTests : IDisposable
         public void SetCulture(string culture)
         {
         }
-    }
-
-    private sealed class FakeHost : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = "Test";
-        public string ApplicationName { get; set; } = "ShimmerChat";
-        public string ContentRootPath { get; set; } = string.Empty;
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
     private sealed class FakeJs : IJSRuntime

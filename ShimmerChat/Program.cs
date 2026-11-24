@@ -1,12 +1,14 @@
 using ShimmerChat.Components;
 using ShimmerChat.Singletons;
+using ShimmerChat.Singletons.Storage;
 using ShimmerChat.Singletons.VectorStore;
+using ShimmerChatLib;
 using ShimmerChatLib.ChatView;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.HomeWidget;
-using ShimmerChatLib;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
+using ShimmerChatLib.Storage;
 using Microsoft.Extensions.FileProviders;
 using System.Reflection;
 
@@ -26,6 +28,54 @@ Console.WriteLine($"Version: {infoVer}");
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 数据布局：所有持久化数据都在 Data/ 下。必须在任何数据库被打开前确定，
+// 并在服务注册前完成旧目录结构的迁移。
+var dataPaths = DataPaths.Create(
+    AppContext.BaseDirectory,
+    builder.Configuration[DataPaths.RootConfigurationKey]);
+DataPaths.Configure(dataPaths);
+
+var storageSettingsStore = new StorageSettingsStore(dataPaths);
+var legacyStoreConfig = builder.Configuration.GetSection("KVDataStorage").Get<StoreStorageConfig>();
+var legacyVectorConfig = builder.Configuration.GetSection("VectorStore").Get<VectorStoreConfig>();
+var storageDefaults = StorageSettings.CreateDefaults(legacyStoreConfig, legacyVectorConfig);
+
+if (!File.Exists(dataPaths.StorageSettingsFile))
+{
+    // 首次生成配置：旧版只有一个全局开关，且 appsettings 可能已被升级覆盖；
+    // 按旧数据实际所在位置逐仓库推断，避免文件后端用户升级后看到"数据消失"。
+    LegacyStorageDetector.ApplyToDefaults(
+        storageDefaults,
+        AppContext.BaseDirectory,
+        legacyConfigPresent: legacyStoreConfig is not null,
+        message => Console.WriteLine($"[Storage] {message}"));
+}
+
+var storageSettings = storageSettingsStore.LoadOrCreate(storageDefaults, out var storageSettingsCreated);
+
+Console.WriteLine(storageSettingsCreated
+    ? $"[Storage] 已生成存储配置：{dataPaths.StorageSettingsFile}"
+    : $"[Storage] 使用存储配置：{dataPaths.StorageSettingsFile}");
+
+if (legacyStoreConfig is not null || legacyVectorConfig is not null)
+{
+    Console.WriteLine(storageSettingsCreated
+        ? "[Storage] 已把 appsettings.json 中的旧 KVDataStorage/VectorStore 写入初始 storage_settings.json。"
+        : "[Storage] appsettings.json 中的 KVDataStorage/VectorStore 已被 Data/storage_settings.json 取代，本次启动忽略。");
+}
+
+var legacyLayoutMigrator = new StorageLayoutMigrator(
+    AppContext.BaseDirectory,
+    dataPaths,
+    message => Console.WriteLine($"[Storage] {message}"));
+
+legacyLayoutMigrator.Migrate(
+    builder.Configuration["VectorStore:RootPath"],
+    legacyStoreConfig?.GetStorageType() ?? KVStorageType.LiteDB);
+
+builder.Services.AddSingleton(dataPaths);
+builder.Services.AddSingleton(storageSettings);
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -36,11 +86,11 @@ builder.Services.AddSignalR(options =>
 	options.MaximumReceiveMessageSize = 50 * 1024 * 1024;
 });
 
-// 配置 KV 数据存储
-ConfigureKVDataStorage(builder);
+// 配置各数据仓库（KV / 聊天消息 / 调试输出）的存储实现
+ConfigureStorageServices(builder, dataPaths, storageSettings);
 
-// 配置向量存储（默认 LiteDB，实现由 appsettings:VectorStore 决定）
-builder.Services.AddShimmerVectorStore(builder.Configuration);
+// 配置向量存储（LiteDb / File / InMemory，实现由 storage_settings.json 的 VectorStore 决定）
+builder.Services.AddShimmerVectorStore(storageSettings.VectorStore, dataPaths);
 
 // ShimmerChat 2.0 服务
 builder.Services.AddSingleton<IToolRegistry, ToolRegistry>();
@@ -88,8 +138,8 @@ builder.Services.AddSingleton<ILocService, LocService>();
 
 var app = builder.Build();
 
-// 执行自动迁移（如果需要）
-ExecuteAutoMigration(app);
+// 执行各仓库的存储后端迁移（如果配置要求）
+ExecuteStorageAutoMigration(app);
 
 // ShimmerChat 2.0: 执行 Agent 数据迁移
 ExecuteAgentMigration(app);
@@ -114,7 +164,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 // 配置用户上传图片 Configure User Upload Image
-var userImagePath = Path.Combine(AppContext.BaseDirectory, "UserUploadImage");
+var userImagePath = dataPaths.UserUploadImageDirectory;
 if (!Directory.Exists(userImagePath))
     Directory.CreateDirectory(userImagePath);
 app.UseStaticFiles(new StaticFileOptions
@@ -197,150 +247,171 @@ static void RegisterPluginStaticFiles(WebApplication app)
     }
 }
 
-// 配置 KV 数据存储服务
-static void ConfigureKVDataStorage(WebApplicationBuilder builder)
+// 按仓库（KV / 聊天消息 / 调试输出）分别注册存储实现与迁移服务
+static void ConfigureStorageServices(
+    WebApplicationBuilder builder,
+    DataPaths paths,
+    StorageSettings settings)
 {
-    var config = builder.Configuration.GetSection("KVDataStorage").Get<KVDataStorageConfig>() ?? new KVDataStorageConfig();
-    builder.Services.AddSingleton(config);
+    builder.Services.AddSingleton<LiteDatabaseFactory>();
+    builder.Services.AddSingleton<IStorageMigrationMarker>(_ => new StorageMigrationMarker(
+        paths,
+        // 旧版标记只读兼容：新标记缺失时仍能判断升级前的迁移状态。
+        [Path.Combine(AppContext.BaseDirectory, "KVData", ".migration_marker")]));
 
-    // 创建共享的 LiteDatabase 实例（消息存储和 KV 存储共用）
-    string dbPath = Path.Combine(AppContext.BaseDirectory, "LiteDBKVData", "data.db");
-    string? dbDir = Path.GetDirectoryName(dbPath);
-    if (!string.IsNullOrEmpty(dbDir) && !Directory.Exists(dbDir))
-    {
-        Directory.CreateDirectory(dbDir);
-    }
-    var sharedDatabase = new LiteDB.LiteDatabase(dbPath);
-    builder.Services.AddSingleton(sharedDatabase);
-
-    // 始终注册两种消息存储实现（用于迁移服务）
-    builder.Services.AddSingleton<FileMessageStoreService>();
-    builder.Services.AddSingleton<LiteDBMessageStoreService>();
+    // 两种实现始终注册：迁移服务需要同时访问源与目标仓库。
+    builder.Services.AddSingleton(_ => new FileMessageStoreService(paths.LocalChatMessageDirectory));
+    builder.Services.AddSingleton(sp => new LiteDBMessageStoreService(
+        sp.GetRequiredService<LiteDatabaseFactory>().Open(paths.ChatMessageDatabase)));
     builder.Services.AddSingleton<IMessageStoreMigrationService, MessageStoreMigrationService>();
 
-    // 注册迁移标记管理器
-    builder.Services.AddSingleton<IKVDataMigrationMarker, KVDataMigrationMarker>();
-
-    // 始终注册两种 KV 存储实现（用于迁移服务）
-    builder.Services.AddSingleton<LocalFileStorageKVData>();
-    builder.Services.AddSingleton<LiteDBKVData>();
+    builder.Services.AddSingleton(sp => new LocalFileStorageKVData(
+        sp.GetRequiredService<ILogger<LocalFileStorageKVData>>(),
+        paths.LocalKvDataDirectory));
+    builder.Services.AddSingleton(sp => new LiteDBKVData(
+        sp.GetRequiredService<LiteDatabaseFactory>().Open(paths.KvDataDatabase),
+        sp.GetRequiredService<ILogger<LiteDBKVData>>()));
     builder.Services.AddSingleton<IKVDataMigrationService, KVDataMigrationService>();
 
-    // 始终注册两种 DebugOutput 实现
-    builder.Services.AddSingleton<LiteDBDebugOutputService>();
-    builder.Services.AddSingleton<FileSystemDebugOutputService>();
+    builder.Services.AddSingleton(sp => new LiteDBDebugOutputService(
+        sp.GetRequiredService<LiteDatabaseFactory>().Open(paths.DebugOutputDatabase)));
+    builder.Services.AddSingleton(sp => new FileSystemDebugOutputService(
+        sp.GetRequiredService<ILogger<FileSystemDebugOutputService>>(),
+        paths.LocalDebugOutputDirectory));
+    builder.Services.AddSingleton<IDebugOutputMigrationService, DebugOutputMigrationService>();
 
-    // 根据配置注册 IKVDataService、IMessageStoreService 和 IDebugOutputService 的实现
-    switch (config.GetStorageType())
+    switch (settings.KVData.GetStorageType())
     {
         case KVStorageType.LiteDB:
-            Console.WriteLine("Using LiteDB for KV data storage");
-            Console.WriteLine("Using LiteDB for debug output");
+            Console.WriteLine($"[Storage] KVData → LiteDB ({paths.KvDataDatabase})");
             builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LiteDBKVData>());
+            break;
+        case KVStorageType.LocalFileStorage:
+            Console.WriteLine($"[Storage] KVData → LocalFileStorage ({paths.LocalKvDataDirectory})");
+            builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LocalFileStorageKVData>());
+            break;
+        default:
+            throw new InvalidOperationException($"未实现的 KV 存储类型：{settings.KVData.StorageType}");
+    }
+
+    switch (settings.ChatMessage.GetStorageType())
+    {
+        case KVStorageType.LiteDB:
+            Console.WriteLine($"[Storage] ChatMessage → LiteDB ({paths.ChatMessageDatabase})");
             builder.Services.AddSingleton<IMessageStoreService>(sp => sp.GetRequiredService<LiteDBMessageStoreService>());
+            break;
+        case KVStorageType.LocalFileStorage:
+            Console.WriteLine($"[Storage] ChatMessage → LocalFileStorage ({paths.LocalChatMessageDirectory})");
+            builder.Services.AddSingleton<IMessageStoreService>(sp => sp.GetRequiredService<FileMessageStoreService>());
+            break;
+        default:
+            throw new InvalidOperationException($"未实现的消息存储类型：{settings.ChatMessage.StorageType}");
+    }
+
+    switch (settings.DebugOutput.GetStorageType())
+    {
+        case KVStorageType.LiteDB:
+            Console.WriteLine($"[Storage] DebugOutput → LiteDB ({paths.DebugOutputDatabase})");
             builder.Services.AddSingleton<IDebugOutputService>(sp => sp.GetRequiredService<LiteDBDebugOutputService>());
             break;
         case KVStorageType.LocalFileStorage:
-        default:
-            Console.WriteLine("Using LocalFileStorage for KV data storage");
-            Console.WriteLine("Using FileSystem for debug output");
-            builder.Services.AddSingleton<IKVDataService>(sp => sp.GetRequiredService<LocalFileStorageKVData>());
-            builder.Services.AddSingleton<IMessageStoreService>(sp => sp.GetRequiredService<FileMessageStoreService>());
+            Console.WriteLine($"[Storage] DebugOutput → LocalFileStorage ({paths.LocalDebugOutputDirectory})");
             builder.Services.AddSingleton<IDebugOutputService>(sp => sp.GetRequiredService<FileSystemDebugOutputService>());
             break;
+        default:
+            throw new InvalidOperationException($"未实现的调试输出存储类型：{settings.DebugOutput.StorageType}");
     }
 }
 
-// 执行自动迁移
-static void ExecuteAutoMigration(WebApplication app)
+// 按仓库执行存储后端迁移
+static void ExecuteStorageAutoMigration(WebApplication app)
 {
     using var scope = app.Services.CreateScope();
-    var config = scope.ServiceProvider.GetRequiredService<KVDataStorageConfig>();
+    var settings = scope.ServiceProvider.GetRequiredService<StorageSettings>();
+    var marker = scope.ServiceProvider.GetRequiredService<IStorageMigrationMarker>();
+    var services = scope.ServiceProvider;
 
-    if (!config.AutoMigrateOnStartup || string.IsNullOrEmpty(config.AutoMigrateFrom))
+    MigrateStore(
+        StorageStores.KvData,
+        settings.KVData,
+        marker,
+        clearSource => services.GetRequiredService<IKVDataMigrationService>().MigrateToLiteDB(clearSource),
+        clearSource => services.GetRequiredService<IKVDataMigrationService>().MigrateToLocalFileStorage(clearSource));
+
+    MigrateStore(
+        StorageStores.ChatMessage,
+        settings.ChatMessage,
+        marker,
+        clearSource => services.GetRequiredService<IMessageStoreMigrationService>().MigrateFileToLite(clearSource),
+        clearSource => services.GetRequiredService<IMessageStoreMigrationService>().MigrateLiteToFile(clearSource));
+
+    MigrateStore(
+        StorageStores.DebugOutput,
+        settings.DebugOutput,
+        marker,
+        clearSource => services.GetRequiredService<IDebugOutputMigrationService>().MigrateFileToLite(clearSource),
+        clearSource => services.GetRequiredService<IDebugOutputMigrationService>().MigrateLiteToFile(clearSource));
+}
+
+static void MigrateStore(
+    string store,
+    StoreStorageConfig config,
+    IStorageMigrationMarker marker,
+    Func<bool, int> migrateToLite,
+    Func<bool, int> migrateToFile)
+{
+    if (!config.AutoMigrateOnStartup)
         return;
 
-    var migrationService = scope.ServiceProvider.GetRequiredService<IKVDataMigrationService>();
-    var messageMigrationService = scope.ServiceProvider.GetRequiredService<IMessageStoreMigrationService>();
-    var marker = scope.ServiceProvider.GetRequiredService<IKVDataMigrationMarker>();
     var migrateFrom = config.GetAutoMigrateFromType();
-
-    if (migrateFrom == null)
-    {
-        Console.WriteLine($"Warning: Invalid AutoMigrateFrom value: {config.AutoMigrateFrom}");
+    if (migrateFrom is null)
         return;
-    }
 
     var targetType = config.GetStorageType();
 
     if (migrateFrom == targetType)
     {
-        Console.WriteLine("Warning: AutoMigrateFrom is the same as target storage type, skipping migration");
+        Console.WriteLine($"[Storage] {store}: AutoMigrateFrom 与目标存储相同，跳过迁移。");
         return;
     }
 
-    // 检查是否已经完成过迁移
-    bool alreadyMigrated = marker.IsMigrationCompleted(migrateFrom.Value, targetType);
+    bool alreadyMigrated = marker.IsMigrationCompleted(store, migrateFrom.Value, targetType);
     if (alreadyMigrated && !config.ForceMigration)
     {
-        Console.WriteLine($"Skipping migration: data was already migrated from {migrateFrom} to {targetType}.");
-        Console.WriteLine("To force re-migration, set 'ForceMigration: true' in configuration.");
+        Console.WriteLine($"[Storage] {store}: 已从 {migrateFrom} 迁移到 {targetType}，跳过。");
         return;
     }
 
-    // 强制迁移需要 CLI 确认
     if (alreadyMigrated && config.ForceMigration)
     {
-        Console.WriteLine("⚠️  WARNING: Force migration is enabled!");
-        Console.WriteLine($"This will re-migrate all data from {migrateFrom} to {targetType}.");
+        Console.WriteLine($"⚠️  WARNING: {store} 强制迁移已启用！");
+        Console.WriteLine($"This will re-migrate all {store} data from {migrateFrom} to {targetType}.");
         Console.WriteLine("Existing data in target storage may be duplicated.");
         Console.Write("Do you want to continue? (yes/no): ");
 
         string? response = Console.ReadLine();
         if (!string.Equals(response, "yes", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine("Force migration cancelled by user.");
+            Console.WriteLine($"[Storage] {store}: 强制迁移已取消。");
             return;
         }
-
-        Console.WriteLine("Force migration confirmed. Proceeding...");
     }
 
+    int migratedCount;
     try
     {
-        int migratedCount = 0;
+        migratedCount = migrateFrom == KVStorageType.LocalFileStorage && targetType == KVStorageType.LiteDB
+            ? migrateToLite(config.ClearSourceAfterMigration)
+            : migrateToFile(config.ClearSourceAfterMigration);
 
-        if (migrateFrom == KVStorageType.LocalFileStorage && targetType == KVStorageType.LiteDB)
-        {
-            Console.WriteLine("Auto-migrating data from LocalFileStorage to LiteDB...");
-            migratedCount = migrationService.MigrateToLiteDB(config.ClearSourceAfterMigration);
-
-            Console.WriteLine("Auto-migrating messages from File to LiteDB...");
-            int msgCount = messageMigrationService.MigrateFileToLite();
-            Console.WriteLine($"Migrated {msgCount} messages.");
-            migratedCount += msgCount;
-        }
-        else if (migrateFrom == KVStorageType.LiteDB && targetType == KVStorageType.LocalFileStorage)
-        {
-            Console.WriteLine("Auto-migrating data from LiteDB to LocalFileStorage...");
-            migratedCount = migrationService.MigrateToLocalFileStorage(config.ClearSourceAfterMigration);
-
-            Console.WriteLine("Auto-migrating messages from LiteDB to File...");
-            int msgCount = messageMigrationService.MigrateLiteToFile();
-            Console.WriteLine($"Migrated {msgCount} messages.");
-            migratedCount += msgCount;
-        }
-
-        // 记录迁移标记
-        marker.MarkMigrationCompleted(migrateFrom.Value, targetType, migratedCount, config.ClearSourceAfterMigration);
-
-        Console.WriteLine($"Auto-migration completed. Migrated {migratedCount} entries.");
+        marker.MarkMigrationCompleted(store, migrateFrom.Value, targetType, migratedCount, config.ClearSourceAfterMigration);
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Error during auto-migration: {ex}");
-        // 迁移失败属于数据完整性问题：不写迁移标记、中止启动，
-        // 避免应用在数据不一致的状态下运行
+        // 迁移失败属于数据完整性问题：打印上下文后中止启动，不写迁移标记。
+        Console.Error.WriteLine($"[Storage] {store} 迁移失败（{migrateFrom} → {targetType}）：{ex}");
         throw;
     }
+
+    Console.WriteLine($"[Storage] {store}: 迁移完成，{migrateFrom} → {targetType}，{migratedCount} 条。");
 }

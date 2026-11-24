@@ -5,11 +5,13 @@ using LiteDB;
 using Microsoft.Extensions.Logging;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
+using ShimmerChatLib.Storage;
 
 namespace ShimmerChat.Singletons.VectorStore
 {
     /// <summary>
     /// LiteDB 持久化 + 进程内扁平索引的向量存储实现。
+    /// 全部集合保存在单个 <c>Data/LiteDB/vector.db</c>，集合之间靠名称隔离；
     /// LiteDB 只承担 BLOB 持久化，检索全部在内存索引中完成。
     /// </summary>
     public sealed class LiteDbVectorStore : IVectorStoreService, IDisposable
@@ -17,33 +19,30 @@ namespace ShimmerChat.Singletons.VectorStore
         private const string MetaCollectionName = "_meta";
         private const int SchemaVersion = 1;
 
-        private readonly VectorStoreConfig _config;
         private readonly ILogger<LiteDbVectorStore> _logger;
-        private readonly string _rootPath;
-        private readonly bool _perCollection;
+        private readonly string _databasePath;
+        private readonly LiteDatabase _database;
 
         private readonly object _sync = new();
-        private readonly Dictionary<string, LiteDatabase> _databases = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, CollectionState> _states = new(StringComparer.Ordinal);
         private readonly SemaphoreSlim _writeLock = new(1, 1);
         private bool _disposed;
 
-        public LiteDbVectorStore(VectorStoreConfig config, ILogger<LiteDbVectorStore> logger)
+        public LiteDbVectorStore(DataPaths paths, ILogger<LiteDbVectorStore> logger)
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
+            ArgumentNullException.ThrowIfNull(paths);
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            _rootPath = Path.IsPathRooted(config.RootPath)
-                ? config.RootPath
-                : Path.Combine(AppContext.BaseDirectory, config.RootPath.
-                    TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            _perCollection = config.IsPerCollectionScope();
-            Directory.CreateDirectory(_rootPath);
+            _databasePath = paths.VectorDatabase;
+            var directory = Path.GetDirectoryName(_databasePath);
+            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+            _database = new LiteDatabase($"Filename={_databasePath};Connection=direct");
         }
 
         public string ProviderId => "LiteDb";
 
-        public string StoreIdentity => $"LiteDb:{_rootPath}";
+        public string StoreIdentity => $"LiteDb:{_databasePath}";
 
         public async Task EnsureCollectionAsync(string collection, CollectionOptions options, CancellationToken ct = default)
         {
@@ -69,29 +68,18 @@ namespace ShimmerChat.Singletons.VectorStore
 
             var result = new List<CollectionInfo>();
 
-            if (!Directory.Exists(_rootPath))
-                return Task.FromResult<IReadOnlyList<CollectionInfo>>(result);
-
-            foreach (var file in Directory.GetFiles(_rootPath, "*.db"))
+            var metaCollection = _database.GetCollection<CollectionMetaDoc>(MetaCollectionName);
+            foreach (var meta in metaCollection.FindAll())
             {
-                // LiteDB 的预写日志文件与数据文件同目录，跳过。
-                if (file.EndsWith("-log.db", StringComparison.OrdinalIgnoreCase)) continue;
-
                 ct.ThrowIfCancellationRequested();
                 try
                 {
-                    var database = GetDatabase(file);
-                    var metaCollection = database.GetCollection<CollectionMetaDoc>(MetaCollectionName);
-
-                    foreach (var meta in metaCollection.FindAll())
-                    {
-                        var count = database.GetCollection<VectorDoc>(meta.Physical).Count();
-                        result.Add(new CollectionInfo(meta.Id, ToOptions(meta), count));
-                    }
+                    var count = _database.GetCollection<VectorDoc>(meta.Physical).Count();
+                    result.Add(new CollectionInfo(meta.Id, ToOptions(meta), count));
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "读取向量库文件 {File} 失败：{Message}", file, ex.Message);
+                    _logger.LogError(ex, "读取向量集合 {Collection} 的元数据失败：{Message}", meta.Id, ex.Message);
                 }
             }
 
@@ -326,8 +314,9 @@ namespace ShimmerChat.Singletons.VectorStore
             try
             {
                 ct.ThrowIfCancellationRequested();
-                Directory.CreateDirectory(_rootPath);
-                var probe = Path.Combine(_rootPath, ".health");
+                var directory = Path.GetDirectoryName(_databasePath)!;
+                Directory.CreateDirectory(directory);
+                var probe = Path.Combine(directory, ".health");
                 File.WriteAllText(probe, DateTimeOffset.UtcNow.ToString("O"));
                 File.Delete(probe);
                 return Task.FromResult(new VectorStoreHealth(true, ProviderId));
@@ -346,9 +335,8 @@ namespace ShimmerChat.Singletons.VectorStore
 
             lock (_sync)
             {
-                foreach (var database in _databases.Values) database.Dispose();
-                _databases.Clear();
                 _states.Clear();
+                _database.Dispose();
             }
 
             _writeLock.Dispose();
@@ -370,8 +358,7 @@ namespace ShimmerChat.Singletons.VectorStore
             }
 
             var owner = ResolveOwner(collection);
-            var path = GetDatabasePath(owner);
-            var database = GetDatabase(path);
+            var database = _database;
             var metaCollection = database.GetCollection<CollectionMetaDoc>(MetaCollectionName);
             var meta = metaCollection.FindById(collection);
 
@@ -522,33 +509,14 @@ namespace ShimmerChat.Singletons.VectorStore
         /// </summary>
         private CollectionState? TryLoadState(string collection)
         {
-            var path = GetDatabasePath(ResolveOwner(collection));
-            if (!File.Exists(path)) return null;
-
-            var database = GetDatabase(path);
-            var meta = database.GetCollection<CollectionMetaDoc>(MetaCollectionName).FindById(collection);
+            var meta = _database.GetCollection<CollectionMetaDoc>(MetaCollectionName).FindById(collection);
             if (meta is null) return null;
 
-            return new CollectionState { Meta = meta, Db = database };
-        }
-
-        private LiteDatabase GetDatabase(string path)
-        {
-            lock (_sync)
-            {
-                if (_databases.TryGetValue(path, out var database)) return database;
-
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                database = new LiteDatabase($"Filename={path};Connection=direct");
-                _databases[path] = database;
-                return database;
-            }
+            return new CollectionState { Meta = meta, Db = _database };
         }
 
         private string ResolveOwner(string collection)
         {
-            if (_perCollection) return collection;
-
             if (collection.StartsWith("plugin:", StringComparison.Ordinal))
             {
                 var rest = collection["plugin:".Length..];
@@ -558,28 +526,6 @@ namespace ShimmerChat.Singletons.VectorStore
             }
 
             return "default";
-        }
-
-        private string GetDatabasePath(string owner)
-        {
-            if (owner == "default") return Path.Combine(_rootPath, "default.db");
-
-            var safe = SafeFileName(owner);
-            var hash = Hash(owner)[..8];
-            return Path.Combine(_rootPath, $"{safe}-{hash}.db");
-        }
-
-        private static string SafeFileName(string value)
-        {
-            var builder = new StringBuilder(value.Length);
-
-            foreach (var ch in value)
-            {
-                builder.Append(char.IsLetterOrDigit(ch) || ch is '_' or '-' or '.' ? ch : '_');
-                if (builder.Length >= 40) break;
-            }
-
-            return builder.Length == 0 ? "store" : builder.ToString();
         }
 
         private static string Hash(string value)

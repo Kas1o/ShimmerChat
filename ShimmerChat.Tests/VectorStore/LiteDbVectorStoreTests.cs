@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ShimmerChat.Singletons.VectorStore;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
+using ShimmerChatLib.Storage;
 
 namespace ShimmerChat.Tests.VectorStore;
 
@@ -21,7 +22,7 @@ public sealed class LiteDbVectorStoreTests : IDisposable
     private static LiteDbVectorStore CreateStore(string root)
     {
         return new LiteDbVectorStore(
-            new VectorStoreConfig { Provider = "LiteDb", RootPath = root, Scope = "PerOwner" },
+            new DataPaths(root),
             NullLogger<LiteDbVectorStore>.Instance);
     }
 
@@ -242,21 +243,22 @@ public sealed class LiteDbVectorStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task PluginCollections_UseSeparateFilesPerOwner()
+    public async Task PluginCollections_ShareSingleVectorDatabase()
     {
         await _store.EnsureCollectionAsync("plugin:alpha:notes", new CollectionOptions(3));
         await _store.EnsureCollectionAsync("plugin:beta:notes", new CollectionOptions(3));
         await _store.EnsureCollectionAsync("memory", new CollectionOptions(3));
 
-        var files = Directory.GetFiles(_root, "*.db")
+        var files = Directory.GetFiles(Path.Combine(_root, DataPaths.LiteDbDirectoryName), "*.db")
             .Select(Path.GetFileName)
             .Where(name => !name!.EndsWith("-log.db", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
-        files.Should().HaveCount(3);
-        files.Should().Contain("default.db");
-        files.Should().Contain(name => name!.StartsWith("plugin_alpha-"));
-        files.Should().Contain(name => name!.StartsWith("plugin_beta-"));
+        files.Should().ContainSingle();
+        files[0].Should().Be(DataPaths.VectorDatabaseFileName);
+
+        var collections = await _store.ListCollectionsAsync();
+        collections.Should().HaveCount(3);
     }
 
     [Fact]

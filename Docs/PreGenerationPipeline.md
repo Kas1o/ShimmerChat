@@ -190,7 +190,7 @@ OpenAI Chat Completions 规范中只有 `user` 消息允许 `image_url`；`syste
 | `ImageCompression` | 超预算图像缩放后的重编码算法：`WebP`（默认，体积最小、保留透明）/ `Jpeg`（兼容性最好，透明填白）/ `None`（仅缩放，保持原格式） |
 | `ImageQuality` | 有损编码质量（1-100，默认 85） |
 
-历史图像每轮都会重发给模型，超预算的大图会持续放大请求体积，直到被端点的 payload / token 上限拒绝，**对话从此无法继续**。`Budgeted` 在解析为请求内容块时把超预算图像压回预算内——只作用于本次请求的内存副本，消息持久化数据与 `UserUploadImage` 文件都不被修改；越界的节点属性值在消费前收敛到合法区间并写入 DebugOutput。图像数据无法解码、引用的文件缺失、图像服务不可用都显式失败（`DATA_MISSING` / `SERVICE_ERROR`），绝不静默丢图。详见 [ImageAttachments.md](ImageAttachments.md)。
+历史图像每轮都会重发给模型，超预算的大图会持续放大请求体积，直到被端点的 payload / token 上限拒绝，**对话从此无法继续**。`Budgeted` 在解析为请求内容块时把超预算图像压回预算内——只作用于本次请求的内存副本，消息持久化数据与 `Data/UserUploadImage` 文件都不被修改；越界的节点属性值在消费前收敛到合法区间并写入 DebugOutput。图像数据无法解码、引用的文件缺失、图像服务不可用都显式失败（`DATA_MISSING` / `SERVICE_ERROR`），绝不静默丢图。详见 [ImageAttachments.md](ImageAttachments.md)。
 
 旧节点树反序列化后 `ImageProcessing` 落到默认值 `AsStored`，行为与旧版完全一致；实现 `IImageAttachmentService` 的旧插件通过接口默认实现自动忽略预算参数（原样解析）。
 

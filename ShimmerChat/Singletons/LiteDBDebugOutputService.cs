@@ -42,6 +42,47 @@ namespace ShimmerChat.Singletons
             _collection.Insert(doc);
         }
 
+        /// <summary>
+        /// 迁移用：按原 EntryId 与时间戳导出全部条目。
+        /// </summary>
+        public IReadOnlyList<DebugOutputEntry> ReadAll()
+        {
+            return _collection.FindAll()
+                .OrderByDescending(x => x.Timestamp)
+                .Select(ToEntry)
+                .ToList();
+        }
+
+        /// <summary>
+        /// 迁移用：按原 EntryId 原样写入（同 Id 覆盖），不重新生成 Id。
+        /// </summary>
+        public void Import(DebugOutputEntry entry)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+
+            _collection.DeleteMany(x => x.EntryId == entry.Id);
+            _collection.Insert(new DebugOutputDocument
+            {
+                EntryId = entry.Id,
+                Timestamp = entry.Timestamp,
+                Source = entry.Source,
+                Category = entry.Category,
+                Content = entry.Content
+            });
+        }
+
+        private static DebugOutputEntry ToEntry(DebugOutputDocument document)
+        {
+            return new DebugOutputEntry
+            {
+                Id = document.EntryId,
+                Timestamp = document.Timestamp,
+                Source = document.Source,
+                Category = document.Category,
+                Content = document.Content
+            };
+        }
+
         public List<DebugOutputEntry> GetEntries(int skip, int take, string? sourceFilter = null, string? categoryFilter = null, string? keyword = null, DateTime? from = null, DateTime? to = null)
         {
             var query = _collection.Query();

@@ -1,38 +1,34 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ShimmerChat.Singletons.VectorStore;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
+using ShimmerChatLib.Storage;
 
 namespace ShimmerChat.Tests.VectorStore;
 
-public sealed class VectorStoreRegistrationTests
+public sealed class VectorStoreRegistrationTests : IDisposable
 {
-    private static IConfiguration BuildConfiguration(string provider)
-    {
-        return new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["VectorStore:Provider"] = provider,
-                ["VectorStore:RootPath"] = Path.Combine(Path.GetTempPath(), "shimmer-vector-registration"),
-                ["VectorStore:Scope"] = "PerOwner"
-            })
-            .Build();
-    }
+    private readonly string _root = Path.Combine(
+        Path.GetTempPath(), "shimmer-vector-registration", Guid.NewGuid().ToString("N"));
 
-    [Fact]
-    public void AddShimmerVectorStore_InMemory_ResolvesInMemoryStore()
+    private DataPaths Paths => new(Path.Combine(_root, "Data"));
+
+    [Theory]
+    [InlineData("InMemory", typeof(InMemoryVectorStore))]
+    [InlineData("LiteDb", typeof(LiteDbVectorStore))]
+    [InlineData("File", typeof(FileVectorStore))]
+    public void AddShimmerVectorStore_ResolvesConfiguredProvider(string provider, Type expected)
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddShimmerVectorStore(BuildConfiguration("InMemory"));
+        services.AddShimmerVectorStore(new VectorStoreConfig { Provider = provider }, Paths);
 
-        using var provider = services.BuildServiceProvider();
-        var store = provider.GetRequiredService<IVectorStoreService>();
+        using var serviceProvider = services.BuildServiceProvider();
+        var store = serviceProvider.GetRequiredService<IVectorStoreService>();
 
-        store.Should().BeOfType<InMemoryVectorStore>();
-        provider.GetRequiredService<VectorStoreConfig>().Provider.Should().Be("InMemory");
+        store.Should().BeOfType(expected);
+        serviceProvider.GetRequiredService<VectorStoreConfig>().Provider.Should().Be(provider);
     }
 
     [Fact]
@@ -40,8 +36,22 @@ public sealed class VectorStoreRegistrationTests
     {
         var services = new ServiceCollection();
 
-        var act = () => services.AddShimmerVectorStore(BuildConfiguration("NotAProvider"));
+        var act = () => services.AddShimmerVectorStore(
+            new VectorStoreConfig { Provider = "NotAProvider" },
+            Paths);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<InvalidOperationException>().WithMessage("*NotAProvider*");
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
+        }
+        catch
+        {
+            // 清理失败不影响断言
+        }
     }
 }

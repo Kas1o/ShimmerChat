@@ -35,8 +35,8 @@ namespace ShimmerChat.Singletons
 		public const string UploadQualityKey = "image_upload_quality";
 		public const string UploadAlwaysReencodeKey = "image_upload_always_reencode";
 
-		/// <summary>图像文件目录（同时由 Program.cs 以 /userimages 暴露为静态资源）。</summary>
-		public static readonly string UploadDirectory = Path.Combine(AppContext.BaseDirectory, "UserUploadImage");
+		/// <summary>图像文件目录（Data/UserUploadImage，同时由 Program.cs 以 /userimages 暴露为静态资源）。</summary>
+		public static string UploadDirectory => ShimmerChatLib.Storage.DataPaths.Current.UserUploadImageDirectory;
 
 		/// <summary>支持的图像格式与落盘扩展名（来源见 <see cref="ImageAttachmentRules"/>）。</summary>
 		private static readonly Dictionary<string, string> SupportedTypes =

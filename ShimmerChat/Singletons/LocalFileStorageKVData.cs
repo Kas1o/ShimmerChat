@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using ShimmerChatLib.Interface;
+using ShimmerChatLib.Storage;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -34,11 +35,11 @@ namespace ShimmerChat.Singletons
 		/// 初始化 LocalFileStorageKVData 实例
 		/// </summary>
 		/// <param name="logger">日志记录器</param>
-		/// <param name="rootPath">可选的根目录路径，默认使用程序目录下的 KVData</param>
+		/// <param name="rootPath">可选的根目录路径，默认使用 Data/LocalFileStorage/kvdata</param>
 		public LocalFileStorageKVData(ILogger<LocalFileStorageKVData> logger, string? rootPath = null)
         {
             // 创建KV数据存储根目录
-            root = rootPath ?? Path.Combine(AppContext.BaseDirectory, "KVData");
+            root = rootPath ?? DataPaths.Current.LocalKvDataDirectory;
             InitializeKVDataFolder();
             _logger = logger;
         }

@@ -7,6 +7,7 @@
 @using ShimmerChatLib.Generation
 @using ShimmerChatLib.ChatView
 @using ShimmerChatLib.Models
+@using ShimmerChatLib.Storage
 @inject NavigationManager navigation
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService
@@ -1176,7 +1177,7 @@
 
         Stream stream = file.OpenReadStream(1024 * 1024 * 30, default);
         var guid = Guid.NewGuid();
-        using (var localFile = File.Create($"{AppContext.BaseDirectory}/UserUploadImage/{guid}.png"))
+        using (var localFile = File.Create(Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{guid}.png")))
         {
             await stream.CopyToAsync(localFile);
         }
@@ -1201,7 +1202,7 @@
 
         Stream stream = file.OpenReadStream(1024 * 1024 * 30, default);
         var guid = Guid.NewGuid();
-        using (var localFile = File.Create($"{AppContext.BaseDirectory}/UserUploadImage/{guid}.png"))
+        using (var localFile = File.Create(Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{guid}.png")))
         {
             await stream.CopyToAsync(localFile);
         }

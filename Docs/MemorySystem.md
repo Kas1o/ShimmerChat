@@ -2,10 +2,10 @@
 
 ShimmerChat 的长期记忆由两层组成：
 
-1. **记忆文本库**（真值）：`Memory/records.db`，LiteDB 单文件，保存内容、标签、版本与来源。
+1. **记忆文本库**（真值）：`Data/LiteDB/memory.db`，LiteDB 单文件，保存内容、标签、版本与来源。
 2. **向量索引**（派生）：按嵌入模型分成不同集合，写入由 `IVectorStoreService` 的实现负责。
 
-删掉向量目录不会丢记忆文本；重建索引即可从文本重新生成向量。
+删掉向量数据不会丢记忆文本；重建索引即可从文本重新生成向量。
 
 ---
 
@@ -14,7 +14,7 @@ ShimmerChat 的长期记忆由两层组成：
 | 类型 | 位置 | 职责 |
 |------|------|------|
 | `IVectorStoreService` | `ShimmerChatLib/Interface` | 集合/记录/检索抽象，不包含记忆领域概念 |
-| `VectorStoreConfig` | `ShimmerChatLib/Models` | `appsettings.json` 的 `VectorStore` 节 |
+| `VectorStoreConfig` | `ShimmerChatLib/Models` | `storage_settings.json` 的 `VectorStore` 节 |
 | `MemoryRecordStore` | `ShimmerChatBuiltin/Memory` | 记忆文本真值库 |
 | `MemoryIndexService` | `ShimmerChatBuiltin/Memory` | 文本 ↔ 向量写穿、对账、构建与检索 |
 | `MemoryModelConfig` | `ShimmerChatBuiltin/Memory` | 当前嵌入配置与 model key / collection 名 |
@@ -27,32 +27,35 @@ ShimmerChat 的长期记忆由两层组成：
 ## 2. 存储布局
 
 ```
-AppContext.BaseDirectory/
-├── Memory/records.db        # 记忆文本真值，始终落盘
-└── VectorStore/             # 由 VectorStore:RootPath 决定
-    ├── default.db
-    └── plugin_<id>-<hash>.db
+Data/
+├── storage_settings.json          # VectorStore:Provider 的配置位置
+├── LiteDB/
+│   ├── memory.db                  # 记忆文本真值，始终落盘
+│   └── vector.db                  # Provider=LiteDb：全部集合共用单文件
+└── LocalFileStorage/
+    └── vector/                    # Provider=File：每个集合一个 JSON 文件
 ```
 
-- 记忆文本库路径目前固定，不随 `VectorStore:RootPath` 改变。
-- 备份/迁移时需要同时保留 `Memory/` 与 `VectorStore/`（若后端为 `LiteDb`）。
-- 把后端切换为 `InMemory` 只会让**向量**不落盘，记忆文本仍在 `Memory/records.db`。
+- 记忆文本库固定为 `Data/LiteDB/memory.db`，不随向量后端变化。
+- 备份/迁移时至少保留 `Data/LiteDB/memory.db`；使用 LiteDb/File 向量后端时连同对应向量数据一起保留。
+- 把向量后端切换为 `InMemory` 只会让**向量**不落盘，记忆文本仍在 `memory.db`。
+- LiteDb 后端的 `StoreIdentity` 是 `LiteDb:<vector.db 绝对路径>`；File 后端是 `File:<vector 目录>`。身份变化会使索引状态视为未就绪，需要重建。
 
-### appsettings.json
+### storage_settings.json
 
 ```json
 {
   "VectorStore": {
-    "Provider": "LiteDb",
-    "RootPath": "VectorStore",
-    "Scope": "PerOwner"
+    "Provider": "LiteDb"
   }
 }
 ```
 
-- `Provider`：`LiteDb` 或 `InMemory`，未知值在启动阶段直接失败。
-- `Scope`：`PerOwner`（每个 owner 一个文件）或 `PerCollection`（每个集合一个文件）。
+- `Provider`：`LiteDb`、`File` 或 `InMemory`，未知值在启动阶段直接失败。
+- 数据位置由 `DataPaths` 固定，不再配置 `RootPath` / `Scope`。
 - 后端由启动配置决定，运行中不可切换；设置页只做只读展示。
+
+详见 [使用方法/KVDataStorage.md](使用方法/KVDataStorage.md)。
 
 ---
 
@@ -70,7 +73,7 @@ AppContext.BaseDirectory/
 
 `MemoryIndexService.Snapshot()` 只看持久化状态；`GetStatusAsync()` 会进一步校验：
 
-- 当前 `IVectorStoreService.StoreIdentity` 是否与构建时一致（Provider / RootPath 变化）；
+- 当前 `IVectorStoreService.StoreIdentity` 是否与构建时一致（Provider 或数据位置变化）；
 - 向量集合是否存在、记录数是否与文本库一致；
 - 对指定 Agent，全局 `Partial/Suspect` 时会单独对账该 Agent 的分区。
 

@@ -1,4 +1,5 @@
 using LiteDB;
+using ShimmerChatLib.Storage;
 
 namespace ShimmerChatBuiltin.Memory
 {
@@ -200,7 +201,7 @@ namespace ShimmerChatBuiltin.Memory
     public static class MemoryStoreProvider
     {
         private static readonly Lazy<MemoryRecordStore> LazyStore = new(() =>
-            new MemoryRecordStore(Path.Combine(AppContext.BaseDirectory, "Memory", "records.db")));
+            new MemoryRecordStore(DataPaths.Current.MemoryDatabase));
 
         private static MemoryRecordStore? _override;
 

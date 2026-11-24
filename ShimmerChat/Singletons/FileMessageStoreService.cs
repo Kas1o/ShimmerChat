@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using ShimmerChatLib;
 using ShimmerChatLib.Interface;
+using ShimmerChatLib.Storage;
 
 namespace ShimmerChat.Singletons
 {
@@ -21,7 +22,7 @@ namespace ShimmerChat.Singletons
 
         public string RootPath => _root;
 
-        public FileMessageStoreService() : this(Path.Combine(AppContext.BaseDirectory, "ChatMessages"))
+        public FileMessageStoreService() : this(DataPaths.Current.LocalChatMessageDirectory)
         {
         }
 

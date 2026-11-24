@@ -2,79 +2,48 @@ using System.Text.Json;
 using FluentAssertions;
 using ShimmerChatBuiltin.Memory;
 using ShimmerChatLib.Models;
+using ShimmerChatLib.Storage;
 using Xunit;
 
 namespace ShimmerChat.Tests.Memory;
 
 /// <summary>
-/// 后端配置的只读呈现逻辑：文件定位、JSON 片段、数据目录解析。
+/// 后端配置的只读呈现逻辑：配置文件定位、JSON 片段、数据位置解析。
 /// 这些值直接展示给用户，错了会把人引向不生效的文件，所以逐条覆盖。
 /// </summary>
 public sealed class MemoryBackendInfoTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "shimmer-backend-info", Guid.NewGuid().ToString("N"));
+    private readonly DataPaths _paths;
 
     public MemoryBackendInfoTests()
     {
         Directory.CreateDirectory(_root);
+        _paths = new DataPaths(Path.Combine(_root, "Data"));
     }
 
     [Fact]
-    public void ResolveConfigPath_PrefersContentRoot()
+    public void ResolveConfigPath_PointsAtStorageSettingsFile()
     {
-        var contentRoot = Path.Combine(_root, "content");
-        var baseDir = Path.Combine(_root, "bin");
-        Directory.CreateDirectory(contentRoot);
-        Directory.CreateDirectory(baseDir);
-        File.WriteAllText(Path.Combine(contentRoot, "appsettings.json"), "{}");
-        File.WriteAllText(Path.Combine(baseDir, "appsettings.json"), "{}");
+        MemoryBackendInfo.ResolveConfigPath(_paths)
+            .Should().Be(_paths.StorageSettingsFile);
 
-        MemoryBackendInfo.ResolveConfigPath(contentRoot, baseDir)
-            .Should().Be(Path.GetFullPath(Path.Combine(contentRoot, "appsettings.json")));
+        MemoryBackendInfo.ResolveConfigPath(_paths)
+            .Should().EndWith(DataPaths.StorageSettingsFileName);
     }
 
     [Fact]
-    public void ResolveConfigPath_FallsBackToBaseDirectory()
+    public void BuildSnippet_ReflectsCurrentProvider()
     {
-        var contentRoot = Path.Combine(_root, "content-empty");
-        var baseDir = Path.Combine(_root, "bin");
-        Directory.CreateDirectory(contentRoot);
-        Directory.CreateDirectory(baseDir);
-        File.WriteAllText(Path.Combine(baseDir, "appsettings.json"), "{}");
-
-        MemoryBackendInfo.ResolveConfigPath(contentRoot, baseDir)
-            .Should().Be(Path.GetFullPath(Path.Combine(baseDir, "appsettings.json")));
-    }
-
-    [Fact]
-    public void ResolveConfigPath_WhenMissing_ReturnsContentRootCandidate()
-    {
-        var contentRoot = Path.Combine(_root, "nowhere");
-        var baseDir = Path.Combine(_root, "also-nowhere");
-
-        MemoryBackendInfo.ResolveConfigPath(contentRoot, baseDir)
-            .Should().Be(Path.GetFullPath(Path.Combine(contentRoot, "appsettings.json")));
-    }
-
-    [Fact]
-    public void BuildSnippet_ReflectsCurrentConfig()
-    {
-        var config = new VectorStoreConfig
-        {
-            Provider = "InMemory",
-            Scope = "PerCollection",
-            RootPath = @"D:\vec"
-        };
+        var config = new VectorStoreConfig { Provider = "File" };
 
         var json = MemoryBackendInfo.BuildSnippet(config);
         using var document = JsonDocument.Parse(json);
         var section = document.RootElement.GetProperty("VectorStore");
 
-        section.GetProperty("Provider").GetString().Should().Be("InMemory");
-        section.GetProperty("Scope").GetString().Should().Be("PerCollection");
-        section.GetProperty("RootPath").GetString().Should().Be(@"D:\vec");
-        section.TryGetProperty("DefaultTopK", out _).Should().BeFalse();
-        section.TryGetProperty("DefaultMinScore", out _).Should().BeFalse();
+        section.GetProperty("Provider").GetString().Should().Be("File");
+        section.TryGetProperty("RootPath", out _).Should().BeFalse();
+        section.TryGetProperty("Scope", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -87,21 +56,19 @@ public sealed class MemoryBackendInfoTests : IDisposable
     }
 
     [Fact]
-    public void ResolveDataRoot_RelativePath_AnchorsToApplicationDirectory()
+    public void ResolveDataRoot_LiteDb_PointsAtVectorDatabaseFile()
     {
-        var config = new VectorStoreConfig { RootPath = "VectorStore" };
+        var config = new VectorStoreConfig { Provider = "LiteDb" };
 
-        MemoryBackendInfo.ResolveDataRoot(config)
-            .Should().Be(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "VectorStore")));
+        MemoryBackendInfo.ResolveDataRoot(config, _paths).Should().Be(_paths.VectorDatabase);
     }
 
     [Fact]
-    public void ResolveDataRoot_AbsolutePath_IsKept()
+    public void ResolveDataRoot_File_PointsAtLocalVectorDirectory()
     {
-        var absolute = Path.Combine(_root, "vectors");
-        var config = new VectorStoreConfig { RootPath = absolute };
+        var config = new VectorStoreConfig { Provider = "File" };
 
-        MemoryBackendInfo.ResolveDataRoot(config).Should().Be(Path.GetFullPath(absolute));
+        MemoryBackendInfo.ResolveDataRoot(config, _paths).Should().Be(_paths.LocalVectorDirectory);
     }
 
     [Fact]
@@ -109,7 +76,7 @@ public sealed class MemoryBackendInfoTests : IDisposable
     {
         var config = new VectorStoreConfig { Provider = "InMemory" };
 
-        MemoryBackendInfo.ResolveDataRoot(config).Should().BeNull();
+        MemoryBackendInfo.ResolveDataRoot(config, _paths).Should().BeNull();
     }
 
     [Fact]
@@ -117,7 +84,7 @@ public sealed class MemoryBackendInfoTests : IDisposable
     {
         var config = new VectorStoreConfig { Provider = "Qdrant" };
 
-        var act = () => MemoryBackendInfo.ResolveDataRoot(config);
+        var act = () => MemoryBackendInfo.ResolveDataRoot(config, _paths);
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*Qdrant*");
     }

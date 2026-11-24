@@ -1,9 +1,10 @@
 @using Microsoft.Extensions.Hosting
 @using ShimmerChatBuiltin.Memory
 @using ShimmerChatLib.Models
+@using ShimmerChatLib.Storage
 @inject ILocService Loc
 @inject VectorStoreConfig VectorConfig
-@inject IHostEnvironment Env
+@inject DataPaths DataPaths
 @inject IJSRuntime JS
 
 <div>
@@ -30,7 +31,7 @@
     <ol class="su-text-sm su-text-2" style="margin:0; padding-left:20px;">
         <li>@Loc["panel.memory.backend_step_edit"]</li>
         <li>@Loc["panel.memory.backend_values_provider"]</li>
-        <li>@Loc["panel.memory.backend_values_scope"]</li>
+        <li>@Loc["panel.memory.backend_values_layout"]</li>
         <li>@Loc["panel.memory.backend_step_restart"]</li>
     </ol>
 
@@ -58,13 +59,13 @@
 
     protected override void OnInitialized()
     {
-        _configPath = MemoryBackendInfo.ResolveConfigPath(Env.ContentRootPath, AppContext.BaseDirectory);
+        _configPath = MemoryBackendInfo.ResolveConfigPath(DataPaths);
         _configFileExists = File.Exists(_configPath);
         _snippet = MemoryBackendInfo.BuildSnippet(VectorConfig);
 
         try
         {
-            _dataRoot = MemoryBackendInfo.ResolveDataRoot(VectorConfig);
+            _dataRoot = MemoryBackendInfo.ResolveDataRoot(VectorConfig, DataPaths);
             _backendError = null;
         }
         catch (InvalidOperationException ex)

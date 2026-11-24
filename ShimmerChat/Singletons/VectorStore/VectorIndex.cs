@@ -188,6 +188,12 @@ namespace ShimmerChat.Singletons.VectorStore
             lock (_sync) return _byId.Values.Where(predicate).Select(x => x.Id).ToList();
         }
 
+        /// <summary>导出当前索引快照，供文件后端整体落盘。</summary>
+        public IReadOnlyList<VectorEntry> Snapshot()
+        {
+            lock (_sync) return _byId.Values.ToArray();
+        }
+
         /// <summary>列出记录元数据（不含向量），用于索引对账。</summary>
         public IReadOnlyList<VectorRecordMeta> ListRecords(string? partition)
         {

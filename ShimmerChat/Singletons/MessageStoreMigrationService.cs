@@ -23,7 +23,7 @@ namespace ShimmerChat.Singletons
             _logger = logger;
         }
 
-        public int MigrateFileToLite()
+        public int MigrateFileToLite(bool clearSource = false)
         {
             int count = 0;
             foreach (var chatGuid in _fileStore.GetAllChatGuids())
@@ -78,12 +78,15 @@ namespace ShimmerChat.Singletons
 
                     offset += messages.Count;
                 }
+
+                if (clearSource)
+                    _fileStore.DeleteAllMessages(chatGuid);
             }
             _logger.LogInformation("Migrated {Count} messages from File to LiteDB", count);
             return count;
         }
 
-        public int MigrateLiteToFile()
+        public int MigrateLiteToFile(bool clearSource = false)
         {
             int count = 0;
             foreach (var chatGuid in _liteStore.GetAllChatGuids())
@@ -138,6 +141,9 @@ namespace ShimmerChat.Singletons
 
                     offset += messages.Count;
                 }
+
+                if (clearSource)
+                    _liteStore.DeleteAllMessages(chatGuid);
             }
             _logger.LogInformation("Migrated {Count} messages from LiteDB to File", count);
             return count;
