@@ -298,6 +298,34 @@ window.isScrolledToTop = function (element, threshold) {
     }
 };
 
+// ─── 向上加载历史消息时的滚动锚定 ────────────────
+//
+// 「显示更早」会在内容顶部插入多条消息。浏览器按像素保留 scrollTop，
+// 插入后视口会跳到新内容上，用户丢失阅读位置。调用方在渲染前记录
+// [scrollTop, scrollHeight]，渲染后把新增高度补进 scrollTop，视口
+// 就仍停在原来那条消息上。
+window.captureScrollMetrics = function (element) {
+    try {
+        if (!element) return null;
+        return [element.scrollTop, element.scrollHeight];
+    } catch (error) {
+        console.error('Error capturing scroll metrics:', error);
+        return null;
+    }
+};
+
+window.restoreScrollMetrics = function (element, metrics) {
+    try {
+        if (!element || !metrics || metrics.length !== 2) return;
+        var delta = element.scrollHeight - metrics[1];
+        if (delta > 0) {
+            element.scrollTop = metrics[0] + delta;
+        }
+    } catch (error) {
+        console.error('Error restoring scroll metrics:', error);
+    }
+};
+
 // textarea 自适应高度
 //
 // 不能把 scrollHeight 直接当成 height：全局 box-sizing 为 border-box，

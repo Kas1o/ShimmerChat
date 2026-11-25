@@ -1,11 +1,11 @@
+/* SubAgent 会话面板：两栏布局，列表与记录各自滚动，
+   保证几十个配置、上千条会话和超长记录下头部操作与筛选始终可见。 */
+
 .sessions-panel {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 24px;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
+    gap: 12px;
+    min-width: 0;
 }
 
 /* ── 头部 ─────────────────────────────────────── */
@@ -16,20 +16,54 @@
     gap: 12px;
     flex-wrap: wrap;
 }
-.sessions-header h2 { margin: 0; font-size: 1.4rem; }
+.sessions-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 1.4rem;
+}
 .sessions-header p { margin: 4px 0 0; }
 
+.sessions-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.sessions-auto-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--su-font-sm);
+    color: var(--su-text-1);
+    user-select: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.sessions-auto-refresh input { accent-color: var(--su-accent); width: 16px; height: 16px; }
+.sessions-interval { display: inline-block; width: 78px; }
+
+.sessions-refresh-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
 /* ── 布局 ─────────────────────────────────────── */
-.sessions-layout { display: flex; align-items: flex-start; gap: 16px; }
+.sessions-layout {
+    display: flex;
+    align-items: stretch;
+    gap: 16px;
+    /* 固定可视高度，让两栏内部的滚动条独立工作；小窗口由 min-height 兜底。 */
+    height: clamp(440px, calc(100vh - 320px), 1600px);
+}
 
 .sessions-list-pane {
     flex: 0 0 320px;
     max-width: 320px;
-    position: sticky;
-    top: 0;
-    align-self: flex-start;
-    max-height: calc(100vh - 180px);
-    overflow-y: auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
 }
@@ -42,19 +76,112 @@
     padding-bottom: 8px;
     border-bottom: 1px solid var(--su-border-1);
 }
-.sessions-list-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.sessions-list-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; min-width: 0; }
 
-.sessions-group { margin-top: 12px; }
+/* ── 筛选 ─────────────────────────────────────── */
+.sessions-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--su-border-1);
+}
+
+.sessions-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.sessions-search > i {
+    position: absolute;
+    left: 9px;
+    font-size: 0.8em;
+    color: var(--su-text-2);
+    pointer-events: none;
+}
+.sessions-search .su-input { padding-left: 26px; padding-right: 28px; }
+.sessions-search .sessions-icon-btn {
+    position: absolute;
+    right: 2px;
+    width: 22px;
+    height: 22px;
+}
+.sessions-search .sessions-icon-btn:hover { color: var(--su-text-0); background: var(--su-surface-3); }
+
+.sessions-status-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.sessions-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: var(--su-font-xs);
+    border: 1px solid var(--su-border-0);
+    background: var(--su-surface-2);
+    color: var(--su-text-1);
+    border-radius: 100px;
+    cursor: pointer;
+    transition: color var(--su-transition), background var(--su-transition), border-color var(--su-transition);
+}
+.sessions-filter-chip:hover { border-color: var(--su-accent); color: var(--su-accent); }
+.sessions-filter-chip.active {
+    background: var(--su-accent-soft);
+    border-color: var(--su-accent);
+    color: var(--su-accent);
+    font-weight: 600;
+}
+.sessions-filter-count { opacity: 0.75; }
+
+.sessions-sort-row { display: flex; align-items: center; gap: 6px; }
+.sessions-sort-label { font-size: var(--su-font-xs); color: var(--su-text-2); white-space: nowrap; }
+.sessions-sort-row .su-select { flex: 1; min-width: 0; }
+
+/* ── 会话列表 ─────────────────────────────────── */
+.sessions-list-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-top: 4px;
+    padding-right: 2px;
+}
+
+.sessions-group { margin-top: 8px; }
+.sessions-group.collapsed { margin-top: 4px; }
+
 .sessions-group-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 2px 4px 6px;
-    font-size: var(--su-font-sm);
-    color: var(--su-text-2);
+    padding: 2px;
 }
-.sessions-group-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-weight: 600; }
+
+.sessions-group-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    padding: 4px;
+    font-family: var(--su-font-sans);
+    font-size: var(--su-font-sm);
+    font-weight: 600;
+    color: var(--su-text-1);
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-radius: var(--su-radius-sm);
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--su-transition);
+}
+.sessions-group-toggle:hover { background: var(--su-surface-2); }
+.sessions-group-toggle:focus-visible { outline: 2px solid var(--su-accent); outline-offset: 1px; }
+.sessions-group-toggle .su-truncate { min-width: 0; }
 
 .sessions-icon-btn {
     flex-shrink: 0;
@@ -90,6 +217,29 @@
     color: var(--su-text-2);
 }
 
+.sessions-more-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-bottom: 6px;
+    padding: 5px 8px;
+    font-size: var(--su-font-sm);
+    color: var(--su-accent);
+    background: transparent;
+    border: 1px dashed var(--su-border-0);
+    border-radius: var(--su-radius-sm);
+    cursor: pointer;
+    transition: background var(--su-transition), border-color var(--su-transition);
+}
+.sessions-more-btn:hover { background: var(--su-accent-soft); border-color: var(--su-accent); }
+
+.sessions-list-footer {
+    padding-top: 8px;
+    border-top: 1px solid var(--su-border-1);
+}
+
 .sessions-empty {
     display: flex;
     flex-direction: column;
@@ -105,6 +255,7 @@
 .sessions-detail-pane {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -117,7 +268,12 @@
     gap: 12px;
     flex-wrap: wrap;
 }
-.sessions-detail-title h3 { margin: 0; font-size: 1.1rem; }
+.sessions-detail-title { min-width: 0; }
+.sessions-detail-title h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    overflow-wrap: anywhere;
+}
 .sessions-detail-meta {
     display: flex;
     align-items: center;
@@ -133,7 +289,31 @@
     font-size: var(--su-font-sm);
     color: var(--su-text-2);
 }
+.sessions-detail-id code { overflow-wrap: anywhere; }
 .sessions-detail-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+
+/* 记录区独立滚动：头部标题、状态与操作按钮永远可见 */
+.sessions-detail-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 2px;
+}
+
+.sessions-transcript-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px solid var(--su-border-1);
+}
+.sessions-transcript-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 
 .sessions-output {
     border: 1px solid var(--su-border-1);
@@ -147,7 +327,7 @@
     color: var(--su-text-2);
     margin-bottom: 6px;
 }
-.sessions-output-body { white-space: pre-wrap; }
+.sessions-output-body { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .sessions-messages { display: flex; flex-direction: column; gap: 10px; }
 
@@ -190,12 +370,17 @@
 }
 
 @media (max-width: 900px) {
-    .sessions-layout { flex-direction: column; }
+    .sessions-layout {
+        flex-direction: column;
+        height: auto;
+    }
     .sessions-list-pane {
         flex: 1 1 auto;
         max-width: none;
-        width: 100%;
-        position: static;
-        max-height: none;
+        max-height: 55vh;
+    }
+    .sessions-detail-pane {
+        min-height: 420px;
+        max-height: 80vh;
     }
 }

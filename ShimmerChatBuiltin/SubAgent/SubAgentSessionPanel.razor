@@ -1,25 +1,61 @@
 @attribute [PluginPanelAttribute("panel.sub_agent_sessions", "panel.sub_agent_sessions.desc", PanelDisplayPlace.Settings, Order = 4)]
 
-@using Microsoft.JSInterop
 @using ShimmerChatBuiltin.SubAgent.Sessions
-@using ShimmerChatLib
-@using ShimmerChatLib.Interface
+
+@implements IAsyncDisposable
 
 @inject IKVDataService KVData
 @inject ILocService Loc
 @inject IMessageDisplayService Display
 @inject IDebugOutputService DebugOutput
 @inject IJSRuntime JS
+@inject ILogger<SubAgentSessionPanel> Logger
 
-<div class="sessions-panel shimmer-content">
+<div class="sessions-panel">
     <div class="sessions-header">
         <div class="sessions-header-title">
-            <h2>@Loc["panel_sub_agent_sessions.title"]</h2>
+            <h2>
+                @Loc["panel_sub_agent_sessions.title"]
+                <span class="su-badge su-badge-accent">@_totalCount</span>
+            </h2>
             <p class="su-text-2">@Loc["panel_sub_agent_sessions.desc"]</p>
         </div>
-        <button class="su-btn su-btn-outline-primary" @onclick="LoadIndex">
-            <i class="bi bi-arrow-clockwise"></i> @Loc["panel_sub_agent_sessions.refresh"]
-        </button>
+        <div class="sessions-header-actions">
+            <label class="sessions-auto-refresh" title="@Loc["panel_sub_agent_sessions.auto_refresh_hint"]">
+                <input type="checkbox" @bind="_autoRefresh" @bind:after="OnAutoRefreshToggled" />
+                <span>@Loc["panel_sub_agent_sessions.auto_refresh"]</span>
+            </label>
+            <select class="su-select su-select-sm sessions-interval"
+                    @bind="_refreshIntervalSeconds"
+                    @bind:after="OnRefreshIntervalChanged"
+                    disabled="@(!_autoRefresh)"
+                    title="@Loc["panel_sub_agent_sessions.auto_refresh_interval"]">
+                <option value="1">1s</option>
+                <option value="3">3s</option>
+                <option value="5">5s</option>
+                <option value="10">10s</option>
+                <option value="30">30s</option>
+            </select>
+            <button class="su-btn su-btn-outline-primary" @onclick="ManualRefresh">
+                <i class="bi bi-arrow-clockwise"></i> @Loc["panel_sub_agent_sessions.refresh"]
+            </button>
+        </div>
+    </div>
+
+    <div class="sessions-refresh-meta su-text-sm su-text-2">
+        @if (_autoRefresh)
+        {
+            <span><i class="bi bi-broadcast"></i> @Loc.Format("panel_sub_agent_sessions.auto_refresh_on", _refreshIntervalSeconds)</span>
+        }
+        else
+        {
+            <span>@Loc["panel_sub_agent_sessions.auto_refresh_off"]</span>
+        }
+        @if (_lastChangeAt is { } lastChange)
+        {
+            <span>@Loc["panel_sub_agent_sessions.last_change"] @lastChange.ToString("HH:mm:ss")</span>
+        }
+        <span>@Loc.Format("panel_sub_agent_sessions.refresh_scope", _totalCount)</span>
     </div>
 
     @if (_statusMessage.Length > 0)
@@ -38,54 +74,168 @@
         <!-- 一级：按 SubAgent 配置分组的会话列表 -->
         <aside class="sessions-list-pane su-group">
             <div class="sessions-list-header">
-                <span class="sessions-list-title"><i class="bi bi-chat-left-text"></i> @Loc["panel_sub_agent_sessions.list_title"]</span>
-                <span class="su-badge su-badge-accent">@_totalCount</span>
+                <span class="sessions-list-title">
+                    <i class="bi bi-chat-left-text"></i> @Loc["panel_sub_agent_sessions.list_title"]
+                    @if (_totalCount > 0)
+                    {
+                        <span class="su-badge @(_shownCount == _totalCount ? "su-badge-accent" : "su-badge-secondary")">
+                            @(_shownCount == _totalCount ? _totalCount.ToString() : $"{_shownCount}/{_totalCount}")
+                        </span>
+                    }
+                </span>
+                <button class="sessions-icon-btn"
+                        title="@(_allCollapsed ? Loc["panel_sub_agent_sessions.expand_all"] : Loc["panel_sub_agent_sessions.collapse_all"])"
+                        @onclick="ToggleCollapseAll">
+                    <i class="bi @(_allCollapsed ? "bi-arrows-expand" : "bi-arrows-collapse")"></i>
+                </button>
             </div>
 
-            @if (_groups.Count == 0)
+            @if (_totalCount > 0)
             {
-                <div class="sessions-empty">
-                    <i class="bi bi-chat-left-text"></i>
-                    <p>@Loc["panel_sub_agent_sessions.empty"]</p>
-                    <p class="su-text-sm su-text-2">@Loc["panel_sub_agent_sessions.empty_hint"]</p>
-                </div>
-            }
-            else
-            {
-                @foreach (var group in _groups)
-                {
-                    <div class="sessions-group">
-                        <div class="sessions-group-header">
-                            <span class="sessions-group-name">
-                                <i class="bi bi-robot"></i> @group.ConfigName
-                                <span class="su-badge su-badge-accent">@group.Sessions.Count</span>
-                            </span>
-                            <button class="sessions-icon-btn" title="@Loc["panel_sub_agent_sessions.delete_group"]"
-                                    @onclick="() => ShowDeleteGroupConfirmation(group)">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-
-                        @foreach (var summary in group.Sessions)
+                <div class="sessions-filters">
+                    <div class="sessions-search">
+                        <i class="bi bi-search"></i>
+                        <input class="su-input su-input-sm"
+                               type="search"
+                               placeholder="@Loc["panel_sub_agent_sessions.search_placeholder"]"
+                               @bind="_keyword"
+                               @bind:event="oninput"
+                               @bind:after="OnFilterCriteriaChanged" />
+                        @if (!string.IsNullOrEmpty(_keyword))
                         {
-                            var isActive = _selectedSummary?.Id == summary.Id;
-                            <div class="sessions-list-item @(isActive ? "active" : "")" @onclick="() => SelectSession(summary)">
-                                <div class="sessions-list-item-main">
-                                    <div class="sessions-list-item-title su-truncate">@summary.Title</div>
-                                    <div class="sessions-list-item-meta">
-                                        <span class="su-badge @StatusBadgeClass(summary.Status)">@StatusLabel(summary.Status)</span>
-                                        <span class="su-text-sm su-text-2">@summary.MessageCount @Loc["panel_sub_agent_sessions.messages_suffix"]</span>
-                                        <span class="su-text-sm su-text-2">@summary.UpdatedAt.ToString("MM-dd HH:mm")</span>
-                                    </div>
-                                    @if (!string.IsNullOrWhiteSpace(summary.LastPreview))
-                                    {
-                                        <div class="sessions-list-item-preview su-truncate">@summary.LastPreview</div>
-                                    }
-                                </div>
-                            </div>
+                            <button class="sessions-icon-btn" title="@Loc["panel_sub_agent_sessions.clear_search"]"
+                                    @onclick="ClearKeyword">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
                         }
                     </div>
+
+                    <div class="sessions-status-filter">
+                        <button class="sessions-filter-chip @(_statusFilter == null ? "active" : "")"
+                                @onclick="() => SetStatusFilter(null)">
+                            @Loc["panel_sub_agent_sessions.filter_all"] <span class="sessions-filter-count">@_counts.Total</span>
+                        </button>
+                        <button class="sessions-filter-chip @(_statusFilter == SubAgentSessionStatus.Running ? "active" : "")"
+                                @onclick="() => SetStatusFilter(SubAgentSessionStatus.Running)">
+                            @Loc["panel_sub_agent_sessions.status_running"] <span class="sessions-filter-count">@_counts.Running</span>
+                        </button>
+                        <button class="sessions-filter-chip @(_statusFilter == SubAgentSessionStatus.Completed ? "active" : "")"
+                                @onclick="() => SetStatusFilter(SubAgentSessionStatus.Completed)">
+                            @Loc["panel_sub_agent_sessions.status_completed"] <span class="sessions-filter-count">@_counts.Completed</span>
+                        </button>
+                        <button class="sessions-filter-chip @(_statusFilter == SubAgentSessionStatus.Failed ? "active" : "")"
+                                @onclick="() => SetStatusFilter(SubAgentSessionStatus.Failed)">
+                            @Loc["panel_sub_agent_sessions.status_failed"] <span class="sessions-filter-count">@_counts.Failed</span>
+                        </button>
+                    </div>
+
+                    <div class="sessions-sort-row">
+                        <label class="sessions-sort-label" for="sessions-sort">@Loc["panel_sub_agent_sessions.sort_label"]</label>
+                        <select id="sessions-sort" class="su-select su-select-sm"
+                                @bind="_sort"
+                                @bind:after="OnFilterChanged">
+                            <option value="@SubAgentSessionSort.UpdatedDesc">@Loc["panel_sub_agent_sessions.sort_updated"]</option>
+                            <option value="@SubAgentSessionSort.CreatedDesc">@Loc["panel_sub_agent_sessions.sort_created"]</option>
+                            <option value="@SubAgentSessionSort.MessageCountDesc">@Loc["panel_sub_agent_sessions.sort_messages"]</option>
+                            <option value="@SubAgentSessionSort.TitleAsc">@Loc["panel_sub_agent_sessions.sort_title"]</option>
+                        </select>
+                    </div>
+                </div>
+            }
+
+            <div class="sessions-list-scroll">
+                @if (_totalCount == 0)
+                {
+                    <div class="sessions-empty">
+                        <i class="bi bi-chat-left-text"></i>
+                        <p>@Loc["panel_sub_agent_sessions.empty"]</p>
+                        <p class="su-text-sm su-text-2">@Loc["panel_sub_agent_sessions.empty_hint"]</p>
+                    </div>
                 }
+                else if (_renderGroups.Count == 0)
+                {
+                    <div class="sessions-empty">
+                        <i class="bi bi-search"></i>
+                        <p>@Loc["panel_sub_agent_sessions.no_match"]</p>
+                        <p class="su-text-sm su-text-2">@Loc["panel_sub_agent_sessions.no_match_hint"]</p>
+                        <button class="su-btn su-btn-outline su-btn-sm" @onclick="ClearFilters">@Loc["panel_sub_agent_sessions.clear_filters"]</button>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var group in _renderGroups)
+                    {
+                        var collapsed = IsCollapsed(group.ConfigGuid);
+                        <div class="sessions-group @(collapsed ? "collapsed" : "")">
+                            <div class="sessions-group-header">
+                                <button class="sessions-group-toggle"
+                                        type="button"
+                                        aria-expanded="@((!collapsed) ? "true" : "false")"
+                                        @onclick="() => ToggleGroup(group.ConfigGuid)">
+                                    <i class="bi @(collapsed ? "bi-chevron-right" : "bi-chevron-down")"></i>
+                                    <i class="bi bi-robot"></i>
+                                    <span class="su-truncate" title="@group.ConfigName">@group.ConfigName</span>
+                                    <span class="su-badge su-badge-accent">
+                                        @(group.Sessions.Count == group.TotalCount ? group.TotalCount.ToString() : $"{group.Sessions.Count}/{group.TotalCount}")
+                                    </span>
+                                </button>
+                                <button class="sessions-icon-btn"
+                                        type="button"
+                                        title="@Loc["panel_sub_agent_sessions.delete_group"]"
+                                        @onclick="() => ShowDeleteGroupConfirmation(group)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+
+                            @if (!collapsed)
+                            {
+                                @foreach (var summary in group.Sessions)
+                                {
+                                    var isActive = _selectedSummary?.Id == summary.Id;
+                                    <div class="sessions-list-item @(isActive ? "active" : "")" @onclick="() => SelectSession(summary)">
+                                        <div class="sessions-list-item-main">
+                                            <div class="sessions-list-item-title su-truncate" title="@summary.Title">@summary.Title</div>
+                                            <div class="sessions-list-item-meta">
+                                                <span class="su-badge @StatusBadgeClass(summary.Status)">@StatusLabel(summary.Status)</span>
+                                                <span class="su-text-sm su-text-2">@summary.MessageCount @Loc["panel_sub_agent_sessions.messages_suffix"]</span>
+                                                <span class="su-text-sm su-text-2">@summary.UpdatedAt.ToString("MM-dd HH:mm")</span>
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(summary.LastPreview))
+                                            {
+                                                <div class="sessions-list-item-preview su-truncate" title="@summary.LastPreview">@summary.LastPreview</div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (group.HiddenCount > 0)
+                                {
+                                    <button class="sessions-more-btn" @onclick="() => ShowMore(group.ConfigGuid)">
+                                        <i class="bi bi-chevron-double-down"></i>
+                                        @Loc.Format("panel_sub_agent_sessions.show_more", group.HiddenCount)
+                                    </button>
+                                }
+                                else if (!FilterActive && group.Sessions.Count > DefaultGroupPageSize)
+                                {
+                                    <button class="sessions-more-btn" @onclick="() => ResetGroupLimit(group.ConfigGuid)">
+                                        @Loc["panel_sub_agent_sessions.show_less"]
+                                    </button>
+                                }
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+            @if (_totalCount > 0)
+            {
+                <div class="sessions-list-footer su-text-sm su-text-2">
+                    @Loc.Format("panel_sub_agent_sessions.footer", _shownCount, _totalCount)
+                    @if (FilterActive)
+                    {
+                        <span>· @Loc.Format("panel_sub_agent_sessions.footer_filtered", _matchedCount)</span>
+                    }
+                </div>
             }
         </aside>
 
@@ -94,32 +244,43 @@
             @if (_selectedSummary == null)
             {
                 <div class="sessions-empty">
-                    <i class="bi bi-arrow-left-circle"></i>
-                    <p>@Loc["panel_sub_agent_sessions.select_hint"]</p>
+                    <i class="bi @(_selectionLost ? "bi-exclamation-circle" : "bi-arrow-left-circle")"></i>
+                    @if (_selectionLost)
+                    {
+                        <p>@Loc["panel_sub_agent_sessions.loaded_missing"]</p>
+                        @if (!string.IsNullOrWhiteSpace(_selectionLostTitle))
+                        {
+                            <p class="su-text-sm su-text-2">@_selectionLostTitle</p>
+                        }
+                        <button class="su-btn su-btn-outline su-btn-sm" @onclick="DismissSelectionLost">
+                            @Loc["panel_sub_agent_sessions.dismiss"]
+                        </button>
+                    }
+                    else
+                    {
+                        <p>@Loc["panel_sub_agent_sessions.select_hint"]</p>
+                    }
                 </div>
             }
-            else if (_sessionLoadError != null)
-            {
-                <div class="su-alert su-alert-danger" style="padding:8px 12px;font-size:0.85em;">
-                    <strong>@Loc["panel_sub_agent_sessions.load_error"]</strong> @_sessionLoadError
-                </div>
-            }
-            else if (_selectedSession != null)
+            else
             {
                 <div class="sessions-detail-header">
                     <div class="sessions-detail-title">
-                        <h3>@_selectedSession.Title</h3>
+                        <h3>@_selectedSummary.Title</h3>
                         <div class="sessions-detail-meta">
-                            <span class="su-badge @StatusBadgeClass(_selectedSession.Status)">@StatusLabel(_selectedSession.Status)</span>
+                            <span class="su-badge @StatusBadgeClass(_selectedSummary.Status)">@StatusLabel(_selectedSummary.Status)</span>
                             <span class="su-text-sm su-text-2">
-                                @Loc["panel_sub_agent_sessions.meta_config"] @_selectedSession.ConfigName
+                                @Loc["panel_sub_agent_sessions.meta_config"] @_selectedSummary.ConfigName
                             </span>
                             <span class="su-text-sm su-text-2">
-                                @Loc["panel_sub_agent_sessions.meta_updated"] @_selectedSession.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                                @Loc["panel_sub_agent_sessions.meta_updated"] @_selectedSummary.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                            </span>
+                            <span class="su-text-sm su-text-2">
+                                @Loc["panel_sub_agent_sessions.meta_created"] @_selectedSummary.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
                             </span>
                         </div>
                         <div class="sessions-detail-id">
-                            <code>@_selectedSession.Id</code>
+                            <code>@_selectedSummary.Id</code>
                             <button class="sessions-icon-btn" title="@Loc["panel_sub_agent_sessions.copy_id"]" @onclick="CopySessionIdAsync">
                                 <i class="bi bi-clipboard"></i>
                             </button>
@@ -135,69 +296,128 @@
                     </div>
                 </div>
 
-                @if (_selectedSession.Status == SubAgentSessionStatus.Failed)
-                {
-                    <div class="su-alert su-alert-danger sessions-failure" style="padding:8px 12px;font-size:0.85em;">
-                        <div><strong>@_selectedSession.ErrorCode</strong></div>
-                        <div style="white-space:pre-wrap;">@_selectedSession.ErrorMessage</div>
-                    </div>
-                }
-
-                @if (!string.IsNullOrWhiteSpace(_selectedSession.OutputText))
-                {
-                    <div class="sessions-output">
-                        <div class="sessions-output-title">@Loc["panel_sub_agent_sessions.output"]</div>
-                        <div class="sessions-output-body">@Display.Render(_selectedSession.OutputText)</div>
-                    </div>
-                }
-
-                <div class="sessions-messages">
-                    @foreach (var message in _selectedSession.Messages)
+                <div class="sessions-detail-scroll" @ref="_transcriptRef">
+                    @if (_sessionLoadError != null)
                     {
-                        var content = message.CurrentVersion;
-                        <div class="sessions-msg @SenderClass(message.sender)">
-                            <div class="sessions-msg-head">
-                                <span class="sessions-msg-role">@SenderLabel(message.sender)</span>
-                                <span class="sessions-msg-time">@message.timestamp.ToString("yyyy-MM-dd HH:mm:ss")</span>
-                            </div>
-                            @if (content == null)
+                        <div class="su-alert su-alert-danger" style="padding:8px 12px;font-size:0.85em;">
+                            <strong>@Loc["panel_sub_agent_sessions.load_error"]</strong> @_sessionLoadError
+                        </div>
+                    }
+
+                    @if (_selectedSession is { Status: SubAgentSessionStatus.Failed })
+                    {
+                        <div class="su-alert su-alert-danger sessions-failure" style="padding:8px 12px;font-size:0.85em;">
+                            <div><strong>@_selectedSession.ErrorCode</strong></div>
+                            <div style="white-space:pre-wrap;">@_selectedSession.ErrorMessage</div>
+                        </div>
+                    }
+
+                    @if (_selectedSession != null && !string.IsNullOrWhiteSpace(_selectedSession.OutputText))
+                    {
+                        <div class="sessions-output">
+                            <div class="sessions-output-title">@Loc["panel_sub_agent_sessions.output"]</div>
+                            <div class="sessions-output-body">@Display.Render(_selectedSession.OutputText)</div>
+                        </div>
+                    }
+
+                    @{
+                        var total = _selectedSession?.Messages.Count ?? 0;
+                        var window = TranscriptWindow;
+                    }
+
+                    <div class="sessions-transcript-bar">
+                        <span class="su-text-sm su-text-2">
+                            @if (total == 0)
                             {
-                                <div class="sessions-msg-body su-text-2">@Loc["panel_sub_agent_sessions.empty_message"]</div>
+                                @Loc["panel_sub_agent_sessions.messages_none"]
                             }
                             else
                             {
-                                @if (!string.IsNullOrWhiteSpace(content.Content))
-                                {
-                                    <div class="sessions-msg-body">@Display.Render(content.Content)</div>
-                                }
-                                @if (content.toolCalls is { Count: > 0 })
-                                {
-                                    <details class="sessions-toolcalls">
-                                        <summary>@Loc.Format("panel_sub_agent_sessions.tool_calls", content.toolCalls.Count)</summary>
-                                        @foreach (var toolCall in content.toolCalls)
-                                        {
-                                            <div class="sessions-toolcall">
-                                                <code>@toolCall.name</code>
-                                                <pre>@toolCall.arguments</pre>
-                                            </div>
-                                        }
-                                    </details>
-                                }
+                                @Loc.Format("panel_sub_agent_sessions.messages_range", window.Start + 1, window.Start + window.Count, total)
+                            }
+                        </span>
+                        <div class="sessions-transcript-actions">
+                            @if (window.Start > 0)
+                            {
+                                <button class="su-btn su-btn-outline su-btn-sm" @onclick="ShowEarlierMessagesAsync">
+                                    <i class="bi bi-arrow-up-circle"></i>
+                                    @Loc.Format("panel_sub_agent_sessions.show_earlier", Math.Min(SubAgentTranscriptWindow.PageSize, window.Start))
+                                </button>
+                            }
+                            @if (_transcriptStart != null)
+                            {
+                                <button class="su-btn su-btn-ghost su-btn-sm" @onclick="FollowLatest">
+                                    <i class="bi bi-arrow-down-circle"></i> @Loc["panel_sub_agent_sessions.jump_latest"]
+                                </button>
                             }
                         </div>
-                    }
+                    </div>
+
+                    <div class="sessions-messages">
+                        @if (_selectedSession == null)
+                        {
+                            <div class="sessions-empty">
+                                <i class="bi bi-file-earmark-x"></i>
+                                <p>@Loc["panel_sub_agent_sessions.detail_unavailable"]</p>
+                            </div>
+                        }
+                        else if (total == 0)
+                        {
+                            <div class="sessions-empty">
+                                <i class="bi bi-chat-square"></i>
+                                <p>@Loc["panel_sub_agent_sessions.messages_none"]</p>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var message in _selectedSession.Messages.Skip(window.Start).Take(window.Count))
+                            {
+                                var content = message.CurrentVersion;
+                                <div class="sessions-msg @SenderClass(message.sender)">
+                                    <div class="sessions-msg-head">
+                                        <span class="sessions-msg-role">@SenderLabel(message.sender)</span>
+                                        <span class="sessions-msg-time">@message.timestamp.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                                    </div>
+                                    @if (content == null)
+                                    {
+                                        <div class="sessions-msg-body su-text-2">@Loc["panel_sub_agent_sessions.empty_message"]</div>
+                                    }
+                                    else
+                                    {
+                                        @if (!string.IsNullOrWhiteSpace(content.Content))
+                                        {
+                                            <div class="sessions-msg-body">@Display.Render(content.Content)</div>
+                                        }
+                                        @if (content.toolCalls is { Count: > 0 })
+                                        {
+                                            <details class="sessions-toolcalls">
+                                                <summary>@Loc.Format("panel_sub_agent_sessions.tool_calls", content.toolCalls.Count)</summary>
+                                                @foreach (var toolCall in content.toolCalls)
+                                                {
+                                                    <div class="sessions-toolcall">
+                                                        <code>@toolCall.name</code>
+                                                        <pre>@toolCall.arguments</pre>
+                                                    </div>
+                                                }
+                                            </details>
+                                        }
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
                 </div>
             }
         </section>
     </div>
 </div>
 
-@if (_deleteSessionVisible && _selectedSession != null)
+@if (_deleteSessionVisible && _selectedSummary != null)
 {
     <div class="su-modal-mask" @onclick="() => _deleteSessionVisible = false">
         <div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
             <h5>@Loc["panel_sub_agent_sessions.delete_title"]</h5>
-            <p class="su-mt-2">@Loc.Format("panel_sub_agent_sessions.delete_msg", _selectedSession.Title)</p>
+            <p class="su-mt-2">@Loc.Format("panel_sub_agent_sessions.delete_msg", _selectedSummary.Title)</p>
             <div class="su-modal-footer">
                 <button class="su-btn su-btn-secondary" @onclick="() => _deleteSessionVisible = false">@Loc["panel_sub_agent_sessions.cancel"]</button>
                 <button class="su-btn su-btn-danger" @onclick="DeleteSelectedSession">@Loc["panel_sub_agent_sessions.delete"]</button>
@@ -211,7 +431,7 @@
     <div class="su-modal-mask" @onclick="() => _deleteGroupVisible = false">
         <div class="su-modal su-modal-sm su-p-4" @onclick:stopPropagation>
             <h5>@Loc["panel_sub_agent_sessions.delete_group_title"]</h5>
-            <p class="su-mt-2">@Loc.Format("panel_sub_agent_sessions.delete_group_msg", _groupToDelete.ConfigName, _groupToDelete.Sessions.Count)</p>
+            <p class="su-mt-2">@Loc.Format("panel_sub_agent_sessions.delete_group_msg", _groupToDelete.ConfigName, _groupToDelete.TotalCount)</p>
             <div class="su-modal-footer">
                 <button class="su-btn su-btn-secondary" @onclick="() => _deleteGroupVisible = false">@Loc["panel_sub_agent_sessions.cancel"]</button>
                 <button class="su-btn su-btn-danger" @onclick="DeleteGroup">@Loc["panel_sub_agent_sessions.delete"]</button>
@@ -221,101 +441,445 @@
 }
 
 @code {
-    private sealed class SessionGroup
+    /// <summary>每个分组默认渲染的会话条数；「显示更多」按批增加，避免一次性渲染上千条。</summary>
+    private const int DefaultGroupPageSize = 20;
+
+    /// <summary>分组渲染模型：已按筛选 / 排序 / 分组展开上限裁剪，界面不再做计算。</summary>
+    private sealed class SessionGroupRender
     {
         public Guid ConfigGuid { get; init; }
         public string ConfigName { get; init; } = "";
+        public int TotalCount { get; init; }
         public List<SubAgentSessionSummary> Sessions { get; init; } = [];
+        public int HiddenCount { get; init; }
     }
 
-    private List<SessionGroup> _groups = [];
+    private sealed class DeleteGroupTarget
+    {
+        public Guid ConfigGuid { get; init; }
+        public string ConfigName { get; init; } = "";
+        public int TotalCount { get; init; }
+    }
+
+    // 索引快照与渲染结果
+    private List<SubAgentSessionSummary> _summaries = [];
+    private List<SessionGroupRender> _renderGroups = [];
+    private SubAgentSessionStatusCounts _counts = new(0, 0, 0, 0);
     private int _totalCount;
+    private int _shownCount;
+    private int _matchedCount;
     private string? _indexError;
 
+    // 列表筛选状态（内存态，不落盘）
+    private string _keyword = "";
+    private SubAgentSessionStatus? _statusFilter;
+    private SubAgentSessionSort _sort = SubAgentSessionSort.UpdatedDesc;
+    private readonly HashSet<Guid> _collapsedGroups = [];
+    private readonly Dictionary<Guid, int> _groupLimits = [];
+
+    // 详情状态
     private SubAgentSessionSummary? _selectedSummary;
     private SubAgentSession? _selectedSession;
+
+    /// <summary>详情上次读取时的索引快照（成功与失败都记录），用于判断自动刷新是否需要重读。</summary>
+    private SubAgentSessionSummary? _loadedSummary;
     private string? _sessionLoadError;
+    private bool _selectionLost;
+    private string? _selectionLostTitle;
+    private int? _transcriptStart;
+    private bool _scrollPending;
+    private bool _scrollForce;
+    private bool _restoreAnchorPending;
+    private double[]? _pendingScrollMetrics;
+    private ElementReference _transcriptRef;
+
+    // 自动刷新（内存态：离开面板即停止）
+    private bool _autoRefresh = true;
+    private int _refreshIntervalSeconds = 5;
+    private CancellationTokenSource? _autoRefreshCts;
+    private bool _disposed;
+    private DateTime? _lastChangeAt;
 
     private bool _deleteSessionVisible;
     private bool _deleteGroupVisible;
-    private SessionGroup? _groupToDelete;
+    private DeleteGroupTarget? _groupToDelete;
 
     private string _statusMessage = "";
     private bool _statusFailed;
 
-    protected override void OnInitialized() => LoadIndex();
+    private bool FilterActive => !string.IsNullOrWhiteSpace(_keyword) || _statusFilter != null;
 
-    private void LoadIndex()
+    private bool _allCollapsed => _renderGroups.Count > 0 && _renderGroups.All(g => _collapsedGroups.Contains(g.ConfigGuid));
+
+    private (int Start, int Count) TranscriptWindow
+        => SubAgentTranscriptWindow.Resolve(_selectedSession?.Messages.Count ?? 0, _transcriptStart);
+
+    protected override void OnInitialized()
+        => RefreshCore(forceDetailReload: false, forceRender: true);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var (summaries, error) = SubAgentSessionStore.List(KVData, DebugOutput);
-        _indexError = error;
-        _totalCount = summaries.Count;
+        // 预渲染阶段不调用 OnAfterRenderAsync，因此这里可以安全地使用 JS interop 与定时器。
+        if (firstRender && _autoRefresh)
+            StartAutoRefresh();
 
-        _groups = summaries
-            .GroupBy(s => s.ConfigGuid)
-            .Select(g => new SessionGroup
-            {
-                ConfigGuid = g.Key,
-                ConfigName = g.Select(s => s.ConfigName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? g.Key.ToString(),
-                Sessions = g.OrderByDescending(s => s.UpdatedAt).ToList()
-            })
-            .OrderBy(g => g.ConfigName, StringComparer.CurrentCulture)
-            .ToList();
-
-        // 已选中的会话可能已被删除或改名，按 Id 重新定位
-        if (_selectedSummary != null)
+        if (_restoreAnchorPending)
         {
-            var relocated = summaries.FirstOrDefault(s => s.Id == _selectedSummary.Id);
-            if (relocated == null)
+            _restoreAnchorPending = false;
+            var metrics = _pendingScrollMetrics;
+            _pendingScrollMetrics = null;
+            if (metrics != null)
             {
-                _selectedSummary = null;
-                _selectedSession = null;
-                _sessionLoadError = null;
-            }
-            else
-            {
-                _selectedSummary = relocated;
+                await SafeJsAsync(
+                    () => JS.InvokeVoidAsync("restoreScrollMetrics", _transcriptRef, metrics).AsTask(),
+                    "restore transcript scroll anchor");
             }
         }
+
+        if (!_scrollPending || _selectedSession == null)
+            return;
+
+        _scrollPending = false;
+        var force = _scrollForce;
+        _scrollForce = false;
+
+        await SafeJsAsync(
+            () => JS.InvokeVoidAsync(force ? "scrollToBottomManual" : "scrollToBottom", _transcriptRef).AsTask(),
+            "scroll transcript to bottom");
     }
+
+    /// <summary>
+    /// 执行只影响显示的 JS 调用；电路断开 / 组件已释放时记录日志并跳过，
+    /// 不让滚动这类优化把整个面板带崩。
+    /// </summary>
+    private async Task SafeJsAsync(Func<Task> action, string description)
+    {
+        try
+        {
+            await action();
+        }
+        catch (JSDisconnectedException ex)
+        {
+            // 电路已断开：滚动只是显示优化，记录后跳过，不影响后续渲染。
+            Logger.LogWarning(ex, "Skipped {Description}: JS circuit disconnected", description);
+            DebugOutput.Write("SubAgentSessionPanel", "Scroll",
+                $"[SubAgentSessionPanel] Skipped {description}: JS circuit disconnected");
+        }
+        catch (ObjectDisposedException ex)
+        {
+            Logger.LogWarning(ex, "Skipped {Description}: component disposed", description);
+            DebugOutput.Write("SubAgentSessionPanel", "Scroll",
+                $"[SubAgentSessionPanel] Skipped {description}: component disposed");
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        StopAutoRefresh();
+        return ValueTask.CompletedTask;
+    }
+
+    #region 刷新
+
+    /// <summary>手动刷新：索引与当前打开的会话详情都重读。</summary>
+    private void ManualRefresh() => RefreshCore(forceDetailReload: true, forceRender: true);
+
+    /// <summary>
+    /// 重新读取索引，并在必要时重读当前打开的会话详情。
+    /// 返回 true 表示界面数据发生变化、需要重新渲染；自动刷新在无变化时不渲染，
+    /// 避免每几秒重跑一遍会话 Markdown。
+    /// </summary>
+    private bool RefreshCore(bool forceDetailReload, bool forceRender)
+    {
+        var (summaries, error) = SubAgentSessionStore.List(KVData, DebugOutput);
+
+        var indexChanged = !SubAgentSessionQuery.SummariesEqual(_summaries, summaries)
+            || !string.Equals(_indexError, error, StringComparison.Ordinal);
+
+        _indexError = error;
+        _summaries = [.. summaries];
+        ReconcileSelection();
+
+        var detailChanged = false;
+        if (_selectedSummary != null
+            && (forceDetailReload || SubAgentSessionRefreshPlan.NeedsDetailReload(
+                _selectedSummary, _loadedSummary, _loadedSummary != null)))
+        {
+            detailChanged = ReloadSelectedSessionCore();
+        }
+
+        if (indexChanged || detailChanged || forceRender)
+        {
+            RebuildList();
+            if (indexChanged || detailChanged)
+                _lastChangeAt = DateTime.Now;
+            return indexChanged || detailChanged;
+        }
+
+        return false;
+    }
+
+    /// <summary>按 Id 把选中项重新定位到最新索引条目；会话已不存在时显式提示，不静默当成未选择。</summary>
+    private void ReconcileSelection()
+    {
+        if (_selectedSummary == null)
+            return;
+
+        var relocated = _summaries.FirstOrDefault(s => s.Id == _selectedSummary.Id);
+        if (relocated != null)
+        {
+            _selectedSummary = relocated;
+            return;
+        }
+
+        _selectionLostTitle = _selectedSummary.Title;
+        _selectedSummary = null;
+        _selectedSession = null;
+        _loadedSummary = null;
+        _sessionLoadError = null;
+        _transcriptStart = null;
+        _selectionLost = true;
+        // 目标已不存在，删除确认框无法继续：关掉它，否则自动刷新会一直被"模态框打开"挡住。
+        _deleteSessionVisible = false;
+    }
+
+    /// <summary>重读当前会话详情；返回 true 表示详情状态发生变化。</summary>
+    private bool ReloadSelectedSessionCore()
+    {
+        if (_selectedSummary == null)
+            return false;
+
+        var previousCount = _selectedSession?.Messages.Count ?? 0;
+        var read = SubAgentSessionStore.Load(KVData, DebugOutput, _selectedSummary.Id);
+
+        // 无论成功失败都记录快照：坏数据不会每个刷新周期重复报错，手动刷新仍会强制重读。
+        _loadedSummary = _selectedSummary;
+
+        if (read.Status == SubAgentSessionLoadStatus.Ok)
+        {
+            var messages = read.Session!.Messages;
+            _selectedSession = read.Session;
+            _sessionLoadError = null;
+
+            if (_transcriptStart is { } pinned && (pinned < 0 || pinned >= messages.Count))
+                _transcriptStart = null;
+
+            if (messages.Count > previousCount)
+                _scrollPending = true;
+
+            return true;
+        }
+
+        _selectedSession = null;
+        _sessionLoadError = read.Status == SubAgentSessionLoadStatus.NotFound
+            ? Loc["panel_sub_agent_sessions.loaded_missing"]
+            : read.Error;
+        return true;
+    }
+
+    private void RebuildList()
+    {
+        _counts = SubAgentSessionQuery.CountByStatus(_summaries);
+        _totalCount = _counts.Total;
+
+        var groups = SubAgentSessionQuery.BuildGroups(_summaries, _keyword, _statusFilter, _sort);
+
+        var renders = new List<SessionGroupRender>(groups.Count);
+        var shown = 0;
+        var matched = 0;
+        foreach (var group in groups)
+        {
+            // 筛选状态下展示全部命中项；浏览状态下按分组分页，避免一次渲染上千个条目。
+            var limit = FilterActive ? int.MaxValue : GroupLimit(group.ConfigGuid);
+            var take = Math.Min(limit, group.Sessions.Count);
+            var visible = take == group.Sessions.Count
+                ? [.. group.Sessions]
+                : group.Sessions.Take(take).ToList();
+
+            matched += group.Sessions.Count;
+            if (!IsCollapsed(group.ConfigGuid))
+                shown += visible.Count;
+
+            renders.Add(new SessionGroupRender
+            {
+                ConfigGuid = group.ConfigGuid,
+                ConfigName = group.ConfigName,
+                TotalCount = group.TotalCount,
+                Sessions = visible,
+                HiddenCount = group.Sessions.Count - visible.Count
+            });
+        }
+
+        _renderGroups = renders;
+        _shownCount = shown;
+        _matchedCount = matched;
+
+        // 配置被删除后清掉对应 UI 状态，避免面板长期打开时集合无限增长。
+        var live = _summaries.Select(s => s.ConfigGuid).ToHashSet();
+        _collapsedGroups.RemoveWhere(id => !live.Contains(id));
+        foreach (var stale in _groupLimits.Keys.Where(id => !live.Contains(id)).ToList())
+            _groupLimits.Remove(stale);
+    }
+
+    #endregion
+
+    #region 列表筛选 / 分组
+
+    /// <summary>筛选 / 排序条件变化：重建渲染列表，随后的组件渲染由事件自身触发。</summary>
+    private void OnFilterChanged() => RebuildList();
+
+    /// <summary>
+    /// 关键词或状态变化：命中项可能落在折叠的分组里，因此先展开全部分组，
+    /// 否则用户搜索后看到的仍是空列表。
+    /// </summary>
+    private void OnFilterCriteriaChanged()
+    {
+        if (FilterActive)
+            _collapsedGroups.Clear();
+        RebuildList();
+    }
+
+    private void ClearKeyword()
+    {
+        _keyword = "";
+        OnFilterChanged();
+    }
+
+    private void SetStatusFilter(SubAgentSessionStatus? status)
+    {
+        _statusFilter = status;
+        OnFilterCriteriaChanged();
+    }
+
+    private void ClearFilters()
+    {
+        _keyword = "";
+        _statusFilter = null;
+        OnFilterChanged();
+    }
+
+    private int GroupLimit(Guid configGuid)
+        => _groupLimits.TryGetValue(configGuid, out var limit) ? limit : DefaultGroupPageSize;
+
+    private bool IsCollapsed(Guid configGuid) => _collapsedGroups.Contains(configGuid);
+
+    private void ToggleGroup(Guid configGuid)
+    {
+        if (!_collapsedGroups.Add(configGuid))
+            _collapsedGroups.Remove(configGuid);
+
+        // 折叠会影响「显示 X / 共 Y」口径，重建渲染列表（不读盘）。
+        RebuildList();
+    }
+
+    private void ToggleCollapseAll()
+    {
+        if (_allCollapsed)
+            _collapsedGroups.Clear();
+        else
+            foreach (var group in _renderGroups)
+                _collapsedGroups.Add(group.ConfigGuid);
+
+        RebuildList();
+    }
+
+    private void ShowMore(Guid configGuid)
+    {
+        _groupLimits[configGuid] = GroupLimit(configGuid) + DefaultGroupPageSize;
+        OnFilterChanged();
+    }
+
+    private void ResetGroupLimit(Guid configGuid)
+    {
+        _groupLimits.Remove(configGuid);
+        OnFilterChanged();
+    }
+
+    #endregion
+
+    #region 详情
 
     private void SelectSession(SubAgentSessionSummary summary)
     {
         _selectedSummary = summary;
+        _selectionLost = false;
+        _selectionLostTitle = null;
         _sessionLoadError = null;
         _selectedSession = null;
+        _loadedSummary = null;
+        _transcriptStart = null;
+        ReloadSelectedSessionCore();
+        _scrollPending = true;
+        _scrollForce = true;
+    }
 
-        var read = SubAgentSessionStore.Load(KVData, DebugOutput, summary.Id);
-        if (read.Status == SubAgentSessionLoadStatus.Ok)
+    private void DismissSelectionLost()
+    {
+        _selectionLost = false;
+        _selectionLostTitle = null;
+    }
+
+    /// <summary>
+    /// 向上展开一页更早的消息。展开前先记下滚动位置与内容高度，渲染后把新增内容算进
+    /// scrollTop，视口仍停在用户原本阅读的那条消息上，而不是突然跳到更早的位置。
+    /// </summary>
+    private async Task ShowEarlierMessagesAsync()
+    {
+        var total = _selectedSession?.Messages.Count ?? 0;
+        if (total == 0)
+            return;
+
+        var next = SubAgentTranscriptWindow.ExpandEarlier(total, _transcriptStart);
+        if (next == _transcriptStart)
+            return;
+
+        try
         {
-            _selectedSession = read.Session;
+            _pendingScrollMetrics = await JS.InvokeAsync<double[]?>("captureScrollMetrics", _transcriptRef);
         }
-        else if (read.Status == SubAgentSessionLoadStatus.NotFound)
+        catch (JSDisconnectedException ex)
         {
-            _sessionLoadError = Loc["panel_sub_agent_sessions.loaded_missing"];
+            _pendingScrollMetrics = null;
+            Logger.LogWarning(ex, "Skipped capture transcript scroll anchor: JS circuit disconnected");
+            DebugOutput.Write("SubAgentSessionPanel", "Scroll",
+                "[SubAgentSessionPanel] Skipped capture transcript scroll anchor: JS circuit disconnected");
         }
-        else
+        catch (ObjectDisposedException ex)
         {
-            _sessionLoadError = read.Error;
+            _pendingScrollMetrics = null;
+            Logger.LogWarning(ex, "Skipped capture transcript scroll anchor: component disposed");
+            DebugOutput.Write("SubAgentSessionPanel", "Scroll",
+                "[SubAgentSessionPanel] Skipped capture transcript scroll anchor: component disposed");
         }
+
+        _transcriptStart = next;
+        _restoreAnchorPending = _pendingScrollMetrics != null;
+    }
+
+    private void FollowLatest()
+    {
+        _transcriptStart = null;
+        _scrollPending = true;
+        _scrollForce = true;
     }
 
     private async Task CopySessionIdAsync()
     {
-        if (_selectedSession == null)
+        if (_selectedSummary == null)
             return;
 
-        await JS.InvokeVoidAsync("copyTextToClipboard", _selectedSession.Id.ToString());
+        await JS.InvokeVoidAsync("copyTextToClipboard", _selectedSummary.Id.ToString());
         ShowStatus(Loc["panel_sub_agent_sessions.copied"], failed: false);
     }
 
     private async Task ExportSessionAsync()
     {
-        if (_selectedSession == null)
+        if (_selectedSummary == null)
             return;
 
         // 导出原始存储文本，保证与磁盘内容一致
-        var json = KVData.Read(SubAgentSessionStore.SpaceId, SubAgentSessionStore.SessionKey(_selectedSession.Id));
+        var json = KVData.Read(SubAgentSessionStore.SpaceId, SubAgentSessionStore.SessionKey(_selectedSummary.Id));
         if (string.IsNullOrWhiteSpace(json))
         {
             ShowStatus(Loc["panel_sub_agent_sessions.export_failed"], failed: true);
@@ -325,15 +889,15 @@
         var bytes = System.Text.Encoding.UTF8.GetBytes(json);
         using var stream = new MemoryStream(bytes);
         using var streamRef = new DotNetStreamReference(stream);
-        await JS.InvokeVoidAsync("downloadFileFromStream", $"subagent-session-{_selectedSession.Id:N}.json", streamRef);
+        await JS.InvokeVoidAsync("downloadFileFromStream", $"subagent-session-{_selectedSummary.Id:N}.json", streamRef);
     }
 
     private void DeleteSelectedSession()
     {
-        if (_selectedSession == null)
+        if (_selectedSummary == null)
             return;
 
-        var error = SubAgentSessionStore.Delete(KVData, DebugOutput, _selectedSession.Id);
+        var error = SubAgentSessionStore.Delete(KVData, DebugOutput, _selectedSummary.Id);
         _deleteSessionVisible = false;
 
         if (error != null)
@@ -344,14 +908,23 @@
 
         _selectedSummary = null;
         _selectedSession = null;
+        _loadedSummary = null;
         _sessionLoadError = null;
-        LoadIndex();
+        _transcriptStart = null;
+        _selectionLost = false;
+        _selectionLostTitle = null;
+        RefreshCore(forceDetailReload: false, forceRender: true);
         ShowStatus(Loc["panel_sub_agent_sessions.deleted"], failed: false);
     }
 
-    private void ShowDeleteGroupConfirmation(SessionGroup group)
+    private void ShowDeleteGroupConfirmation(SessionGroupRender group)
     {
-        _groupToDelete = group;
+        _groupToDelete = new DeleteGroupTarget
+        {
+            ConfigGuid = group.ConfigGuid,
+            ConfigName = group.ConfigName,
+            TotalCount = group.TotalCount
+        };
         _deleteGroupVisible = true;
     }
 
@@ -360,7 +933,8 @@
         if (_groupToDelete == null)
             return;
 
-        var (deleted, error) = SubAgentSessionStore.DeleteAllForConfig(KVData, DebugOutput, _groupToDelete.ConfigGuid);
+        var target = _groupToDelete;
+        var (deleted, error) = SubAgentSessionStore.DeleteAllForConfig(KVData, DebugOutput, target.ConfigGuid);
         _deleteGroupVisible = false;
         _groupToDelete = null;
 
@@ -369,9 +943,17 @@
         else
             ShowStatus(Loc.Format("panel_sub_agent_sessions.deleted_count", deleted), failed: false);
 
-        _selectedSummary = null;
-        _selectedSession = null;
-        LoadIndex();
+        // 只清掉属于被删配置的选中项：删除 A 分组不应该把用户正在看的 B 会话一起关掉。
+        if (_selectedSummary?.ConfigGuid == target.ConfigGuid)
+        {
+            _selectedSummary = null;
+            _selectedSession = null;
+            _loadedSummary = null;
+            _sessionLoadError = null;
+            _transcriptStart = null;
+        }
+
+        RefreshCore(forceDetailReload: false, forceRender: true);
     }
 
     private void ShowStatus(string message, bool failed)
@@ -381,10 +963,138 @@
         _ = InvokeAsync(async () =>
         {
             await Task.Delay(4000);
+            if (_disposed)
+                return;
             _statusMessage = "";
             StateHasChanged();
         });
     }
+
+    #endregion
+
+    #region 自动刷新
+
+    private void OnAutoRefreshToggled()
+    {
+        if (_autoRefresh)
+            StartAutoRefresh();
+        else
+            StopAutoRefresh();
+    }
+
+    private void OnRefreshIntervalChanged()
+    {
+        // 周期在循环启动时读取，修改间隔必须重建循环
+        if (_autoRefresh)
+            StartAutoRefresh();
+    }
+
+    private void StartAutoRefresh()
+    {
+        StopAutoRefresh();
+        var cts = new CancellationTokenSource();
+        _autoRefreshCts = cts;
+        _ = RunAutoRefreshAsync(cts.Token);
+    }
+
+    private void StopAutoRefresh()
+    {
+        var cts = _autoRefreshCts;
+        _autoRefreshCts = null;
+        if (cts == null)
+            return;
+
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+    private async Task RunAutoRefreshAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_refreshIntervalSeconds));
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                // 刷新本身的异常在 AutoRefreshTick 里处理并回写界面，这里只等待调度完成。
+                await InvokeAsync(AutoRefreshTick);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // 关闭自动刷新 / 组件释放：定时循环的唯一取消出口。
+        }
+        catch (ObjectDisposedException ex)
+        {
+            // 组件先于循环释放：属于关闭边界，记录后结束。
+            Logger.LogWarning(ex, "Auto refresh stopped after component disposal");
+            DebugOutput.Write("SubAgentSessionPanel", "AutoRefresh",
+                "[SubAgentSessionPanel] Auto refresh stopped after component disposal");
+        }
+        catch (Exception ex)
+        {
+            // 循环基础设施（周期 / 调度）失败：记录完整异常并显式关闭开关，不静默重试。
+            Logger.LogError(ex, "Auto refresh loop failed");
+            DebugOutput.Write("SubAgentSessionPanel", "AutoRefresh",
+                $"[SubAgentSessionPanel] Auto refresh loop failed: {ex}");
+            await NotifyAutoRefreshFailureAsync(ex.Message);
+        }
+    }
+
+    /// <summary>把自动刷新失败回写到界面（关闭开关 + 顶部告警）；组件已释放时只保留日志。</summary>
+    private async Task NotifyAutoRefreshFailureAsync(string message)
+    {
+        try
+        {
+            await InvokeAsync(() =>
+            {
+                StopAutoRefresh();
+                _autoRefresh = false;
+                ShowStatus(Loc.Format("panel_sub_agent_sessions.auto_refresh_failed", message), failed: true);
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException ex)
+        {
+            // 组件已释放，无法再渲染；异常已由调用方记录。
+            Logger.LogWarning(ex, "Could not report auto refresh failure: component disposed");
+        }
+        catch (OperationCanceledException ex) when (_disposed)
+        {
+            // 电路关闭时调度任务被取消：界面已不存在，无需再通知。
+            Logger.LogWarning(ex, "Could not report auto refresh failure: circuit shutting down");
+        }
+    }
+
+    /// <summary>一次自动刷新。使用模态框或正在手动删除时不打断用户操作。</summary>
+    private void AutoRefreshTick()
+    {
+        if (_disposed || _deleteSessionVisible || _deleteGroupVisible)
+            return;
+
+        try
+        {
+            if (RefreshCore(forceDetailReload: false, forceRender: false))
+                StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            // 自动刷新在渲染线程上失败：立刻停止循环并显式告警，而不是每个周期静默重试。
+            Logger.LogError(ex, "Auto refresh stopped after failure");
+            DebugOutput.Write("SubAgentSessionPanel", "AutoRefresh",
+                $"[SubAgentSessionPanel] Auto refresh stopped after failure: {ex}");
+            StopAutoRefresh();
+            _autoRefresh = false;
+            ShowStatus(Loc.Format("panel_sub_agent_sessions.auto_refresh_failed", ex.Message), failed: true);
+            StateHasChanged();
+        }
+    }
+
+    #endregion
+
+    #region 显示辅助
 
     private string StatusBadgeClass(SubAgentSessionStatus status) => status switch
     {
@@ -415,4 +1125,6 @@
         Sender.ToolResult => Loc["panel_sub_agent_sessions.role_tool"],
         _ => Loc["panel_sub_agent_sessions.role_system"]
     };
+
+    #endregion
 }
