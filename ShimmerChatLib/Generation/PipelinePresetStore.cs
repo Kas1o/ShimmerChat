@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
 
@@ -25,6 +26,16 @@ public enum GenerationPipeline
 /// </summary>
 public static class PipelinePresetStore
 {
+    /// <summary>
+    /// 各管线预设存储的写入版本。只在本进程内递增，供渲染树缓存判断预设是否被编辑。
+    /// 直接绕过本类写 KVData 的改动无法被感知，因此 <see cref="WriteAll{TPreset}"/> 是唯一写入入口。
+    /// </summary>
+    private static readonly ConcurrentDictionary<GenerationPipeline, long> Revisions = new();
+
+    /// <summary>获取指定管线预设存储的写入版本。</summary>
+    public static long GetRevision(GenerationPipeline pipeline)
+        => Revisions.TryGetValue(pipeline, out var revision) ? revision : 0;
+
     /// <summary>获取指定管线预设列表在 KVData 中的存储位置。</summary>
     public static (string SpaceId, string StoreKey) GetLocation(GenerationPipeline pipeline) => pipeline switch
     {
@@ -78,5 +89,6 @@ public static class PipelinePresetStore
     {
         var (spaceId, storeKey) = GetLocation(pipeline);
         kv.Write(spaceId, storeKey, JsonConvert.SerializeObject(presets, Formatting.Indented));
+        Revisions.AddOrUpdate(pipeline, 1, static (_, current) => current + 1);
     }
 }

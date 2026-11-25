@@ -228,7 +228,6 @@ else
     /// <summary>事件模式下提供器配置中的管线树属性名</summary>
     [Parameter] [SupplyParameterFromQuery] public string? prop { get; set; }
 
-    private const string PresetStorageKey = "render_modifier_presets";
     private const string DefaultPresetId = "__default__";
 
     private List<RenderModifierPreset> _presets = [];
@@ -301,10 +300,8 @@ else
     {
         try
         {
-            var json = KVData.Read("RenderModifierManager", PresetStorageKey);
-            _presets = string.IsNullOrEmpty(json)
-                ? []
-                : Newtonsoft.Json.JsonConvert.DeserializeObject<List<RenderModifierPreset>>(json) ?? [];
+            _presets = PipelinePresetStore.ReadAll<RenderModifierPreset>(
+                KVData, GenerationPipeline.RenderModifier);
 
             if (_presets.Count == 0)
             {
@@ -446,8 +443,7 @@ else
         try
         {
             CommitEditingTree();
-            KVData.Write("RenderModifierManager", PresetStorageKey,
-                Newtonsoft.Json.JsonConvert.SerializeObject(_presets));
+            PipelinePresetStore.WriteAll(KVData, GenerationPipeline.RenderModifier, _presets);
             _savedSnapshot = Snapshot();
             SetStatus(Loc["generation_config.saved"], "success");
         }

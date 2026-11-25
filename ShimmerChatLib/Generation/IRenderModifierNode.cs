@@ -68,6 +68,15 @@ namespace ShimmerChatLib.Generation
         public Chat? Chat { get; }
         public Agent? Agent { get; }
 
+        /// <summary>
+        /// 本次执行是否允许写渲染缓存。流式生成中的内容每次增量都会变化，
+        /// 写入只会产生大量一次性 key 并污染缓存池，因此调用方应将其设为 false。
+        /// </summary>
+        public bool AllowCacheWrites { get; init; } = true;
+
+        /// <summary>本次执行所用渲染树的修订号；缓存节点用它让树 / 预设编辑后的旧结果失效。</summary>
+        public RenderTreeRevision TreeRevision { get; init; } = RenderTreeRevision.Empty;
+
         public RenderEnv(string initialContent, ITreeNodeSerializer serializer, IKVDataService kvData,
             Chat? chat = null, Agent? agent = null, ILocService? loc = null)
         {

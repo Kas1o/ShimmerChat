@@ -114,6 +114,9 @@ public class ChatViewRenderTests
         display
             .Setup(d => d.Render(It.IsAny<string>(), It.IsAny<Chat?>(), It.IsAny<Agent?>()))
             .Returns((string text, Chat? _, Agent? _) => new MarkupString(WebUtility.HtmlEncode(text ?? string.Empty)));
+        display
+            .Setup(d => d.Render(It.IsAny<string>(), It.IsAny<Chat?>(), It.IsAny<Agent?>(), It.IsAny<bool>()))
+            .Returns((string text, Chat? _, Agent? _, bool _) => new MarkupString(WebUtility.HtmlEncode(text ?? string.Empty)));
 
         var loc = new Mock<ILocService>();
         loc.SetupGet(l => l.CurrentCulture).Returns("zh-CN");

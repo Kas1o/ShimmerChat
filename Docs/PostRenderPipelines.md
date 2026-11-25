@@ -269,18 +269,34 @@ Markdig 已升级到 1.6.x。旧版（0.41）的管道表格解析器会为每�
 `Markdown elements in the input are too deeply nested`；1.x 改用扁平的表格结构，
 数千行的表格可以正常渲染（超宽表格仍由 `.chat-msg-body table` 在气泡内横向滚动）。
 
-消息气泡的渲染结果由 `MessageRenderCache` 缓存：**同一段文本**在
-`ChatMessage` 版本、`ChatViewContext`（Chat / Agent 实例）、当前语言、
-Agent / Chat 上盖印的渲染树都没有变化时，直接复用上一次的 HTML，
-不会重跑 Markdig、KStyleMath、代码高亮与 SVG 解析。
+渲染结果的复用**不在节点树之外做**，而是由 `RenderSequenceNode` 显式承担：
 
-这样做的原因：气泡会在滚动、流式增量、宿主刷新时被反复重渲染。
-若每次都执行完整管线，一次父组件重渲染就会退化为「消息数 × Markdown 解析」。
-渲染失败时 `MessageDisplayServiceV1` 生成的错误 HTML 同样走缓存——
-失败会完整记录一次，而不是随着滚动反复记录同一条错误。
+| 属性 | 默认 | 行为 |
+|------|------|------|
+| `CacheOutput` | `false` | 命中时跳过 children，直接复用上次的 HTML |
+| `CacheErrors` | `false` | 显式开启后缓存 `RenderNodeException` 的 code / message / 节点信息，命中时直接重抛 |
 
-新增自定义对话界面直接调用 `IMessageDisplayService` 时，应自行做同等缓存
-（可复用 `MessageRenderCache`）；见 [插件开发](PluginDevelopment.md#对话界面ichatview)。
+- 缓存 key = 节点 Id + 输入内容 + 当前语言 + `RenderEnv.TreeRevision`。
+  `TreeRevision` 由根树修订号与 `PipelinePresetStore` 的写入版本组成，
+  Agent / Chat 树或预设被编辑后自动失效，不需要序列化整棵子树。
+- **只应对确定性渲染开启**。缓存节点不会检查子树是否纯；插件节点如果读外部状态
+  （文件、网络、时间、KVData），必须放在缓存区域之外。
+- 流式生成期间 `AllowCacheWrites` 为 false：内容每个增量都会变化，
+  写入只会产生一次性 key 并污染缓存池，因此只读不写。
+- 池子按总字符数（32M）+ 单条上限（4M）+ 条目数（512）做 LRU 淘汰，
+  不做“满就清空”，避免所有热点同时失效。超大输出直接不缓存。
+- **默认预设不开启缓存**；需要时由用户或预设作者把一段 Sequence 的 `CacheOutput` 打开。
+- 渲染预设必须经 `PipelinePresetStore.WriteAll` 写入（它会递增版本号）。绕过它直接写 KVData
+  不会刷新 `TreeRevision`，`CacheOutput` 会继续命中旧结果。
+
+`RenderCallNode` 与 `RenderModifierManager` 还会缓存**反序列化后的树**：
+同一份 JSON 只构建一次节点树，预设 / Agent / Chat 树内容变化后换 key。
+这会跨渲染复用节点实例，因此渲染节点只能把字段当配置使用，不得保存执行期状态。
+
+新增自定义对话界面直接调用 `IMessageDisplayService.Render` 时，
+应把 `allowCacheWrites: !message.IsStreaming` 传下去；渲染树里的
+`RenderSequenceNode.CacheOutput` 负责实际复用。见
+[插件开发](PluginDevelopment.md#对话界面ichatview)。
 
 ### 执行示例
 
@@ -304,7 +320,9 @@ public class MyRenderNode : IRenderModifierNode
 
 ### 集成点
 
-`MessageDisplayServiceV1.RenderWithDetails()` 调用 `IRenderModifierManager.RenderWithLog()`，返回 `(string Content, List<RenderChangeRecord> ChangeLog)` 元组。
+`MessageDisplayServiceV1.RenderWithDetails()` 调用 `IRenderModifierManager.RenderWithLog(agent, content, chat, allowCacheWrites)`，
+返回 `(string Content, List<RenderChangeRecord> ChangeLog)` 元组。`allowCacheWrites` 由调用方按消息是否流式传入，
+最终落到 `RenderEnv.AllowCacheWrites`，由 `RenderSequenceNode` 决定是否写缓存。
 
 - **成功**：直接使用 `Content` 作为 HTML
 - **失败**：调用 `BuildErrorHtml()`（私有方法）输出完整 `ChangeLog` + 错误信息

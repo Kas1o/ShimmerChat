@@ -1445,10 +1445,8 @@
             ? new()
             : Newtonsoft.Json.JsonConvert.DeserializeObject<List<PostGenerationPreset>>(postJson) ?? new();
 
-        var renderJson = kvDataService.Read("RenderModifierManager", "render_modifier_presets");
-        _renderPresets = string.IsNullOrEmpty(renderJson)
-            ? new()
-            : Newtonsoft.Json.JsonConvert.DeserializeObject<List<RenderModifierPreset>>(renderJson) ?? new();
+        _renderPresets = PipelinePresetStore.ReadAll<RenderModifierPreset>(
+            kvDataService, GenerationPipeline.RenderModifier);
     }
 
     private void CreatePrivateTree()

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using ShimmerChatBuiltin.Misc.Node.Render;
 using ShimmerChatBuiltin.NodeBasic.Render;
@@ -15,7 +17,30 @@ namespace ShimmerChat.Singletons
         private readonly ILogger<RenderModifierManager> _logger;
 
         private RenderModifierNodeWrapper? _globalRoot;
+        private string? _globalRootJson;
         private readonly object _globalLock = new();
+
+        /// <summary>
+        /// 已反序列化的根树缓存。按 JSON 内容索引，避免每次消息渲染都重建整棵树；
+        /// 有上限且按先进先出淘汰，不会因为一条新树清空整个缓存。
+        /// </summary>
+        private readonly ConcurrentDictionary<string, RenderModifierNodeWrapper> _deserializedRoots =
+            new(StringComparer.Ordinal);
+        private readonly ConcurrentQueue<string> _deserializedRootOrder = new();
+        private const int MaxDeserializedRoots = 64;
+
+        /// <summary>
+        /// 根树 JSON 实例 → 修订号。使用引用相等：Agent / Chat 上盖印的树字符串在
+        /// 未被编辑时是同一个实例，编辑后换成新实例，因此不需要哈希整棵 JSON。
+        /// </summary>
+        private readonly ConditionalWeakTable<string, RootRevision> _rootRevisions = new();
+        private long _nextRootRevision;
+
+        private sealed class RootRevision
+        {
+            public RootRevision(long value) => Value = value;
+            public long Value { get; }
+        }
 
         public RenderModifierManager(RenderModifierNodeSerializer serializer, IKVDataService kvData,
             ILocService loc, ILogger<RenderModifierManager> logger)
@@ -30,20 +55,32 @@ namespace ShimmerChat.Singletons
 
         public string Render(Agent? agent, string content, Chat? chat = null)
         {
-            var (result, _) = RenderWithLog(agent, content, chat);
+            var (result, _) = RenderWithLog(agent, content, chat, allowCacheWrites: true);
             return result;
         }
 
         public (string Content, List<RenderChangeRecord> ChangeLog) RenderWithLog(
             Agent? agent, string content, Chat? chat = null)
+            => RenderWithLog(agent, content, chat, allowCacheWrites: true);
+
+        public (string Content, List<RenderChangeRecord> ChangeLog) RenderWithLog(
+            Agent? agent, string content, Chat? chat, bool allowCacheWrites)
         {
             if (string.IsNullOrEmpty(content))
                 return (content, new List<RenderChangeRecord>());
 
-            RenderModifierNodeWrapper root = ResolveRoot(agent, chat)
-                ?? CreateFallbackRoot();
+            var (resolvedRoot, rootJson) = ResolveRoot(agent, chat);
+            RenderModifierNodeWrapper root = resolvedRoot ?? CreateFallbackRoot();
 
-            var env = new RenderEnv(content, _serializer, _kvData, chat, agent, _loc);
+            var revision = new RenderTreeRevision(
+                GetRootRevision(rootJson),
+                PipelinePresetStore.GetRevision(GenerationPipeline.RenderModifier));
+
+            var env = new RenderEnv(content, _serializer, _kvData, chat, agent, _loc)
+            {
+                AllowCacheWrites = allowCacheWrites,
+                TreeRevision = revision
+            };
             var context = new RenderNodeExecutionContext(env);
 
             try
@@ -66,15 +103,35 @@ namespace ShimmerChat.Singletons
         {
             lock (_globalLock)
             {
+                _globalRootJson = json;
                 _globalRoot = string.IsNullOrEmpty(json) ? null : DeserializeRoot(json, "global");
             }
         }
 
+        /// <summary>
+        /// 根树 JSON 对应的修订号。空 JSON（使用默认回退树）固定为 0；
+        /// 其余按字符串实例分配递增编号，Agent / Chat 的树被替换时编号随之变化。
+        /// </summary>
+        private long GetRootRevision(string? json)
+        {
+            if (string.IsNullOrEmpty(json)) return 0;
+
+            return _rootRevisions
+                .GetValue(json, _ => new RootRevision(Interlocked.Increment(ref _nextRootRevision)))
+                .Value;
+        }
+
         private RenderModifierNodeWrapper? DeserializeRoot(string json, string source)
         {
+            if (_deserializedRoots.TryGetValue(json, out var cached))
+                return cached;
+
             var result = _serializer.DeserializeTree(json);
             if (result.Root is RenderModifierNodeWrapper wrapper)
+            {
+                CacheDeserializedRoot(json, wrapper);
                 return wrapper;
+            }
 
             if (!result.Success)
             {
@@ -86,16 +143,34 @@ namespace ShimmerChat.Singletons
             return null;
         }
 
-        private RenderModifierNodeWrapper? ResolveRoot(Agent? agent, Chat? chat = null)
+        private void CacheDeserializedRoot(string json, RenderModifierNodeWrapper root)
+        {
+            if (!_deserializedRoots.TryAdd(json, root)) return;
+
+            _deserializedRootOrder.Enqueue(json);
+            while (_deserializedRoots.Count > MaxDeserializedRoots
+                && _deserializedRootOrder.TryDequeue(out var oldest))
+            {
+                _deserializedRoots.TryRemove(oldest, out _);
+            }
+        }
+
+        private (RenderModifierNodeWrapper? Root, string? Json) ResolveRoot(Agent? agent, Chat? chat = null)
         {
             // 生成提供器渲染树覆盖：优先使用触发时盖印在 Chat 上的覆盖树
             if (!string.IsNullOrEmpty(chat?.SourceRenderModifierTreeJson))
-                return DeserializeRoot(chat.SourceRenderModifierTreeJson, "chat override");
+            {
+                var json = chat.SourceRenderModifierTreeJson;
+                return (DeserializeRoot(json, "chat override"), json);
+            }
 
             if (agent != null && !string.IsNullOrEmpty(agent.RenderModifierTreeJson))
-                return DeserializeRoot(agent.RenderModifierTreeJson, "agent");
+            {
+                var json = agent.RenderModifierTreeJson;
+                return (DeserializeRoot(json, "agent"), json);
+            }
 
-            lock (_globalLock) return _globalRoot;
+            lock (_globalLock) return (_globalRoot, _globalRootJson);
         }
 
         private void EnsureDefaultRenderPreset()

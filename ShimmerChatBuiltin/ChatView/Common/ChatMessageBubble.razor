@@ -169,10 +169,6 @@
 	private string editContent = string.Empty;
 	private string editThinking = string.Empty;
 
-	/// <summary>正文 / 思考的渲染结果缓存，避免每次重渲染都重跑整套渲染管线。</summary>
-	private MessageRenderCache? _contentRenderCache;
-	private MessageRenderCache? _thinkingRenderCache;
-
 	private Message? _subscribedMessage;
 
 	private ChatMessage CurrentMessageContent => message.CurrentVersion;
@@ -182,13 +178,20 @@
 	private IReadOnlyList<MessageImage> CurrentImages =>
 		(IReadOnlyList<MessageImage>?)message.Images ?? Array.Empty<MessageImage>();
 
+	/// <summary>
+	/// 流式消息的内容每个增量都会变化，写入渲染缓存只会产生一次性 key；
+	/// 因此流式期间只读缓存、不写缓存。
+	/// </summary>
 	private MarkupString DisplayContent =>
-		(_contentRenderCache ??= new MessageRenderCache(MessageDisplayService))
-			.Get(stringContent, CurrentMessageContent, Context, Loc.CurrentCulture);
+		MessageDisplayService.Render(
+			stringContent, Context.Chat, Context.Agent, allowCacheWrites: !message.IsStreaming);
 
 	private MarkupString DisplayThinking =>
-		(_thinkingRenderCache ??= new MessageRenderCache(MessageDisplayService))
-			.Get(CurrentMessageContent?.thinking ?? string.Empty, CurrentMessageContent, Context, Loc.CurrentCulture);
+		MessageDisplayService.Render(
+			CurrentMessageContent?.thinking ?? string.Empty,
+			Context.Chat,
+			Context.Agent,
+			allowCacheWrites: !message.IsStreaming);
 
 	/// <summary>
 	/// 界面上一次读取的全局显示设置。这些值只在设置页修改，而设置页会卸载聊天组件；
