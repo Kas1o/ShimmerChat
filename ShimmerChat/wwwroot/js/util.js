@@ -152,7 +152,7 @@ window.chatScroll = (function () {
         var state = states.get(element);
         if (state) return state;
 
-        state = { following: true, animating: false };
+        state = { following: true, animating: false, notifyRef: null };
         states.set(element, state);
 
         // 用户接管滚动时立即取消「回到底部」的平滑动画，
@@ -164,7 +164,20 @@ window.chatScroll = (function () {
 
         element.addEventListener('scroll', function () {
             if (state.animating) return;
-            state.following = atBottom(element);
+            var following = atBottom(element);
+            if (following === state.following) return;
+
+            state.following = following;
+
+            // 只在「跟随 / 不跟随」真的翻转时通知 .NET。
+            // 每个 scroll 事件都回服务端会让 Blazor 重渲染整个对话，
+            // 一次滚动就能触发上百次完整的消息重渲染。
+            if (state.notifyRef) {
+                state.notifyRef.invokeMethodAsync('OnScrollFollowingChanged', following)
+                    .catch(function (error) {
+                        console.error('chatScroll: failed to notify .NET of scroll state:', error);
+                    });
+            }
         }, { passive: true });
 
         return state;
@@ -178,6 +191,24 @@ window.chatScroll = (function () {
                 state.following = atBottom(element);
             }
             return state.following;
+        },
+
+        // 注册滚动状态变化的回调（只在上报状态真的翻转时调用）。
+        // 初次注册立即回报一次当前状态，让 .NET 侧不必自己探测。
+        subscribe: function (element, dotNetRef) {
+            var state = getState(element);
+            state.notifyRef = dotNetRef;
+            state.following = atBottom(element);
+            dotNetRef.invokeMethodAsync('OnScrollFollowingChanged', state.following)
+                .catch(function (error) {
+                    console.error('chatScroll: failed to notify .NET of scroll state:', error);
+                });
+        },
+
+        // 界面卸载时注销回调：之后不再向已释放的 .NET 引用发消息。
+        unsubscribe: function (element) {
+            var state = states.get(element);
+            if (state) state.notifyRef = null;
         },
 
         // 自动跟随：仅在仍处于跟随状态时滚到底部。

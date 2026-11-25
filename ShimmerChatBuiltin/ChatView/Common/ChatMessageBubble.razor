@@ -169,6 +169,12 @@
 	private string editContent = string.Empty;
 	private string editThinking = string.Empty;
 
+	/// <summary>正文 / 思考的渲染结果缓存，避免每次重渲染都重跑整套渲染管线。</summary>
+	private MessageRenderCache? _contentRenderCache;
+	private MessageRenderCache? _thinkingRenderCache;
+
+	private Message? _subscribedMessage;
+
 	private ChatMessage CurrentMessageContent => message.CurrentVersion;
 	private string stringContent => CurrentMessageContent?.Content ?? string.Empty;
 
@@ -176,8 +182,23 @@
 	private IReadOnlyList<MessageImage> CurrentImages =>
 		(IReadOnlyList<MessageImage>?)message.Images ?? Array.Empty<MessageImage>();
 
-	private MarkupString DisplayContent => MessageDisplayService.Render(stringContent, Context.Chat, Context.Agent);
-	private MarkupString DisplayThinking => MessageDisplayService.Render(CurrentMessageContent?.thinking ?? string.Empty, Context.Chat, Context.Agent);
+	private MarkupString DisplayContent =>
+		(_contentRenderCache ??= new MessageRenderCache(MessageDisplayService))
+			.Get(stringContent, CurrentMessageContent, Context, Loc.CurrentCulture);
+
+	private MarkupString DisplayThinking =>
+		(_thinkingRenderCache ??= new MessageRenderCache(MessageDisplayService))
+			.Get(CurrentMessageContent?.thinking ?? string.Empty, CurrentMessageContent, Context, Loc.CurrentCulture);
+
+	/// <summary>
+	/// 界面上一次读取的全局显示设置。这些值只在设置页修改，而设置页会卸载聊天组件；
+	/// 缓存在气泡里可以避免每次重渲染都读一遍 KV 存储（LiteDB 实现是一次磁盘查询）。
+	/// </summary>
+	private bool? _thinkingCollapsedSetting;
+	private bool? _toolResultCollapsedSetting;
+	private bool? _continuationEnabledSetting;
+	private bool _userNameLoaded;
+	private string? _userNameSetting;
 
 	private string ToolResultTitle => string.IsNullOrEmpty(ToolResultTitleOverride)
 		? Loc["ToolResultDetail"]
@@ -192,17 +213,43 @@
 
 	private string sender => message.sender switch
 	{
-		ShimmerChatLib.Sender.User => KVData.Read("User", "username") ?? Loc["msg.default_user"],
+		ShimmerChatLib.Sender.User => CachedUserName ?? Loc["msg.default_user"],
 		ShimmerChatLib.Sender.AI => Context.Agent.Name,
 		ShimmerChatLib.Sender.ToolResult => Loc["ToolResult"],
 		var other => other
 	};
 
+	private string? CachedUserName
+	{
+		get
+		{
+			if (!_userNameLoaded)
+			{
+				_userNameLoaded = true;
+				_userNameSetting = KVData.Read("User", "username");
+			}
+
+			return _userNameSetting;
+		}
+	}
+
 	protected override void OnInitialized() { base.OnInitialized(); SubscribeToMessageEvents(); }
-	protected override void OnParametersSet() { base.OnParametersSet(); SubscribeToMessageEvents(); }
+
+	protected override void OnParametersSet()
+	{
+		base.OnParametersSet();
+
+		// 同一消息在宿主重渲染时会被反复 SetParameters；只有消息实例真的换了
+		// 才需要迁移事件订阅，否则每次重渲染都要先退订再订阅一遍。
+		if (!ReferenceEquals(_subscribedMessage, message))
+			SubscribeToMessageEvents();
+	}
 
 	private void SubscribeToMessageEvents()
 	{
+		UnsubscribeFromMessageEvents();
+
+		_subscribedMessage = message;
 		message.ContentChanged -= HandleContentChanged;
 		message.StreamingStateChanged -= HandleStreamingStateChanged;
 		message.VersionChanged -= HandleVersionChanged;
@@ -211,19 +258,21 @@
 		message.VersionChanged += HandleVersionChanged;
 	}
 
+	private void UnsubscribeFromMessageEvents()
+	{
+		if (_subscribedMessage == null) return;
+
+		_subscribedMessage.ContentChanged -= HandleContentChanged;
+		_subscribedMessage.StreamingStateChanged -= HandleStreamingStateChanged;
+		_subscribedMessage.VersionChanged -= HandleVersionChanged;
+		_subscribedMessage = null;
+	}
+
 	private void HandleContentChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
 	private void HandleStreamingStateChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
 	private void HandleVersionChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
 
-	public void Dispose()
-	{
-		if (message != null)
-		{
-			message.ContentChanged -= HandleContentChanged;
-			message.StreamingStateChanged -= HandleStreamingStateChanged;
-			message.VersionChanged -= HandleVersionChanged;
-		}
-	}
+	public void Dispose() => UnsubscribeFromMessageEvents();
 
 	private void NavigateToPreviousVersion() { if (message.CurrentVersionIndex > 0) { message.CurrentVersionIndex--; Context.MarkDirty(); } }
 	private void NavigateToNextVersion() { if (message.CurrentVersionIndex < message.Versions.Count - 1) { message.CurrentVersionIndex++; Context.MarkDirty(); } }
@@ -239,16 +288,16 @@
 
 	private bool IsContinuationEnabled()
 	{
-		var value = KVData.Read("MiscSettings", "enableContinue") ?? "false";
-		return bool.TryParse(value, out var enabled) && enabled;
+		_continuationEnabledSetting ??= ReadBoolSetting("MiscSettings", "enableContinue", defaultValue: false);
+		return _continuationEnabledSetting.Value;
 	}
 
 	private bool _thinkingCollapsed
 	{
 		get
 		{
-			var value = KVData.Read("App", "thinking_collapsed") ?? "true";
-			return !bool.TryParse(value, out var b) || b;
+			_thinkingCollapsedSetting ??= ReadBoolSetting("App", "thinking_collapsed", defaultValue: true);
+			return _thinkingCollapsedSetting.Value;
 		}
 	}
 
@@ -256,9 +305,16 @@
 	{
 		get
 		{
-			var value = KVData.Read("App", "toolresult_collapsed") ?? "true";
-			return !bool.TryParse(value, out var b) || b;
+			_toolResultCollapsedSetting ??= ReadBoolSetting("App", "toolresult_collapsed", defaultValue: true);
+			return _toolResultCollapsedSetting.Value;
 		}
+	}
+
+	private bool ReadBoolSetting(string spaceId, string key, bool defaultValue)
+	{
+		var value = KVData.Read(spaceId, key);
+		if (string.IsNullOrEmpty(value)) return defaultValue;
+		return bool.TryParse(value, out var parsed) ? parsed : defaultValue;
 	}
 
 	private async Task CopyContentToClipboard() => await JS.InvokeVoidAsync("copyTextToClipboard", stringContent);

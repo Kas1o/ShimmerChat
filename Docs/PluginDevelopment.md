@@ -618,6 +618,10 @@ if (PanelContext is LiveAgentPanelContext live)
 - 界面指定的 `Id` 未注册时（例如插件被移除），宿主会回退到默认界面并显示警告、记录错误日志。
 - 消息的 Markdown→HTML 渲染仍走 `IMessageDisplayService`（可注入），与渲染修改管线保持独立。
 - 复用 `ChatViewShell` 时，消息正文（`.chat-msg-body`）内的图片会等比缩放到气泡宽度以内，超宽表格与行间公式在各自容器里横向滚动；渲染管线产出的任意 HTML 都不会撑破气泡。
+- 滚动跟随状态由 `ChatViewShell` 的 JS 侧监听维护：只有「跟随 / 不跟随」翻转时才回调 .NET 触发重渲染，
+  不要给消息区再加 `@onscroll` 处理器——每个 scroll 事件往返服务端会让整段对话按消息数重渲染一遍。
+- 自行渲染消息正文时应缓存 `IMessageDisplayService.Render` 的结果（可复用 `MessageRenderCache`），
+  否则宿主每次重渲染都会重跑整套 Markdown / 公式 / 高亮管线。
 - 折叠区域（`<details>`）的展开状态必须由界面自己持有：不要直接把 `open` 绑到 `IsGenerating()` 这类会在回合中途翻转的值。
   工具执行 / 后处理 / 等待回答期间单条消息已经结束生成，但回合仍在进行，折叠区域应保持展开；
   用户手动开合后以用户的选择为准（推荐 `open` 属性 + `@onclick:preventDefault` 自行切换，避免 `ontoggle` 与重渲染互相覆盖）。

@@ -141,4 +141,20 @@ public class MarkdownRenderNodeTests
 
         html.Should().Contain("<table");
     }
+
+    [Fact]
+    public void VeryLargePipeTable_IsRenderedInsteadOfHittingDepthLimit()
+    {
+        // 回归：Markdig 0.41 的管道表格解析器会为每个单元格产生嵌套结构，
+        // 几千行的表格就会触发深度限制并抛「too deeply nested」。
+        // 升级到 Markdig 1.x 后，这类表格必须正常渲染。
+        var rows = Enumerable.Range(0, 5000).Select(i => $"| {i} | value-{i} |");
+        var markdown = "| id | value |\n| --- | --- |\n" + string.Join('\n', rows);
+
+        var html = Render(markdown);
+
+        html.Should().Contain("<table");
+        html.Should().Contain("value-4999");
+        html.Should().NotContain("too deeply nested");
+    }
 }

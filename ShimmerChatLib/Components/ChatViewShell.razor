@@ -501,7 +501,10 @@
 		}
 	</div>
 
-	<div class="chat-messages" @ref="ChatMainElement" @onscroll="OnChatScroll">
+	@* 滚动跟随状态由 JS（chatScroll）维护，只在状态翻转时回调 OnScrollFollowingChanged。
+	   不要在这里加 @onscroll：Blazor 在每次事件处理后都会 StateHasChanged，
+	   每个 scroll 事件都会把整段对话按消息数重渲染一遍。 *@
+	<div class="chat-messages" @ref="ChatMainElement">
 		<div class="chat-messages-inner">
 			@ChildContent
 		</div>
@@ -618,6 +621,12 @@
 	bool _skipNextInput;
 
 	/// <summary>
+	/// 传给 JS 的回调引用：滚动跟随状态由 JS 在滚动事件里判定，
+	/// 只在「跟随 / 不跟随」翻转时回调，避免每个 scroll 事件都往返服务端。
+	/// </summary>
+	private DotNetObjectReference<ChatViewShell>? _selfRef;
+
+	/// <summary>
 	/// 文本由代码改写（发送后清空 / 插件写入）时，高度必须在渲染把新值写进 DOM 之后再算；
 	/// 渲染前调用 JS 只会量到旧文本，输入框也就不会缩回或撑开。
 	/// </summary>
@@ -714,7 +723,9 @@
 		if (firstRender)
 		{
 			_hasRendered = true;
+			_selfRef = DotNetObjectReference.Create(this);
 			await RegisterImageDropAsync();
+			await RegisterScrollTrackingAsync();
 		}
 
 		if (editingTitle && focusTitlePending)
@@ -763,9 +774,59 @@
 		}
 	}
 
+	private async Task RegisterScrollTrackingAsync()
+	{
+		try
+		{
+			await JS.InvokeVoidAsync("chatScroll.subscribe", ChatMainElement, _selfRef);
+		}
+		catch (Exception ex)
+		{
+			// JS 属于边界层：订阅失败只影响「回到底部」按钮的显示时机，
+			// 自动滚动仍由宿主事件驱动，记录完整错误后继续。
+			Logger.LogError(ex, "[ChatViewShell] Failed to subscribe to chat scroll state.");
+		}
+	}
+
+	/// <summary>
+	/// JS 在滚动越过「接近底部」阈值时回调（只在状态翻转时触发）。
+	/// 只有这里会因滚动触发重渲染，而不是每个 scroll 事件都触发一次。
+	/// </summary>
+	[JSInvokable]
+	public Task OnScrollFollowingChanged(bool following)
+	{
+		if (isUserAtBottom == following) return Task.CompletedTask;
+
+		isUserAtBottom = following;
+		return InvokeAsync(StateHasChanged);
+	}
+
 	public async ValueTask DisposeAsync()
 	{
 		DiscardPendingImages();
+
+		if (_selfRef != null)
+		{
+			try
+			{
+				await JS.InvokeVoidAsync("chatScroll.unsubscribe", ChatMainElement);
+			}
+			catch (JSDisconnectedException)
+			{
+				// 电路已断开：监听随页面一起消失，无需清理
+			}
+			catch (ObjectDisposedException)
+			{
+				// JS 运行时已释放：同上
+			}
+			catch (Exception ex)
+			{
+				Logger.LogError(ex, "[ChatViewShell] Failed to unsubscribe from chat scroll state.");
+			}
+
+			_selfRef.Dispose();
+			_selfRef = null;
+		}
 
 		try
 		{
@@ -802,8 +863,23 @@
 
 	private async Task ScrollToBottomAsync()
 	{
-		try { await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement); }
-		catch (Exception) { /* 元素尚未渲染或电路已断开：忽略滚动请求 */ }
+		try
+		{
+			await JS.InvokeVoidAsync("scrollToBottom", ChatMainElement);
+		}
+		catch (JSDisconnectedException)
+		{
+			// 电路已断开：页面即将消失，滚动请求无需再执行
+		}
+		catch (ObjectDisposedException)
+		{
+			// JS 运行时已释放：同上
+		}
+		catch (Exception ex)
+		{
+			// 元素尚未渲染或脚本异常：只有自动跟随受影响，记录完整错误。
+			Logger.LogError(ex, "[ChatViewShell] Failed to scroll the chat to the bottom.");
+		}
 	}
 
 	private async Task NavigateBackAsync() => await ViewContext.NavigateBackAsync();
@@ -1011,20 +1087,6 @@
 		await ViewContext.StopGenerationAsync();
 	}
 
-	private async Task OnChatScroll()
-	{
-		try
-		{
-			bool following = await JS.InvokeAsync<bool>("isChatAutoFollowing", ChatMainElement);
-			if (isUserAtBottom != following)
-			{
-				isUserAtBottom = following;
-				await InvokeAsync(StateHasChanged);
-			}
-		}
-		catch (Exception) { /* 元素已卸载或电路断开：忽略滚动状态探测 */ }
-	}
-
 	private async Task ScrollToBottomManually()
 	{
 		try
@@ -1033,7 +1095,18 @@
 			isUserAtBottom = true;
 			await InvokeAsync(StateHasChanged);
 		}
-		catch (Exception) { /* 元素已卸载或电路断开：忽略滚动请求 */ }
+		catch (JSDisconnectedException)
+		{
+			// 电路已断开：页面即将消失，滚动请求无需再执行
+		}
+		catch (ObjectDisposedException)
+		{
+			// JS 运行时已释放：同上
+		}
+		catch (Exception ex)
+		{
+			Logger.LogError(ex, "[ChatViewShell] Failed to scroll the chat to the bottom manually.");
+		}
 	}
 
 	/// <summary>供插件面板经 ChatPanelContext 写入输入框（不发送）。</summary>

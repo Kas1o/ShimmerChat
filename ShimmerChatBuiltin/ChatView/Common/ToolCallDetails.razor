@@ -23,12 +23,24 @@
 @code {
     [Parameter] public ShimmerChatLib.Message message { get; set; } = null!;
 
+    /// <summary>
+    /// 折叠设置只在设置页修改；缓存在组件里，避免气泡每次重渲染都读一次 KV 存储。
+    /// 设置页返回后组件会重建，因此不需要监听运行时变化。
+    /// </summary>
+    private bool? _toolCallCollapsedSetting;
+
     private bool _toolCallCollapsed
     {
         get
         {
-            var value = KVData.Read("App", "toolcall_collapsed") ?? "true";
-            return !bool.TryParse(value, out var b) || b;
+            if (_toolCallCollapsedSetting == null)
+            {
+                var value = KVData.Read("App", "toolcall_collapsed");
+                _toolCallCollapsedSetting = string.IsNullOrEmpty(value)
+                    || !bool.TryParse(value, out var parsed) || parsed;
+            }
+
+            return _toolCallCollapsedSetting.Value;
         }
     }
 

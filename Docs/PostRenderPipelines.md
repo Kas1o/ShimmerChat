@@ -262,6 +262,26 @@ SVG（补齐 `xmlns`、编码声明为 UTF-8），保证文件可独立打开。
 @import url("/katex/katex.min.css");
 ```
 
+### 大表格与渲染结果缓存
+
+Markdig 已升级到 1.6.x。旧版（0.41）的管道表格解析器会为每个单元格建立嵌套结构，
+几千行的表格就会触发 Markdig 的 AST 深度限制并抛出
+`Markdown elements in the input are too deeply nested`；1.x 改用扁平的表格结构，
+数千行的表格可以正常渲染（超宽表格仍由 `.chat-msg-body table` 在气泡内横向滚动）。
+
+消息气泡的渲染结果由 `MessageRenderCache` 缓存：**同一段文本**在
+`ChatMessage` 版本、`ChatViewContext`（Chat / Agent 实例）、当前语言、
+Agent / Chat 上盖印的渲染树都没有变化时，直接复用上一次的 HTML，
+不会重跑 Markdig、KStyleMath、代码高亮与 SVG 解析。
+
+这样做的原因：气泡会在滚动、流式增量、宿主刷新时被反复重渲染。
+若每次都执行完整管线，一次父组件重渲染就会退化为「消息数 × Markdown 解析」。
+渲染失败时 `MessageDisplayServiceV1` 生成的错误 HTML 同样走缓存——
+失败会完整记录一次，而不是随着滚动反复记录同一条错误。
+
+新增自定义对话界面直接调用 `IMessageDisplayService` 时，应自行做同等缓存
+（可复用 `MessageRenderCache`）；见 [插件开发](PluginDevelopment.md#对话界面ichatview)。
+
 ### 执行示例
 
 ```csharp
