@@ -87,9 +87,9 @@
     {
         <div class="home-agent-identity">
             <div class="home-agent-avatar" style="background-color: @GetAvatarColor(_selectedAgent.Name)">
-                @if (_selectedAgent.AvatarGuid != null)
+                @if (AgentImagePath.ToUrl(_selectedAgent.AvatarPath) is { } avatarUrl)
                 {
-                    <img src="/userimages/@(_selectedAgent.AvatarGuid).png" alt="@_selectedAgent.Name" />
+                    <img src="@avatarUrl" alt="@_selectedAgent.Name" />
                 }
                 else
                 {

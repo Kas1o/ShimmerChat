@@ -43,6 +43,18 @@ SharperLLM（只处理 Base64 内容块，不接触文件系统）
 设置每次读取，切换后立即对**新的上传**生效；目录同时由 Program.cs 以 `/userimages/` 暴露为静态资源。
 内联 Base64 的消息在构建请求前由 `IImageAttachmentService.ToChatImageAsync` 统一解析。
 
+### 2.1 Agent 头像与背景图
+
+Agent 不再保存图像 Guid，而是保存**相对 `Data/UserUploadImage` 的路径**
+（`Agent.AvatarPath` / `Agent.BackgroundPath`，例如 `avatar.png` 或 `sub/avatar.png`）。
+路径到磁盘位置与 `/userimages/...` URL 的换算统一由 `ShimmerChatLib/AgentImagePath.cs` 完成：
+
+- 只接受相对路径；绝对路径、盘符、`..` 等越界片段一律拒绝，界面按「无图」显示占位符。
+- URL 按路径分段转义，文件扩展名可以是任意受支持图像格式，不再固定 `.png`。
+- 导出时把路径指向的图像嵌入 Base64；导入时按文件头识别实际格式、以新随机名落盘并写回新路径。
+- 旧数据里的 `AvatarGuid` / `BackgroundGuid` 在反序列化时懒迁移为 `{guid}.png`；
+  启动时的 `AgentMigrationService` 会保存一次新格式并清掉旧字段。
+
 ## 3. 上传处理方式（`App/image_upload_processing_mode`）
 
 控制**进入存储前**是否对上传图像做处理，五份 KV 键（`App` 空间）：
@@ -146,6 +158,7 @@ native 缺失时异常（`DllNotFoundException` 等）原样向上抛出，不�
 | 文件 | 职责 |
 |------|------|
 | `ShimmerChatLib/ImageAttachmentRules.cs` | 全部共享约束、像素预算 / 质量区间与默认值、data URL 解析 |
+| `ShimmerChatLib/AgentImagePath.cs` | Agent 头像 / 背景图相对路径的规范化、URL 与磁盘路径解析（含越界拒绝） |
 | `ShimmerChatLib/ImageProcessingOptions.cs` | 处理模式、压缩算法、请求处理策略枚举与参数形状 |
 | `ShimmerChatLib/Interface/IImageAttachmentService.cs` | 存储与解析服务契约（含带处理参数的兼容重载） |
 | `ShimmerChat/Singletons/ImageAttachmentService.cs` | 存储方式与处理方式设置读取、落盘 / 内联、请求解析 |

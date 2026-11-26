@@ -5,6 +5,7 @@ using ShimmerChatLib;
 using ShimmerChatLib.ChatView;
 using ShimmerChatLib.Generation;
 using ShimmerChatLib.Interface;
+using ShimmerChatLib.Storage;
 using ShimmerChatBuiltin.Tests.SubAgent;
 
 namespace ShimmerChatBuiltin.Tests.Creator;
@@ -147,6 +148,101 @@ public class CreatorAgentToolTests
 
         result.Status.Should().Be(ToolResultStatus.Failed);
         result.ErrorCode.Should().Be(ToolErrorCodes.TargetNotFound);
+    }
+
+    [Fact]
+    public async Task Update_AvatarPath_FromUserImagesUrl_StoresRelativePath()
+    {
+        using var images = new TempUserUploadImage();
+        var agent = Agent.Create("AvatarOwner", "");
+        agent.Save(_kv);
+
+        var result = await Tool().ExecuteAsync(
+            Invocation($$"""{"action":"update","agent_id":"{{agent.Guid}}","avatar_path":"{{images.Url}}"}"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        result.Content.Should().Contain("avatar_path");
+        Agent.Load(agent.Guid, _kv).AvatarPath.Should().Be(images.FileName);
+    }
+
+    [Fact]
+    public async Task Create_WithAvatarPath_StoresIt()
+    {
+        using var images = new TempUserUploadImage();
+
+        var result = await Tool().ExecuteAsync(
+            Invocation($$"""{"action":"create","name":"WithAvatar","avatar_path":"{{images.FileName}}"}"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        var guid = JObject.Parse(result.Content!)["agent_id"]!.Value<string>();
+        Agent.Load(Guid.Parse(guid!), _kv).AvatarPath.Should().Be(images.FileName);
+    }
+
+    [Fact]
+    public async Task Update_AvatarPath_NonExistingFile_FailsAndKeepsOldPath()
+    {
+        using var images = new TempUserUploadImage();
+        var agent = Agent.Create("AvatarOwner", "");
+        agent.AvatarPath = "old.png";
+        agent.Save(_kv);
+
+        var result = await Tool().ExecuteAsync(
+            Invocation($$"""{"action":"update","agent_id":"{{agent.Guid}}","avatar_path":"{{images.Url}}missing.png"}"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Failed);
+        result.ErrorCode.Should().Be(ToolErrorCodes.InvalidArguments);
+        result.ErrorMessage.Should().Contain("avatar_path");
+        Agent.Load(agent.Guid, _kv).AvatarPath.Should().Be("old.png");
+    }
+
+    [Fact]
+    public async Task Update_AvatarPath_Traversal_IsRejected()
+    {
+        var agent = Agent.Create("AvatarOwner", "");
+        agent.Save(_kv);
+
+        var result = await Tool().ExecuteAsync(
+            Invocation($$"""{"action":"update","agent_id":"{{agent.Guid}}","avatar_path":"../escape.png"}"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Failed);
+        result.ErrorCode.Should().Be(ToolErrorCodes.InvalidArguments);
+        result.ErrorMessage.Should().Contain("UserUploadImage");
+        Agent.Load(agent.Guid, _kv).AvatarPath.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_ExplicitNullAvatarPath_ClearsIt()
+    {
+        var agent = Agent.Create("AvatarOwner", "");
+        agent.AvatarPath = "old.png";
+        agent.Save(_kv);
+
+        var result = await Tool().ExecuteAsync(
+            Invocation($$"""{"action":"update","agent_id":"{{agent.Guid}}","avatar_path":null}"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Completed);
+        Agent.Load(agent.Guid, _kv).AvatarPath.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_WrongTypeAvatarPath_FailsExplicitly()
+    {
+        var agent = Agent.Create("AvatarOwner", "");
+        agent.Save(_kv);
+
+        var result = await Tool().ExecuteAsync(
+            Invocation($$"""{"action":"update","agent_id":"{{agent.Guid}}","avatar_path":123}"""),
+            CancellationToken.None);
+
+        result.Status.Should().Be(ToolResultStatus.Failed);
+        result.ErrorCode.Should().Be(ToolErrorCodes.InvalidArguments);
+        result.ErrorMessage.Should().Contain("avatar_path");
+        Agent.Load(agent.Guid, _kv).AvatarPath.Should().BeNull();
     }
 
     [Fact]
@@ -494,5 +590,39 @@ public class CreatorAgentToolTests
         var act = () => Tool().ExecuteAsync(Invocation("""{"action":"list"}"""), cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    /// <summary>
+    /// 临时切换 UserUploadImage 根目录并放一张真实文件；Creator 工具会校验文件存在，
+    /// 测试结束后恢复原布局，避免污染真实 Data 目录。
+    /// </summary>
+    private sealed class TempUserUploadImage : IDisposable
+    {
+        private readonly DataPaths _previous;
+        private readonly string _root;
+
+        public TempUserUploadImage()
+        {
+            _previous = DataPaths.Current;
+            _root = Path.Combine(Path.GetTempPath(), "shimmer-creator-image", Guid.NewGuid().ToString("N"));
+            DataPaths.Configure(new DataPaths(_root));
+
+            Directory.CreateDirectory(DataPaths.Current.UserUploadImageDirectory);
+            FileName = $"{Guid.NewGuid():N}.png";
+            File.WriteAllBytes(
+                Path.Combine(DataPaths.Current.UserUploadImageDirectory, FileName),
+                [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        }
+
+        public string FileName { get; }
+
+        public string Url => $"{AgentImagePath.RequestPath}/{FileName}";
+
+        public void Dispose()
+        {
+            DataPaths.Configure(_previous);
+            if (Directory.Exists(_root))
+                Directory.Delete(_root, true);
+        }
     }
 }

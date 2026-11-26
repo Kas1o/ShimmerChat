@@ -215,9 +215,9 @@
                              @onclick="() => NavigateToAgent(agent)"
                              @onkeydown="e => OnAgentRowKeyDown(e, agent)">
                         <div class="agent-list-avatar" style="background-color: @GetAvatarColor(agent.Name)">
-                            @if (agent.AvatarGuid != null)
+                            @if (GetAvatarUrl(agent) is { } listAvatarUrl)
                             {
-                                <img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
+                                <img src="@listAvatarUrl" alt="@agent.Name" />
                             }
                             else
                             {
@@ -273,9 +273,9 @@
                             </span>
 
                             <div class="agent-card-avatar" style="background-color: @GetAvatarColor(agent.Name)">
-                                @if (agent.AvatarGuid != null)
+                                @if (GetAvatarUrl(agent) is { } cardAvatarUrl)
                                 {
-                                    <img src="/userimages/@(agent.AvatarGuid).png" alt="@agent.Name" />
+                                    <img src="@cardAvatarUrl" alt="@agent.Name" />
                                 }
                                 else
                                 {
@@ -1056,8 +1056,8 @@
                 agent.Greeting,
                 agent.AlternativeGreetings?.ToList());
             copy.Tags = agent.Tags?.ToList() ?? new List<string>();
-            copy.AvatarGuid = agent.AvatarGuid;
-            copy.BackgroundGuid = agent.BackgroundGuid;
+            copy.AvatarPath = agent.AvatarPath;
+            copy.BackgroundPath = agent.BackgroundPath;
             copy.ChatViewId = agent.ChatViewId;
             copy.PreGenerationTreeJson = agent.PreGenerationTreeJson;
             copy.PostGenerationTreeJson = agent.PostGenerationTreeJson;
@@ -1209,14 +1209,16 @@
         return char.ToUpper(name.TrimStart()[0]).ToString();
     }
 
+    static string? GetAvatarUrl(Agent agent) => AgentImagePath.ToUrl(agent.AvatarPath);
+
     static string GetCoverStyle(Agent agent)
     {
         // 扁平设计：封面一律不使用渐变蒙版；徽章与操作按钮自带纯色底板保证可读性。
-        if (agent.BackgroundGuid != null)
-            return $"background-image: url('/userimages/{agent.BackgroundGuid}.png');";
+        if (AgentImagePath.ToUrl(agent.BackgroundPath) is { } backgroundUrl)
+            return $"background-image: url('{backgroundUrl}');";
 
-        if (agent.AvatarGuid != null)
-            return $"background-image: url('/userimages/{agent.AvatarGuid}.png');";
+        if (GetAvatarUrl(agent) is { } avatarUrl)
+            return $"background-image: url('{avatarUrl}');";
 
         // 无图封面：角色色低透明纯色底 + 同色圆点纹理（SVG data URI，全部为纯色，无渐变）。
         // _avatarColors 中的颜色固定为 #rrggbb，可直接拼接 alpha 与 URL 编码。

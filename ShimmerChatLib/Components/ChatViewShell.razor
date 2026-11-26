@@ -679,8 +679,8 @@
 	};
 
 	/// <summary>Agent 背景图的内联样式；无背景图时返回 null，保持默认主题背景。</summary>
-	private string? BackgroundStyle => ViewContext.Agent.BackgroundGuid != null
-		? $"background-image: url('/userimages/{ViewContext.Agent.BackgroundGuid}.png'); background-size: cover; background-position: center;"
+	private string? BackgroundStyle => AgentImagePath.ToUrl(ViewContext.Agent.BackgroundPath) is { } backgroundUrl
+		? $"background-image: url('{backgroundUrl}'); background-size: cover; background-position: center;"
 		: null;
 
 	protected override void OnInitialized()

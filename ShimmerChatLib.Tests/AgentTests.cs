@@ -3,6 +3,8 @@ using Moq;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
 using ShimmerChatLib.Models;
+using ShimmerChatLib.Storage;
+using System.Text;
 
 namespace ShimmerChatLib.Tests;
 
@@ -141,6 +143,152 @@ public class AgentTests
         var act = () => Agent.Load(Guid.NewGuid(), _kvDataMock.Object);
 
         act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Deserialize_LegacyImageGuids_MigratesToPngPaths()
+    {
+        var avatarGuid = Guid.NewGuid();
+        var backgroundGuid = Guid.NewGuid();
+        var json = JsonConvert.SerializeObject(new
+        {
+            Guid = Guid.NewGuid(),
+            Name = "Legacy",
+            AvatarGuid = avatarGuid,
+            BackgroundGuid = backgroundGuid
+        });
+
+        var agent = JsonConvert.DeserializeObject<Agent>(json)!;
+
+        agent.AvatarPath.Should().Be($"{avatarGuid}.png");
+        agent.BackgroundPath.Should().Be($"{backgroundGuid}.png");
+    }
+
+    [Fact]
+    public void Deserialize_NewPath_IsKeptAndTakesPrecedenceOverLegacyGuid()
+    {
+        var json = JsonConvert.SerializeObject(new
+        {
+            Guid = Guid.NewGuid(),
+            Name = "New",
+            AvatarPath = "avatars/new.png",
+            AvatarGuid = Guid.NewGuid()
+        });
+
+        var agent = JsonConvert.DeserializeObject<Agent>(json)!;
+
+        agent.AvatarPath.Should().Be("avatars/new.png");
+    }
+
+    [Fact]
+    public void Serialize_WritesPathAndOmitsLegacyGuidFields()
+    {
+        var agent = Agent.Create("PathSave", "desc");
+        agent.AvatarPath = "avatars/avatar.png";
+        agent.BackgroundPath = "backgrounds/bg.png";
+
+        var json = JsonConvert.SerializeObject(agent);
+
+        json.Should().Contain("\"AvatarPath\":\"avatars/avatar.png\"");
+        json.Should().Contain("\"BackgroundPath\":\"backgrounds/bg.png\"");
+        json.Should().NotContain("AvatarGuid");
+        json.Should().NotContain("BackgroundGuid");
+    }
+
+    [Fact]
+    public void Export_ReadsImageFromPathAndEmbedsBase64()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "shimmer-agent-export", Guid.NewGuid().ToString("N"));
+        var previous = DataPaths.Current;
+        try
+        {
+            DataPaths.Configure(new DataPaths(root));
+            var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+            Directory.CreateDirectory(Path.Combine(root, "UserUploadImage", "avatars"));
+            File.WriteAllBytes(Path.Combine(root, "UserUploadImage", "avatars", "avatar.png"), imageBytes);
+
+            var agent = Agent.Create("ExportImage", "desc");
+            agent.AvatarPath = "avatars/avatar.png";
+
+            var structure = JsonConvert.DeserializeObject<AgentExportStructure>(agent.Export())!;
+
+            structure.AvatarBase64.Should().Be(Convert.ToBase64String(imageBytes));
+            structure.Agent!.AvatarPath.Should().Be("avatars/avatar.png");
+        }
+        finally
+        {
+            DataPaths.Configure(previous);
+        }
+    }
+
+    [Fact]
+    public void Export_LegacyImageGuid_IsMigratedAndNotWrittenBack()
+    {
+        var avatarGuid = Guid.NewGuid();
+        var json = JsonConvert.SerializeObject(new
+        {
+            Guid = Guid.NewGuid(),
+            Name = "LegacyExport",
+            AvatarGuid = avatarGuid
+        });
+        var agent = JsonConvert.DeserializeObject<Agent>(json)!;
+
+        var export = agent.Export();
+
+        export.Should().Contain($"\"AvatarPath\":\"{avatarGuid}.png\"");
+        export.Should().NotContain("AvatarGuid");
+    }
+
+    [Fact]
+    public void Import_InvalidAvatarBase64_Throws()
+    {
+        var json = JsonConvert.SerializeObject(new AgentExportStructure(
+            Agent.Create("ImportBadBase64", "desc"),
+            AvatarBase64: "not-base64",
+            BackgroundBase64: null));
+
+        var act = () => Agent.Import(json);
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*avatar*Base64*");
+    }
+
+    [Fact]
+    public void Import_UnsupportedAvatarBytes_Throws()
+    {
+        var json = JsonConvert.SerializeObject(new AgentExportStructure(
+            Agent.Create("ImportBadImage", "desc"),
+            AvatarBase64: Convert.ToBase64String(Encoding.UTF8.GetBytes("hello")),
+            BackgroundBase64: null));
+
+        var act = () => Agent.Import(json);
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*avatar*not a supported image*");
+    }
+
+    [Fact]
+    public void Import_ValidImage_WritesNewFileAndSetsRelativePath()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "shimmer-agent-import", Guid.NewGuid().ToString("N"));
+        var previous = DataPaths.Current;
+        try
+        {
+            DataPaths.Configure(new DataPaths(root));
+            var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+            var json = JsonConvert.SerializeObject(new AgentExportStructure(
+                Agent.Create("ImportImage", "desc"),
+                AvatarBase64: Convert.ToBase64String(imageBytes),
+                BackgroundBase64: null));
+
+            var imported = Agent.Import(json);
+
+            imported.AvatarPath.Should().NotBeNull();
+            imported.AvatarPath!.Should().EndWith(".png");
+            File.Exists(Path.Combine(root, "UserUploadImage", imported.AvatarPath!)).Should().BeTrue();
+        }
+        finally
+        {
+            DataPaths.Configure(previous);
+        }
     }
 
     [Fact]

@@ -8,7 +8,7 @@ namespace ShimmerChatLib.Interface
     public interface IAgentMigrationService
     {
         /// <summary>
-        /// 迁移所有未迁移的 Agent
+        /// 迁移所有未迁移的 Agent（管线树与旧版图像 Guid）
         /// </summary>
         int MigrateAll();
 

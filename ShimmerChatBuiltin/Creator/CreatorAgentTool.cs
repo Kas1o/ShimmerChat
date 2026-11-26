@@ -54,14 +54,17 @@ namespace ShimmerChatBuiltin.Creator
                 "Manage ShimmerChat agents (top-level AI personas) and their pipeline trees. " +
                 "Actions: 'list' all agents (guid, name, tags, chat count, which private trees exist); " +
                 "'get' one agent's full settings {agent_id}; 'create' {name, user_intro?, greeting?, " +
-                "alternative_greetings?, tags?}; 'update' {agent_id, name?, user_intro?, greeting?, tags?, " +
-                "chat_view_id?, alternative_greetings?} — only fields present in the arguments are changed, " +
-                "an explicit null clears greeting or chat_view_id; 'delete' {agent_id} removes the agent from " +
+                "alternative_greetings?, tags?, avatar_path?, background_path?}; 'update' {agent_id, name?, " +
+                "user_intro?, greeting?, tags?, chat_view_id?, alternative_greetings?, avatar_path?, " +
+                "background_path?} — only fields present in the arguments are changed, " +
+                "an explicit null clears greeting, chat_view_id or an image path; 'delete' {agent_id} removes the agent from " +
                 "the registry while its chats stay in storage (this mirrors the UI delete; confirm with the " +
                 "user first); 'get_pipeline' {agent_id, pipeline} returns the agent's private tree JSON for " +
                 "'pre' | 'post' | 'render'; 'set_pipeline' {agent_id, pipeline, tree_json} validates then stores " +
                 "a private tree — an empty or '{}' tree_json clears it so the global/default pipeline applies; " +
                 "'list_chat_views' shows the ids usable as chat_view_id. " +
+                "Image paths must point to an existing file inside UserUploadImage and may be given as " +
+                "'avatar.png' or '/userimages/avatar.png'. " +
                 "Tree JSON is a wrapper object {\"Id\",\"Name\",\"IsExpanded\",\"IsBypassed\",\"Node\":{...}} where " +
                 "Node holds the business node with \"$type\" set to its full type name; use " +
                 "creator_node_catalog to discover node types and properties.",
@@ -115,6 +118,22 @@ namespace ShimmerChatBuiltin.Creator
                     name = "chat_view_id",
                     type = ParameterType.String,
                     description = "Chat view id from list_chat_views; null uses the default view (update)."
+                }, false),
+                (new ToolParameter
+                {
+                    name = "avatar_path",
+                    type = ParameterType.String,
+                    description =
+                        "Avatar image path relative to UserUploadImage (e.g. 'avatar.png'), or a " +
+                        "'/userimages/...' link. The file must exist; null / empty clears it (create/update)."
+                }, false),
+                (new ToolParameter
+                {
+                    name = "background_path",
+                    type = ParameterType.String,
+                    description =
+                        "Background image path relative to UserUploadImage, or a '/userimages/...' link. " +
+                        "The file must exist; null / empty clears it (create/update)."
                 }, false),
                 (new ToolParameter
                 {
@@ -222,8 +241,8 @@ namespace ShimmerChatBuiltin.Creator
                 alternative_greetings = agent.AlternativeGreetings,
                 tags = agent.Tags,
                 chat_view_id = agent.ChatViewId,
-                avatar_guid = agent.AvatarGuid,
-                background_guid = agent.BackgroundGuid,
+                avatar_path = agent.AvatarPath,
+                background_path = agent.BackgroundPath,
                 chat_count = agent.ChatGuids.Count,
                 pipelines = PipelineFlags(agent)
             }));
@@ -251,9 +270,15 @@ namespace ShimmerChatBuiltin.Creator
                 return ToolResult.Fail(ToolErrorCodes.InvalidArguments, greetingsError!);
             if (!CreatorShared.TryGetStringArray(args, "tags", out var tags, out var tagsError))
                 return ToolResult.Fail(ToolErrorCodes.InvalidArguments, tagsError!);
+            if (!TryResolveImagePathArg(args, "avatar_path", out var avatarPath, out var avatarError))
+                return ToolResult.Fail(ToolErrorCodes.InvalidArguments, avatarError!);
+            if (!TryResolveImagePathArg(args, "background_path", out var backgroundPath, out var backgroundError))
+                return ToolResult.Fail(ToolErrorCodes.InvalidArguments, backgroundError!);
 
             var agent = Agent.Create(name!.Trim(), intro ?? "", greeting, alternativeGreetings);
             agent.Tags = tags ?? new List<string>();
+            agent.AvatarPath = avatarPath;
+            agent.BackgroundPath = backgroundPath;
             agent.Save(_kvData);
             Agent.AddAgentToAll(agent, _kvData);
 
@@ -326,10 +351,24 @@ namespace ShimmerChatBuiltin.Creator
                 mutations.Add(("chat_view_id", a => a.ChatViewId = viewId));
             }
 
+            if (args.ContainsKey("avatar_path"))
+            {
+                if (!TryResolveImagePathArg(args, "avatar_path", out var avatarPath, out var avatarError))
+                    return ToolResult.Fail(ToolErrorCodes.InvalidArguments, avatarError!);
+                mutations.Add(("avatar_path", a => a.AvatarPath = avatarPath));
+            }
+
+            if (args.ContainsKey("background_path"))
+            {
+                if (!TryResolveImagePathArg(args, "background_path", out var backgroundPath, out var backgroundError))
+                    return ToolResult.Fail(ToolErrorCodes.InvalidArguments, backgroundError!);
+                mutations.Add(("background_path", a => a.BackgroundPath = backgroundPath));
+            }
+
             if (mutations.Count == 0)
                 return ToolResult.Fail(ToolErrorCodes.InvalidArguments,
                     "No updatable fields present. Provide at least one of: name, user_intro, greeting, " +
-                    "alternative_greetings, tags, chat_view_id.");
+                    "alternative_greetings, tags, chat_view_id, avatar_path, background_path.");
 
             // Agent.Update 在进程内互斥下读改写，避免与其他电路的整对象 Save 相互覆盖。
             Agent updated;
@@ -600,6 +639,68 @@ namespace ShimmerChatBuiltin.Creator
             }
 
             failure = null!;
+            return true;
+        }
+
+        /// <summary>
+        /// 解析 create / update 的图像路径参数。
+        /// <para>
+        /// 接受相对 UserUploadImage 的路径，或模型从消息里抄来的 <c>/userimages/...</c> 链接；
+        /// 文件必须真实存在，避免把 Agent 写成悬空引用。显式 null / 空串表示清空。
+        /// 绝对路径、盘符、<c>..</c> 等越界值与不存在的文件都返回 false，由调用方显式失败。
+        /// </para>
+        /// </summary>
+        private static bool TryResolveImagePathArg(
+            JObject args, string field, out string? storedPath, out string? error)
+        {
+            storedPath = null;
+            error = null;
+
+            if (!CreatorShared.TryGetStringArg(args, field, out var raw, out var typeError))
+            {
+                error = typeError;
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(raw))
+                return true;
+
+            var candidate = raw.Trim();
+            var urlPrefix = AgentImagePath.RequestPath + "/";
+            if (candidate.StartsWith(urlPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                candidate = candidate[urlPrefix.Length..];
+                try
+                {
+                    candidate = Uri.UnescapeDataString(candidate);
+                }
+                catch (UriFormatException ex)
+                {
+                    error = $"'{field}' contains an invalid URL-encoded path: {ex.Message}";
+                    return false;
+                }
+            }
+
+            if (!AgentImagePath.TryNormalize(candidate, out var normalized) || normalized == null)
+            {
+                error = $"'{field}' must be a relative path inside UserUploadImage " +
+                        $"(for example 'avatar.png' or '{AgentImagePath.RequestPath}/avatar.png').";
+                return false;
+            }
+
+            if (!AgentImagePath.TryGetFullPath(normalized, out var fullPath) || fullPath == null)
+            {
+                error = $"'{field}' resolves outside UserUploadImage: '{raw}'.";
+                return false;
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                error = $"'{field}' does not point to an existing image file: '{raw}'.";
+                return false;
+            }
+
+            storedPath = normalized;
             return true;
         }
 

@@ -31,9 +31,9 @@
 | 动作 | 参数 | 说明 |
 |------|------|------|
 | `list` | — | 全部智能体：`agent_id`、`name`、`tags`、`chat_view_id`、`chat_count`、三条管线是否有私有树。注册表里加载失败的记录进 `unreadable`，不隐藏 |
-| `get` | `agent_id` | 单个智能体完整设置（不含树 JSON） |
-| `create` | `name`（必填）、`user_intro`、`greeting`、`alternative_greetings`、`tags` | 经 `Agent.Create` + `Save` + `AddAgentToAll`，返回新 `agent_id` |
-| `update` | `agent_id` + 任意字段 | **只改参数里显式出现的字段**；显式 `null` 清空 `greeting` / `chat_view_id` |
+| `get` | `agent_id` | 单个智能体完整设置（不含树 JSON）；含 `avatar_path` / `background_path`（相对 `UserUploadImage` 的路径，null 表示无图） |
+| `create` | `name`（必填）、`user_intro`、`greeting`、`alternative_greetings`、`tags`、`avatar_path`、`background_path` | 经 `Agent.Create` + `Save` + `AddAgentToAll`，返回新 `agent_id` |
+| `update` | `agent_id` + 任意字段 | **只改参数里显式出现的字段**；显式 `null` 清空 `greeting` / `chat_view_id` / 图像路径 |
 | `delete` | `agent_id` | 从 `__AllAgents__` 注册表移除，记录与对话保留（与 UI 删除语义一致，建议先与用户确认） |
 | `get_pipeline` | `agent_id`、`pipeline` | 原样返回私有树 JSON；未配置时返回 `tree_json: null` 与说明 |
 | `set_pipeline` | `agent_id`、`pipeline`、`tree_json` | 校验后写入；`""` / `"{}"` 表示清除（回退全局 / 默认管线） |
@@ -50,6 +50,10 @@
   让用户从智能体列表页操作。
 - **`chat_view_id` 校验**：宿主界面注册表（`IChatViewRegistry`）可用时拒绝未注册 Id
   并列出可用值；注册表不可用（无宿主服务）时按原样接受，由宿主显示期做显式回退 + 告警。
+- **图像路径写入**：`create` / `update` 接受 `avatar_path` / `background_path`，
+  值可以是相对 `UserUploadImage` 的路径（如 `avatar.png`），也可以是 `/userimages/...` 链接。
+  目标文件必须已存在；绝对路径、盘符、`..` 与不存在的文件返回 `TOOL_INVALID_ARGUMENTS`，
+  显式 `null` / 空串清空路径。不存在「顺便把外部文件复制进来」的隐式行为。
 
 ---
 

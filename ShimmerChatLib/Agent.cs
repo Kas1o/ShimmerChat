@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
+using System.Runtime.Serialization;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ShimmerChatLib.Interface;
@@ -50,13 +51,37 @@ namespace ShimmerChatLib
             }
         }
         /// <summary>
-        /// 头像的Guid
+        /// 头像图像相对于 <see cref="DataPaths.UserUploadImageDirectory"/> 的路径
+        /// （例如 <c>avatar.png</c>），null / 空表示无头像。
+        /// 解析规则统一走 <see cref="AgentImagePath"/>。
         /// </summary>
-		public Guid? AvatarGuid { get; set; }
+        public string? AvatarPath { get; set; }
         /// <summary>
-        /// 背景图的Guid
+        /// 背景图像相对于 <see cref="DataPaths.UserUploadImageDirectory"/> 的路径
+        /// （例如 <c>background.png</c>），null / 空表示无背景图。
         /// </summary>
+        public string? BackgroundPath { get; set; }
+
+        /// <summary>
+        /// 旧版头像 Guid。仅为读取旧数据保留：反序列化时懒迁移到 <see cref="AvatarPath"/>，
+        /// 序列化时不再写出。新代码一律使用 <see cref="AvatarPath"/>。
+        /// </summary>
+        [Obsolete("使用 AvatarPath；AvatarGuid 仅用于读取旧数据。")]
+        [JsonProperty("AvatarGuid")]
+        public Guid? AvatarGuid { get; set; }
+
+        /// <summary>
+        /// 旧版背景图 Guid。仅用于读取旧数据，迁移语义同 <see cref="AvatarGuid"/>。
+        /// </summary>
+        [Obsolete("使用 BackgroundPath；BackgroundGuid 仅用于读取旧数据。")]
+        [JsonProperty("BackgroundGuid")]
         public Guid? BackgroundGuid { get; set; }
+
+        /// <summary>旧字段不再写回：任意一次保存都会把数据落到新格式。</summary>
+        public bool ShouldSerializeAvatarGuid() => false;
+
+        /// <inheritdoc cref="ShouldSerializeAvatarGuid"/>
+        public bool ShouldSerializeBackgroundGuid() => false;
         /// <summary>
         /// 预生成树 JSON（生成管线定义）
         /// </summary>
@@ -112,31 +137,13 @@ namespace ShimmerChatLib
             if (clearChat)
                 copy!.ChatGuids = [];
 
-            string? avatar = null;
-            string? background = null;
-			string avatarPath = Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{this.AvatarGuid}.png");
-			string backgroundPath = Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{this.BackgroundGuid}.png");
-
-			if (AvatarGuid != null)
-            if (File.Exists(avatarPath))
-            {
-                var content = File.ReadAllBytes(avatarPath);
-                avatar = Convert.ToBase64String(content);
-            }
-
-			if (BackgroundGuid != null)
-			if (File.Exists(backgroundPath))
-			{
-				var content = File.ReadAllBytes(backgroundPath);
-				background = Convert.ToBase64String(content);
-			}
-
-
+            var avatar = ReadImageBase64(this.AvatarPath, "avatar");
+            var background = ReadImageBase64(this.BackgroundPath, "background");
             return JsonConvert.SerializeObject(new AgentExportStructure
             (
                 Agent : copy!,
-                AvatarBase64 : avatar!,
-                BackgroundBase64 : background!
+                AvatarBase64 : avatar,
+                BackgroundBase64 : background
             ), new JsonSerializerSettings
             {
                 NullValueHandling = NullValueHandling.Include,
@@ -165,22 +172,65 @@ namespace ShimmerChatLib
             }
             if (!string.IsNullOrEmpty(importStructure.AvatarBase64))
             {
-                var avatarBytes = Convert.FromBase64String(importStructure.AvatarBase64);
-                var avatarGuid = Guid.NewGuid();
-                var avatarPath = Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{avatarGuid}.png");
-                File.WriteAllBytes(avatarPath, avatarBytes);
-                agent.AvatarGuid = avatarGuid;
+                agent.AvatarPath = WriteImportedImage(importStructure.AvatarBase64, "avatar");
             }
             if (!string.IsNullOrEmpty(importStructure.BackgroundBase64))
             {
-                var backgroundBytes = Convert.FromBase64String(importStructure.BackgroundBase64);
-                var backgroundGuid = Guid.NewGuid();
-                var backgroundPath = Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{backgroundGuid}.png");
-                File.WriteAllBytes(backgroundPath, backgroundBytes);
-                agent.BackgroundGuid = backgroundGuid;
+                agent.BackgroundPath = WriteImportedImage(importStructure.BackgroundBase64, "background");
             }
             return agent;
 		}
+
+        /// <summary>
+        /// 把导出包里的 Base64 图像写成 UserUploadImage 下的新文件，并返回相对路径。
+        /// 扩展名按实际文件头选择（不信任导出包里的路径）；无法识别的数据显式失败。
+        /// </summary>
+        private static string WriteImportedImage(string base64, string imageKind)
+        {
+            byte[] bytes;
+            try
+            {
+                bytes = Convert.FromBase64String(base64);
+            }
+            catch (FormatException ex)
+            {
+                throw new InvalidDataException($"Imported {imageKind} is not valid Base64 data.", ex);
+            }
+
+            var mimeType = ImageMimeDetector.Detect(bytes)
+                ?? throw new InvalidDataException(
+                    $"Imported {imageKind} is not a supported image " +
+                    $"(expected: {string.Join(", ", ImageAttachmentRules.SupportedMimeTypes)}).");
+
+            var fileName = AgentImagePath.NewFileName(ImageAttachmentRules.MimeToExtension[mimeType]);
+            var fullPath = AgentImagePath.GetFullPath(fileName);
+
+            Directory.CreateDirectory(AgentImagePath.RootDirectory);
+            File.WriteAllBytes(fullPath, bytes);
+            return fileName;
+        }
+
+        /// <summary>
+        /// 读取 Agent 图像为 Base64。路径非法（试图越出上传目录）时显式失败；
+        /// 文件缺失时返回 null，保持旧版「图像不在就只导出定义」的行为。
+        /// </summary>
+        private static string? ReadImageBase64(string? relativePath, string imageKind)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+                return null;
+
+            if (!AgentImagePath.TryGetFullPath(relativePath, out var fullPath) || fullPath == null)
+            {
+                throw new InvalidOperationException(
+                    $"Agent {imageKind} path '{relativePath}' is invalid: it must be a relative path inside " +
+                    $"'{AgentImagePath.RootDirectory}'.");
+            }
+
+            if (!File.Exists(fullPath))
+                return null;
+
+            return Convert.ToBase64String(File.ReadAllBytes(fullPath));
+        }
 		#endregion
 		#region Save & Load
         /// <summary>
@@ -490,6 +540,24 @@ namespace ShimmerChatLib
             _logger = logger;
         }
         #pragma warning restore CS8618
+
+        /// <summary>
+        /// 旧数据懒迁移：旧版只存 <see cref="AvatarGuid"/> / <see cref="BackgroundGuid"/>，
+        /// 对应文件固定为 <c>{guid}.png</c>。反序列化后立即换算成路径，读取方无需再关心 Guid；
+        /// 启动时的 <c>AgentMigrationService</c> 会再保存一次，清掉旧字段。
+        /// </summary>
+        [OnDeserialized]
+        private void MigrateLegacyImageReferences(StreamingContext context)
+        {
+#pragma warning disable CS0618 // 兼容旧数据
+            if (string.IsNullOrWhiteSpace(AvatarPath) && AvatarGuid is Guid avatarGuid)
+                AvatarPath = $"{avatarGuid}.png";
+
+            if (string.IsNullOrWhiteSpace(BackgroundPath) && BackgroundGuid is Guid backgroundGuid)
+                BackgroundPath = $"{backgroundGuid}.png";
+#pragma warning restore CS0618
+        }
+
         /// <summary>
         /// 创建一个新的智能体实例
         /// </summary>
@@ -539,7 +607,8 @@ namespace ShimmerChatLib
 
     /// <summary>
     /// 导出的 Agent 结构。
-    /// 因为 Agent 保存的是图像的 Guid，所以导出时需要包含图像的 Base64 编码。
+    /// 因为 Agent 保存的是图像相对路径，导出时需要包含图像的 Base64 编码，
+    /// 导入端再按文件头选择扩展名落盘并写回新的相对路径。
     /// </summary>
     public record AgentExportStructure
     (

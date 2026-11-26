@@ -7,7 +7,6 @@
 @using ShimmerChatLib.Generation
 @using ShimmerChatLib.ChatView
 @using ShimmerChatLib.Models
-@using ShimmerChatLib.Storage
 @inject NavigationManager navigation
 @inject IKVDataService kvDataService
 @inject IPopupService PopupService
@@ -27,14 +26,14 @@
 
 @if(agent != null)
 {
-    <div class="agent-page-container shimmer-content" style="background-image: url('@BackgroudPath'); background-size: cover; background-position: center; min-height: 100vh;">
+    <div class="agent-page-container shimmer-content" style="@PageBackgroundStyle">
         <div class="agent-header">
             <button class="agent-back-btn" @onclick="NavigateBack" title="@Loc["agent.back"]">
                 <i class="bi bi-arrow-left"></i>
             </button>
-            @if (agent.AvatarGuid != null)
+            @if (AvatarUrl != null)
             {
-                <img class="agent-header-avatar" src="@AvatarPath" alt="@Loc["agent.avatar_alt"]" />
+                <img class="agent-header-avatar" src="@AvatarUrl" alt="@Loc["agent.avatar_alt"]" />
             }
             else
             {
@@ -288,9 +287,9 @@
                         <h4><i class="bi bi-image"></i> @Loc["agent.section_avatar_bg"]</h4>
                         <div class="media-upload-row">
                             <div class="media-upload-item">
-                                @if (agent!.AvatarGuid != null)
+                                @if (AvatarUrl != null)
                                 {
-                                    <img id="avatar-preview" src="@AvatarPath" alt="avatar"/>
+                                    <img id="avatar-preview" src="@AvatarUrl" alt="avatar"/>
                                 }
                                 else
                                 {
@@ -865,8 +864,12 @@
         agent?.Save(kvDataService);
     }
 
-    string AvatarPath => $"/userimages/{agent!.AvatarGuid}.png";
-    string BackgroudPath => $"/userimages/{agent!.BackgroundGuid}.png";
+    string? AvatarUrl => agent == null ? null : AgentImagePath.ToUrl(agent.AvatarPath);
+    string? BackgroundUrl => agent == null ? null : AgentImagePath.ToUrl(agent.BackgroundPath);
+
+    string PageBackgroundStyle => BackgroundUrl is { } backgroundUrl
+        ? $"background-image: url('{backgroundUrl}'); background-size: cover; background-position: center; min-height: 100vh;"
+        : "min-height: 100vh;";
 
     static readonly string[] _avatarColors = new[]
     {
@@ -1176,13 +1179,15 @@
         }
 
         Stream stream = file.OpenReadStream(1024 * 1024 * 30, default);
-        var guid = Guid.NewGuid();
-        using (var localFile = File.Create(Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{guid}.png")))
+        var fileName = AgentImagePath.NewFileName();
+        var fullPath = AgentImagePath.GetFullPath(fileName);
+        Directory.CreateDirectory(AgentImagePath.RootDirectory);
+        using (var localFile = File.Create(fullPath))
         {
             await stream.CopyToAsync(localFile);
         }
 
-        agent!.AvatarGuid = guid;
+        agent!.AvatarPath = fileName;
         agent!.Save(kvDataService);
         StateHasChanged();
     }
@@ -1201,13 +1206,15 @@
         }
 
         Stream stream = file.OpenReadStream(1024 * 1024 * 30, default);
-        var guid = Guid.NewGuid();
-        using (var localFile = File.Create(Path.Combine(DataPaths.Current.UserUploadImageDirectory, $"{guid}.png")))
+        var fileName = AgentImagePath.NewFileName();
+        var fullPath = AgentImagePath.GetFullPath(fileName);
+        Directory.CreateDirectory(AgentImagePath.RootDirectory);
+        using (var localFile = File.Create(fullPath))
         {
             await stream.CopyToAsync(localFile);
         }
 
-        agent!.BackgroundGuid = guid;
+        agent!.BackgroundPath = fileName;
         agent!.Save(kvDataService);
         StateHasChanged();
     }
