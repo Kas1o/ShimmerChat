@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using ShimmerChatLib.Generation;
 
 namespace ShimmerChatLib.Interface
 {
@@ -17,6 +18,15 @@ namespace ShimmerChatLib.Interface
         /// </summary>
         MarkupString Render(string markdownText, Chat? chat, Agent? agent, bool allowCacheWrites)
             => Render(markdownText, chat, agent);
+
+        /// <summary>
+        /// 带渲染位置的重载。<paramref name="position"/> 表示这段文本显示在界面的哪个区域，
+        /// 渲染节点可通过 <see cref="RenderNodeExecutionContext.Position"/> 读取。
+        /// 默认实现忽略位置并转发给四参数版本，旧实现无需改动。
+        /// </summary>
+        MarkupString Render(string markdownText, Chat? chat, Agent? agent, bool allowCacheWrites,
+            RenderPosition position)
+            => Render(markdownText, chat, agent, allowCacheWrites);
 
         /// <summary>调试模式开关</summary>
         bool DebugModeEnabled { get; set; }

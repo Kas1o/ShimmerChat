@@ -1,4 +1,5 @@
 @using ShimmerChatLib.ChatView
+@using ShimmerChatLib.Generation
 @using SharperLLM.Util
 @inject IJSRuntime JS
 @inject ILocService Loc
@@ -184,14 +185,16 @@
 	/// </summary>
 	private MarkupString DisplayContent =>
 		MessageDisplayService.Render(
-			stringContent, Context.Chat, Context.Agent, allowCacheWrites: !message.IsStreaming);
+			stringContent, Context.Chat, Context.Agent, allowCacheWrites: !message.IsStreaming,
+			RenderPosition.Body);
 
 	private MarkupString DisplayThinking =>
 		MessageDisplayService.Render(
 			CurrentMessageContent?.thinking ?? string.Empty,
 			Context.Chat,
 			Context.Agent,
-			allowCacheWrites: !message.IsStreaming);
+			allowCacheWrites: !message.IsStreaming,
+			RenderPosition.Thinking);
 
 	/// <summary>
 	/// 界面上一次读取的全局显示设置。这些值只在设置页修改，而设置页会卸载聊天组件；

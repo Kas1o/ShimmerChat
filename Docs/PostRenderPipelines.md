@@ -124,8 +124,9 @@ PostChat.Remove(env, target);
 
 - `Chat.AddMessage` 追加时分配 `末条 Order + 1`；
 - `Chat.InsertMessage(store, index, msg)` 插入后重编号并全量持久化（顺序权威来自 `Chat.Messages`）；
+- `Chat.DeleteMessage(store, msg)` 删除中间消息后把后面消息的顺序号前移为连续值，并只回写真正变化的消息（删末尾时没有重写）；
 - store 排序规则：该会话存在任何 `Order < 0` 的消息时整组回退到 `timestamp`（迁移前行为），否则按 `Order`；
-- 老数据在 `Chat.LoadAllMessages` 时懒迁移（补号 + 全量回写），只迁移被打开的会话。
+- 老数据在 `Chat.LoadAllMessages` 时懒迁移（补号 + 全量回写）：既包括 `Order < 0` 的迁移前数据，也包括旧版本删除中间消息留下的顺序空洞（`Order` 与索引错位），只处理被打开的会话。
 
 节点若绕过 `Chat` API 直接改 `ObservableCollection`，回合末的 `Chat.ValidateOrder()` 会告警；`Chat.NormalizeOrder()` 用于修复，不会自动重排。
 
@@ -171,8 +172,23 @@ public interface IRenderModifierNode
 public class RenderNodeExecutionContext
 {
     public RenderEnv Env { get; }
+    public RenderPosition Position { get; init; }   // 本次渲染的位置：Body / Thinking
 }
 ```
+
+`Position` 由调用方（`IMessageDisplayService` / 对话界面）指定。节点据此区分同一段文本的显示区域，
+例如只对正文执行 Markdown 渲染，思维链保持原样。默认值为 `Body`，旧的调用方无需改动。
+
+### 渲染位置（RenderPosition）
+
+| 值 | 含义 |
+|----|------|
+| `Body` | 消息正文（聊天气泡正文、工具结果、子智能体会话正文） |
+| `Thinking` | 思维链（`ChatMessage.thinking` / reasoning） |
+
+渲染位置只影响显示，不写入对话数据。内置对话界面在正文与思维链分别传 `Body` / `Thinking`；
+自定义对话界面调用 `IMessageDisplayService.Render(..., position)` 时应显式传入实际位置，
+不传则按 `Body` 处理。
 
 ### RenderEnv — 渲染管线环境
 
@@ -212,12 +228,17 @@ public class RenderNodeException : Exception
 | 节点 | 职责 |
 |------|------|
 | `RenderSequenceNode` | 顺序执行子节点，各子节点通过 `GetContent`/`UpdateContent` 读写内容 |
+| `RenderIfNode` | 按 `RenderNodeExecutionContext.Position` 分支：命中执行 `Then`，否则执行 `Else`（可留空） |
 | `MarkdownRenderNode` | Markdown → HTML 渲染（基于 Markdig，可配置 PipeTables 与数学公式） |
 | `CodeHighlightNode` | 给围栏代码块加语法高亮，**必须排在 Markdown 渲染之后**；可配置跳过着色的语言（默认 `svg,mermaid`）与最大块长度 |
 | `CodeBlockActionsNode` | 给代码块加语言标签与复制 / 下载按钮（行为在 `wwwroot/js/code-block-actions.js`，事件委托）；与高亮节点先后顺序无关 |
 | `SvgRenderNode` | 把代码块中的 SVG（含根节点为 `<svg>` 的 XML）替换为渲染后的图片卡片，可选复制 / 下载；**必须排在 Markdown 之后、代码高亮 / 代码块工具条之前** |
 | `RegexReplaceNode` | 正则表达式替换（IgnoreCase/Multiline/Singleline） |
 | `RenderCallNode` | 引用 `RenderModifierPreset`，通过 `context.Env.Serializer` + `KVData` 加载 |
+
+默认预设为 `RenderSequenceNode → RenderIfNode(Position = Body, Then = MarkdownRenderNode)`：
+只有消息正文做 Markdown 渲染，思维链等位置原样通过。需要恢复旧的「所有位置都 Markdown」行为时，
+把 `RenderIfNode` 的 `Then` 直接换成 `MarkdownRenderNode`（或把 `MarkdownRenderNode` 提到 `RenderIfNode` 之前）。
 
 ### SVG 直出（SvgRenderNode）
 
@@ -276,9 +297,10 @@ Markdig 已升级到 1.6.x。旧版（0.41）的管道表格解析器会为每�
 | `CacheOutput` | `false` | 命中时跳过 children，直接复用上次的 HTML |
 | `CacheErrors` | `false` | 显式开启后缓存 `RenderNodeException` 的 code / message / 节点信息，命中时直接重抛 |
 
-- 缓存 key = 节点 Id + 输入内容 + 当前语言 + `RenderEnv.TreeRevision`。
+- 缓存 key = 节点 Id + 输入内容 + 当前语言 + `RenderEnv.TreeRevision` + `RenderNodeExecutionContext.Position`。
   `TreeRevision` 由根树修订号与 `PipelinePresetStore` 的写入版本组成，
   Agent / Chat 树或预设被编辑后自动失效，不需要序列化整棵子树。
+  位置进入 key，避免同一段文本在正文与思维链之间复用错误的渲染结果。
 - **只应对确定性渲染开启**。缓存节点不会检查子树是否纯；插件节点如果读外部状态
   （文件、网络、时间、KVData），必须放在缓存区域之外。
 - 流式生成期间 `AllowCacheWrites` 为 false：内容每个增量都会变化，
@@ -320,9 +342,10 @@ public class MyRenderNode : IRenderModifierNode
 
 ### 集成点
 
-`MessageDisplayServiceV1.RenderWithDetails()` 调用 `IRenderModifierManager.RenderWithLog(agent, content, chat, allowCacheWrites)`，
+`MessageDisplayServiceV1.RenderWithDetails()` 调用
+`IRenderModifierManager.RenderWithLog(agent, content, chat, allowCacheWrites, position)`，
 返回 `(string Content, List<RenderChangeRecord> ChangeLog)` 元组。`allowCacheWrites` 由调用方按消息是否流式传入，
-最终落到 `RenderEnv.AllowCacheWrites`，由 `RenderSequenceNode` 决定是否写缓存。
+`position` 表示渲染位置，两者最终落到 `RenderEnv.AllowCacheWrites` 与 `RenderNodeExecutionContext.Position`。
 
 - **成功**：直接使用 `Content` 作为 HTML
 - **失败**：调用 `BuildErrorHtml()`（私有方法）输出完整 `ChangeLog` + 错误信息

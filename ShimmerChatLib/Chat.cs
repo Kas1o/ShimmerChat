@@ -205,14 +205,23 @@ namespace ShimmerChatLib
 
 			LastMessagePreview = messageStore.GetLastMessagePreview(Guid) ?? string.Empty;
 
-			// 懒迁移：Order 出现前写入的数据没有顺序号，store 已按其 timestamp 还原出顺序，
-			// 这里在内存中补号并全量回写一次。此后该会话一律按 Order 排序。
+			// 懒迁移分两种情况，都只需在加载时补号并全量回写一次：
+			// 1. Order 出现前写入的数据没有顺序号，store 已按其 timestamp 还原出顺序；
+			// 2. 旧版本删除中间消息不重编号，留下了与索引错位的空洞（Order 仍是升序，
+			//    所以排序看着正常），不修的话该会话永远无法回到顺序契约。
+			string? repairReason = null;
 			if (Messages.Any(m => m.Order < 0))
+				repairReason = "missing order";
+			else
+				repairReason = ValidateOrder();
+
+			if (repairReason != null)
 			{
 				NormalizeOrder();
 				SaveAllMessages(messageStore);
 				_logger?.LogInformation(
-					"Migrated message order for chat {ChatGuid} ({Count} messages)", Guid, Messages.Count);
+					"Normalized message order for chat {ChatGuid} ({Count} messages): {Reason}",
+					Guid, Messages.Count, repairReason);
 			}
 		}
 
@@ -228,13 +237,42 @@ namespace ShimmerChatLib
 			LastMessagePreview = messageStore.GetLastMessagePreview(Guid) ?? string.Empty;
 		}
 
+		/// <summary>
+		/// 删除一条消息。删除中间消息后，后续消息的顺序号必须整体前移，
+		/// 否则 <see cref="Message.Order"/> 会与集合索引错位，下一次 AddMessage 取
+		/// 末条 +1 就会与索引不一致，回合末校验持续报警。因此这里重编号并只回写
+		/// 真正变化的消息（删末尾时没有变化，不产生写入）。
+		/// </summary>
 		public void DeleteMessage(IMessageStoreService messageStore, Message message)
 		{
+			var index = Messages.IndexOf(message);
 			messageStore.DeleteMessage(Guid, message);
-			Messages.Remove(message);
+
+			if (index >= 0)
+			{
+				Messages.RemoveAt(index);
+				RenumberFrom(messageStore, index);
+			}
 
 			MessageCount = messageStore.GetMessageCount(Guid);
 			LastMessagePreview = messageStore.GetLastMessagePreview(Guid) ?? string.Empty;
+		}
+
+		/// <summary>
+		/// 从 startIndex 起把顺序号重设为集合索引，并回写真正变化的消息。
+		/// 只处理删除点之后的部分：更早的错位不是本次删除造成的，应由加载时迁移或
+		/// 回合末校验暴露，不能借删除顺手掩盖调用方直接改集合的错误。
+		/// </summary>
+		private void RenumberFrom(IMessageStoreService messageStore, int startIndex)
+		{
+			for (int i = startIndex; i < Messages.Count; i++)
+			{
+				if (Messages[i].Order == i)
+					continue;
+
+				Messages[i].Order = i;
+				messageStore.UpdateMessage(Guid, Messages[i]);
+			}
 		}
 
 		public void SaveAllMessages(IMessageStoreService messageStore)

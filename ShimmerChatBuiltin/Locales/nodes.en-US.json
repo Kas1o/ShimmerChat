@@ -66,6 +66,8 @@
   "node.codeact.desc": "Adds a C# code-execution tool. Scripts can call every tool available in this round, observe cancellation, and put tool images into the result container manually when image output is enabled. Place it anywhere in the pre-generation tree; tools added later in the same round are still callable.",
   "node.markdown_render": "Markdown Render",
   "node.markdown_render.desc": "Renders message text to HTML with Markdig, with pipe tables and math formulas (KStyleMath) as toggles",
+  "node.render_if": "Render If",
+  "node.render_if.desc": "Chooses a branch by render position. The default tree uses it to limit Markdown rendering to the message body, leaving thinking and other positions untouched.",
   "node.code_highlight": "Code Highlight",
   "node.code_highlight.desc": "Adds syntax highlighting to fenced code blocks; must run after the Markdown Render node. Languages listed in the skip list (e.g. SVG / Mermaid) are left untouched for other nodes to render",
   "node.code_block_actions": "Code Block Actions",

@@ -10,6 +10,7 @@ using ShimmerChatBuiltin.ChatView.Aggregated;
 using ShimmerChatBuiltin.ChatView.Standard;
 using ShimmerChatLib;
 using ShimmerChatLib.ChatView;
+using ShimmerChatLib.Generation;
 using ShimmerChatLib.Generation.ToolUi;
 using ShimmerChatLib.Interface;
 
@@ -117,6 +118,11 @@ public class ChatViewRenderTests
         display
             .Setup(d => d.Render(It.IsAny<string>(), It.IsAny<Chat?>(), It.IsAny<Agent?>(), It.IsAny<bool>()))
             .Returns((string text, Chat? _, Agent? _, bool _) => new MarkupString(WebUtility.HtmlEncode(text ?? string.Empty)));
+        display
+            .Setup(d => d.Render(It.IsAny<string>(), It.IsAny<Chat?>(), It.IsAny<Agent?>(), It.IsAny<bool>(),
+                It.IsAny<RenderPosition>()))
+            .Returns((string text, Chat? _, Agent? _, bool _, RenderPosition _) =>
+                new MarkupString(WebUtility.HtmlEncode(text ?? string.Empty)));
 
         var loc = new Mock<ILocService>();
         loc.SetupGet(l => l.CurrentCulture).Returns("zh-CN");

@@ -60,13 +60,17 @@ namespace ShimmerChat.Singletons
             => Render(markdownText, chat, agent, allowCacheWrites: true);
 
         public MarkupString Render(string markdownText, Chat? chat, Agent? agent, bool allowCacheWrites)
+            => Render(markdownText, chat, agent, allowCacheWrites, RenderPosition.Body);
+
+        public MarkupString Render(string markdownText, Chat? chat, Agent? agent, bool allowCacheWrites,
+            RenderPosition position)
         {
-            var result = RenderWithDetails(markdownText, chat, agent, allowCacheWrites);
+            var result = RenderWithDetails(markdownText, chat, agent, allowCacheWrites, position);
             return result.Html;
         }
 
         public RenderResult RenderWithDetails(string markdownText, Chat? chat = null, Agent? agent = null,
-            bool allowCacheWrites = true)
+            bool allowCacheWrites = true, RenderPosition position = RenderPosition.Body)
         {
             var processedText = markdownText ?? "";
             var intermediateResults = new List<RenderStepResult>();
@@ -81,7 +85,7 @@ namespace ShimmerChat.Singletons
             try
             {
                 var (content, changeLog) = _renderModifierManager.RenderWithLog(
-                    agent, processedText, chat, allowCacheWrites);
+                    agent, processedText, chat, allowCacheWrites, position);
 
                 foreach (var change in changeLog)
                 {

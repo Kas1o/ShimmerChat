@@ -123,6 +123,37 @@ public abstract class MessageStoreOrderTestBase : IDisposable
     }
 
     [Fact]
+    public void DeleteMiddleMessage_ThenReload_KeepsContiguousOrder()
+    {
+        var store = CreateStore();
+        var chat = new Chat { Name = "delete-order" };
+        var a = NewMessage("a", -1, BaseTime);
+        var b = NewMessage("b", -1, BaseTime.AddMinutes(1));
+        var c = NewMessage("c", -1, BaseTime.AddMinutes(2));
+        chat.AddMessage(a);
+        chat.AddMessage(b);
+        chat.AddMessage(c);
+        chat.SaveMessage(store, a);
+        chat.SaveMessage(store, b);
+        chat.SaveMessage(store, c);
+
+        chat.DeleteMessage(store, b);
+
+        // 删除中间消息后，后面的消息必须前移为连续顺序号并落库
+        chat.Messages.Select(m => m.Order).Should().Equal(0, 1);
+        chat.ValidateOrder().Should().BeNull();
+        store.GetMessages(chat.Guid, 0, 10).Select(m => m.message.Content).Should().Equal("a", "c");
+        store.GetLastMessagePreview(chat.Guid).Should().Be("c");
+
+        // 重新加载后顺序契约仍然成立（store 里没有留下空洞）
+        var reloaded = new Chat { Name = "delete-order", Guid = chat.Guid };
+        reloaded.LoadAllMessages(store);
+        reloaded.Messages.Select(m => m.message.Content).Should().Equal("a", "c");
+        reloaded.Messages.Select(m => m.Order).Should().Equal(0, 1);
+        reloaded.ValidateOrder().Should().BeNull();
+    }
+
+    [Fact]
     public void GetLastMessagePreview_UsesOrder()
     {
         var store = CreateStore();

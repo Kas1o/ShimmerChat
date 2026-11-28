@@ -621,7 +621,9 @@ if (PanelContext is LiveAgentPanelContext live)
 - 滚动跟随状态由 `ChatViewShell` 的 JS 侧监听维护：只有「跟随 / 不跟随」翻转时才回调 .NET 触发重渲染，
   不要给消息区再加 `@onscroll` 处理器——每个 scroll 事件往返服务端会让整段对话按消息数重渲染一遍。
 - 自行渲染消息正文时应把 `allowCacheWrites: !message.IsStreaming` 传给 `IMessageDisplayService.Render`；
-  是否复用渲染结果由渲染树里的 `RenderSequenceNode.CacheOutput` 决定，组件层不再维护第二套缓存。
+  正文与思维链应分别传 `RenderPosition.Body` / `RenderPosition.Thinking`，渲染树可据此只对特定区域做处理
+  （默认预设只对正文做 Markdown 渲染）；是否复用渲染结果由渲染树里的 `RenderSequenceNode.CacheOutput` 决定，
+  组件层不再维护第二套缓存。
   缓存区域内的节点必须是确定性渲染，读外部状态的节点应放在缓存区域之外。
 - 折叠区域（`<details>`）的展开状态必须由界面自己持有：不要直接把 `open` 绑到 `IsGenerating()` 这类会在回合中途翻转的值。
   工具执行 / 后处理 / 等待回答期间单条消息已经结束生成，但回合仍在进行，折叠区域应保持展开；

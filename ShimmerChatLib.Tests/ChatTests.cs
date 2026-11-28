@@ -164,6 +164,66 @@ public class ChatTests
     }
 
     [Fact]
+    public void DeleteMessage_Middle_RenumbersSuffixAndPersistsOrder()
+    {
+        var chat = new Chat { Name = "Test" };
+        var a = NewMessage();
+        var b = NewMessage(Sender.AI);
+        var c = NewMessage();
+        chat.AddMessage(a);
+        chat.AddMessage(b);
+        chat.AddMessage(c);
+        _msgStoreMock.Setup(m => m.GetMessageCount(chat.Guid)).Returns(2);
+        _msgStoreMock.Setup(m => m.GetLastMessagePreview(chat.Guid)).Returns("c");
+
+        chat.DeleteMessage(_msgStoreMock.Object, b);
+
+        chat.Messages.Should().Equal(a, c);
+        chat.Messages.Select(m => m.Order).Should().Equal(0, 1);
+        chat.ValidateOrder().Should().BeNull();
+        chat.MessageCount.Should().Be(2);
+        chat.LastMessagePreview.Should().Be("c");
+
+        // 只有被前移的消息需要回写；未受影响的 a 不重写
+        _msgStoreMock.Verify(m => m.UpdateMessage(chat.Guid, c), Times.Once);
+        _msgStoreMock.Verify(m => m.UpdateMessage(chat.Guid, a), Times.Never);
+        _msgStoreMock.Verify(m => m.DeleteMessage(chat.Guid, b), Times.Once);
+    }
+
+    [Fact]
+    public void DeleteMessage_Last_DoesNotRewriteOrder()
+    {
+        var chat = new Chat { Name = "Test" };
+        var a = NewMessage();
+        var b = NewMessage(Sender.AI);
+        chat.AddMessage(a);
+        chat.AddMessage(b);
+
+        chat.DeleteMessage(_msgStoreMock.Object, b);
+
+        chat.Messages.Select(m => m.Order).Should().Equal(0);
+        chat.ValidateOrder().Should().BeNull();
+        _msgStoreMock.Verify(m => m.UpdateMessage(It.IsAny<Guid>(), It.IsAny<Message>()), Times.Never);
+    }
+
+    [Fact]
+    public void DeleteMessage_First_RenumbersRemaining()
+    {
+        var chat = new Chat { Name = "Test" };
+        var a = NewMessage();
+        var b = NewMessage(Sender.AI);
+        chat.AddMessage(a);
+        chat.AddMessage(b);
+
+        chat.DeleteMessage(_msgStoreMock.Object, a);
+
+        chat.Messages.Select(m => m.Order).Should().Equal(0);
+        chat.Messages[0].Should().Be(b);
+        chat.ValidateOrder().Should().BeNull();
+        _msgStoreMock.Verify(m => m.UpdateMessage(chat.Guid, b), Times.Once);
+    }
+
+    [Fact]
     public void SaveAllMessages_SavesAll()
     {
         var chat = new Chat { Name = "Test" };
@@ -379,6 +439,28 @@ public class ChatTests
         chat.Messages.Select(m => m.Order).Should().Equal(0, 1);
         chat.ValidateOrder().Should().BeNull();
         // 迁移后必须落库，否则下次加载又会走时间戳回退
+        _msgStoreMock.Verify(m => m.DeleteAllMessages(chat.Guid), Times.Once);
+        _msgStoreMock.Verify(m => m.InsertMessage(chat.Guid, It.IsAny<Message>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public void LoadAllMessages_RepairsGapLeftByLegacyDelete()
+    {
+        var chat = new Chat { Name = "Test" };
+        var messages = new List<Message>
+        {
+            new() { sender = Sender.User, timestamp = DateTime.UtcNow, Id = Guid.NewGuid(), Order = 0 },
+            new() { sender = Sender.AI, timestamp = DateTime.UtcNow, Id = Guid.NewGuid(), Order = 2 }
+        };
+        _msgStoreMock.Setup(m => m.GetMessageCount(chat.Guid)).Returns(2);
+        _msgStoreMock.Setup(m => m.GetMessages(chat.Guid, 0, 2)).Returns(messages);
+        _msgStoreMock.Setup(m => m.GetLastMessagePreview(chat.Guid)).Returns("preview");
+
+        chat.LoadAllMessages(_msgStoreMock.Object);
+
+        // 旧版本删除中间消息留下的空洞（0,2）在加载时补号并回写
+        chat.Messages.Select(m => m.Order).Should().Equal(0, 1);
+        chat.ValidateOrder().Should().BeNull();
         _msgStoreMock.Verify(m => m.DeleteAllMessages(chat.Guid), Times.Once);
         _msgStoreMock.Verify(m => m.InsertMessage(chat.Guid, It.IsAny<Message>()), Times.Exactly(2));
     }

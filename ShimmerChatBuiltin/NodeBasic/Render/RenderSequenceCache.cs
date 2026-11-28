@@ -5,7 +5,7 @@ namespace ShimmerChatBuiltin.NodeBasic.Render;
 /// <summary>
 /// <see cref="RenderSequenceNode"/> 的输出缓存。
 /// <para>
-/// 按「节点 Id + 输入 + 语言 + 树修订号」索引一次完整的子树输出。池子按总字符数
+/// 按「节点 Id + 输入 + 语言 + 树修订号 + 渲染位置」索引一次完整的子树输出。池子按总字符数
 /// 和单条上限做 LRU 淘汰，而不是满就清空——整池清空会让所有热点同时失效，
 /// 反而把压力全部打回 Markdown / 高亮这些昂贵节点。
 /// </para>
@@ -35,7 +35,8 @@ internal static class RenderSequenceCache
 		string NodeId,
 		string Input,
 		string? Culture,
-		RenderTreeRevision Revision);
+		RenderTreeRevision Revision,
+		RenderPosition Position);
 
 	internal sealed record CachedFailure(string Code, string Message, string? NodeId, string? NodeName);
 

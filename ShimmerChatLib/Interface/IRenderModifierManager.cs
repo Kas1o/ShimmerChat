@@ -18,5 +18,14 @@ namespace ShimmerChatLib.Interface
         (string Content, List<RenderChangeRecord> ChangeLog) RenderWithLog(
             Agent? agent, string content, Chat? chat, bool allowCacheWrites)
             => RenderWithLog(agent, content, chat);
+
+        /// <summary>
+        /// 带渲染位置的执行重载。<paramref name="position"/> 会写入
+        /// <see cref="RenderNodeExecutionContext.Position"/>，供节点按显示区域分支。
+        /// 默认实现忽略位置并转发给四参数版本。
+        /// </summary>
+        (string Content, List<RenderChangeRecord> ChangeLog) RenderWithLog(
+            Agent? agent, string content, Chat? chat, bool allowCacheWrites, RenderPosition position)
+            => RenderWithLog(agent, content, chat, allowCacheWrites);
     }
 }

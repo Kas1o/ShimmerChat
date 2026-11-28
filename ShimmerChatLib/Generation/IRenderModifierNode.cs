@@ -43,6 +43,12 @@ namespace ShimmerChatLib.Generation
         /// <summary>当前执行节点（包装器）的显示名，由包装器在执行期间设置。</summary>
         public string? CurrentNodeName { get; internal set; }
 
+        /// <summary>
+        /// 本次渲染的位置。由调用方（消息显示服务 / 对话界面）指定，
+        /// 节点可据此只处理特定区域（例如仅正文做 Markdown 渲染）。
+        /// </summary>
+        public RenderPosition Position { get; init; } = RenderPosition.Body;
+
         public RenderNodeExecutionContext(RenderEnv env) => Env = env;
     }
 

@@ -66,6 +66,8 @@
   "node.codeact.desc": "加入 C# 代码执行工具：脚本可调用本轮全部工具、响应取消，并在开启图像输出时手动把工具图像放入返回容器。节点放在前生成树的任意位置即可，同一轮中稍后添加的工具也能被调用。",
   "node.markdown_render": "Markdown 渲染",
   "node.markdown_render.desc": "把消息文本按 Markdig 渲染为 HTML，可开关管道表格与数学公式（KStyleMath）",
+  "node.render_if": "渲染条件分支",
+  "node.render_if.desc": "按渲染位置决定执行哪个分支。默认树用它把 Markdown 渲染限制在消息正文，思维链等位置保持原样。",
   "node.code_highlight": "代码高亮",
   "node.code_highlight.desc": "给围栏代码块加语法高亮，必须排在 Markdown 渲染节点之后；可指定跳过着色的语言（如 SVG / Mermaid），交给其他节点直接渲染",
   "node.code_block_actions": "代码块工具条",

@@ -55,7 +55,8 @@ namespace ShimmerChat.Singletons
 
         public string Render(Agent? agent, string content, Chat? chat = null)
         {
-            var (result, _) = RenderWithLog(agent, content, chat, allowCacheWrites: true);
+            var (result, _) = RenderWithLog(agent, content, chat, allowCacheWrites: true,
+                RenderPosition.Body);
             return result;
         }
 
@@ -65,6 +66,10 @@ namespace ShimmerChat.Singletons
 
         public (string Content, List<RenderChangeRecord> ChangeLog) RenderWithLog(
             Agent? agent, string content, Chat? chat, bool allowCacheWrites)
+            => RenderWithLog(agent, content, chat, allowCacheWrites, RenderPosition.Body);
+
+        public (string Content, List<RenderChangeRecord> ChangeLog) RenderWithLog(
+            Agent? agent, string content, Chat? chat, bool allowCacheWrites, RenderPosition position)
         {
             if (string.IsNullOrEmpty(content))
                 return (content, new List<RenderChangeRecord>());
@@ -81,7 +86,10 @@ namespace ShimmerChat.Singletons
                 AllowCacheWrites = allowCacheWrites,
                 TreeRevision = revision
             };
-            var context = new RenderNodeExecutionContext(env);
+            var context = new RenderNodeExecutionContext(env)
+            {
+                Position = position
+            };
 
             try
             {
@@ -189,7 +197,14 @@ namespace ShimmerChat.Singletons
                     {
                         Children =
                         [
-                            new RenderModifierNodeWrapper(new MarkdownRenderNode(), "Markdown Render")
+                            // 仅正文做 Markdown 渲染：思维链等位置原样通过，
+                            // 需要时用户可以在树里给其他位置追加自己的节点。
+                            new RenderModifierNodeWrapper(new RenderIfNode
+                            {
+                                Position = RenderPosition.Body,
+                                Then = new RenderModifierNodeWrapper(
+                                    new MarkdownRenderNode(), "Markdown Render")
+                            }, "Only Body")
                         ]
                     }, "Default"))
             });

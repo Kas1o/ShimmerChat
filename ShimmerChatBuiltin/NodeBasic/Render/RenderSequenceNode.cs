@@ -51,7 +51,8 @@ namespace ShimmerChatBuiltin.NodeBasic.Render
                 nodeId,
                 context.Env.GetContent() ?? string.Empty,
                 context.Env.Loc?.CurrentCulture,
-                context.Env.TreeRevision);
+                context.Env.TreeRevision,
+                context.Position);
 
             if (RenderSequenceCache.TryGet(key, out var cached))
             {
